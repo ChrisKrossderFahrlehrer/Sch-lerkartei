@@ -1,0 +1,3141 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0d1117">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Fahrschüler Kartei</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Manrope:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface2: #1c2330;
+  --border: #30363d;
+  --text: #e6edf3;
+  --muted: #7d8590;
+  --accent: #f0b429;
+  --accent2: #3fb950;
+  --danger: #f85149;
+  --blue: #58a6ff;
+  --radius: 14px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+body.light {
+  --bg: #f4f6f9;
+  --surface: #ffffff;
+  --surface2: #edf0f4;
+  --border: #d0d7de;
+  --text: #1a1f27;
+  --muted: #6b7280;
+  --accent: #d4920a;
+  --accent2: #2d8a3e;
+  --danger: #c0392b;
+  --blue: #2563eb;
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body { height:100%; overflow:hidden; }
+body { font-family:'Manrope',sans-serif; background:var(--bg); color:var(--text); display:flex; flex-direction:column; }
+/* Wenn Offline-Banner sichtbar, Screens nach unten schieben */
+#offline-bar[style*="flex"] ~ .screen,
+#offline-bar[style*="flex"] ~ #loading { margin-top: 36px; }
+
+/* SCREENS */
+.screen { display:none; flex-direction:column; height:100%; overflow:hidden; }
+.screen.active { display:flex; }
+
+/* ── LOGIN SCREEN ── */
+#screen-login {
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  background: var(--bg);
+}
+
+.login-box {
+  width:100%;
+  max-width:380px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:20px;
+  padding:32px 28px;
+  animation: fadeUp 0.3s ease;
+}
+
+@keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+
+.login-logo {
+  font-family:'Syne',sans-serif;
+  font-size:1.8rem;
+  font-weight:800;
+  text-align:center;
+  margin-bottom:6px;
+  letter-spacing:-0.02em;
+}
+.login-logo span { color:var(--accent); }
+.login-sub { text-align:center; color:var(--muted); font-size:0.82rem; margin-bottom:28px; }
+
+.tabs { display:flex; background:var(--surface2); border-radius:10px; padding:3px; margin-bottom:22px; }
+.tab-btn {
+  flex:1; padding:9px; border:none; background:none; color:var(--muted);
+  font-family:'Manrope',sans-serif; font-weight:600; font-size:0.85rem;
+  border-radius:8px; cursor:pointer; transition:all 0.2s;
+}
+.tab-btn.active { background:var(--surface); color:var(--text); box-shadow:0 1px 4px rgba(0,0,0,0.3); }
+
+.form-group { margin-bottom:14px; }
+.form-label { display:block; font-size:0.75rem; color:var(--muted); font-weight:600; margin-bottom:6px; letter-spacing:0.04em; }
+.form-input {
+  width:100%; background:var(--surface2); border:1.5px solid var(--border);
+  border-radius:10px; padding:12px 14px; font-family:'Manrope',sans-serif;
+  font-size:0.95rem; color:var(--text); outline:none; transition:border-color 0.2s;
+}
+.form-input:focus { border-color:var(--accent); }
+select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%237d8590' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 14px center; padding-right:36px; cursor:pointer; }
+
+.btn-main {
+  width:100%; background:var(--accent); color:#0d1117; border:none;
+  padding:13px; border-radius:10px; font-family:'Manrope',sans-serif;
+  font-weight:700; font-size:0.95rem; cursor:pointer; margin-top:6px;
+  transition:opacity 0.15s;
+}
+.btn-main:active { opacity:0.8; }
+.btn-main:disabled { opacity:0.5; cursor:not-allowed; }
+
+.error-msg { color:var(--danger); font-size:0.8rem; margin-top:10px; text-align:center; min-height:18px; }
+
+/* ── HEADER ── */
+.header {
+  background:var(--surface); border-bottom:1px solid var(--border);
+  padding:calc(var(--safe-top) + 14px) 18px 14px;
+  display:flex; align-items:center; gap:12px; flex-shrink:0;
+}
+.header-title { font-family:'Syne',sans-serif; font-size:1.1rem; font-weight:700; flex:1; }
+.header-sub { font-size:0.72rem; color:var(--muted); margin-top:1px; }
+.btn-back {
+  background:var(--surface2); border:1px solid var(--border); color:var(--text);
+  width:38px; height:38px; border-radius:10px; display:flex; align-items:center;
+  justify-content:center; font-size:1.1rem; cursor:pointer; flex-shrink:0;
+}
+.btn-icon-sm {
+  background:var(--surface2); border:1px solid var(--border); color:var(--text);
+  width:36px; height:36px; border-radius:10px; font-size:0.9rem; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Manrope',sans-serif; white-space:nowrap; flex-shrink:0;
+  transition: background 0.15s;
+}
+.btn-icon-sm:active { background:var(--accent); color:#0d1117; border-color:var(--accent); }
+
+/* FAB */
+.fab {
+  position:fixed; bottom:calc(var(--safe-bottom) + 24px); right:22px;
+  width:58px; height:58px; border-radius:50%;
+  background:var(--accent); color:#0d1117; border:none;
+  font-size:1.8rem; font-weight:300; cursor:pointer;
+  box-shadow:0 4px 20px rgba(240,180,41,0.45);
+  display:flex; align-items:center; justify-content:center;
+  z-index:100; transition:transform 0.15s, box-shadow 0.15s;
+  line-height:1;
+}
+.fab:active { transform:scale(0.93); box-shadow:0 2px 10px rgba(240,180,41,0.3); }
+
+/* ── LIST SCREEN ── */
+.list-header {
+  background:var(--surface); border-bottom:1px solid var(--border);
+  padding:calc(var(--safe-top) + 14px) 16px 10px; flex-shrink:0;
+}
+.list-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; gap:10px; }
+.app-title { font-family:'Syne',sans-serif; font-size:1.4rem; font-weight:800; letter-spacing:-0.02em; }
+.app-title span { color:var(--accent); }
+.search-wrap { position:relative; margin-bottom:10px; }
+.search-input {
+  width:100%; background:var(--surface2); border:1px solid var(--border);
+  border-radius:12px; padding:10px 14px 10px 38px; font-family:'Manrope',sans-serif;
+  font-size:0.9rem; color:var(--text); outline:none;
+}
+.search-input:focus { border-color:var(--accent); }
+.search-input::placeholder { color:var(--muted); }
+.search-icon { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none; }
+
+.stats-row { display:flex; gap:8px; padding:10px 16px; border-bottom:1px solid var(--border); flex-shrink:0; }
+.stat-chip { background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:8px 10px; font-size:0.78rem; display:flex; flex-direction:column; gap:2px; flex:1; text-align:center; }
+.stat-val { font-family:'Syne',sans-serif; font-size:1.1rem; font-weight:700; color:var(--accent); }
+.stat-lbl { color:var(--muted); font-size:0.65rem; }
+
+.student-scroll { flex:1; overflow-y:auto; padding:8px 16px 100px; }
+
+.student-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:14px;
+  padding:13px 14px; margin-bottom:8px; display:flex; align-items:center;
+  gap:12px; cursor:pointer; transition:border-color 0.15s, transform 0.1s;
+  -webkit-user-select:none;
+}
+.student-card:active { background:var(--surface2); border-color:var(--accent); transform:scale(0.99); }
+
+.avatar { width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:'Syne',sans-serif; font-weight:700; font-size:0.95rem; color:white; flex-shrink:0; }
+.sc-name { font-weight:700; font-size:0.92rem; }
+.sc-meta { font-size:0.72rem; color:var(--muted); margin-top:2px; }
+.sc-right { margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
+
+.progress-ring-wrap { position:relative; width:38px; height:38px; }
+.ring-svg { transform:rotate(-90deg); }
+.ring-bg { fill:none; stroke:var(--border); stroke-width:3; }
+.ring-fill { fill:none; stroke-width:3; stroke-linecap:round; transition:stroke-dashoffset 0.4s ease; }
+.ring-label { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:0.58rem; font-weight:700; }
+
+.badge { font-size:0.62rem; padding:2px 7px; border-radius:20px; font-weight:600; white-space:nowrap; }
+.badge-green { background:rgba(63,185,80,0.15); color:var(--accent2); }
+.badge-amber { background:rgba(240,180,41,0.15); color:var(--accent); }
+.badge-blue  { background:rgba(88,166,255,0.15); color:var(--blue); }
+.badge-gray  { background:var(--surface2); color:var(--muted); }
+
+.empty-state { text-align:center; padding:60px 24px; color:var(--muted); }
+.empty-state .ei { font-size:3rem; margin-bottom:12px; }
+.empty-state p { font-size:0.9rem; line-height:1.6; }
+
+/* ── DETAIL SCREEN ── */
+.detail-scroll { flex:1; overflow-y:auto; padding:16px 18px calc(var(--safe-bottom) + 24px); }
+
+.profile-strip { background:var(--surface2); border-bottom:1px solid var(--border); padding:16px 18px; display:flex; align-items:center; gap:14px; flex-shrink:0; }
+.profile-info { flex:1; }
+.profile-name { font-family:'Syne',sans-serif; font-weight:700; font-size:1.1rem; }
+.profile-meta { font-size:0.75rem; color:var(--muted); margin-top:2px; }
+
+.section-block { background:var(--surface); border:1px solid var(--border); border-radius:16px; margin-bottom:10px; overflow:hidden; }
+.section-header { padding:13px 16px 11px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+.section-title { font-family:'Syne',sans-serif; font-size:0.8rem; font-weight:800; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); }
+.section-body { padding:14px 16px; }
+
+.fahrstunden-display { display:flex; align-items:center; gap:16px; margin-bottom:14px; }
+.stunden-big { font-family:'Syne',sans-serif; font-size:3rem; font-weight:800; color:var(--accent); line-height:1; }
+.stunden-label { font-size:0.82rem; color:var(--muted); }
+.stepper { display:flex; align-items:center; gap:12px; margin-left:auto; }
+.step-btn { background:var(--surface2); border:1px solid var(--border); color:var(--text); width:40px; height:40px; border-radius:10px; font-size:1.3rem; cursor:pointer; display:flex; align-items:center; justify-content:center; font-weight:700; }
+.step-btn:active { background:var(--border); }
+
+.bar-label-row { display:flex; justify-content:space-between; font-size:0.75rem; color:var(--muted); margin-bottom:5px; }
+.bar-bg { background:var(--surface2); border-radius:6px; height:8px; overflow:hidden; }
+.bar-fill { height:100%; border-radius:6px; transition:width 0.4s ease; }
+
+.sonder-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+.sonder-item { background:var(--surface2); border:1.5px solid var(--border); border-radius:10px; padding:12px 8px; text-align:center; cursor:pointer; transition:all 0.2s; -webkit-user-select:none; }
+.sonder-item.done { background:rgba(63,185,80,0.1); border-color:var(--accent2); }
+.sonder-icon { font-size:1.5rem; margin-bottom:5px; }
+.sonder-name { font-size:0.7rem; font-weight:600; color:var(--muted); }
+.sonder-item.done .sonder-name { color:var(--accent2); }
+.sonder-stepper { display:flex; align-items:center; justify-content:center; gap:8px; margin-top:6px; }
+.s-btn { background:var(--surface); border:1px solid var(--border); color:var(--text); width:26px; height:26px; border-radius:6px; font-size:1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; font-weight:700; }
+.s-val { font-family:'Syne',sans-serif; font-weight:700; font-size:0.9rem; min-width:16px; text-align:center; }
+.sonder-count { font-size:0.7rem; color:var(--muted); margin-top:4px; }
+.sonder-item.done .sonder-count { color:var(--accent2); }
+
+.themen-list { display:flex; flex-direction:column; gap:8px; }
+.thema-row { display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:8px; transition:background 0.15s; -webkit-user-select:none; }
+.thema-row:active { background:var(--surface2); }
+.thema-name { flex:1; font-size:0.84rem; font-weight:500; min-width:0; }
+.thema-dots { display:flex; gap:3px; flex-shrink:0; }
+.dot-btn { width:30px; height:30px; border-radius:8px; border:1.5px solid var(--border); background:var(--surface2); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:0.85rem; transition:all 0.15s; color:var(--muted); font-weight:600; }
+.dot-btn.active-1 { background:rgba(220,50,50,0.2);  border-color:#dc3232; }
+.dot-btn.active-2 { background:rgba(230,120,20,0.2); border-color:#e67814; }
+.dot-btn.active-3 { background:rgba(240,180,41,0.2); border-color:#f0b429; }
+.dot-btn.active-4 { background:rgba(63,185,80,0.2);  border-color:#3fb950; }
+.dot-btn.active-5 { background:rgba(100,210,255,0.2);border-color:#64d2ff; }
+
+.notes-textarea { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:12px; font-family:'Manrope',sans-serif; font-size:0.88rem; color:var(--text); resize:none; min-height:100px; outline:none; line-height:1.6; }
+.notes-textarea:focus { border-color:var(--accent); }
+.save-btn { background:var(--accent2); color:white; border:none; padding:11px 20px; border-radius:10px; font-family:'Manrope',sans-serif; font-weight:600; font-size:0.88rem; cursor:pointer; width:100%; margin-top:10px; }
+.save-btn:active { opacity:0.8; }
+.delete-btn { background:rgba(248,81,73,0.1); border:1px solid rgba(248,81,73,0.3); color:var(--danger); padding:11px; border-radius:10px; font-family:'Manrope',sans-serif; font-size:0.85rem; cursor:pointer; width:100%; margin-top:6px; }
+
+/* EIGENE FELDER */
+.custom-field-row {
+  display:flex; align-items:center; gap:12px;
+  padding:10px 12px; border-radius:10px;
+  background:var(--surface2); margin-bottom:8px;
+  cursor:pointer; -webkit-user-select:none;
+  transition: background 0.15s;
+}
+.custom-field-row:active { background:var(--border); }
+
+.custom-checkbox {
+  width:26px; height:26px; border-radius:7px;
+  border:2px solid var(--border); background:var(--surface);
+  display:flex; align-items:center; justify-content:center;
+  font-size:1rem; flex-shrink:0; transition:all 0.15s;
+}
+.custom-checkbox.checked { background:var(--accent2); border-color:var(--accent2); }
+
+.custom-field-name { flex:1; font-size:0.9rem; font-weight:500; }
+
+.btn-delete-field {
+  background:none; border:none; color:var(--muted);
+  font-size:1rem; cursor:pointer; padding:4px; flex-shrink:0;
+}
+
+.btn-add-field {
+  width:100%; background:none; border:1.5px dashed var(--border);
+  color:var(--muted); padding:11px; border-radius:10px;
+  font-family:'Manrope',sans-serif; font-size:0.85rem;
+  cursor:pointer; margin-top:4px; transition:all 0.15s;
+}
+.btn-add-field:active { border-color:var(--accent); color:var(--accent); }
+
+.scope-btn {
+  flex:1; padding:10px 8px; border-radius:10px; border:1.5px solid var(--border);
+  background:var(--surface2); color:var(--muted); font-family:'Manrope',sans-serif;
+  font-size:0.8rem; font-weight:600; cursor:pointer; transition:all 0.15s; text-align:center;
+}
+.scope-btn.active { background:rgba(240,180,41,0.15); border-color:var(--accent); color:var(--accent); }
+
+/* MODAL */
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.7); backdrop-filter:blur(6px); z-index:200; display:none; align-items:flex-end; justify-content:center; }
+.modal-overlay.open { display:flex; }
+.modal-sheet { background:var(--surface); border-radius:20px 20px 0 0; padding:24px 20px calc(var(--safe-bottom) + 28px); width:100%; max-width:480px; animation:slideUp 0.25s ease; }
+@keyframes slideUp { from{transform:translateY(40px);opacity:0} to{transform:translateY(0);opacity:1} }
+.sheet-title { font-family:'Syne',sans-serif; font-size:1.1rem; font-weight:700; margin-bottom:20px; text-align:center; }
+.sheet-actions { display:flex; gap:10px; margin-top:20px; }
+.btn-sheet-cancel { flex:1; background:var(--surface2); border:1px solid var(--border); color:var(--text); padding:13px; border-radius:10px; font-family:'Manrope',sans-serif; font-weight:600; font-size:0.9rem; cursor:pointer; }
+.btn-sheet-ok { flex:2; background:var(--accent); border:none; color:#0d1117; padding:13px; border-radius:10px; font-family:'Manrope',sans-serif; font-weight:700; font-size:0.9rem; cursor:pointer; }
+
+/* TOAST */
+.toast { position:fixed; bottom:calc(var(--safe-bottom) + 24px); left:50%; transform:translateX(-50%); background:#222; color:var(--text); border:1px solid var(--border); border-radius:10px; padding:10px 20px; font-size:0.85rem; z-index:999; white-space:nowrap; animation:toastAnim 0.25s ease; pointer-events:none; }
+@keyframes toastAnim { from{opacity:0;transform:translate(-50%,10px)} to{opacity:1;transform:translate(-50%,0)} }
+
+/* LOADING */
+.loading-screen { position:fixed; inset:0; background:var(--bg); display:flex; align-items:center; justify-content:center; flex-direction:column; gap:16px; z-index:500; }
+.spinner { width:40px; height:40px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
+@keyframes spin { to{transform:rotate(360deg)} }
+.loading-screen p { color:var(--muted); font-size:0.85rem; }
+
+/* MANGEL CHIPS & STERNE */
+.mangel-chip {
+  background:var(--surface2); border:1px solid var(--border);
+  color:var(--text); border-radius:20px; padding:5px 11px;
+  font-size:0.78rem; cursor:pointer; font-family:'Manrope',sans-serif;
+  font-weight:500; transition:all 0.15s; white-space:nowrap;
+}
+.mangel-chip.selected {
+  background:rgba(248,81,73,0.15); border-color:var(--danger);
+  color:var(--danger); font-weight:700;
+}
+.stern-btn { opacity:0.3; transition:opacity 0.15s, transform 0.1s; }
+.stern-btn.active { opacity:1 !important; transform:scale(1.15); }
+
+/* ABC REGISTER */
+.abc-bar {
+  display:flex; gap:4px; padding:4px 16px 8px;
+  overflow-x:auto; scrollbar-width:none; flex-wrap:wrap;
+}
+.abc-bar-btn {
+  flex-shrink:0; min-width:28px; height:28px;
+  background:var(--surface2); border:1px solid var(--border);
+  color:var(--text); border-radius:7px; font-family:'Syne',sans-serif;
+  font-size:0.78rem; font-weight:700; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:all 0.15s;
+}
+.abc-bar-btn:active { background:var(--accent); color:#0d1117; border-color:var(--accent); }
+.abc-group { margin-bottom:4px; }
+.abc-header {
+  font-family:'Syne',sans-serif; font-size:0.72rem; font-weight:800;
+  color:var(--muted); text-transform:uppercase; letter-spacing:0.1em;
+  padding:10px 18px 4px; position:sticky; top:0;
+  background:var(--bg); z-index:1;
+}
+
+/* FILTER CHIPS */
+.filter-row {
+  display:flex; gap:6px; overflow-x:auto; padding:0 0 2px;
+  scrollbar-width:none; -webkit-overflow-scrolling:touch;
+}
+.filter-chip {
+  flex-shrink:0; border:1px solid var(--border); background:var(--surface2);
+  color:var(--muted); border-radius:20px; padding:5px 12px;
+  font-family:'Manrope',sans-serif; font-size:0.74rem; font-weight:600;
+  cursor:pointer; white-space:nowrap; transition:all 0.15s;
+}
+.filter-chip.active {
+  background:var(--accent); border-color:var(--accent);
+  color:#0d1117;
+}
+
+/* DASHBOARD */
+.dash-kpi-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px; }
+.dash-kpi {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); padding:16px;
+  display:flex; flex-direction:column; gap:6px;
+}
+.dash-kpi-val { font-family:'Syne',sans-serif; font-size:2rem; font-weight:800; line-height:1; }
+.dash-kpi-lbl { font-size:0.72rem; color:var(--muted); font-weight:600; }
+.dash-student-row {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:12px; padding:14px 16px;
+  margin-bottom:8px; display:flex; align-items:center; gap:12px;
+}
+.dash-bar-wrap { flex:1; }
+.dash-name { font-weight:600; font-size:0.88rem; margin-bottom:5px; display:flex; justify-content:space-between; }
+.dash-bar-bg { background:var(--surface2); border-radius:4px; height:6px; overflow:hidden; }
+.dash-bar-fill { height:100%; border-radius:4px; transition:width 0.4s; }
+.dash-pct { font-size:0.72rem; color:var(--muted); }
+
+/* SCHÜLER ANSICHT */
+#screen-schueler { display:none; flex-direction:column; }
+#screen-schueler.active { display:flex; }
+
+::-webkit-scrollbar { display:none; }
+</style>
+</head>
+<body>
+
+<!-- OFFLINE-BANNER -->
+<div id="offline-bar" style="display:none;position:fixed;top:0;left:0;right:0;z-index:8000;background:#f0b429;color:#0d1117;padding:8px 16px;font-size:0.78rem;font-weight:700;align-items:center;justify-content:center;gap:8px;font-family:'Manrope',sans-serif">
+  📵 Kein Internet – Änderungen werden gespeichert und später synchronisiert
+</div>
+
+<!-- LOADING -->
+<div class="loading-screen" id="loading">
+  <div class="spinner"></div>
+  <p>Wird geladen…</p>
+</div>
+
+<!-- ══ LOGIN ══ -->
+<div class="screen" id="screen-login">
+  <div class="login-box">
+    <div style="display:flex;justify-content:center;margin-bottom:6px">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 200" style="height:80px;width:auto" font-family="'Georgia', serif">
+        <defs>
+          <linearGradient id="bgGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#0a1628;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#112240;stop-opacity:1" />
+          </linearGradient>
+          <linearGradient id="cardGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#1e3a5f;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#0d2137;stop-opacity:1" />
+          </linearGradient>
+          <linearGradient id="goldGrad2" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:#c8972a" />
+            <stop offset="50%" style="stop-color:#f0c040" />
+            <stop offset="100%" style="stop-color:#c8972a" />
+          </linearGradient>
+          <radialGradient id="wheelGrad2" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" style="stop-color:#2a5298" />
+            <stop offset="100%" style="stop-color:#1a3a6e" />
+          </radialGradient>
+          <filter id="shadow2" x="-10%" y="-10%" width="120%" height="120%">
+            <feDropShadow dx="2" dy="3" stdDeviation="4" flood-color="#000" flood-opacity="0.5"/>
+          </filter>
+          <filter id="glow2">
+            <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+            <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <rect x="5" y="5" width="470" height="190" rx="18" ry="18" fill="url(#bgGrad2)" filter="url(#shadow2)"/>
+        <rect x="5" y="5" width="470" height="190" rx="18" ry="18" fill="none" stroke="url(#goldGrad2)" stroke-width="1.5" opacity="0.8"/>
+        <rect x="28" y="38" width="110" height="124" rx="7" ry="7" fill="url(#cardGrad2)" stroke="#2a5298" stroke-width="1.5"/>
+        <rect x="28" y="38" width="110" height="22" rx="7" ry="7" fill="#1e4d8c"/>
+        <rect x="28" y="52" width="110" height="8" fill="#1e4d8c"/>
+        <rect x="36" y="44" width="55" height="4" rx="2" fill="#f0c040" opacity="0.9"/>
+        <rect x="36" y="51" width="40" height="3" rx="1.5" fill="#fff" opacity="0.5"/>
+        <line x1="50" y1="70" x2="50" y2="152" stroke="#2a5298" stroke-width="0.7" opacity="0.6"/>
+        <line x1="68" y1="70" x2="68" y2="152" stroke="#2a5298" stroke-width="0.7" opacity="0.6"/>
+        <line x1="86" y1="70" x2="86" y2="152" stroke="#2a5298" stroke-width="0.7" opacity="0.6"/>
+        <line x1="104" y1="70" x2="104" y2="152" stroke="#2a5298" stroke-width="0.7" opacity="0.6"/>
+        <line x1="36" y1="80" x2="130" y2="80" stroke="#2a5298" stroke-width="0.7" opacity="0.6"/>
+        <line x1="36" y1="92" x2="130" y2="92" stroke="#2a5298" stroke-width="0.7" opacity="0.6"/>
+        <line x1="36" y1="104" x2="130" y2="104" stroke="#2a5298" stroke-width="0.7" opacity="0.6"/>
+        <line x1="36" y1="116" x2="130" y2="116" stroke="#2a5298" stroke-width="0.7" opacity="0.6"/>
+        <line x1="36" y1="128" x2="130" y2="128" stroke="#2a5298" stroke-width="0.7" opacity="0.6"/>
+        <line x1="36" y1="140" x2="130" y2="140" stroke="#2a5298" stroke-width="0.7" opacity="0.6"/>
+        <text x="52" y="90" font-size="9" fill="#f0c040" text-anchor="middle" filter="url(#glow2)">✓</text>
+        <text x="70" y="90" font-size="9" fill="#f0c040" text-anchor="middle" filter="url(#glow2)">✓</text>
+        <text x="88" y="90" font-size="9" fill="#f0c040" text-anchor="middle" filter="url(#glow2)">✓</text>
+        <text x="52" y="102" font-size="9" fill="#f0c040" text-anchor="middle">✓</text>
+        <text x="70" y="102" font-size="9" fill="#4a9eff" text-anchor="middle">○</text>
+        <text x="88" y="114" font-size="9" fill="#4a9eff" text-anchor="middle">○</text>
+        <text x="52" y="114" font-size="9" fill="#f0c040" text-anchor="middle">✓</text>
+        <text x="106" y="90" font-size="9" fill="#f0c040" text-anchor="middle">✓</text>
+        <text x="106" y="102" font-size="9" fill="#4a9eff" text-anchor="middle">○</text>
+        <text x="70" y="128" font-size="9" fill="#f0c040" text-anchor="middle">✓</text>
+        <rect x="36" y="147" width="86" height="5" rx="2.5" fill="#0a1628"/>
+        <rect x="36" y="147" width="58" height="5" rx="2.5" fill="url(#goldGrad2)"/>
+        <circle cx="108" cy="135" r="30" fill="none" stroke="url(#goldGrad2)" stroke-width="5" filter="url(#shadow2)"/>
+        <circle cx="108" cy="135" r="26" fill="url(#wheelGrad2)" opacity="0.95"/>
+        <line x1="108" y1="109" x2="108" y2="135" stroke="url(#goldGrad2)" stroke-width="3.5" stroke-linecap="round"/>
+        <line x1="108" y1="135" x2="83" y2="149" stroke="url(#goldGrad2)" stroke-width="3.5" stroke-linecap="round"/>
+        <line x1="108" y1="135" x2="133" y2="149" stroke="url(#goldGrad2)" stroke-width="3.5" stroke-linecap="round"/>
+        <circle cx="108" cy="135" r="6" fill="url(#goldGrad2)"/>
+        <circle cx="108" cy="135" r="3" fill="#0a1628"/>
+        <text x="165" y="90" font-family="'Palatino Linotype','Book Antiqua',Palatino,Georgia,serif" font-size="38" font-weight="bold" fill="url(#goldGrad2)" letter-spacing="1" filter="url(#glow2)">Schüler</text>
+        <text x="165" y="128" font-family="'Palatino Linotype','Book Antiqua',Palatino,Georgia,serif" font-size="38" font-weight="bold" fill="#ffffff" letter-spacing="3">kartei</text>
+        <line x1="165" y1="138" x2="455" y2="138" stroke="url(#goldGrad2)" stroke-width="1.2" opacity="0.7"/>
+        <text x="165" y="158" font-family="'Trebuchet MS','Lucida Sans Unicode',sans-serif" font-size="11.5" fill="#8ab4d4" letter-spacing="3.5">FAHRSCHUL-VERWALTUNG</text>
+        <text x="165" y="175" font-family="Georgia,serif" font-size="9.5" fill="#4a7a9b" letter-spacing="1.5" font-style="italic">Ausbildungsdiagrammkarte · Digital</text>
+        <circle cx="395" cy="175" r="2" fill="#f0c040" opacity="0.5"/>
+        <circle cx="404" cy="175" r="2" fill="#f0c040" opacity="0.5"/>
+        <circle cx="413" cy="175" r="2" fill="#f0c040" opacity="0.5"/>
+      </svg>
+    </div>
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-login" onclick="switchTab('login')">Anmelden</button>
+      <button class="tab-btn" id="tab-register" onclick="switchTab('register')">Registrieren</button>
+      <button class="tab-btn" id="tab-schueler" onclick="switchTab('schueler')">📋 Meine Akte</button>
+    </div>
+    <div id="login-form">
+      <div class="form-group">
+        <label class="form-label">Benutzername</label>
+        <input class="form-input" id="login-username" type="text" placeholder="z. B. max.mustermann" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false">
+        <div style="font-size:0.7rem;color:var(--muted);margin-top:4px">⚠️ Genau so schreiben wie beim Registrieren</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Passwort</label>
+        <input class="form-input" id="login-pw" type="password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button class="btn-main" id="btn-login" onclick="doLogin()">Anmelden</button>
+    </div>
+    <div id="register-form" style="display:none">
+      <div class="form-group">
+        <label class="form-label">Vollständiger Name</label>
+        <input class="form-input" id="reg-name" type="text" placeholder="z. B. Max Mustermann">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Benutzername</label>
+        <input class="form-input" id="reg-username" type="text" placeholder="z. B. max.mustermann" autocapitalize="none">
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:5px">Nur Buchstaben, Zahlen und Punkte. Wird zum Anmelden verwendet.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Passwort (min. 6 Zeichen)</label>
+        <input class="form-input" id="reg-pw" type="password" placeholder="••••••••" autocomplete="new-password">
+      </div>
+      <button class="btn-main" id="btn-register" onclick="doRegister()">Konto erstellen</button>
+    </div>
+    <div id="schueler-form" style="display:none">
+      <div style="text-align:center;margin-bottom:20px">
+        <div style="font-size:2.5rem;margin-bottom:8px">🎓</div>
+        <div style="font-size:0.85rem;color:var(--muted);line-height:1.5">Gib den 6-stelligen Code ein,<br>den dein Fahrlehrer dir gegeben hat.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Zugangscode</label>
+        <input class="form-input" id="inp-schueler-code" type="text" placeholder="z. B. AB1234" autocapitalize="characters" autocorrect="off" maxlength="6" style="font-size:1.4rem;letter-spacing:0.2em;text-align:center;font-family:'Syne',sans-serif;font-weight:800">
+      </div>
+      <div id="schueler-code-error" style="color:var(--danger);font-size:0.8rem;text-align:center;min-height:18px;margin-bottom:8px"></div>
+      <button class="btn-main" id="btn-schueler-code" onclick="doSchuelerLogin()">Akte öffnen →</button>
+    </div>
+    <div class="error-msg" id="auth-error"></div>
+  </div>
+</div>
+
+<!-- ══ LIST ══ -->
+<div class="screen" id="screen-list">
+  <div class="list-header">
+    <div class="list-top">
+      <div style="flex:1;min-width:0">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 200" style="height:44px;width:auto;display:block" font-family="'Georgia', serif">
+          <defs>
+            <linearGradient id="bgGrad3" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" style="stop-color:#0a1628;stop-opacity:1" />
+              <stop offset="100%" style="stop-color:#112240;stop-opacity:1" />
+            </linearGradient>
+            <linearGradient id="cardGrad3" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" style="stop-color:#1e3a5f;stop-opacity:1" />
+              <stop offset="100%" style="stop-color:#0d2137;stop-opacity:1" />
+            </linearGradient>
+            <linearGradient id="goldGrad3" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" style="stop-color:#c8972a" />
+              <stop offset="50%" style="stop-color:#f0c040" />
+              <stop offset="100%" style="stop-color:#c8972a" />
+            </linearGradient>
+            <radialGradient id="wheelGrad3" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" style="stop-color:#2a5298" />
+              <stop offset="100%" style="stop-color:#1a3a6e" />
+            </radialGradient>
+            <filter id="shadow3" x="-10%" y="-10%" width="120%" height="120%">
+              <feDropShadow dx="2" dy="3" stdDeviation="4" flood-color="#000" flood-opacity="0.5"/>
+            </filter>
+            <filter id="glow3">
+              <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+              <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <rect x="5" y="5" width="470" height="190" rx="18" ry="18" fill="url(#bgGrad3)" filter="url(#shadow3)"/>
+          <rect x="5" y="5" width="470" height="190" rx="18" ry="18" fill="none" stroke="url(#goldGrad3)" stroke-width="1.5" opacity="0.8"/>
+          <rect x="28" y="38" width="110" height="124" rx="7" ry="7" fill="url(#cardGrad3)" stroke="#2a5298" stroke-width="1.5"/>
+          <rect x="28" y="38" width="110" height="22" rx="7" ry="7" fill="#1e4d8c"/>
+          <rect x="28" y="52" width="110" height="8" fill="#1e4d8c"/>
+          <rect x="36" y="44" width="55" height="4" rx="2" fill="#f0c040" opacity="0.9"/>
+          <rect x="36" y="51" width="40" height="3" rx="1.5" fill="#fff" opacity="0.5"/>
+          <line x1="50" y1="70" x2="50" y2="152" stroke="#2a5298" stroke-width="0.7" opacity="0.6"/>
+          <line x1="68" y1="70" x2="68" y2="152" stroke="#2a5298" stroke-width="0.7" opacity="0.6"/>
+          <line x1="86" y1="70" x2="86" y2="152" stroke="#2a5298" stroke-width="0.7" opacity="0.6"/>
+          <line x1="104" y1="70" x2="104" y2="152" stroke="#2a5298" stroke-width="0.7" opacity="0.6"/>
+          <line x1="122" y1="70" x2="122" y2="152" stroke="#2a5298" stroke-width="0.7" opacity="0.6"/>
+          <line x1="36" y1="80" x2="130" y2="80" stroke="#2a5298" stroke-width="0.7" opacity="0.6"/>
+          <line x1="36" y1="92" x2="130" y2="92" stroke="#2a5298" stroke-width="0.7" opacity="0.6"/>
+          <line x1="36" y1="104" x2="130" y2="104" stroke="#2a5298" stroke-width="0.7" opacity="0.6"/>
+          <line x1="36" y1="116" x2="130" y2="116" stroke="#2a5298" stroke-width="0.7" opacity="0.6"/>
+          <line x1="36" y1="128" x2="130" y2="128" stroke="#2a5298" stroke-width="0.7" opacity="0.6"/>
+          <line x1="36" y1="140" x2="130" y2="140" stroke="#2a5298" stroke-width="0.7" opacity="0.6"/>
+          <text x="52" y="90" font-size="9" fill="#f0c040" text-anchor="middle" filter="url(#glow3)">✓</text>
+          <text x="70" y="90" font-size="9" fill="#f0c040" text-anchor="middle" filter="url(#glow3)">✓</text>
+          <text x="88" y="90" font-size="9" fill="#f0c040" text-anchor="middle" filter="url(#glow3)">✓</text>
+          <text x="52" y="102" font-size="9" fill="#f0c040" text-anchor="middle">✓</text>
+          <text x="70" y="102" font-size="9" fill="#4a9eff" text-anchor="middle">○</text>
+          <text x="88" y="114" font-size="9" fill="#4a9eff" text-anchor="middle">○</text>
+          <text x="52" y="114" font-size="9" fill="#f0c040" text-anchor="middle">✓</text>
+          <text x="106" y="90" font-size="9" fill="#f0c040" text-anchor="middle" filter="url(#glow3)">✓</text>
+          <text x="106" y="102" font-size="9" fill="#4a9eff" text-anchor="middle">○</text>
+          <text x="70" y="128" font-size="9" fill="#f0c040" text-anchor="middle">✓</text>
+          <rect x="36" y="147" width="86" height="5" rx="2.5" fill="#0a1628"/>
+          <rect x="36" y="147" width="58" height="5" rx="2.5" fill="url(#goldGrad3)"/>
+          <circle cx="108" cy="135" r="30" fill="none" stroke="url(#goldGrad3)" stroke-width="5" filter="url(#shadow3)"/>
+          <circle cx="108" cy="135" r="26" fill="url(#wheelGrad3)" opacity="0.95"/>
+          <line x1="108" y1="109" x2="108" y2="135" stroke="url(#goldGrad3)" stroke-width="3.5" stroke-linecap="round"/>
+          <line x1="108" y1="135" x2="83" y2="149" stroke="url(#goldGrad3)" stroke-width="3.5" stroke-linecap="round"/>
+          <line x1="108" y1="135" x2="133" y2="149" stroke="url(#goldGrad3)" stroke-width="3.5" stroke-linecap="round"/>
+          <circle cx="108" cy="135" r="6" fill="url(#goldGrad3)"/>
+          <circle cx="108" cy="135" r="3" fill="#0a1628"/>
+          <text x="165" y="90" font-family="'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif" font-size="38" font-weight="bold" fill="url(#goldGrad3)" letter-spacing="1" filter="url(#glow3)">Schüler</text>
+          <text x="165" y="128" font-family="'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif" font-size="38" font-weight="bold" fill="#ffffff" letter-spacing="3">kartei</text>
+          <line x1="165" y1="138" x2="455" y2="138" stroke="url(#goldGrad3)" stroke-width="1.2" opacity="0.7"/>
+          <text x="165" y="158" font-family="'Trebuchet MS', 'Lucida Sans Unicode', sans-serif" font-size="11.5" fill="#8ab4d4" letter-spacing="3.5" font-weight="400">FAHRSCHUL-VERWALTUNG</text>
+          <text x="165" y="175" font-family="Georgia, serif" font-size="9.5" fill="#4a7a9b" letter-spacing="1.5" font-style="italic">Ausbildungsdiagrammkarte · Digital</text>
+          <circle cx="395" cy="175" r="2" fill="#f0c040" opacity="0.5"/>
+          <circle cx="404" cy="175" r="2" fill="#f0c040" opacity="0.5"/>
+          <circle cx="413" cy="175" r="2" fill="#f0c040" opacity="0.5"/>
+        </svg>
+        <div id="user-greeting" style="font-size:0.72rem;color:var(--muted);margin-top:2px"></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn-icon-sm" onclick="toggleTheme()" id="theme-btn" title="Design wechseln">☀️</button>
+        <button class="btn-icon-sm" onclick="openDashboard()" title="Übersicht" id="btn-dashboard">📊</button>
+        <button class="btn-icon-sm" onclick="openSettings()" title="Einstellungen" id="btn-settings-header">⚙️</button>
+        <button class="btn-icon-sm" onclick="doLogout()" id="user-btn" title="Abmelden">⏻</button>
+      </div>
+    </div>
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input class="search-input" id="search" placeholder="Schüler suchen…" oninput="renderList()">
+      <button id="search-clear" onclick="clearSearch()" style="display:none;background:none;border:none;color:var(--muted);font-size:1rem;cursor:pointer;padding:0 8px;position:absolute;right:4px;top:50%;transform:translateY(-50%)">✕</button>
+    </div>
+    <div class="filter-row" id="filter-row">
+      <button class="filter-chip active" data-filter="alle"    onclick="setFilter('alle')">Alle</button>
+      <button class="filter-chip"        data-filter="klasseB" onclick="setFilter('klasseB')">🚗 Klasse B</button>
+      <button class="filter-chip"        data-filter="klasseA" onclick="setFilter('klasseA')">🏍️ Klasse A</button>
+      <button class="filter-chip"        data-filter="reif"    onclick="setFilter('reif')">🏆 Prüfungsreif</button>
+      <button class="filter-chip"        data-filter="theorie" onclick="setFilter('theorie')">📋 Theorie offen</button>
+      <button class="filter-chip"        data-filter="sonder"  onclick="setFilter('sonder')">⚠️ Pflichtf. offen</button>
+      <button class="filter-chip"        data-filter="sortDesc" onclick="setFilter('sortDesc')">📉 Fortschritt ↓</button>
+      <button class="filter-chip"        data-filter="sortAsc" onclick="setFilter('sortAsc')">📈 Fortschritt ↑</button>
+      <button class="filter-chip"        data-filter="archiv"  onclick="setFilter('archiv')">🎓 Archiv</button>
+    </div>
+  </div>
+  <div class="stats-row" id="stats-row"></div>
+  <div id="abc-bar" class="abc-bar" style="display:none"></div>
+  <div class="student-scroll" id="student-list">
+    <div class="empty-state"><div class="ei">🚗</div><p>Noch keine Schüler angelegt.</p></div>
+  </div>
+  <!-- FAB -->
+  <button class="fab" id="fab-add" onclick="openAddModal()" title="Neuen Schüler anlegen">+</button>
+</div>
+
+<!-- ══ DASHBOARD ══ -->
+<div class="screen" id="screen-dashboard">
+  <div class="header">
+    <button class="btn-back" onclick="closeDashboard()">←</button>
+    <div><div class="header-title">Gesamtübersicht</div><div class="header-sub">Alle Schüler auf einen Blick</div></div>
+    <div style="width:38px"></div>
+  </div>
+  <div class="detail-scroll" id="dashboard-body"></div>
+</div>
+
+<!-- ══ DETAIL ══ -->
+<div class="screen" id="screen-detail">
+  <div class="header">
+    <button class="btn-back" onclick="goBack()">←</button>
+    <div><div class="header-title" id="detail-header-name">—</div><div class="header-sub" id="detail-header-sub">Schüler-Kartei</div></div>
+    <div style="display:flex;gap:6px">
+      <button class="btn-icon-sm" onclick="openCodeModal()" title="Zugangscode für Schüler">🔑</button>
+      <button class="btn-icon-sm" onclick="openTransferModal()" title="Schüler übertragen">🔄</button>
+    </div>
+  </div>
+  <div id="pruefung-banner" style="display:none;background:rgba(63,185,80,0.12);border-bottom:1px solid rgba(63,185,80,0.3);padding:10px 18px;display:none;align-items:center;justify-content:space-between;gap:10px">
+    <span style="font-size:0.82rem;color:var(--accent2);font-weight:600">🎓 Prüfung bestanden – Archiviert</span>
+    <button onclick="unarchiveStudent()" style="font-size:0.75rem;background:none;border:1px solid var(--accent2);color:var(--accent2);border-radius:8px;padding:4px 10px;cursor:pointer">Rückgängig</button>
+  </div>
+  <div class="profile-strip" id="profile-strip"></div>
+  <div class="detail-scroll" id="detail-body"></div>
+</div>
+
+<!-- ADD MODAL -->
+<div class="modal-overlay" id="add-modal" onclick="closeModal(event)">
+  <div class="modal-sheet">
+    <div class="sheet-title">Neuen Schüler anlegen</div>
+    <div class="form-group"><label class="form-label">Vorname</label><input class="form-input" id="inp-vn" placeholder="z. B. Lena" autocomplete="off"></div>
+    <div class="form-group"><label class="form-label">Nachname</label><input class="form-input" id="inp-nn" placeholder="z. B. Müller" autocomplete="off"></div>
+    <div class="form-group"><label class="form-label">Geburtsdatum (optional)</label><input class="form-input" id="inp-geb" type="date"></div>
+    <div class="form-group">
+      <label class="form-label">Führerscheinklasse</label>
+      <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap">
+        <button class="scope-btn active" id="klasse-b-btn" onclick="setKlasse('B')">🚗 Klasse B</button>
+        <button class="scope-btn" id="klasse-b197-btn" onclick="setKlasse('B197')">⚙️ B197</button>
+        <button class="scope-btn" id="klasse-a-btn" onclick="setKlasse('A')">🏍️ Klasse A</button>
+      </div>
+      <div id="b197-hint" style="display:none;font-size:0.7rem;color:var(--muted);margin-top:6px;line-height:1.4">⚙️ Automatik-Prüfung + min. 10 Schaltstunden + 15-min. Testfahrt erforderlich</div>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn-sheet-cancel" onclick="document.getElementById('add-modal').classList.remove('open')">Abbrechen</button>
+      <button class="btn-sheet-ok" onclick="addStudent()">Anlegen ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- TRANSFER MODAL -->
+<div class="modal-overlay" id="transfer-modal" onclick="closeModal(event)">
+  <div class="modal-sheet">
+    <div class="sheet-title">🔄 Schüler übertragen</div>
+    <p style="font-size:0.85rem;color:var(--muted);text-align:center;margin-bottom:16px">Gib den Benutzernamen des Fahrlehrers ein, dem du diesen Schüler übertragen möchtest.</p>
+    <div class="form-group">
+      <label class="form-label">Benutzername des Fahrlehrers</label>
+      <input class="form-input" id="inp-transfer-username" type="text" placeholder="z. B. anna.schmidt" autocapitalize="none" autocomplete="off">
+    </div>
+    <div id="transfer-error" style="color:var(--danger);font-size:0.8rem;margin-top:6px;min-height:18px;text-align:center"></div>
+    <div class="sheet-actions">
+      <button class="btn-sheet-cancel" onclick="document.getElementById('transfer-modal').classList.remove('open')">Abbrechen</button>
+      <button class="btn-sheet-ok" onclick="transferStudent()">Übertragen ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- CUSTOM FIELD MODAL -->
+<div class="modal-overlay" id="custom-field-modal" onclick="closeModal(event)">
+  <div class="modal-sheet">
+    <div class="sheet-title">Eigenes Feld hinzufügen</div>
+    <div class="form-group">
+      <label class="form-label">Feldname</label>
+      <input class="form-input" id="inp-field-name" placeholder="z. B. Erste Hilfe Kurs" autocomplete="off">
+    </div>
+    <div class="sheet-actions">
+      <button class="btn-sheet-cancel" onclick="document.getElementById('custom-field-modal').classList.remove('open')">Abbrechen</button>
+      <button class="btn-sheet-ok" onclick="addCustomField()">Hinzufügen ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- CUSTOM THEMA MODAL -->
+<div class="modal-overlay" id="custom-thema-modal" onclick="closeModal(event)">
+  <div class="modal-sheet">
+    <div class="sheet-title">Eigenes Thema hinzufügen</div>
+    <div class="form-group">
+      <label class="form-label">Themenname</label>
+      <input class="form-input" id="inp-thema-name" placeholder="z. B. Autobahnfahrt Technik" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Kategorie (optional)</label>
+      <select class="form-input" id="inp-thema-kategorie">
+        <option value="">➕ Eigene Kategorie (unten)</option>
+        <option value="🚗 Grundstufe – Fahrzeugbedienung">🚗 Grundstufe – Fahrzeugbedienung</option>
+        <option value="🏙️ Grundstufe – Fahren im Verkehr">🏙️ Grundstufe – Fahren im Verkehr</option>
+        <option value="📚 Aufbaustufe – Leistungsstufe">📚 Aufbaustufe – Leistungsstufe</option>
+        <option value="🛣️ Sonderfahrten – Vorbereitung">🛣️ Sonderfahrten – Vorbereitung</option>
+        <option value="✅ Grundfahraufgaben (Prüfungsrelevant)">✅ Grundfahraufgaben (Prüfungsrelevant)</option>
+        <option value="📋 Theorie & Abschluss">📋 Theorie & Abschluss</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Für wen gilt dieses Thema?</label>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button class="scope-btn active" id="scope-all" onclick="setThemaScope('all')">🌍 Alle Schüler</button>
+        <button class="scope-btn" id="scope-one" onclick="setThemaScope('one')">👤 Nur dieser Schüler</button>
+      </div>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn-sheet-cancel" onclick="document.getElementById('custom-thema-modal').classList.remove('open')">Abbrechen</button>
+      <button class="btn-sheet-ok" onclick="addCustomThema()">Hinzufügen ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- PROTOKOLL MODAL -->
+<div class="modal-overlay" id="protokoll-modal" onclick="closeModal(event)">
+  <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
+    <div class="sheet-title">🗓️ Fahrstunde eintragen</div>
+
+    <div class="form-group">
+      <label class="form-label">Datum</label>
+      <input class="form-input" id="inp-proto-datum" type="date">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Bewertung der Stunde</label>
+      <div id="stern-row" style="display:flex;gap:8px;margin-top:6px">
+        <button class="stern-btn" id="stern-1" onclick="setStern(1)" style="font-size:1.6rem;background:none;border:none;cursor:pointer;padding:0">⭐</button>
+        <button class="stern-btn" id="stern-2" onclick="setStern(2)" style="font-size:1.6rem;background:none;border:none;cursor:pointer;padding:0">⭐</button>
+        <button class="stern-btn" id="stern-3" onclick="setStern(3)" style="font-size:1.6rem;background:none;border:none;cursor:pointer;padding:0">⭐</button>
+        <button class="stern-btn" id="stern-4" onclick="setStern(4)" style="font-size:1.6rem;background:none;border:none;cursor:pointer;padding:0">⭐</button>
+        <button class="stern-btn" id="stern-5" onclick="setStern(5)" style="font-size:1.6rem;background:none;border:none;cursor:pointer;padding:0">⭐</button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Mängel (antippbar)</label>
+      <div id="maengel-grid" style="display:flex;flex-wrap:wrap;gap:7px;margin-top:6px">
+        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🅿️ Einparken">🅿️ Einparken</button>
+        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="↩️ Umkehren">↩️ Umkehren</button>
+        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🔄 Rückwärtsfahren">🔄 Rückwärtsfahren</button>
+        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="⚡ Anfahren/Anhalten">⚡ Anfahren/Anhalten</button>
+        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🔀 Spurwechsel">🔀 Spurwechsel</button>
+        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="↗️ Abbiegen">↗️ Abbiegen</button>
+        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🛑 Vorfahrt">🛑 Vorfahrt</button>
+        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="📏 Abstand halten">📏 Abstand halten</button>
+        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🏎️ Geschwindigkeit">🏎️ Geschwindigkeit</button>
+        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🌙 Nachtfahrt">🌙 Nachtfahrt</button>
+        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🛣️ Autobahn">🛣️ Autobahn</button>
+        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🌄 Überland">🌄 Überland</button>
+        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🔁 Kreisverkehr">🔁 Kreisverkehr</button>
+        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🚦 Ampelverhalten">🚦 Ampelverhalten</button>
+        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="👁️ Schulterblick">👁️ Schulterblick</button>
+        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🅱️ Bremstechnik">🅱️ Bremstechnik</button>
+        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="⚙️ Schalten">⚙️ Schalten</button>
+        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🎯 Lenken &amp; Spurhalten">🎯 Lenken &amp; Spurhalten</button>
+        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🚶 Fußgänger beachten">🚶 Fußgänger beachten</button>
+        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🔦 Licht &amp; Signale">🔦 Licht &amp; Signale</button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Notiz zur Stunde (optional)</label>
+      <textarea class="notes-textarea" id="inp-proto-notiz" placeholder="Was lief gut? Was muss nächste Stunde geübt werden?…" style="height:80px"></textarea>
+    </div>
+
+    <div class="form-group">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <label class="form-label" style="margin:0">✍️ Unterschrift Schüler (optional)</label>
+        <button onclick="clearSignature()" style="background:none;border:1px solid var(--border);color:var(--muted);font-size:0.72rem;padding:3px 8px;border-radius:6px;cursor:pointer">Löschen</button>
+      </div>
+      <canvas id="sig-canvas" width="400" height="120"
+        style="width:100%;height:120px;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;touch-action:none;display:block;cursor:crosshair"></canvas>
+      <div style="font-size:0.68rem;color:var(--muted);margin-top:4px">Mit Finger oder Stift unterschreiben</div>
+    </div>
+
+    <div class="sheet-actions">
+      <button class="btn-sheet-cancel" onclick="document.getElementById('protokoll-modal').classList.remove('open')">Abbrechen</button>
+      <button class="btn-sheet-ok" onclick="addProtokollEintrag()">Eintragen ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settings-modal" onclick="closeModal(event)">
+  <div class="modal-sheet">
+    <div class="sheet-title">⚙️ Einstellungen</div>
+    <div style="font-size:0.8rem;color:var(--muted);margin-bottom:16px;text-align:center" id="settings-username-display"></div>
+
+    <div style="height:1px;background:var(--border);margin:0 0 16px"></div>
+    <div style="font-family:'Syne',sans-serif;font-size:0.75rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:12px">🔒 Passwort ändern</div>
+
+    <div class="form-group">
+      <label class="form-label">Aktuelles Passwort</label>
+      <input class="form-input" id="inp-pw-alt" type="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Neues Passwort (min. 6 Zeichen)</label>
+      <input class="form-input" id="inp-pw-neu" type="password" placeholder="••••••••" autocomplete="new-password">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Neues Passwort wiederholen</label>
+      <input class="form-input" id="inp-pw-neu2" type="password" placeholder="••••••••" autocomplete="new-password">
+    </div>
+    <div id="settings-error" style="color:var(--danger);font-size:0.8rem;min-height:18px;text-align:center;margin-bottom:8px"></div>
+    <div id="settings-success" style="color:var(--accent2);font-size:0.8rem;min-height:18px;text-align:center;margin-bottom:8px"></div>
+
+    <button class="btn-main" onclick="changePassword()" style="margin-bottom:12px">Passwort ändern ✓</button>
+    <div style="height:1px;background:var(--border);margin:0 0 16px"></div>
+    <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openHelp()" style="background:var(--surface2);margin-bottom:8px">❓ Hilfe & Funktionsübersicht</button>
+    <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');startTutorial()" style="background:var(--surface2);margin-bottom:12px">🎓 Tutorial nochmal anzeigen</button>
+    <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open')">Schließen</button>
+  </div>
+</div>
+
+<!-- ══ TUTORIAL OVERLAY ══ -->
+<div id="tutorial-overlay" style="display:none;position:fixed;inset:0;z-index:9000;pointer-events:none">
+  <!-- Dimming layer with hole -->
+  <div id="tutorial-dim" style="position:absolute;inset:0;background:rgba(0,0,0,0.7);pointer-events:all"></div>
+  <!-- Highlight box -->
+  <div id="tutorial-highlight" style="position:absolute;border:2.5px solid var(--accent);border-radius:12px;box-shadow:0 0 0 4000px rgba(0,0,0,0.65);transition:all 0.35s cubic-bezier(.4,0,.2,1);pointer-events:none;z-index:9001"></div>
+  <!-- Tooltip card -->
+  <div id="tutorial-card" style="position:absolute;background:var(--surface);border:1.5px solid var(--accent);border-radius:16px;padding:18px 20px;max-width:290px;width:calc(100vw - 40px);box-shadow:0 8px 32px rgba(0,0,0,0.5);z-index:9002;pointer-events:all;transition:all 0.3s ease">
+    <div style="font-size:1.5rem;margin-bottom:6px" id="tut-emoji">👋</div>
+    <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1rem;margin-bottom:6px" id="tut-title">Willkommen!</div>
+    <div style="font-size:0.84rem;color:var(--muted);line-height:1.5" id="tut-text">Lass uns kurz die wichtigsten Funktionen zeigen.</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px">
+      <button onclick="skipTutorial()" style="background:none;border:none;color:var(--muted);font-size:0.78rem;cursor:pointer;padding:0;font-family:'Manrope',sans-serif">Überspringen</button>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div id="tut-dots" style="display:flex;gap:5px"></div>
+        <button onclick="tutNext()" id="tut-next-btn" style="background:var(--accent);border:none;color:#0d1117;padding:8px 18px;border-radius:10px;font-weight:700;font-size:0.85rem;cursor:pointer;font-family:'Syne',sans-serif">Weiter →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ HILFE SCREEN ══ -->
+<div class="screen" id="screen-help" style="display:none;flex-direction:column">
+  <div class="header">
+    <button class="btn-back" onclick="closeHelp()">←</button>
+    <div><div class="header-title">Hilfe</div><div class="header-sub">Alle Funktionen im Überblick</div></div>
+    <div style="width:38px"></div>
+  </div>
+  <div class="detail-scroll" id="help-body" style="padding:16px">
+
+    <div style="margin-bottom:20px">
+      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:10px">📋 Schülerverwaltung</div>
+      <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
+        <div style="font-weight:700;margin-bottom:3px">➕ Schüler anlegen</div>
+        <div style="font-size:0.8rem;color:var(--muted)">Großer runder Button unten rechts. Vorname, Nachname, Geburtsdatum und Klasse (B, B197 oder A) eingeben.</div>
+      </div></div>
+      <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
+        <div style="font-weight:700;margin-bottom:3px">🔍 Suche & Filter</div>
+        <div style="font-size:0.8rem;color:var(--muted)">Oben nach Name suchen. Filter-Chips für Klasse, Fortschritt, Prüfungsreife und Archiv.</div>
+      </div></div>
+      <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
+        <div style="font-weight:700;margin-bottom:3px">🔤 ABC-Register</div>
+        <div style="font-size:0.8rem;color:var(--muted)">Buchstaben-Leiste am rechten Rand – antippen um direkt zum Anfangsbuchstaben zu springen.</div>
+      </div></div>
+    </div>
+
+    <div style="margin-bottom:20px">
+      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:10px">📊 Schüler-Kartei</div>
+      <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
+        <div style="font-weight:700;margin-bottom:3px">⏱️ Fahrstunden-Zähler</div>
+        <div style="font-size:0.8rem;color:var(--muted)">− und + Buttons zum schnellen Anpassen. Zahl direkt antippen zum Eintippen. Unabhängig vom Protokoll.</div>
+      </div></div>
+      <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
+        <div style="font-weight:700;margin-bottom:3px">🗓️ Fahrtenbuch / Protokoll</div>
+        <div style="font-size:0.8rem;color:var(--muted)">Button neben Fahrstunden. Öffnet eigenen Screen mit Monatskalender. + Button = neuer Eintrag mit Datum, Mängeln, Notiz und optionaler Schüler-Unterschrift.</div>
+      </div></div>
+      <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
+        <div style="font-weight:700;margin-bottom:3px">✅ Pflichtfahrten</div>
+        <div style="font-size:0.8rem;color:var(--muted)">Überland (5×), Autobahn (4×), Nacht (3×) separat zählbar. Gesetzlich vorgeschrieben.</div>
+      </div></div>
+      <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
+        <div style="font-weight:700;margin-bottom:3px">📚 ADK-Lernstand</div>
+        <div style="font-size:0.8rem;color:var(--muted)">5 Stufen pro Thema: 🔴 Nicht gezeigt → 🟠 Gezeigt → 🟡 Ausreichend → 🟢 Beherrscht → ⭐ Sehr sicher. Antippen zum Ändern.</div>
+      </div></div>
+      <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
+        <div style="font-weight:700;margin-bottom:3px">📊 ADK-Gruppen Grafik</div>
+        <div style="font-size:0.8rem;color:var(--muted)">Spinnennetz-Diagramm + Balken unter dem ADK-Lernstand. Zeigt Fortschritt je Themengruppe auf einen Blick.</div>
+      </div></div>
+      <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
+        <div style="font-weight:700;margin-bottom:3px">⚙️ B197 – Schaltausbildung</div>
+        <div style="font-size:0.8rem;color:var(--muted)">Für B197-Schüler: Schaltstunden-Zähler (min. 10) und Testfahrt-Checkbox (15 Min., innen+außerorts).</div>
+      </div></div>
+      <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
+        <div style="font-weight:700;margin-bottom:3px">🔑 Schüler-Zugangscode</div>
+        <div style="font-size:0.8rem;color:var(--muted)">🔑 Button in der Kartei generiert 6-stelligen Code. Schüler kann damit im Login-Bereich „Meine Akte" seine eigene Kartei (nur lesen) einsehen.</div>
+      </div></div>
+      <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
+        <div style="font-weight:700;margin-bottom:3px">🎓 Prüfung bestanden</div>
+        <div style="font-size:0.8rem;color:var(--muted)">Großer grüner Button unten in der Kartei. Schüler wird archiviert und über Filter „🎓 Archiv" noch sichtbar.</div>
+      </div></div>
+      <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
+        <div style="font-weight:700;margin-bottom:3px">🔄 Schüler übertragen</div>
+        <div style="font-size:0.8rem;color:var(--muted)">Schüler an Kollegen weitergeben – per Benutzername des anderen Fahrlehrers.</div>
+      </div></div>
+    </div>
+
+    <div style="margin-bottom:20px">
+      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:10px">🖥️ Weitere Funktionen</div>
+      <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
+        <div style="font-weight:700;margin-bottom:3px">📊 Dashboard</div>
+        <div style="font-size:0.8rem;color:var(--muted)">Übersicht aller Schüler: KPIs, Durchschnittsfortschritt, Warnungen bei fehlenden Pflichtfahrten.</div>
+      </div></div>
+      <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
+        <div style="font-weight:700;margin-bottom:3px">☀️ / 🌙 Dark/Light Mode</div>
+        <div style="font-size:0.8rem;color:var(--muted)">Sonnen-Button oben rechts in der Schülerliste wechselt zwischen Hell und Dunkel.</div>
+      </div></div>
+      <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
+        <div style="font-weight:700;margin-bottom:3px">📱 Als App installieren</div>
+        <div style="font-size:0.8rem;color:var(--muted)">Im Browser „Zum Startbildschirm hinzufügen" – funktioniert als PWA offline-fähig auf Android und iPhone.</div>
+      </div></div>
+    </div>
+
+    <button onclick="closeHelp();startTutorial()" style="width:100%;padding:14px;background:var(--accent);border:none;border-radius:var(--radius);color:#0d1117;font-family:'Syne',sans-serif;font-size:0.95rem;font-weight:700;cursor:pointer;margin-bottom:32px">🎓 Tutorial starten</button>
+  </div>
+</div>
+
+<!-- ══ SCHÜLER-ANSICHT ══ -->
+<div class="screen" id="screen-schueler">
+  <div class="header">
+    <div style="width:38px"></div>
+    <div><div class="header-title" id="schueler-header-name">Meine Akte</div><div class="header-sub">Nur-Lesen Ansicht</div></div>
+    <button class="btn-back" onclick="schuelerLogout()" style="font-size:0.75rem;width:auto;padding:0 10px">✕ Beenden</button>
+  </div>
+  <div class="detail-scroll" id="schueler-body" style="padding-bottom:40px"></div>
+</div>
+
+<!-- CODE MODAL (für Fahrlehrer – Code anzeigen/generieren) -->
+<div class="modal-overlay" id="code-modal" onclick="closeModal(event)">
+  <div class="modal-sheet">
+    <div class="sheet-title">📋 Schüler-Zugangscode</div>
+    <div style="text-align:center;margin:10px 0 20px">
+      <div style="font-size:0.8rem;color:var(--muted);margin-bottom:16px">Dieser Code gibt dem Schüler Zugang zu seiner Akte (nur lesen).</div>
+      <div id="code-display" style="font-family:'Syne',sans-serif;font-size:2.5rem;font-weight:800;letter-spacing:0.15em;color:var(--accent);background:var(--surface2);border:2px solid var(--border);border-radius:16px;padding:20px 24px;margin-bottom:12px">––––––</div>
+      <div id="code-valid-until" style="font-size:0.72rem;color:var(--muted)"></div>
+    </div>
+    <button class="btn-main" onclick="generateCode()" style="margin-bottom:10px">🔄 Neuen Code generieren</button>
+    <button class="btn-sheet-cancel" onclick="document.getElementById('code-modal').classList.remove('open')">Schließen</button>
+  </div>
+</div>
+
+<!-- ══ PROTOKOLL SCREEN ══ -->
+<div class="screen" id="screen-protokoll" style="display:none;flex-direction:column">
+  <div class="header">
+    <button class="btn-back" onclick="closeProtokoll()">←</button>
+    <div><div class="header-title" id="protokoll-header-name">Protokoll</div><div class="header-sub">Was wann geübt wurde</div></div>
+    <button class="btn-icon-sm" onclick="openNewEintragModal()" title="Neuen Eintrag erstellen" style="background:var(--accent);border-color:var(--accent);color:#0d1117;font-size:1.1rem;font-weight:700">+</button>
+  </div>
+  <div class="detail-scroll" id="protokoll-screen-body"></div>
+</div>
+
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, enableIndexedDbPersistence, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD490kLzTOq3h3VdQ9ZqWZd_aXcDRfxBOs",
+  authDomain: "fahrschule-ebc65.firebaseapp.com",
+  projectId: "fahrschule-ebc65",
+  storageBucket: "fahrschule-ebc65.firebasestorage.app",
+  messagingSenderId: "194338111405",
+  appId: "1:194338111405:web:73e2f31d69cde3ac9beb24"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// ── OFFLINE-PERSISTENZ ──────────────────────────────────────
+// Firestore speichert alle Daten lokal in IndexedDB.
+// Änderungen offline werden automatisch synchronisiert sobald Internet zurück ist.
+enableIndexedDbPersistence(db).catch(err => {
+  if (err.code === 'failed-precondition') {
+    console.warn('Offline-Modus: Mehrere Tabs offen – nur ein Tab kann offline cachen.');
+  } else if (err.code === 'unimplemented') {
+    console.warn('Offline-Modus: Dieser Browser unterstützt IndexedDB nicht.');
+  }
+});
+
+// ── ONLINE/OFFLINE STATUS ───────────────────────────────────
+function updateOnlineStatus() {
+  const bar = document.getElementById('offline-bar');
+  if (!bar) return;
+  if (navigator.onLine) {
+    bar.style.display = 'none';
+  } else {
+    bar.style.display = 'flex';
+  }
+}
+window.addEventListener('online',  updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
+
+
+// ─────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────
+const SONDERFAHRTEN = [
+  { key:'ueber',    icon:'🌄', name:'Überland',  min:5 },
+  { key:'autobahn', icon:'🛣️', name:'Autobahn',  min:4 },
+  { key:'nacht',    icon:'🌙', name:'Nacht/Dämmerung', min:3 },
+];
+
+// ADK Klasse B – gegliedert nach Ausbildungsstufen
+const ADK_THEMEN = [
+  {
+    gruppe: '🚗 Grundstufe – Fahrzeugbedienung',
+    items: [
+      'Fahrzeug einstellen (Sitz, Spiegel, Gurt)',
+      'Anfahren & Anhalten',
+      'Schalten & Gangwahl',
+      'Lenken & Spurhalten',
+      'Bremsen (normal)',
+      'Rückwärtsfahren',
+      'Einparken längs (rückwärts)',
+      'Einparken quer / schräg',
+      'Umkehren',
+    ]
+  },
+  {
+    gruppe: '🏙️ Grundstufe – Fahren im Verkehr',
+    items: [
+      'Fahren innerorts',
+      'Abbiegen & Einordnen',
+      'Vorfahrt & Vorrang beachten',
+      'Fahrstreifenwechsel',
+      'Überholen',
+      'Abstand einhalten',
+      'Angepasste Geschwindigkeit',
+      'Andere Verkehrsteilnehmer',
+      'Parken & Halten',
+    ]
+  },
+  {
+    gruppe: '📚 Aufbaustufe – Leistungsstufe',
+    items: [
+      'Selbstständiges Fahren',
+      'Besondere Situationen & Kreuzungen',
+      'Fahrbahnbenutzung',
+      'Schlechte Witterung / Sichtbedingungen',
+      'Liegenbleiben & Absichern',
+      'Steigung & Gefälle',
+    ]
+  },
+  {
+    gruppe: '🛣️ Sonderfahrten – Vorbereitung',
+    items: [
+      'Überlandfahrt vorbereitet',
+      'Autobahnfahrt: Einfahren & Ausfahren',
+      'Autobahnfahrt: Spurwechsel & Überholen',
+      'Autobahnfahrt: Angepasste Geschwindigkeit',
+      'Nacht-/Dämmerungsfahrt: Beleuchtung bedienen',
+      'Nacht-/Dämmerungsfahrt: Fernlicht & Blenden',
+    ]
+  },
+  {
+    gruppe: '✅ Grundfahraufgaben (Prüfungsrelevant)',
+    items: [
+      'Rückwärts rechts in Bogen fahren',
+      'Einparken Längsaufstellung',
+      'Einparken Quer-/Schrägaufstellung',
+      'Umkehren eigenständig',
+      'Gefahrenbremsung',
+    ]
+  },
+  {
+    gruppe: '📋 Theorie & Abschluss',
+    items: [
+      'Theorie bestanden',
+      'Sehhilfe geprüft',
+      'Erste-Hilfe-Kurs absolviert',
+      'Prüfungsreife festgestellt',
+    ]
+  },
+];
+
+const COLORS = ['#f0b429','#3fb950','#58a6ff','#bc8cff','#f85149','#4fb3a9','#d4834a','#e060a0'];
+
+// ADK Klasse A – Motorrad (nach FahrschAusbO Deutschland)
+const ADK_THEMEN_A = [
+  {
+    gruppe: '🏍️ Grundausbildung Schonraum',
+    items: [
+      'Fahrzeugkunde & Technik (Motor, Bremsen, Reifen)',
+      'Schutzkleidung anlegen & prüfen',
+      'Motorrad auf- & abstellen, Rangierschieben',
+      'Anfahren & Anhalten',
+      'Lenken & Gleichgewicht halten',
+      'Slalom (langsam)',
+      'Kreisfahren (enger Radius)',
+      'Schritttempo fahren',
+      'Abbiegen links & rechts',
+      'Schalten & Gangwahl',
+    ]
+  },
+  {
+    gruppe: '✅ Grundfahraufgaben (Prüfungsrelevant)',
+    items: [
+      'Slalom (Pylonengasse)',
+      'Ausweichen ohne Bremsen',
+      'Ausweichen mit Bremsen (Notmanöver)',
+      'Gefahrenbremsung (aus mind. 50 km/h)',
+      'Stopp & Go (Langsamfahren)',
+      'Kreisfahren (8er-Kurs)',
+      'Schritttempofahren (Gleichgewicht)',
+    ]
+  },
+  {
+    gruppe: '🏙️ Fahren im Stadtverkehr',
+    items: [
+      'Stadtfahrten & Einbahnstraßen',
+      'Kreisverkehr befahren',
+      'Vorfahrt & Stopp-Schilder beachten',
+      'Rechts vor Links',
+      'Fußgängerüberwege & Schutzwege',
+      'Fahrstreifenwechsel',
+      'Überholen im Stadtverkehr',
+      'Hauptverkehrszeiten & dichter Verkehr',
+    ]
+  },
+  {
+    gruppe: '📚 Aufbaustufe – Leistungsstufe',
+    items: [
+      'Selbstständiges Fahren außerorts',
+      'Kurvenfahrtechnik (Schräglage)',
+      'Bremstechnik (Hand- & Fußbremse kombiniert)',
+      'Dynamische Achslastverlagerung beim Bremsen',
+      'Fahrphysik: Pendeln, Flattern, Winddruck',
+      'Schlechte Witterung & Fahrbahnverhältnisse',
+      'Nässe, Glätte, Spurrillen, Schienen',
+      'Sozius- / Gepäckbetrieb (Schwerpunkt)',
+    ]
+  },
+  {
+    gruppe: '🛣️ Sonderfahrten – Vorbereitung',
+    items: [
+      'Überlandfahrt: Überholen & Einscheren',
+      'Überlandfahrt: Kurven & Gefälle',
+      'Autobahnfahrt: Einfahren & Ausfahren',
+      'Autobahnfahrt: Spurwechsel & Überholen (LKW)',
+      'Autobahnfahrt: Windschatten & Seitenwind',
+      'Nacht-/Dämmerungsfahrt: Beleuchtung',
+      'Nacht-/Dämmerungsfahrt: Sichtweite & Tempo',
+    ]
+  },
+  {
+    gruppe: '⛑️ Sicherheit & Sonderlagen',
+    items: [
+      'Absicherung Unfallstelle (Motorradunfall)',
+      'Helm abnehmen (Erste Hilfe)',
+      'Übersehen-werden vermeiden (Sichtbarkeit)',
+      'Umgang mit Linksabbiegern & Gegenverkehr',
+      'Aquaplaning & Glätte auf Motorrad',
+      'Pannensicherheit & Einmotten',
+    ]
+  },
+  {
+    gruppe: '📋 Theorie & Abschluss',
+    items: [
+      'Theorie bestanden (inkl. Zusatzstoff Klasse A)',
+      'Sehtest durchgeführt',
+      'Erste-Hilfe-Kurs absolviert',
+      'Schutzkleidung vollständig vorhanden',
+      'Simulierte Prüfungsfahrt absolviert',
+      'Prüfungsreife festgestellt',
+    ]
+  },
+];
+
+let newStudentKlasse = 'B';
+let activeFilter = 'alle';
+let aktiveSterne = 0;
+let aktiveMaengel = [];
+
+let students = [];
+let activeId = null;
+let currentUser = null;
+let unsubSnapshot = null;
+let unsubFields = null;
+let unsubThemen = null;
+let unsubProtokoll = null;
+let customFields = [];
+let customThemen = [];
+let protokollEintraege = []; // { id, datum, notiz, fortschritt }
+let themaScope = 'all';
+
+// ─────────────────────────────────────────
+// AUTH
+// ─────────────────────────────────────────
+window.switchTab = (tab) => {
+  ['login','register','schueler'].forEach(t => {
+    const form = document.getElementById(t+'-form');
+    const btn  = document.getElementById('tab-'+t);
+    if (form) form.style.display = t===tab ? '' : 'none';
+    if (btn)  btn.classList.toggle('active', t===tab);
+  });
+  document.getElementById('auth-error').textContent = '';
+  if (tab==='schueler') {
+    const errEl = document.getElementById('schueler-code-error');
+    const inp   = document.getElementById('inp-schueler-code');
+    if (errEl) errEl.textContent = '';
+    if (inp)   { inp.value = ''; setTimeout(()=>inp.focus(), 100); }
+  }
+};
+
+// Converts username to a fake internal email Firebase can use
+function usernameToEmail(username) {
+  // Konsequent: nur Kleinbuchstaben, Zahlen, Punkte und Bindestriche erlaubt
+  // Alles andere wird entfernt – muss beim Registrieren UND Login identisch sein
+  return username.toLowerCase().trim().replace(/[^a-z0-9.\-]/g,'') + '@fahrschule-kartei.app';
+}
+
+function validateUsername(u) {
+  return /^[a-zA-Z0-9.\-]{3,30}$/.test(u);
+}
+
+window.doLogin = async () => {
+  const username = document.getElementById('login-username').value.trim();
+  const pw = document.getElementById('login-pw').value;
+  const btn = document.getElementById('btn-login');
+  if (!username || !pw) { setAuthError('Bitte Benutzername und Passwort eingeben.'); return; }
+  // Zeige dem Nutzer welche E-Mail intern verwendet wird (für Debugging)
+  const internalEmail = usernameToEmail(username);
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    await signInWithEmailAndPassword(auth, internalEmail, pw);
+  } catch(e) {
+    btn.disabled = false; btn.textContent = 'Anmelden';
+    // Klarer Hinweis bei falschem Login
+    if (e.code === 'auth/invalid-credential' || e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found') {
+      setAuthError('Benutzername oder Passwort falsch. Bitte prüfe die Schreibweise.');
+    } else {
+      setAuthError(friendlyError(e.code));
+    }
+  }
+};
+
+window.doRegister = async () => {
+  const name = document.getElementById('reg-name').value.trim();
+  const username = document.getElementById('reg-username').value.trim();
+  const pw = document.getElementById('reg-pw').value;
+  const btn = document.getElementById('btn-register');
+  if (!name || !username || !pw) { setAuthError('Bitte alle Felder ausfüllen.'); return; }
+  if (!validateUsername(username)) { setAuthError('Benutzername: nur Buchstaben, Zahlen, Punkte und Bindestriche (min. 3 Zeichen).'); return; }
+  if (pw.length < 6) { setAuthError('Passwort muss mindestens 6 Zeichen haben.'); return; }
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    const email = usernameToEmail(username);
+    const cred = await createUserWithEmailAndPassword(auth, email, pw);
+    await updateProfile(cred.user, { displayName: name });
+    // Speichere Benutzername für Schüler-Übertragung
+    await addDoc(collection(db, 'users'), { uid: cred.user.uid, username: username.toLowerCase().trim(), email, name, createdAt: Date.now() });
+  } catch(e) {
+    btn.disabled = false; btn.textContent = 'Konto erstellen';
+    if (e.code === 'auth/email-already-in-use') {
+      setAuthError('Dieser Benutzername ist bereits vergeben. Bitte einen anderen wählen.');
+    } else {
+      setAuthError(friendlyError(e.code));
+    }
+  }
+};
+
+window.doLogout = async () => {
+  if (unsubSnapshot) { unsubSnapshot(); unsubSnapshot = null; }
+  if (unsubFields) { unsubFields(); unsubFields = null; }
+  if (unsubThemen) { unsubThemen(); unsubThemen = null; }
+  if (unsubProtokoll) { unsubProtokoll(); unsubProtokoll = null; }
+  await signOut(auth);
+};
+
+function setAuthError(msg) { document.getElementById('auth-error').textContent = msg; }
+
+function friendlyError(code) {
+  const map = {
+    'auth/invalid-email': 'Ungültiger Benutzername.',
+    'auth/user-not-found': 'Kein Konto mit diesem Benutzernamen gefunden.',
+    'auth/wrong-password': 'Falsches Passwort.',
+    'auth/email-already-in-use': 'Dieser Benutzername ist bereits vergeben.',
+    'auth/weak-password': 'Passwort zu schwach (min. 6 Zeichen).',
+    'auth/invalid-credential': 'Benutzername oder Passwort falsch.',
+    'auth/too-many-requests': 'Zu viele Versuche. Bitte kurz warten.',
+  };
+  return map[code] || 'Fehler: ' + code;
+}
+
+// ─────────────────────────────────────────
+// AUTH STATE
+// ─────────────────────────────────────────
+onAuthStateChanged(auth, (user) => {
+  document.getElementById('loading').style.display = 'none';
+  if (user) {
+    currentUser = user;
+    document.getElementById('screen-login').classList.remove('active');
+    document.getElementById('screen-list').classList.add('active');
+    document.getElementById('screen-detail').classList.remove('active');
+    // Show name in header
+    const userBtn = document.getElementById('user-btn');
+    if (userBtn) userBtn.textContent = '⏻';
+    const greeting = document.getElementById('user-greeting');
+    if (greeting) greeting.textContent = 'Hallo, ' + (user.displayName || 'Fahrlehrer') + ' 👋';
+    listenStudents();
+    listenFields();
+    listenCustomThemen();
+    checkFirstTime();
+  } else {
+    currentUser = null;
+    students = [];
+    activeId = null;
+    protokollEintraege = [];
+    document.getElementById('screen-login').classList.add('active');
+    document.getElementById('screen-list').classList.remove('active');
+    document.getElementById('screen-detail').classList.remove('active');
+    document.getElementById('screen-protokoll').style.display = 'none';
+    document.getElementById('screen-help').style.display = 'none';
+    document.getElementById('tutorial-overlay').style.display = 'none';
+    // Formular komplett zurücksetzen
+    document.getElementById('login-username').value = '';
+    document.getElementById('login-pw').value = '';
+    document.getElementById('btn-login').disabled = false;
+    document.getElementById('btn-login').textContent = 'Anmelden';
+    document.getElementById('btn-register').disabled = false;
+    document.getElementById('btn-register').textContent = 'Konto erstellen';
+    document.getElementById('auth-error').textContent = '';
+    // Zurück zum Login-Tab
+    switchTab('login');
+  }
+});
+
+// ─────────────────────────────────────────
+// FIRESTORE
+// ─────────────────────────────────────────
+function listenStudents() {
+  if (unsubSnapshot) unsubSnapshot();
+  const q = query(collection(db, 'students'), where('uid', '==', currentUser.uid));
+  unsubSnapshot = onSnapshot(q, (snap) => {
+    students = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    students.sort((a,b) => (a.nachname||'').localeCompare(b.nachname||''));
+    renderList();
+    if (activeId) renderDetail();
+  });
+}
+
+function listenFields() {
+  if (unsubFields) unsubFields();
+  const q = query(collection(db, 'customFields'), where('uid', '==', currentUser.uid));
+  unsubFields = onSnapshot(q, (snap) => {
+    customFields = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    customFields.sort((a,b) => (a.createdAt||0)-(b.createdAt||0));
+    if (activeId) renderDetail();
+  });
+}
+
+window.openCustomFieldModal = () => {
+  document.getElementById('inp-field-name').value = '';
+  document.getElementById('custom-field-modal').classList.add('open');
+  setTimeout(() => document.getElementById('inp-field-name').focus(), 100);
+};
+
+window.addCustomField = async () => {
+  const name = document.getElementById('inp-field-name').value.trim();
+  if (!name) { toast('Bitte einen Namen eingeben.'); return; }
+  try {
+    await addDoc(collection(db, 'customFields'), {
+      uid: currentUser.uid,
+      name,
+      createdAt: Date.now()
+    });
+    document.getElementById('custom-field-modal').classList.remove('open');
+    toast(`Feld „${name}" hinzugefügt ✓`);
+  } catch(e) { toast('Fehler beim Hinzufügen.'); }
+};
+
+window.deleteCustomField = async (fieldId) => {
+  if (!confirm('Dieses Feld bei allen Schülern löschen?')) return;
+  await deleteDoc(doc(db, 'customFields', fieldId));
+  toast('Feld gelöscht.');
+};
+
+window.toggleCustomField = async (fieldId) => {
+  const s = getStudent(activeId);
+  const cf = { ...(s.customFields || {}) };
+  cf[fieldId] = !cf[fieldId];
+  await saveToFirestore(activeId, { customFields: cf });
+};
+
+// ── CUSTOM THEMEN ──
+function listenCustomThemen() {
+  if (unsubThemen) unsubThemen();
+  const q = query(collection(db, 'customThemen'), where('uid', '==', currentUser.uid));
+  unsubThemen = onSnapshot(q, (snap) => {
+    customThemen = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    customThemen.sort((a,b) => (a.createdAt||0)-(b.createdAt||0));
+    if (activeId) renderDetail();
+  });
+}
+
+window.setThemaScope = (scope) => {
+  themaScope = scope;
+  document.getElementById('scope-all').classList.toggle('active', scope==='all');
+  document.getElementById('scope-one').classList.toggle('active', scope==='one');
+};
+
+window.openCustomThemaModal = () => {
+  document.getElementById('inp-thema-name').value = '';
+  document.getElementById('inp-thema-kategorie').value = '';
+  themaScope = 'all';
+  document.getElementById('scope-all').classList.add('active');
+  document.getElementById('scope-one').classList.remove('active');
+  document.getElementById('custom-thema-modal').classList.add('open');
+  setTimeout(() => document.getElementById('inp-thema-name').focus(), 100);
+};
+
+window.addCustomThema = async () => {
+  const name = document.getElementById('inp-thema-name').value.trim();
+  if (!name) { toast('Bitte einen Namen eingeben.'); return; }
+  const kategorie = document.getElementById('inp-thema-kategorie').value;
+  try {
+    await addDoc(collection(db, 'customThemen'), {
+      uid: currentUser.uid,
+      name,
+      kategorie: kategorie || null,
+      scope: themaScope === 'all' ? 'all' : activeId,
+      createdAt: Date.now()
+    });
+    document.getElementById('custom-thema-modal').classList.remove('open');
+    toast(`Thema „${name}" hinzugefügt ✓`);
+  } catch(e) { toast('Fehler beim Hinzufügen.'); }
+};
+
+window.deleteCustomThema = async (themaId) => {
+  const t = customThemen.find(x => x.id === themaId);
+  const msg = t?.scope === 'all' ? 'Dieses Thema bei allen Schülern löschen?' : 'Dieses Thema löschen?';
+  if (!confirm(msg)) return;
+  await deleteDoc(doc(db, 'customThemen', themaId));
+  toast('Thema gelöscht.');
+};
+
+window.setCustomThema = async (themaId, val) => {
+  const s = getStudent(activeId);
+  const ct = { ...(s.customThemen || {}) };
+  ct[themaId] = ct[themaId] === val ? 0 : val;
+  await saveToFirestore(activeId, { customThemen: ct });
+};
+
+async function saveToFirestore(studentId, data) {
+  try {
+    await updateDoc(doc(db, 'students', studentId), data);
+  } catch(e) { toast('Fehler beim Speichern.'); }
+}
+
+// ─────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────
+function getStudent(id) { return students.find(s => s.id === id); }
+function getColor(s) { const i = students.indexOf(s); return COLORS[(i<0?0:i)%COLORS.length]; }
+function initials(s) { return ((s.vorname||'?')[0] + (s.nachname||'?')[0]).toUpperCase(); }
+function formatDate(d) { if (!d) return ''; const [y,m,day]=d.split('-'); return `${day}.${m}.${y}`; }
+function age(d) { if (!d) return null; const b=new Date(d),now=new Date(); let a=now.getFullYear()-b.getFullYear(); if(now<new Date(now.getFullYear(),b.getMonth(),b.getDate()))a--; return a; }
+function progressColor(p) { return p>=80?'#3fb950':p>=50?'#f0b429':'#58a6ff'; }
+
+// B197: min. 10 Schaltstunden + Testfahrt bestanden
+const SONDER_B197 = [
+  { key:'ueber',    icon:'🌄', label:'Überland',  min:5 },
+  { key:'autobahn', icon:'🛣️', label:'Autobahn',  min:4 },
+  { key:'nacht',    icon:'🌙', label:'Nacht',      min:3 },
+];
+
+function overallProgress(s) {
+  const fs=s.fahrstunden||0, ziel=s.zielStunden||30;
+  const isA    = s.klasse==='A';
+  const isB197 = s.klasse==='B197';
+  const ADK    = isA ? ADK_THEMEN_A : ADK_THEMEN;
+  const SONDER = isA ? [
+    { key:'ueber', min:5 }, { key:'autobahn', min:4 }, { key:'nacht', min:3 }
+  ] : SONDERFAHRTEN;
+  const allThemen = ADK.flatMap(g => g.items);
+  const themenVals = allThemen.map(t => (s.themen||{})[t]||0);
+  const themaAvg = themenVals.length ? themenVals.reduce((a,v)=>a+Math.min(v,4),0)/themenVals.length/4 : 0;
+
+  if (isB197) {
+    // B197: 35% Fahrstunden + 35% Themen + 15% Sonderfahrten + 10% Schaltstunden + 5% Testfahrt
+    const sonderDone = SONDER_B197.filter(f=>(s.sonderfahrten||{})[f.key]>=f.min).length;
+    const schaltPct  = Math.min((s.schaltstunden||0)/10, 1);
+    const testfahrt  = s.testfahrtBestanden ? 1 : 0;
+    return Math.round(((fs/ziel)*0.35 + themaAvg*0.35 + (sonderDone/SONDER_B197.length)*0.15 + schaltPct*0.1 + testfahrt*0.05)*100);
+  }
+
+  const sonderDone=SONDER.filter(f=>(s.sonderfahrten||{})[f.key]>=f.min).length;
+  return Math.round(((fs/ziel)*0.4 + themaAvg*0.4 + (sonderDone/SONDER.length)*0.2)*100);
+}
+
+// ─────────────────────────────────────────
+// LIST
+// ─────────────────────────────────────────
+window.clearSearch = () => {
+  const inp = document.getElementById('search');
+  inp.value = '';
+  document.getElementById('search-clear').style.display = 'none';
+  renderList();
+  inp.focus();
+};
+
+window.setFilter = (f) => {
+  activeFilter = f;
+  document.querySelectorAll('.filter-chip').forEach(c =>
+    c.classList.toggle('active', c.dataset.filter === f)
+  );
+  renderList();
+};
+
+window.renderList = () => {
+  const inp = document.getElementById('search')||{value:''};
+  const q = inp.value.toLowerCase();
+  const clearBtn = document.getElementById('search-clear');
+  if (clearBtn) clearBtn.style.display = q ? 'block' : 'none';
+
+  let filtered = students.filter(s => {
+    const matchSearch = (s.vorname+' '+s.nachname).toLowerCase().includes(q);
+    const isArchiv = activeFilter === 'archiv';
+    return matchSearch && (isArchiv ? s.archiviert : !s.archiviert);
+  });
+
+  // Apply active filter
+  switch(activeFilter) {
+    case 'klasseA':  filtered = filtered.filter(s => s.klasse === 'A'); break;
+    case 'klasseB':  filtered = filtered.filter(s => (s.klasse||'B') === 'B'); break;
+    case 'theorie':  filtered = filtered.filter(s => !s.theorieBestanden); break;
+    case 'sonder':   filtered = filtered.filter(s => {
+      const SONDER = s.klasse==='A' ? [{key:'ueber',min:5},{key:'autobahn',min:4},{key:'nacht',min:3}] : SONDERFAHRTEN;
+      return !SONDER.every(f => (s.sonderfahrten||{})[f.key] >= f.min);
+    }); break;
+    case 'reif':     filtered = filtered.filter(s => overallProgress(s) >= 90); break;
+    case 'archiv':   break; // already handled above
+    case 'sortAsc':  filtered = [...filtered].sort((a,b) => overallProgress(a)-overallProgress(b)); break;
+    case 'sortDesc': filtered = [...filtered].sort((a,b) => overallProgress(b)-overallProgress(a)); break;
+  }
+
+  // stats
+  const total=students.length;
+  const active=students.filter(s=>(s.fahrstunden||0)>0).length;
+  const done=students.filter(s=>SONDERFAHRTEN.every(f=>(s.sonderfahrten||{})[f.key]>=f.min)).length;
+  document.getElementById('stats-row').innerHTML=`
+    <div class="stat-chip"><div class="stat-val">${total}</div><div class="stat-lbl">Schüler</div></div>
+    <div class="stat-chip"><div class="stat-val">${active}</div><div class="stat-lbl">Aktiv</div></div>
+    <div class="stat-chip"><div class="stat-val">${done}</div><div class="stat-lbl">Sonderf. ✓</div></div>`;
+
+  const list = document.getElementById('student-list');
+  if (!students.filter(s => !s.archiviert).length && activeFilter !== 'archiv') {
+    list.innerHTML=`<div class="empty-state"><div class="ei">🚗</div><p>Noch keine Schüler angelegt.<br>Tippe auf <strong>+ Neu</strong>, um zu starten.</p></div>`; return;
+  }
+  if (!filtered.length) {
+    const msg = activeFilter === 'archiv' ? 'Noch keine archivierten Schüler.' : 'Keine Schüler für diesen Filter.';
+    list.innerHTML=`<div class="empty-state"><div class="ei">${activeFilter==='archiv'?'🎓':'🔍'}</div><p>${msg}</p></div>`; return;
+  }
+
+  // Sortiere nach Nachname für ABC-Gruppierung (nur wenn kein Fortschritt-Sort aktiv)
+  const isProgressSort = activeFilter === 'sortAsc' || activeFilter === 'sortDesc';
+  const isSearchActive = q.length > 0;
+
+  if (!isProgressSort && !isSearchActive) {
+    // ABC-Gruppierung nach Nachname
+    filtered.sort((a,b) => a.nachname.localeCompare(b.nachname, 'de'));
+    const groups = {};
+    filtered.forEach(s => {
+      const letter = (s.nachname||'?')[0].toUpperCase();
+      if (!groups[letter]) groups[letter] = [];
+      groups[letter].push(s);
+    });
+
+    const letters = Object.keys(groups).sort();
+    list.innerHTML = letters.map(letter => {
+      const cards = groups[letter].map(s => renderStudentCard(s)).join('');
+      return `<div class="abc-group">
+        <div class="abc-header">${letter}</div>
+        ${cards}
+      </div>`;
+    }).join('');
+  } else {
+    list.innerHTML = filtered.map(s => renderStudentCard(s)).join('');
+  }
+
+  // ABC Schnellsprung-Leiste aktualisieren
+  renderAbcBar(filtered);
+};
+
+function renderStudentCard(s) {
+  const pct=Math.min(overallProgress(s),100);
+  const c=getColor(s);
+  const r=17, circ=2*Math.PI*r, offset=circ-(pct/100)*circ;
+  const a=age(s.geburt);
+  const klasseLabel = s.klasse==='B197' ? '⚙️ B197' : s.klasse==='A' ? '🏍️ Klasse A' : '🚗 Klasse B';
+  const meta=[klasseLabel, a?a+' Jahre':null, (s.fahrstunden||0)+' Std.', s.theorieBestanden?'📋 Theorie ✓':null].filter(Boolean).join(' · ');
+  const badge = pct>=90?'<span class="badge badge-green">Prüfungsreif</span>':pct>=60?'<span class="badge badge-amber">Guter Fortschritt</span>':pct>0?'<span class="badge badge-blue">In Ausbildung</span>':'<span class="badge badge-gray">Neu</span>';
+  return `<div class="student-card" onclick="openDetail('${s.id}')">
+    <div class="avatar" style="background:${c}">${initials(s)}</div>
+    <div style="flex:1;min-width:0"><div class="sc-name">${s.vorname} ${s.nachname}</div><div class="sc-meta">${meta}</div></div>
+    <div class="sc-right">
+      <div class="progress-ring-wrap">
+        <svg class="ring-svg" width="40" height="40" viewBox="0 0 40 40">
+          <circle class="ring-bg" cx="20" cy="20" r="${r}"/>
+          <circle class="ring-fill" cx="20" cy="20" r="${r}" stroke="${progressColor(pct)}" stroke-dasharray="${circ}" stroke-dashoffset="${offset}"/>
+        </svg>
+        <div class="ring-label">${pct}%</div>
+      </div>
+      ${badge}
+    </div>
+  </div>`;
+}
+
+function renderAbcBar(filtered) {
+  const bar = document.getElementById('abc-bar');
+  if (!bar) return;
+  const isProgressSort = activeFilter === 'sortAsc' || activeFilter === 'sortDesc';
+  const isSearchActive = (document.getElementById('search')||{value:''}).value.trim().length > 0;
+  if (isProgressSort || isSearchActive || filtered.length < 5) {
+    bar.style.display = 'none'; return;
+  }
+  bar.style.display = 'flex';
+  const letters = [...new Set(filtered.map(s => (s.nachname||'?')[0].toUpperCase()))].sort();
+  bar.innerHTML = letters.map(l =>
+    `<button class="abc-bar-btn" onclick="scrollToLetter('${l}')">${l}</button>`
+  ).join('');
+}
+
+window.scrollToLetter = (letter) => {
+  const groups = document.querySelectorAll('.abc-group');
+  for (const g of groups) {
+    const header = g.querySelector('.abc-header');
+    if (header && header.textContent === letter) {
+      g.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      break;
+    }
+  }
+};
+
+// ─────────────────────────────────────────
+// DETAIL
+// ─────────────────────────────────────────
+window.openDetail = (id) => {
+  activeId = id;
+  const s = getStudent(id);
+  document.getElementById('screen-list').classList.remove('active');
+  document.getElementById('screen-detail').classList.add('active');
+  document.getElementById('detail-header-name').textContent = s.vorname+' '+s.nachname;
+  listenProtokoll(id);
+  renderDetail();
+};
+
+window.goBack = () => {
+  if (unsubProtokoll) { unsubProtokoll(); unsubProtokoll = null; }
+  protokollEintraege = [];
+  document.getElementById('screen-detail').classList.remove('active');
+  document.getElementById('screen-list').classList.add('active');
+};
+
+function renderDetail() {
+  const s = getStudent(activeId);
+  if (!s) return;
+  const c=getColor(s), a=age(s.geburt), pct=Math.min(overallProgress(s),100);
+  const klasse = s.klasse || 'B';
+  const isA    = klasse === 'A';
+  const isB197 = klasse === 'B197';
+  const ADK = isA ? ADK_THEMEN_A : ADK_THEMEN;
+  const SONDER = isA ? [
+    { key:'ueber',    icon:'🌄', name:'Überland',        min:5 },
+    { key:'autobahn', icon:'🛣️', name:'Autobahn',        min:4 },
+    { key:'nacht',    icon:'🌙', name:'Nacht/Dämmerung', min:3 },
+  ] : isB197 ? [
+    { key:'ueber',    icon:'🌄', name:'Überland',        min:5 },
+    { key:'autobahn', icon:'🛣️', name:'Autobahn',        min:4 },
+    { key:'nacht',    icon:'🌙', name:'Nacht/Dämmerung', min:3 },
+  ] : SONDERFAHRTEN;
+
+  const badgeColor = isA ? 'rgba(88,166,255,0.15)' : isB197 ? 'rgba(160,100,255,0.15)' : 'rgba(240,180,41,0.15)';
+  const badgeBorder= isA ? 'rgba(88,166,255,0.4)' : isB197 ? 'rgba(160,100,255,0.5)' : 'rgba(240,180,41,0.4)';
+  const badgeText  = isA ? 'var(--blue)' : isB197 ? '#bc8cff' : 'var(--accent)';
+  const badgeLabel = isA ? '🏍️ Klasse A' : isB197 ? '⚙️ B197' : '🚗 Klasse B';
+
+  document.getElementById('profile-strip').innerHTML=`
+    <div class="avatar" style="background:${c};width:50px;height:50px;font-size:1.1rem">${initials(s)}</div>
+    <div class="profile-info">
+      <div class="profile-name">${s.vorname} ${s.nachname}</div>
+      <div class="profile-meta" style="display:flex;align-items:center;gap:6px">
+        <span style="background:${badgeColor};color:${badgeText};border:1px solid ${badgeBorder};border-radius:6px;padding:2px 8px;font-size:0.72rem;font-weight:700">${badgeLabel}</span>
+        ${a?'<span>'+a+' Jahre</span>':''}${s.geburt?(a?' · ':'')+'Geb. '+formatDate(s.geburt):''}
+      </div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;color:${progressColor(pct)}">${pct}%</div>
+      <div style="font-size:0.68rem;color:var(--muted)">Fortschritt</div>
+    </div>`;
+
+  const fs=s.fahrstunden||0, ziel=s.zielStunden||30, fsPct=Math.min(Math.round((fs/ziel)*100),100);
+
+  const sonderHTML=SONDER.map(f=>{
+    const cnt=(s.sonderfahrten||{})[f.key]||0, done=cnt>=f.min;
+    return `<div class="sonder-item${done?' done':''}">
+      <div class="sonder-icon">${f.icon}</div>
+      <div class="sonder-name">${f.name}</div>
+      <div class="sonder-stepper">
+        <button class="s-btn" onclick="changeSonder('${f.key}',-1)">−</button>
+        <span class="s-val">${cnt}</span>
+        <button class="s-btn" onclick="changeSonder('${f.key}',1)">+</button>
+      </div>
+      <div class="sonder-count">${done?'✓ ':''}min. ${f.min}</div>
+    </div>`;
+  }).join('');
+
+  const myCustomThemen = customThemen.filter(t => t.scope === 'all' || t.scope === activeId);
+  const customThemenOhneKat = myCustomThemen.filter(t => !t.kategorie);
+
+  const STUFEN = ['🔴','🟠','🟡','🟢','⭐'];
+  const STUFEN_NAME = ['Nicht gezeigt','Gezeigt','Ausreichend','Beherrscht','Sehr sicher'];
+
+  const themenHTML = ADK.map(gruppe => {
+    const standardItems = gruppe.items.map(t => {
+      const val = (s.themen||{})[t]||0;
+      return `<div class="thema-row">
+        <div class="thema-name">${t}</div>
+        <div class="thema-dots">
+          ${STUFEN.map((em,i)=>{const v=i+1;return `<button class="dot-btn${val===v?' active-'+v:''}" title="${STUFEN_NAME[i]}" onclick="setThema('${t.replace(/'/g,"\\'")}',${val===v?0:v})">${em}</button>`;}).join('')}
+        </div>
+      </div>`;
+    }).join('');
+
+    // Eigene Themen die in diese Kategorie einsortiert wurden
+    const extraItems = myCustomThemen.filter(t => t.kategorie === gruppe.gruppe).map(t => {
+      const val = (s.customThemen||{})[t.id]||0;
+      const scopeTag = t.scope === 'all'
+        ? '<span style="font-size:0.6rem;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1px 5px;margin-left:5px">Alle</span>'
+        : '<span style="font-size:0.6rem;color:var(--blue);background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.3);border-radius:4px;padding:1px 5px;margin-left:5px">Nur dieser</span>';
+      return `<div class="thema-row" style="background:rgba(240,180,41,0.05);border-radius:8px">
+        <div class="thema-name" style="display:flex;align-items:center;flex-wrap:wrap;gap:2px">${t.name}${scopeTag}</div>
+        <div class="thema-dots" style="display:flex;gap:4px;align-items:center">
+          ${STUFEN.map((em,i)=>{const v=i+1;return `<button class="dot-btn${val===v?' active-'+v:''}" title="${STUFEN_NAME[i]}" onclick="setCustomThema('${t.id}',${v})">${em}</button>`;}).join('')}
+          <button onclick="event.stopPropagation();deleteCustomThema('${t.id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:4px;font-size:0.8rem">🗑</button>
+        </div>
+      </div>`;
+    }).join('');
+
+    const allCount = gruppe.items.length + myCustomThemen.filter(t => t.kategorie === gruppe.gruppe).length;
+    const doneCount = gruppe.items.filter(t => ((s.themen||{})[t]||0) >= 4).length
+      + myCustomThemen.filter(t => t.kategorie === gruppe.gruppe && ((s.customThemen||{})[t.id]||0) >= 4).length;
+    const groupPct = allCount ? Math.round((doneCount/allCount)*100) : 0;
+
+    return `
+      <div style="margin-bottom:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-size:0.8rem;font-weight:700;color:var(--text)">${gruppe.gruppe}</div>
+          <div style="font-size:0.7rem;color:${groupPct===100?'var(--accent2)':'var(--muted)'};font-weight:600">${doneCount}/${allCount}</div>
+        </div>
+        <div class="bar-bg" style="margin-bottom:10px;height:4px">
+          <div class="bar-fill" style="width:${groupPct}%;background:${groupPct===100?'var(--accent2)':groupPct>50?'var(--accent)':'var(--blue)'}"></div>
+        </div>
+        ${standardItems}${extraItems}
+      </div>`;
+  }).join('<div style="height:1px;background:var(--border);margin:6px 0 14px"></div>');
+
+  // Eigene Themen ohne Kategorie → eigener Block
+  const customThemenHTML = customThemenOhneKat.length ? `
+    <div style="height:1px;background:var(--border);margin:6px 0 14px"></div>
+    <div style="margin-bottom:16px">
+      <div style="font-size:0.8rem;font-weight:700;color:var(--text);margin-bottom:8px">➕ Eigene Themen</div>
+      ${customThemenOhneKat.map(t => {
+        const val = (s.customThemen||{})[t.id]||0;
+        const scopeTag = t.scope === 'all'
+          ? '<span style="font-size:0.6rem;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1px 5px;margin-left:5px">Alle</span>'
+          : '<span style="font-size:0.6rem;color:var(--blue);background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.3);border-radius:4px;padding:1px 5px;margin-left:5px">Nur dieser</span>';
+        return `<div class="thema-row">
+          <div class="thema-name" style="display:flex;align-items:center;flex-wrap:wrap;gap:2px">${t.name}${scopeTag}</div>
+          <div class="thema-dots" style="display:flex;gap:4px;align-items:center">
+            ${STUFEN.map((em,i)=>{const v=i+1;return `<button class="dot-btn${val===v?' active-'+v:''}" title="${STUFEN_NAME[i]}" onclick="setCustomThema('${t.id}',${v})">${em}</button>`;}).join('')}
+            <button onclick="event.stopPropagation();deleteCustomThema('${t.id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:4px;font-size:0.8rem">🗑</button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>` : '';
+
+  document.getElementById('detail-body').innerHTML=`
+    <div class="section-block">
+      <div class="section-header">
+        <div class="section-title">Fahrstunden</div>
+        <button onclick="openProtokollModal()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:5px 10px;border-radius:8px;font-size:0.72rem;cursor:pointer;font-family:'Manrope',sans-serif;font-weight:600">🗓️ Protokoll</button>
+      </div>
+      <div class="section-body">
+        <div class="fahrstunden-display">
+          <div><div class="stunden-big">${fs}</div><div class="stunden-label">von ${ziel} Std.</div></div>
+          <div class="stepper">
+            <button class="step-btn" onclick="changeStunden(-1)">−</button>
+            <div style="position:relative">
+              <input id="stunden-input" type="number" min="0" max="999" value="${fs}"
+                style="width:58px;height:40px;text-align:center;font-family:'Syne',sans-serif;font-weight:800;font-size:1rem;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);outline:none;-moz-appearance:textfield"
+                onchange="setStundenDirekt(this.value)"
+                onfocus="this.select()">
+            </div>
+            <button class="step-btn" onclick="changeStunden(1)" style="background:var(--accent);color:#0d1117;border-color:var(--accent)">+</button>
+          </div>
+        </div>
+        <div class="bar-label-row"><span>Fortschritt</span><span>${fsPct}%</span></div>
+        <div class="bar-bg"><div class="bar-fill" style="width:${fsPct}%;background:${progressColor(fsPct)}"></div></div>
+      </div>
+    </div>
+
+    <div class="section-block" onclick="toggleTheorie()" style="cursor:pointer">
+      <div class="section-body" style="display:flex;align-items:center;gap:14px;padding:16px">
+        <div style="width:36px;height:36px;border-radius:10px;border:2px solid ${s.theorieBestanden?'var(--accent2)':'var(--border)'};background:${s.theorieBestanden?'var(--accent2)':'var(--surface2)'};display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;transition:all 0.2s">
+          ${s.theorieBestanden?'✓':''}
+        </div>
+        <div>
+          <div style="font-weight:700;font-size:0.95rem">Theorieprüfung bestanden</div>
+          <div style="font-size:0.75rem;color:${s.theorieBestanden?'var(--accent2)':'var(--muted)'}">
+            ${s.theorieBestanden ? '✅ Bestanden' : 'Noch nicht bestanden – antippen zum Abhaken'}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="section-block">
+      <div class="section-header"><div class="section-title">Pflichtfahrten Klasse ${klasse}</div><span style="font-size:0.65rem;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:1px 5px">Gesetzlich vorgeschrieben</span></div>
+      <div class="section-body"><div class="sonder-grid">${sonderHTML}</div></div>
+    </div>
+
+    ${isB197 ? `
+    <div class="section-block">
+      <div class="section-header">
+        <div class="section-title">⚙️ B197 – Schaltausbildung</div>
+        <span style="font-size:0.65rem;color:#bc8cff;background:rgba(160,100,255,0.1);border:1px solid rgba(160,100,255,0.3);border-radius:4px;padding:1px 5px">§5a FahrschAusbO</span>
+      </div>
+      <div class="section-body">
+        <div style="margin-bottom:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <span style="font-size:0.88rem;font-weight:600">⚙️ Schaltstunden</span>
+            <div style="display:flex;align-items:center;gap:8px">
+              <button onclick="changeSchaltstunden(-1)" style="width:28px;height:28px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface2);cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center">−</button>
+              <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:1rem;min-width:48px;text-align:center;color:${(s.schaltstunden||0)>=10?'var(--accent2)':'var(--text)'}">${s.schaltstunden||0} / 10</span>
+              <button onclick="changeSchaltstunden(1)" style="width:28px;height:28px;border-radius:8px;border:1.5px solid var(--accent);background:var(--accent);color:#0d1117;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center">+</button>
+            </div>
+          </div>
+          <div class="bar-bg" style="height:5px">
+            <div class="bar-fill" style="width:${Math.min((s.schaltstunden||0)/10*100,100)}%;background:${(s.schaltstunden||0)>=10?'var(--accent2)':'var(--blue)'}"></div>
+          </div>
+          <div style="font-size:0.7rem;color:var(--muted);margin-top:4px">Mindestens 10 Fahrstunden (à 45 Min.) auf Schaltfahrzeug</div>
+        </div>
+
+        <div onclick="toggleTestfahrt()" style="cursor:pointer;display:flex;align-items:center;gap:14px;padding:12px;background:var(--surface2);border-radius:12px;border:1px solid ${s.testfahrtBestanden?'var(--accent2)':'var(--border)'}">
+          <div style="width:34px;height:34px;border-radius:10px;border:2px solid ${s.testfahrtBestanden?'var(--accent2)':'var(--border)'};background:${s.testfahrtBestanden?'var(--accent2)':'var(--surface)'};display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;transition:all 0.2s">
+            ${s.testfahrtBestanden?'✓':''}
+          </div>
+          <div>
+            <div style="font-weight:700;font-size:0.9rem">15-min. Testfahrt bestanden</div>
+            <div style="font-size:0.72rem;color:${s.testfahrtBestanden?'var(--accent2)':'var(--muted)'}">
+              ${s.testfahrtBestanden ? '✅ Testfahrt absolviert & bestanden' : 'Innen- & Außerorts · antippen zum Abhaken'}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>` : ''}
+    <div class="section-block">
+      <div class="section-header">
+        <div class="section-title">ADK – Lernstand Klasse ${klasse}</div>
+        <button onclick="openCustomThemaModal()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:5px 10px;border-radius:7px;font-size:0.72rem;cursor:pointer;font-family:'Manrope',sans-serif;">+ Thema</button>
+      </div>
+      <div class="section-body">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;font-size:0.7rem;color:var(--muted);background:var(--surface2);padding:8px 12px;border-radius:8px">
+          <span>🔴 Nicht gezeigt</span><span>🟠 Gezeigt</span><span>🟡 Ausreichend</span><span>🟢 Beherrscht</span><span>⭐ Sehr sicher</span>
+        </div>
+        <div class="themen-list">${themenHTML}${customThemenHTML}</div>
+      </div>
+    </div>
+    <div class="section-block">
+      <div class="section-header">
+        <div class="section-title">📊 ADK-Fortschritt je Gruppe</div>
+        <span style="font-size:0.65rem;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:1px 5px">Bewertungshistorie</span>
+      </div>
+      <div class="section-body">${renderAdkGruppenChart(s)}</div>
+    </div>
+    <div class="section-block">
+      <div class="section-header"><div class="section-title">Notizen & Bemerkungen</div></div>
+      <div class="section-body">
+        <textarea class="notes-textarea" id="notes-ta" placeholder="Beobachtungen, Förderziele, Besonderheiten…">${s.notes||''}</textarea>
+        <button class="save-btn" onclick="saveNotes()">Notizen speichern</button>
+      </div>
+    </div>
+    <div class="section-block">
+      <div class="section-header"><div class="section-title">Eigene Felder</div></div>
+      <div class="section-body">${renderCustomFields(s)}</div>
+    </div>
+    <button class="delete-btn" onclick="deleteStudent()">🗑 Schüler löschen</button>
+    ${!s.archiviert ? `<button onclick="pruefungBestanden()" style="width:100%;margin:0 0 32px;padding:16px;background:var(--accent2);border:none;border-radius:var(--radius);color:#fff;font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;cursor:pointer;letter-spacing:0.02em">🎓 Prüfung bestanden!</button>` : ''}`;
+
+  // Show/hide archive banner
+  const banner = document.getElementById('pruefung-banner');
+  if (s.archiviert) {
+    banner.style.display = 'flex';
+    document.getElementById('detail-header-sub').textContent = '🎓 Archiviert';
+  } else {
+    banner.style.display = 'none';
+    document.getElementById('detail-header-sub').textContent = 'Schüler-Kartei';
+  }
+}
+
+// ─── ADK GRUPPEN CHART ───────────────────────────────────────
+function renderAdkGruppenChart(s) {
+  const ADK = (s.klasse === 'A') ? ADK_THEMEN_A : ADK_THEMEN;
+  const gruppen = ADK.map((g, gi) => {
+    const vals = g.items.map(t => (s.themen||{})[t] || 0);
+    const avg = vals.reduce((a,v) => a + Math.min(v,4), 0) / vals.length / 4 * 100;
+    return { name: g.gruppe, pct: Math.round(avg), farbe: COLORS[gi % COLORS.length] };
+  });
+
+  const stufen = ['🔴','🟠','🟡','🟢','⭐'];
+  const stufenLabel = ['Nicht gezeigt','Gezeigt','Ausreichend','Beherrscht','Sehr sicher'];
+
+  const bars = gruppen.map(g => {
+    const pct = g.pct;
+    const color = pct >= 80 ? '#3fb950' : pct >= 50 ? '#f0b429' : '#58a6ff';
+    // Kurzer Gruppenname ohne Emoji-Präfix
+    const kurzName = g.name.replace(/^[^\w\s]+\s*/u, '');
+    return `
+      <div style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+          <span style="font-size:0.78rem;font-weight:600;color:var(--text)">${g.name}</span>
+          <span style="font-size:0.8rem;font-weight:800;color:${color};min-width:36px;text-align:right">${pct}%</span>
+        </div>
+        <div style="background:var(--surface2);border-radius:6px;height:10px;overflow:hidden;border:1px solid var(--border)">
+          <div style="height:100%;width:${pct}%;background:${color};border-radius:6px;transition:width 0.5s ease"></div>
+        </div>
+      </div>`;
+  }).join('');
+
+  // Radar-ähnliche Übersicht als SVG-Spinnennetz
+  const n = gruppen.length;
+  const cx = 130, cy = 130, r = 100;
+  const angleStep = (2 * Math.PI) / n;
+  const toXY = (i, radius) => ({
+    x: cx + radius * Math.sin(i * angleStep),
+    y: cy - radius * Math.cos(i * angleStep)
+  });
+
+  // Netzlinien
+  let netz = '';
+  for (let ring = 1; ring <= 4; ring++) {
+    const pts = gruppen.map((_, i) => {
+      const p = toXY(i, r * ring / 4);
+      return `${p.x.toFixed(1)},${p.y.toFixed(1)}`;
+    }).join(' ');
+    netz += `<polygon points="${pts}" fill="none" stroke="var(--border)" stroke-width="0.8" opacity="0.6"/>`;
+  }
+  // Achsen
+  let achsen = gruppen.map((_, i) => {
+    const p = toXY(i, r);
+    return `<line x1="${cx}" y1="${cy}" x2="${p.x.toFixed(1)}" y2="${p.y.toFixed(1)}" stroke="var(--border)" stroke-width="0.8" opacity="0.6"/>`;
+  }).join('');
+  // Datenpunkte
+  const dataPoints = gruppen.map((g, i) => {
+    const p = toXY(i, r * g.pct / 100);
+    return `${p.x.toFixed(1)},${p.y.toFixed(1)}`;
+  }).join(' ');
+  // Labels
+  let labels = gruppen.map((g, i) => {
+    const p = toXY(i, r + 18);
+    const emoji = g.name.match(/^(\S+)/u)?.[1] || '';
+    return `<text x="${p.x.toFixed(1)}" y="${p.y.toFixed(1)}" text-anchor="middle" font-size="13" dominant-baseline="middle">${emoji}</text>`;
+  }).join('');
+
+  const radar = `
+    <svg viewBox="0 0 260 260" width="100%" style="max-width:260px;display:block;margin:0 auto 8px">
+      ${netz}${achsen}
+      <polygon points="${dataPoints}" fill="var(--accent)" fill-opacity="0.2" stroke="var(--accent)" stroke-width="2"/>
+      ${gruppen.map((g,i) => {
+        const p = toXY(i, r * g.pct / 100);
+        return `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4" fill="var(--accent)"/>`;
+      }).join('')}
+      ${labels}
+    </svg>
+    <div style="font-size:0.68rem;color:var(--muted);text-align:center;margin-bottom:12px">Jede Achse = eine ADK-Gruppe · außen = 100%</div>`;
+
+  return `
+    <div style="margin-bottom:4px">${radar}</div>
+    <div>${bars}</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:0.68rem;color:var(--muted)">
+      <span>🔵 0–49% Anfänger</span>
+      <span>🟡 50–79% Fortschritt</span>
+      <span>🟢 80–100% Gut</span>
+    </div>`;
+}
+
+// ─── UNTERSCHRIFT (Signature Pad) ────────────────────────────
+let sigCanvas = null, sigCtx = null, sigDrawing = false;
+
+function initSignaturePad() {
+  sigCanvas = document.getElementById('sig-canvas');
+  if (!sigCanvas) return;
+  sigCtx = sigCanvas.getContext('2d');
+  // Skalierung für Retina
+  const dpr = window.devicePixelRatio || 1;
+  const rect = sigCanvas.getBoundingClientRect();
+  sigCanvas.width  = rect.width  * dpr;
+  sigCanvas.height = rect.height * dpr;
+  sigCtx.scale(dpr, dpr);
+  sigCtx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#e6edf3';
+  sigCtx.lineWidth = 2.5;
+  sigCtx.lineCap = 'round';
+  sigCtx.lineJoin = 'round';
+
+  const getPos = (e) => {
+    const r = sigCanvas.getBoundingClientRect();
+    const src = e.touches ? e.touches[0] : e;
+    return { x: src.clientX - r.left, y: src.clientY - r.top };
+  };
+  sigCanvas.addEventListener('pointerdown', e => {
+    sigDrawing = true;
+    const p = getPos(e);
+    sigCtx.beginPath();
+    sigCtx.moveTo(p.x, p.y);
+    e.preventDefault();
+  }, { passive: false });
+  sigCanvas.addEventListener('pointermove', e => {
+    if (!sigDrawing) return;
+    const p = getPos(e);
+    sigCtx.lineTo(p.x, p.y);
+    sigCtx.stroke();
+    e.preventDefault();
+  }, { passive: false });
+  sigCanvas.addEventListener('pointerup',   () => { sigDrawing = false; });
+  sigCanvas.addEventListener('pointerout',  () => { sigDrawing = false; });
+}
+
+function isSignatureEmpty() {
+  if (!sigCanvas) return true;
+  const data = sigCtx.getImageData(0, 0, sigCanvas.width, sigCanvas.height).data;
+  return !data.some((v, i) => i % 4 === 3 && v > 10);
+}
+
+window.clearSignature = () => {
+  if (!sigCtx || !sigCanvas) return;
+  sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height);
+};
+
+function renderLernkurve() {
+  if (protokollEintraege.length < 2) {
+    return `<div style="font-size:0.8rem;color:var(--muted);text-align:center;padding:12px 0 4px">📈 Lernkurve erscheint ab 2 Fahrstunden</div>`;
+  }
+  const W = 320, H = 100, pad = 12;
+  const pts = protokollEintraege.filter(e => e.fortschritt != null);
+  if (pts.length < 2) return '';
+  const maxF = 100, minF = 0;
+  const xStep = (W - pad*2) / (pts.length - 1);
+  const toX = i => pad + i * xStep;
+  const toY = v => H - pad - ((v - minF) / (maxF - minF)) * (H - pad*2);
+  const pathD = pts.map((p,i) => `${i===0?'M':'L'}${toX(i).toFixed(1)},${toY(p.fortschritt).toFixed(1)}`).join(' ');
+  const areaD = pathD + ` L${toX(pts.length-1).toFixed(1)},${H-pad} L${pad},${H-pad} Z`;
+  const lastPt = pts[pts.length-1];
+  return `
+    <div style="margin-bottom:12px">
+      <div style="font-size:0.72rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">📈 Lernkurve – Fortschritt über Zeit</div>
+      <svg width="100%" viewBox="0 0 ${W} ${H}" style="overflow:visible">
+        <defs>
+          <linearGradient id="kurveGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.3"/>
+            <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <path d="${areaD}" fill="url(#kurveGrad)"/>
+        <path d="${pathD}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        ${pts.map((p,i) => `<circle cx="${toX(i).toFixed(1)}" cy="${toY(p.fortschritt).toFixed(1)}" r="3.5" fill="var(--accent)"/>`).join('')}
+        <text x="${toX(pts.length-1).toFixed(1)}" y="${(toY(lastPt.fortschritt)-8).toFixed(1)}" text-anchor="middle" font-size="10" fill="var(--accent)" font-weight="bold">${lastPt.fortschritt}%</text>
+        <text x="${pad}" y="${H-2}" font-size="9" fill="var(--muted)">${pts[0].datum?.slice(5)||''}</text>
+        <text x="${toX(pts.length-1).toFixed(1)}" y="${H-2}" text-anchor="end" font-size="9" fill="var(--muted)">${lastPt.datum?.slice(5)||''}</text>
+      </svg>
+    </div>`;
+}
+
+function renderProtokollListe() {
+  if (!protokollEintraege.length) {
+    return `<div style="font-size:0.82rem;color:var(--muted);text-align:center;padding:8px 0">Noch keine Fahrstunden eingetragen.<br>Tippe auf <strong>+</strong> um die erste Stunde zu erfassen.</div>`;
+  }
+
+  // Mini-Kalender: aktueller Monat mit markierten Fahrtagen
+  const heute = new Date();
+  const year = heute.getFullYear(), month = heute.getMonth();
+  const firstDay = new Date(year, month, 1).getDay() || 7; // Mo=1
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const fahrtage = new Set(protokollEintraege
+    .filter(e => e.datum && e.datum.startsWith(`${year}-${String(month+1).padStart(2,'0')}`))
+    .map(e => parseInt(e.datum.split('-')[2]))
+  );
+  const monate = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+  let kalCells = '';
+  for (let i=1; i<firstDay; i++) kalCells += `<div></div>`;
+  for (let d=1; d<=daysInMonth; d++) {
+    const isToday = d === heute.getDate();
+    const hasFahrt = fahrtage.has(d);
+    kalCells += `<div style="
+      width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+      font-size:0.72rem;font-weight:${isToday||hasFahrt?'800':'400'};
+      background:${hasFahrt?'var(--accent)':isToday?'var(--surface2)':'none'};
+      color:${hasFahrt?'#0d1117':isToday?'var(--text)':'var(--muted)'};
+      border:${isToday&&!hasFahrt?'1px solid var(--border)':'none'};
+      margin:1px auto;
+    ">${d}</div>`;
+  }
+
+  const miniKal = `
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:14px">
+      <div style="font-size:0.78rem;font-weight:700;color:var(--text);margin-bottom:8px;text-align:center">${monate[month]} ${year} · ${fahrtage.size} Fahrstunde${fahrtage.size!==1?'n':''}</div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);text-align:center;gap:0">
+        ${['Mo','Di','Mi','Do','Fr','Sa','So'].map(t=>`<div style="font-size:0.62rem;color:var(--muted);font-weight:700;padding-bottom:4px">${t}</div>`).join('')}
+        ${kalCells}
+      </div>
+    </div>`;
+
+  const sorted = [...protokollEintraege].reverse();
+  const eintraege = sorted.map(e => {
+    const sterne = e.sterne ? '⭐'.repeat(e.sterne) : '';
+    const maengelHTML = (e.maengel||[]).length
+      ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">${(e.maengel||[]).map(m=>`<span style="background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.3);color:var(--danger);border-radius:12px;padding:2px 8px;font-size:0.68rem">${m}</span>`).join('')}</div>`
+      : '';
+    return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:4px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:0.95rem;color:var(--accent)">Std. ${e.stunde}</div>
+          <div style="font-size:0.75rem;color:var(--muted)">${formatDate(e.datum)}</div>
+          ${sterne ? `<div style="font-size:0.75rem">${sterne}</div>` : ''}
+        </div>
+        <button onclick="deleteProtokollEintrag('${e.id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.8rem;padding:2px">🗑</button>
+      </div>
+      ${maengelHTML}
+      ${e.notiz ? `<div style="font-size:0.82rem;color:var(--text);line-height:1.4;margin-top:4px">📝 ${e.notiz}</div>` : ''}
+      ${e.fortschritt != null ? `<div style="font-size:0.68rem;color:var(--muted)">Fortschritt: ${e.fortschritt}%</div>` : ''}
+    </div>`;
+  }).join('');
+
+  return miniKal + `<div style="display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto">${eintraege}</div>`;
+}
+
+function renderCustomFields(s) {
+  if (!customFields.length) {
+    return `<button class="btn-add-field" onclick="openCustomFieldModal()">+ Eigenes Feld hinzufügen</button>`;
+  }
+  const rows = customFields.map(f => {
+    const checked = (s.customFields || {})[f.id] || false;
+    return `<div class="custom-field-row" onclick="toggleCustomField('${f.id}')">
+      <div class="custom-checkbox${checked?' checked':''}>${checked?'✓':''}</div>
+      <div class="custom-field-name">${f.name}</div>
+      <button class="btn-delete-field" onclick="event.stopPropagation();deleteCustomField('${f.id}')">🗑</button>
+    </div>`;
+  }).join('');
+  return rows + `<button class="btn-add-field" onclick="openCustomFieldModal()">+ Weiteres Feld hinzufügen</button>`;
+}
+
+window.pruefungBestanden = async () => {
+  const s = getStudent(activeId);
+  if (!confirm(`${s.vorname} ${s.nachname} als „Prüfung bestanden" archivieren?\n\nSie werden aus der aktiven Liste entfernt und sind im 🎓 Archiv-Filter noch sichtbar.`)) return;
+  await saveToFirestore(activeId, { archiviert: true, archiviertAm: Date.now() });
+  toast(`🎓 ${s.vorname} ${s.nachname} – Herzlichen Glückwunsch!`);
+  goBack();
+};
+
+window.unarchiveStudent = async () => {
+  await saveToFirestore(activeId, { archiviert: false, archiviertAm: null });
+  toast('Schüler wieder aktiviert.');
+};
+
+window.changeStunden = async (delta) => {
+  const s = getStudent(activeId);
+  const neu = Math.max(0, (s.fahrstunden||0) + delta);
+  await saveToFirestore(activeId, { fahrstunden: neu });
+};
+
+window.setStundenDirekt = async (val) => {
+  const neu = Math.max(0, Math.min(999, parseInt(val)||0));
+  await saveToFirestore(activeId, { fahrstunden: neu });
+  const inp = document.getElementById('stunden-input');
+  if (inp) inp.value = neu;
+};
+
+window.setStern = (n) => {
+  aktiveSterne = aktiveSterne === n ? 0 : n;
+  [1,2,3,4,5].forEach(i => {
+    const b = document.getElementById('stern-'+i);
+    if (b) b.classList.toggle('active', i <= aktiveSterne);
+  });
+};
+
+window.toggleMangel = (btn) => {
+  btn.classList.toggle('selected');
+  const m = btn.dataset.m;
+  if (btn.classList.contains('selected')) {
+    if (!aktiveMaengel.includes(m)) aktiveMaengel.push(m);
+  } else {
+    aktiveMaengel = aktiveMaengel.filter(x => x !== m);
+  }
+};
+
+window.addProtokollEintrag = async () => {
+  const datum = document.getElementById('inp-proto-datum').value;
+  const notiz = document.getElementById('inp-proto-notiz').value.trim();
+  if (!datum) { toast('Bitte ein Datum wählen.'); return; }
+  const s = getStudent(activeId);
+  const fortschritt = Math.min(overallProgress(s), 100);
+  const anzahlBisher = protokollEintraege.length + 1;
+  // Unterschrift als Base64 (nur wenn nicht leer)
+  const unterschrift = (!isSignatureEmpty() && sigCanvas)
+    ? sigCanvas.toDataURL('image/png')
+    : null;
+  try {
+    await addDoc(collection(db, 'protokoll'), {
+      studentId: activeId,
+      uid: currentUser.uid,
+      datum,
+      notiz: notiz || '',
+      maengel: [...aktiveMaengel],
+      sterne: aktiveSterne,
+      stunde: anzahlBisher,
+      fortschritt,
+      unterschrift: unterschrift || null,
+      createdAt: Date.now()
+    });
+    document.getElementById('protokoll-modal').classList.remove('open');
+    toast(`Eintrag vom ${formatDate(datum)} gespeichert ${aktiveSterne ? '⭐'.repeat(aktiveSterne) : '✓'}${unterschrift ? ' ✍️' : ''}`);
+    renderProtokollScreen();
+  } catch(e) { toast('Fehler beim Speichern.'); }
+};
+
+function listenProtokoll(studentId) {
+  if (unsubProtokoll) { unsubProtokoll(); unsubProtokoll = null; }
+  const q = query(collection(db, 'protokoll'), where('studentId', '==', studentId), where('uid', '==', currentUser.uid));
+  unsubProtokoll = onSnapshot(q, snap => {
+    protokollEintraege = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    protokollEintraege.sort((a,b) => a.datum.localeCompare(b.datum));
+    if (activeId === studentId) {
+      renderDetail();
+      const ps = document.getElementById('screen-protokoll');
+      if (ps && ps.style.display !== 'none') renderProtokollScreen();
+    }
+  });
+}
+
+window.deleteProtokollEintrag = async (id) => {
+  if (!confirm('Diesen Eintrag löschen?')) return;
+  await deleteDoc(doc(db, 'protokoll', id));
+  toast('Eintrag gelöscht.');
+  renderProtokollScreen();
+};
+
+window.toggleTheorie = async () => {
+  const s = getStudent(activeId);
+  await saveToFirestore(activeId, { theorieBestanden: !s.theorieBestanden });
+  toast(s.theorieBestanden ? 'Theorie: offen' : 'Theorie: bestanden ✓');
+};
+
+window.changeSonder = async (key,delta) => {
+  const s=getStudent(activeId);
+  const sf={...(s.sonderfahrten||{})};
+  sf[key]=Math.max(0,(sf[key]||0)+delta);
+  await saveToFirestore(activeId,{sonderfahrten:sf});
+};
+
+window.setThema = async (thema, val) => {
+  const s = getStudent(activeId);
+  const th = { ...(s.themen||{}) };
+  th[thema] = val;
+  await saveToFirestore(activeId, { themen: th });
+};
+
+window.saveNotes = async () => {
+  const notes=document.getElementById('notes-ta').value;
+  await saveToFirestore(activeId,{notes});
+  toast('Notizen gespeichert ✓');
+};
+
+window.deleteStudent = async () => {
+  if (!confirm('Schüler wirklich löschen?')) return;
+  await deleteDoc(doc(db,'students',activeId));
+  activeId=null;
+  goBack();
+  toast('Schüler gelöscht.');
+};
+
+// ─────────────────────────────────────────
+// ADD STUDENT
+// ─────────────────────────────────────────
+window.openAddModal = () => {
+  ['inp-vn','inp-nn'].forEach(id=>document.getElementById(id).value='');
+  const geb = document.getElementById('inp-geb');
+  if (geb) geb.value='';
+  newStudentKlasse = 'B';
+  document.getElementById('klasse-b-btn').classList.add('active');
+  document.getElementById('klasse-b197-btn').classList.remove('active');
+  document.getElementById('klasse-a-btn').classList.remove('active');
+  document.getElementById('b197-hint').style.display = 'none';
+  document.getElementById('add-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('inp-vn').focus(),100);
+};
+
+window.setKlasse = (k) => {
+  newStudentKlasse = k;
+  document.getElementById('klasse-b-btn').classList.toggle('active', k==='B');
+  document.getElementById('klasse-b197-btn').classList.toggle('active', k==='B197');
+  document.getElementById('klasse-a-btn').classList.toggle('active', k==='A');
+  document.getElementById('b197-hint').style.display = k==='B197' ? 'block' : 'none';
+};
+
+window.addStudent = async () => {
+  const vn=document.getElementById('inp-vn').value.trim();
+  const nn=document.getElementById('inp-nn').value.trim();
+  if (!vn||!nn) { toast('Bitte Vor- und Nachname eingeben.'); return; }
+  const ziel = newStudentKlasse==='A' ? 20 : 30;
+  try {
+    await addDoc(collection(db,'students'),{
+      uid: currentUser.uid,
+      vorname:vn, nachname:nn,
+      geburt:document.getElementById('inp-geb').value,
+      klasse: newStudentKlasse,
+      zielStunden: ziel,
+      fahrstunden:0, sonderfahrten:{}, themen:{}, customThemen:{}, customFields:{}, notes:'',
+      schaltstunden: 0, testfahrtBestanden: false,
+      createdAt: Date.now()
+    });
+    document.getElementById('add-modal').classList.remove('open');
+    toast(`${vn} ${nn} (Klasse ${newStudentKlasse}) angelegt ✓`);
+  } catch(e) { toast('Fehler beim Anlegen.'); }
+};
+
+window.closeModal = (e) => { if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('open'); };
+
+// ─────────────────────────────────────────
+// THEME TOGGLE
+// ─────────────────────────────────────────
+function initTheme() {
+  const saved = localStorage.getItem('fs_theme') || 'dark';
+  if (saved === 'light') {
+    document.body.classList.add('light');
+    const btn = document.getElementById('theme-btn');
+    if (btn) btn.textContent = '🌙';
+  }
+}
+
+window.toggleTheme = () => {
+  const isLight = document.body.classList.toggle('light');
+  localStorage.setItem('fs_theme', isLight ? 'light' : 'dark');
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = isLight ? '🌙' : '☀️';
+};
+
+// ─────────────────────────────────────────
+// DASHBOARD
+// ─────────────────────────────────────────
+window.openDashboard = () => {
+  document.getElementById('screen-list').classList.remove('active');
+  document.getElementById('screen-dashboard').classList.add('active');
+  renderDashboard();
+};
+
+window.closeDashboard = () => {
+  document.getElementById('screen-dashboard').classList.remove('active');
+  document.getElementById('screen-list').classList.add('active');
+};
+
+function renderDashboard() {
+  const aktive = students.filter(s => !s.archiviert);
+  const archiviert = students.filter(s => s.archiviert);
+  const total = aktive.length;
+
+  if (!total && !archiviert.length) {
+    document.getElementById('dashboard-body').innerHTML = `<div class="empty-state"><div class="ei">📊</div><p>Noch keine Schüler vorhanden.</p></div>`;
+    return;
+  }
+
+  const sorted = [...aktive].sort((a,b) => overallProgress(b) - overallProgress(a));
+  const pruefungsreif = aktive.filter(s => overallProgress(s) >= 90).length;
+  const sonderOk = aktive.filter(s => SONDERFAHRTEN.every(f => (s.sonderfahrten||{})[f.key] >= f.min)).length;
+  const theorieBestanden = aktive.filter(s => s.theorieBestanden).length;
+  const avgStunden = total ? Math.round(aktive.reduce((a,s) => a + (s.fahrstunden||0), 0) / total) : 0;
+  const avgPct = total ? Math.round(aktive.reduce((a,s) => a + overallProgress(s), 0) / total) : 0;
+  const maxStunden = total ? Math.max(...aktive.map(s => s.fahrstunden||0)) : 0;
+  const minStunden = total ? Math.min(...aktive.filter(s=>(s.fahrstunden||0)>0).map(s => s.fahrstunden||0)) : 0;
+  const schnellster = [...aktive].sort((a,b) => overallProgress(b) - overallProgress(a))[0];
+  const klasseA = aktive.filter(s => s.klasse === 'A').length;
+  const klasseB = aktive.filter(s => (s.klasse||'B') === 'B').length;
+
+  const rows = sorted.map(s => {
+    const pct = Math.min(overallProgress(s), 100);
+    const c = getColor(s);
+    const warnung = pct >= 80 && !SONDERFAHRTEN.every(f => (s.sonderfahrten||{})[f.key] >= f.min);
+    return `<div class="dash-student-row">
+      <div class="avatar" style="background:${c};width:38px;height:38px;font-size:0.85rem;flex-shrink:0">${initials(s)}</div>
+      <div class="dash-bar-wrap">
+        <div class="dash-name">
+          <span>${s.vorname} ${s.nachname} ${warnung?'<span style="color:var(--danger);font-size:0.7rem">⚠️ Pflichtf. fehlen</span>':''}</span>
+          <span class="dash-pct" style="color:${progressColor(pct)}">${pct}%</span>
+        </div>
+        <div class="dash-bar-bg">
+          <div class="dash-bar-fill" style="width:${pct}%;background:${progressColor(pct)}"></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:5px;font-size:0.68rem;color:var(--muted);flex-wrap:wrap">
+          <span>${s.klasse==='A'?'🏍️':'🚗'} Klasse ${s.klasse||'B'}</span>
+          <span>🚗 ${s.fahrstunden||0} Std.</span>
+          <span>🌄${(s.sonderfahrten||{}).ueber||0} 🛣️${(s.sonderfahrten||{}).autobahn||0} 🌙${(s.sonderfahrten||{}).nacht||0}</span>
+          ${s.theorieBestanden?'<span style="color:var(--accent2)">📋 Theorie ✓</span>':''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('dashboard-body').innerHTML = `
+    <div style="padding:14px 16px 80px">
+
+      <div style="font-family:'Syne',sans-serif;font-size:0.72rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:10px">📊 Aktuelle Schüler</div>
+      <div class="dash-kpi-row">
+        <div class="dash-kpi"><div class="dash-kpi-val" style="color:var(--accent)">${total}</div><div class="dash-kpi-lbl">Aktive Schüler</div></div>
+        <div class="dash-kpi"><div class="dash-kpi-val" style="color:var(--accent2)">${pruefungsreif}</div><div class="dash-kpi-lbl">Prüfungsreif</div></div>
+        <div class="dash-kpi"><div class="dash-kpi-val" style="color:var(--blue)">${klasseB}</div><div class="dash-kpi-lbl">🚗 Klasse B</div></div>
+        <div class="dash-kpi"><div class="dash-kpi-val" style="color:#bc8cff">${klasseA}</div><div class="dash-kpi-lbl">🏍️ Klasse A</div></div>
+      </div>
+
+      <div style="font-family:'Syne',sans-serif;font-size:0.72rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin:14px 0 10px">📈 Statistiken</div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--muted);margin-bottom:8px"><span>Ø Gesamtfortschritt</span><span style="color:${progressColor(avgPct)};font-weight:700">${avgPct}%</span></div>
+        <div class="dash-bar-bg" style="height:8px"><div class="dash-bar-fill" style="width:${avgPct}%;background:${progressColor(avgPct)}"></div></div>
+      </div>
+      <div class="dash-kpi-row">
+        <div class="dash-kpi"><div class="dash-kpi-val" style="color:var(--blue)">${avgStunden}</div><div class="dash-kpi-lbl">Ø Fahrstunden</div></div>
+        <div class="dash-kpi"><div class="dash-kpi-val" style="color:var(--accent2)">${sonderOk}</div><div class="dash-kpi-lbl">Pflichtf. ✓</div></div>
+        <div class="dash-kpi"><div class="dash-kpi-val" style="color:var(--accent)">${theorieBestanden}</div><div class="dash-kpi-lbl">Theorie ✓</div></div>
+        <div class="dash-kpi"><div class="dash-kpi-val" style="color:var(--danger)">${archiviert.length}</div><div class="dash-kpi-lbl">🎓 Bestanden</div></div>
+      </div>
+
+      ${schnellster ? `
+      <div style="background:var(--surface);border:1px solid var(--accent2);border-radius:14px;padding:14px 16px;margin-bottom:10px">
+        <div style="font-size:0.72rem;color:var(--accent2);font-weight:700;margin-bottom:6px">🏆 Bester Fortschritt</div>
+        <div style="font-weight:700">${schnellster.vorname} ${schnellster.nachname}</div>
+        <div style="font-size:0.78rem;color:var(--muted)">${Math.min(overallProgress(schnellster),100)}% Fortschritt · ${schnellster.fahrstunden||0} Fahrstunden</div>
+      </div>` : ''}
+
+      ${maxStunden > 0 ? `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:14px;display:flex;gap:12px">
+        <div style="flex:1;text-align:center">
+          <div style="font-family:'Syne',sans-serif;font-size:1.5rem;font-weight:800;color:var(--accent)">${maxStunden}</div>
+          <div style="font-size:0.7rem;color:var(--muted)">Meiste Stunden</div>
+        </div>
+        <div style="width:1px;background:var(--border)"></div>
+        <div style="flex:1;text-align:center">
+          <div style="font-family:'Syne',sans-serif;font-size:1.5rem;font-weight:800;color:var(--blue)">${minStunden||'–'}</div>
+          <div style="font-size:0.7rem;color:var(--muted)">Wenigste Stunden</div>
+        </div>
+        <div style="width:1px;background:var(--border)"></div>
+        <div style="flex:1;text-align:center">
+          <div style="font-family:'Syne',sans-serif;font-size:1.5rem;font-weight:800;color:var(--accent2)">${archiviert.length}</div>
+          <div style="font-size:0.7rem;color:var(--muted)">Abschlüsse</div>
+        </div>
+      </div>` : ''}
+
+      <div style="font-family:'Syne',sans-serif;font-size:0.72rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:10px">Alle Schüler – nach Fortschritt</div>
+      ${rows}
+    </div>`;
+}
+
+// ─────────────────────────────────────────
+// EINSTELLUNGEN & PASSWORT ÄNDERN
+// ─────────────────────────────────────────
+window.openSettings = () => {
+  document.getElementById('inp-pw-alt').value = '';
+  document.getElementById('inp-pw-neu').value = '';
+  document.getElementById('inp-pw-neu2').value = '';
+  document.getElementById('settings-error').textContent = '';
+  document.getElementById('settings-success').textContent = '';
+  const disp = document.getElementById('settings-username-display');
+  if (disp && currentUser) disp.textContent = '👤 Angemeldet als: ' + (currentUser.displayName || '');
+  document.getElementById('settings-modal').classList.add('open');
+};
+
+window.changePassword = async () => {
+  const altPw = document.getElementById('inp-pw-alt').value;
+  const neuPw = document.getElementById('inp-pw-neu').value;
+  const neuPw2 = document.getElementById('inp-pw-neu2').value;
+  const errEl = document.getElementById('settings-error');
+  const okEl = document.getElementById('settings-success');
+  errEl.textContent = ''; okEl.textContent = '';
+
+  if (!altPw || !neuPw || !neuPw2) { errEl.textContent = 'Bitte alle Felder ausfüllen.'; return; }
+  if (neuPw.length < 6) { errEl.textContent = 'Neues Passwort muss mindestens 6 Zeichen haben.'; return; }
+  if (neuPw !== neuPw2) { errEl.textContent = 'Die neuen Passwörter stimmen nicht überein.'; return; }
+  if (neuPw === altPw) { errEl.textContent = 'Das neue Passwort muss sich vom alten unterscheiden.'; return; }
+
+  try {
+    // Re-authentifizieren mit aktuellem Passwort
+    const credential = EmailAuthProvider.credential(currentUser.email, altPw);
+    await reauthenticateWithCredential(currentUser, credential);
+    // Passwort ändern
+    await updatePassword(currentUser, neuPw);
+    okEl.textContent = '✓ Passwort erfolgreich geändert!';
+    document.getElementById('inp-pw-alt').value = '';
+    document.getElementById('inp-pw-neu').value = '';
+    document.getElementById('inp-pw-neu2').value = '';
+  } catch(e) {
+    if (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
+      errEl.textContent = 'Aktuelles Passwort ist falsch.';
+    } else if (e.code === 'auth/too-many-requests') {
+      errEl.textContent = 'Zu viele Versuche. Bitte kurz warten.';
+    } else {
+      errEl.textContent = 'Fehler: ' + e.code;
+    }
+  }
+};
+
+// ─────────────────────────────────────────
+// TRANSFER STUDENT
+// ─────────────────────────────────────────
+window.openTransferModal = () => {
+  document.getElementById('inp-transfer-username').value = '';
+  document.getElementById('transfer-error').textContent = '';
+  document.getElementById('transfer-modal').classList.add('open');
+  setTimeout(() => document.getElementById('inp-transfer-username').focus(), 100);
+};
+
+window.transferStudent = async () => {
+  const username = document.getElementById('inp-transfer-username').value.trim().toLowerCase();
+  const errEl = document.getElementById('transfer-error');
+  errEl.textContent = '';
+  if (!username) { errEl.textContent = 'Bitte einen Benutzernamen eingeben.'; return; }
+
+  const s = getStudent(activeId);
+  const myUsername = currentUser.displayName;
+
+  try {
+    const q = query(collection(db, 'users'), where('username', '==', username));
+    const snap = await new Promise((res, rej) => {
+      const unsub = onSnapshot(q, (s) => { unsub(); res(s); }, rej);
+    });
+
+    if (snap.empty) {
+      errEl.textContent = 'Kein Fahrlehrer mit diesem Benutzernamen gefunden.';
+      return;
+    }
+
+    const targetUid = snap.docs[0].data().uid;
+    if (targetUid === currentUser.uid) { errEl.textContent = 'Das ist dein eigener Benutzername.'; return; }
+
+    await updateDoc(doc(db, 'students', activeId), { uid: targetUid });
+    document.getElementById('transfer-modal').classList.remove('open');
+    goBack();
+    toast(`${s.vorname} ${s.nachname} wurde übertragen ✓`);
+  } catch(e) {
+    errEl.textContent = 'Fehler bei der Übertragung. Bitte erneut versuchen.';
+  }
+};
+
+// ─────────────────────────────────────────
+// TOAST
+// ─────────────────────────────────────────
+window.toast = (msg) => {
+  const t=document.createElement('div'); t.className='toast'; t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),2500);
+};
+
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('open')); });
+
+// ─────────────────────────────────────────
+// SCHÜLER ZUGANGSCODE
+// ─────────────────────────────────────────
+function generateCodeStr() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i=0; i<6; i++) code += chars[Math.floor(Math.random()*chars.length)];
+  return code;
+}
+
+window.openCodeModal = async () => {
+  document.getElementById('code-modal').classList.add('open');
+  document.getElementById('code-display').textContent = '…';
+  document.getElementById('code-valid-until').textContent = '';
+  // Load existing code for this student
+  try {
+    const q = query(collection(db,'accessCodes'), where('studentId','==',activeId));
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      const data = snap.docs[0].data();
+      document.getElementById('code-display').textContent = data.code;
+      const exp = new Date(data.expiresAt);
+      document.getElementById('code-valid-until').textContent = `Gültig bis: ${exp.toLocaleDateString('de-DE')}`;
+    } else {
+      document.getElementById('code-display').textContent = '––––––';
+      document.getElementById('code-valid-until').textContent = 'Noch kein Code generiert';
+    }
+  } catch(e) {
+    document.getElementById('code-display').textContent = '––––––';
+  }
+};
+
+window.generateCode = async () => {
+  const code = generateCodeStr();
+  const expiresAt = Date.now() + 365*24*60*60*1000; // 1 Jahr gültig
+  const s = getStudent(activeId);
+  try {
+    // Delete old codes for this student
+    const q = query(collection(db,'accessCodes'), where('studentId','==',activeId));
+    const snap = await getDocs(q);
+    for (const d of snap.docs) await deleteDoc(doc(db,'accessCodes',d.id));
+    // Save new code
+    await addDoc(collection(db,'accessCodes'), {
+      code,
+      studentId: activeId,
+      teacherUid: currentUser.uid,
+      studentName: `${s.vorname} ${s.nachname}`,
+      expiresAt,
+      createdAt: Date.now()
+    });
+    document.getElementById('code-display').textContent = code;
+    const exp = new Date(expiresAt);
+    document.getElementById('code-valid-until').textContent = `Gültig bis: ${exp.toLocaleDateString('de-DE')}`;
+    toast('Code generiert ✓ – Gib ihn dem Schüler weiter');
+  } catch(e) { toast('Fehler beim Generieren.'); }
+};
+
+// ─────────────────────────────────────────
+// SCHÜLER LOGIN mit Code
+// ─────────────────────────────────────────
+window.doSchuelerLogin = async () => {
+  const code = document.getElementById('inp-schueler-code').value.trim().toUpperCase();
+  const errEl = document.getElementById('schueler-code-error');
+  const btn   = document.getElementById('btn-schueler-code');
+  errEl.textContent = '';
+  if (code.length < 6) { errEl.textContent = 'Bitte einen 6-stelligen Code eingeben.'; return; }
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    const q = query(collection(db,'accessCodes'), where('code','==',code));
+    const snap = await getDocs(q);
+    if (snap.empty) {
+      errEl.textContent = 'Ungültiger Code. Bitte prüfe die Eingabe.';
+      btn.disabled=false; btn.textContent='Akte öffnen →'; return;
+    }
+    const codeData = snap.docs[0].data();
+    if (codeData.expiresAt < Date.now()) {
+      errEl.textContent = 'Dieser Code ist abgelaufen. Bitte deinen Fahrlehrer um einen neuen.';
+      btn.disabled=false; btn.textContent='Akte öffnen →'; return;
+    }
+    // Load student and protokoll data
+    const studentDoc = await getDoc(doc(db,'students',codeData.studentId));
+    if (!studentDoc.exists()) {
+      errEl.textContent = 'Schüler nicht gefunden.';
+      btn.disabled=false; btn.textContent='Akte öffnen →'; return;
+    }
+    const schuelerData = { id: studentDoc.id, ...studentDoc.data() };
+    // Load protokoll
+    const pq = query(collection(db,'protokoll'), where('studentId','==',codeData.studentId));
+    const pSnap = await getDocs(pq);
+    const protokoll = pSnap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>b.createdAt-a.createdAt);
+    // Show Schüler-Ansicht
+    renderSchuelerAnsicht(schuelerData, protokoll);
+    btn.disabled=false; btn.textContent='Akte öffnen →';
+  } catch(e) {
+    errEl.textContent = 'Fehler beim Laden. Bitte erneut versuchen.';
+    btn.disabled=false; btn.textContent='Akte öffnen →';
+  }
+};
+
+window.schuelerLogout = () => {
+  document.getElementById('screen-schueler').classList.remove('active');
+  document.getElementById('screen-login').classList.add('active');
+  switchTab('schueler');
+};
+
+function renderSchuelerAnsicht(s, protokoll) {
+  // Switch to Schüler screen
+  document.getElementById('screen-login').classList.remove('active');
+  document.getElementById('screen-schueler').classList.add('active');
+  document.getElementById('schueler-header-name').textContent = `${s.vorname} ${s.nachname}`;
+
+  const pct = Math.min(overallProgress(s), 100);
+  const ADK = (s.klasse==='A') ? ADK_THEMEN_A : ADK_THEMEN;
+  const SONDER_DEF = (s.klasse==='A') ? [
+    {key:'ueber',icon:'🌄',label:'Überland',min:5},
+    {key:'autobahn',icon:'🛣️',label:'Autobahn',min:4},
+    {key:'nacht',icon:'🌙',label:'Nacht',min:3}
+  ] : SONDERFAHRTEN;
+  const STUFEN_EM = ['🔴','🟠','🟡','🟢','⭐'];
+
+  // Sonderfahrten
+  const sonderHTML = SONDER_DEF.map(f => {
+    const val = (s.sonderfahrten||{})[f.key]||0;
+    const ok = val >= f.min;
+    return `<div style="background:var(--surface2);border:1px solid ${ok?'var(--accent2)':'var(--border)'};border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:0.85rem">${f.icon} ${f.label}</span>
+      <span style="font-weight:700;color:${ok?'var(--accent2)':'var(--muted)'}">${val}/${f.min} ${ok?'✓':''}</span>
+    </div>`;
+  }).join('');
+
+  // ADK Themen
+  const adkHTML = ADK.map(g => {
+    const items = g.items.map(t => {
+      const val = (s.themen||{})[t]||0;
+      const em = val > 0 ? STUFEN_EM[val-1] : '⬜';
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:0.82rem;color:var(--text)">${t}</span>
+        <span style="font-size:1rem">${em}</span>
+      </div>`;
+    }).join('');
+    return `<div style="margin-bottom:14px">
+      <div style="font-size:0.78rem;font-weight:700;color:var(--muted);margin-bottom:6px">${g.gruppe}</div>
+      ${items}
+    </div>`;
+  }).join('');
+
+  // Protokoll
+  const protokollHTML = protokoll.length ? protokoll.map(e => {
+    const sterne = e.sterne ? '⭐'.repeat(e.sterne) : '';
+    const maengelHTML = (e.maengel||[]).length
+      ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">${(e.maengel||[]).map(m=>`<span style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);color:var(--danger);border-radius:10px;padding:2px 7px;font-size:0.68rem">${m}</span>`).join('')}</div>` : '';
+    return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:7px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <span style="font-weight:700;color:var(--accent);font-family:'Syne',sans-serif">Std. ${e.stunde}</span>
+        <span style="font-size:0.75rem;color:var(--muted)">${formatDate(e.datum)} ${sterne}</span>
+      </div>
+      ${maengelHTML}
+      ${e.notiz ? `<div style="font-size:0.8rem;color:var(--muted);margin-top:5px">📝 ${e.notiz}</div>` : ''}
+      ${e.unterschrift ? `<div style="margin-top:7px"><div style="font-size:0.65rem;color:var(--muted);margin-bottom:3px">✍️ Unterschrift</div><img src="${e.unterschrift}" style="width:100%;max-width:260px;border:1px solid var(--border);border-radius:8px;background:#fff;display:block"></div>` : ''}
+    </div>`;
+  }).join('') : `<div style="font-size:0.82rem;color:var(--muted);text-align:center;padding:12px 0">Noch keine Fahrstunden eingetragen.</div>`;
+
+  document.getElementById('schueler-body').innerHTML = `
+    <div style="padding:16px">
+      <!-- Fortschritt -->
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:12px;text-align:center">
+        <div style="font-family:'Syne',sans-serif;font-size:3rem;font-weight:800;color:${progressColor(pct)}">${pct}%</div>
+        <div style="font-size:0.8rem;color:var(--muted);margin-bottom:14px">Gesamtfortschritt</div>
+        <div style="background:var(--surface2);border-radius:8px;height:10px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${progressColor(pct)};border-radius:8px;transition:width 0.6s"></div>
+        </div>
+        <div style="display:flex;justify-content:space-around;margin-top:16px">
+          <div style="text-align:center"><div style="font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;color:var(--accent)">${s.fahrstunden||0}</div><div style="font-size:0.68rem;color:var(--muted)">Fahrstunden</div></div>
+          <div style="text-align:center"><div style="font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;color:${s.theorieBestanden?'var(--accent2)':'var(--muted)'}">${s.theorieBestanden?'✓':'○'}</div><div style="font-size:0.68rem;color:var(--muted)">Theorie</div></div>
+          <div style="text-align:center"><div style="font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;color:var(--blue)">${s.klasse||'B'}</div><div style="font-size:0.68rem;color:var(--muted)">Klasse</div></div>
+        </div>
+      </div>
+
+      <!-- Pflichtfahrten -->
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:12px">
+        <div style="padding:13px 16px 11px;border-bottom:1px solid var(--border)"><span style="font-family:'Syne',sans-serif;font-size:0.8rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted)">Pflichtfahrten</span></div>
+        <div style="padding:14px 16px;display:flex;flex-direction:column;gap:8px">${sonderHTML}</div>
+      </div>
+
+      <!-- ADK -->
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:12px">
+        <div style="padding:13px 16px 11px;border-bottom:1px solid var(--border)">
+          <span style="font-family:'Syne',sans-serif;font-size:0.8rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted)">ADK Lernstand Klasse ${s.klasse||'B'}</span>
+        </div>
+        <div style="padding:14px 16px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;font-size:0.7rem;color:var(--muted);background:var(--surface2);padding:8px 12px;border-radius:8px">
+            <span>🔴 Nicht gezeigt</span><span>🟠 Gezeigt</span><span>🟡 Ausreichend</span><span>🟢 Beherrscht</span><span>⭐ Sehr sicher</span>
+          </div>
+          ${adkHTML}
+        </div>
+      </div>
+
+      <!-- Protokoll -->
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:12px">
+        <div style="padding:13px 16px 11px;border-bottom:1px solid var(--border)"><span style="font-family:'Syne',sans-serif;font-size:0.8rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted)">Fahrstunden-Protokoll</span></div>
+        <div style="padding:14px 16px">${protokollHTML}</div>
+      </div>
+
+      <div style="text-align:center;font-size:0.72rem;color:var(--muted);padding:8px 0">Nur-Lesen Ansicht · Alle Daten von deinem Fahrlehrer</div>
+    </div>`;
+}
+
+window.changeSchaltstunden = async (delta) => {
+  const s = getStudent(activeId);
+  const neu = Math.max(0, (s.schaltstunden||0) + delta);
+  await saveToFirestore(activeId, { schaltstunden: neu });
+};
+
+window.toggleTestfahrt = async () => {
+  const s = getStudent(activeId);
+  await saveToFirestore(activeId, { testfahrtBestanden: !s.testfahrtBestanden });
+};
+
+
+// ─────────────────────────────────────────
+// PROTOKOLL SCREEN
+// ─────────────────────────────────────────
+window.openProtokollModal = () => {
+  const s = getStudent(activeId);
+  if (!s) return;
+  document.getElementById('protokoll-header-name').textContent = s.vorname + ' ' + s.nachname;
+  protokollKalMonat = new Date().getMonth();
+  protokollKalJahr  = new Date().getFullYear();
+  renderProtokollScreen();
+  document.querySelectorAll('.screen').forEach(sc => sc.style.display = 'none');
+  const ps = document.getElementById('screen-protokoll');
+  ps.style.display = 'flex';
+};
+
+window.closeProtokoll = () => {
+  document.getElementById('screen-protokoll').style.display = 'none';
+  document.getElementById('screen-detail').style.display = 'flex';
+};
+
+let protokollKalMonat = new Date().getMonth();
+let protokollKalJahr  = new Date().getFullYear();
+
+window.kalNavMonat = (delta) => {
+  protokollKalMonat += delta;
+  if (protokollKalMonat > 11) { protokollKalMonat = 0; protokollKalJahr++; }
+  if (protokollKalMonat < 0)  { protokollKalMonat = 11; protokollKalJahr--; }
+  // Nicht in die Zukunft
+  const heute = new Date();
+  if (protokollKalJahr > heute.getFullYear() ||
+     (protokollKalJahr === heute.getFullYear() && protokollKalMonat > heute.getMonth())) {
+    protokollKalMonat = heute.getMonth();
+    protokollKalJahr  = heute.getFullYear();
+  }
+  renderProtokollScreen();
+};
+
+function renderProtokollScreen() {
+  const body = document.getElementById('protokoll-screen-body');
+  if (!body) return;
+
+  const monatNamen = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+  const year = protokollKalJahr, month = protokollKalMonat;
+  const firstDay = new Date(year, month, 1).getDay() || 7;
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const heute = new Date();
+  const isAktuellerMonat = year === heute.getFullYear() && month === heute.getMonth();
+
+  const fahrtage = new Map();
+  protokollEintraege
+    .filter(e => e.datum && e.datum.startsWith(`${year}-${String(month+1).padStart(2,'0')}`))
+    .forEach(e => {
+      const d = parseInt(e.datum.split('-')[2]);
+      fahrtage.set(d, (fahrtage.get(d)||0) + 1);
+    });
+
+  let kalCells = '';
+  for (let i=1; i<firstDay; i++) kalCells += `<div></div>`;
+  for (let d=1; d<=daysInMonth; d++) {
+    const isToday = isAktuellerMonat && d === heute.getDate();
+    const anzahl  = fahrtage.get(d) || 0;
+    const hasFahrt = anzahl > 0;
+    kalCells += `<div style="
+      width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+      font-size:0.78rem;font-weight:${hasFahrt||isToday?'800':'400'};
+      background:${hasFahrt?'var(--accent)':isToday?'var(--surface2)':'none'};
+      color:${hasFahrt?'#0d1117':isToday?'var(--text)':'var(--muted)'};
+      border:${isToday&&!hasFahrt?'1.5px solid var(--accent)':'none'};
+      margin:2px auto;cursor:default;position:relative
+    ">${d}${hasFahrt&&anzahl>1?`<span style="position:absolute;top:0;right:0;background:var(--danger);color:#fff;border-radius:50%;width:12px;height:12px;font-size:0.5rem;display:flex;align-items:center;justify-content:center">${anzahl}</span>`:''}</div>`;
+  }
+
+  // Einträge dieses Monats gefiltert + sortiert
+  const monatsEintraege = [...protokollEintraege]
+    .filter(e => e.datum && e.datum.startsWith(`${year}-${String(month+1).padStart(2,'0')}`))
+    .sort((a,b) => b.datum.localeCompare(a.datum));
+
+  const alleEintraege = [...protokollEintraege].sort((a,b) => b.datum?.localeCompare(a.datum||'')||0);
+
+  const renderEintrag = (e) => {
+    const sterne = e.sterne ? '⭐'.repeat(e.sterne) : '';
+    const maengelHTML = (e.maengel||[]).length
+      ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px">${(e.maengel||[]).map(m=>`<span style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.25);color:var(--danger);border-radius:10px;padding:2px 9px;font-size:0.68rem">${m}</span>`).join('')}</div>`
+      : '';
+    return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:4px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <div style="background:var(--accent);color:#0d1117;border-radius:8px;padding:2px 10px;font-family:'Syne',sans-serif;font-weight:800;font-size:0.88rem">${formatDate(e.datum)}</div>
+          ${sterne ? `<div style="font-size:0.82rem">${sterne}</div>` : ''}
+        </div>
+        <button onclick="deleteProtokollEintrag('${e.id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.9rem;padding:4px 6px">🗑</button>
+      </div>
+      ${maengelHTML}
+      ${e.notiz ? `<div style="font-size:0.84rem;color:var(--text);line-height:1.5;margin-top:6px;padding:8px 10px;background:var(--surface);border-radius:8px;border-left:3px solid var(--accent)">📝 ${e.notiz}</div>` : ''}
+      ${e.unterschrift ? `<div style="margin-top:8px"><div style="font-size:0.68rem;color:var(--muted);margin-bottom:4px">✍️ Unterschrift</div><img src="${e.unterschrift}" style="width:100%;max-width:280px;border:1px solid var(--border);border-radius:8px;background:#fff;display:block"></div>` : ''}
+    </div>`;
+  };
+
+  body.innerHTML = `
+    <div style="padding:16px;display:flex;flex-direction:column;gap:16px">
+
+      <!-- Lernkurve -->
+      ${renderLernkurve()}
+
+      <!-- Monats-Kalender -->
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <button onclick="kalNavMonat(-1)" style="background:var(--surface);border:1px solid var(--border);color:var(--text);width:34px;height:34px;border-radius:10px;cursor:pointer;font-size:1rem">←</button>
+          <div style="font-weight:800;font-size:0.95rem">${monatNamen[month]} ${year} <span style="font-weight:400;color:var(--muted);font-size:0.8rem">· ${fahrtage.size} Fahrtag${fahrtage.size!==1?'e':''}</span></div>
+          <button onclick="kalNavMonat(1)" style="background:var(--surface);border:1px solid var(--border);color:var(--text);width:34px;height:34px;border-radius:10px;cursor:pointer;font-size:1rem;${isAktuellerMonat?'opacity:0.3;cursor:default':''}" ${isAktuellerMonat?'disabled':''}>→</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);text-align:center">
+          ${['Mo','Di','Mi','Do','Fr','Sa','So'].map(t=>`<div style="font-size:0.65rem;color:var(--muted);font-weight:700;padding-bottom:6px">${t}</div>`).join('')}
+          ${kalCells}
+        </div>
+      </div>
+
+      <!-- Einträge dieses Monats -->
+      ${monatsEintraege.length ? `
+        <div>
+          <div style="font-size:0.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Einträge ${monatNamen[month]}</div>
+          <div style="display:flex;flex-direction:column;gap:8px">${monatsEintraege.map(renderEintrag).join('')}</div>
+        </div>` : `<div style="text-align:center;color:var(--muted);font-size:0.85rem;padding:8px 0">Keine Einträge in ${monatNamen[month]} ${year}</div>`}
+
+      <!-- Alle bisherigen Einträge -->
+      ${alleEintraege.length > monatsEintraege.length ? `
+        <details style="border:1px solid var(--border);border-radius:14px;overflow:hidden">
+          <summary style="padding:13px 16px;font-weight:700;font-size:0.88rem;cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;background:var(--surface2)">
+            📋 Alle Einträge <span style="color:var(--muted);font-weight:400;font-size:0.8rem">${alleEintraege.length} gesamt ▼</span>
+          </summary>
+          <div style="padding:12px;display:flex;flex-direction:column;gap:8px">${alleEintraege.map(renderEintrag).join('')}</div>
+        </details>` : ''}
+
+    </div>`;
+}
+
+window.openNewEintragModal = () => {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('inp-proto-datum').value = today;
+  document.getElementById('inp-proto-notiz').value = '';
+  aktiveSterne = 0;
+  [1,2,3,4,5].forEach(n => {
+    const b = document.getElementById('stern-'+n);
+    if (b) b.classList.remove('active');
+  });
+  aktiveMaengel = [];
+  document.querySelectorAll('.mangel-chip').forEach(c => c.classList.remove('selected'));
+  document.getElementById('protokoll-modal').classList.add('open');
+  // Unterschrift-Pad initialisieren (kurz warten bis Modal sichtbar)
+  setTimeout(() => {
+    clearSignature();
+    initSignaturePad();
+    document.getElementById('inp-proto-notiz').focus();
+  }, 150);
+};
+
+// ─── HILFE-SCREEN ────────────────────────────────────────────
+window.openHelp = () => {
+  document.querySelectorAll('.screen').forEach(sc => sc.style.display = 'none');
+  document.getElementById('screen-help').style.display = 'flex';
+};
+window.closeHelp = () => {
+  document.getElementById('screen-help').style.display = 'none';
+  document.getElementById('screen-list').style.display = 'flex';
+};
+
+// ─── TUTORIAL ────────────────────────────────────────────────
+const TUTORIAL_STEPS = [
+  {
+    emoji: '👋',
+    title: 'Willkommen bei Schülerkartei!',
+    text: 'Kurze Tour durch die wichtigsten Funktionen. Du kannst jederzeit überspringen.',
+    target: null,
+  },
+  {
+    emoji: '➕',
+    title: 'Schüler anlegen',
+    text: 'Dieser runde Button legt einen neuen Schüler an. Klasse B, B197 oder A wählbar.',
+    target: 'fab-add',
+  },
+  {
+    emoji: '🔍',
+    title: 'Suche & Filter',
+    text: 'Hier nach Namen suchen. Die Chips darunter filtern nach Klasse, Fortschritt oder Archiv.',
+    target: 'search',
+  },
+  {
+    emoji: '📊',
+    title: 'Dashboard',
+    text: 'Zeigt eine Übersicht aller Schüler mit Fortschritt, Warnungen und KPIs.',
+    target: 'btn-dashboard',
+  },
+  {
+    emoji: '☀️',
+    title: 'Dark / Light Mode',
+    text: 'Hier zwischen dunklem und hellem Design wechseln.',
+    target: 'theme-btn',
+  },
+  {
+    emoji: '⚙️',
+    title: 'Einstellungen & Hilfe',
+    text: 'Passwort ändern, Tutorial wiederholen und die vollständige Hilfe findest du hier.',
+    target: 'btn-settings-header',
+  },
+  {
+    emoji: '✅',
+    title: 'Fertig!',
+    text: 'Das war die Kurzübersicht. Im ⚙️ Menü findest du jederzeit die vollständige Hilfe.',
+    target: null,
+  },
+];
+
+let tutStep = 0;
+
+window.startTutorial = () => {
+  // Sicherstellen dass Schülerliste sichtbar ist
+  document.querySelectorAll('.screen').forEach(sc => sc.style.display = 'none');
+  document.getElementById('screen-list').style.display = 'flex';
+  tutStep = 0;
+  document.getElementById('tutorial-overlay').style.display = 'block';
+  renderTutStep();
+};
+
+window.tutNext = () => {
+  tutStep++;
+  if (tutStep >= TUTORIAL_STEPS.length) {
+    skipTutorial();
+    return;
+  }
+  renderTutStep();
+};
+
+window.skipTutorial = () => {
+  document.getElementById('tutorial-overlay').style.display = 'none';
+  localStorage.setItem('tutorialSeen', '1');
+};
+
+function renderTutStep() {
+  const step = TUTORIAL_STEPS[tutStep];
+  const total = TUTORIAL_STEPS.length;
+  const isLast = tutStep === total - 1;
+
+  // Tooltip text
+  document.getElementById('tut-emoji').textContent = step.emoji;
+  document.getElementById('tut-title').textContent = step.title;
+  document.getElementById('tut-text').textContent  = step.text;
+  document.getElementById('tut-next-btn').textContent = isLast ? 'Los geht\'s ✓' : 'Weiter →';
+
+  // Dots
+  const dotsEl = document.getElementById('tut-dots');
+  dotsEl.innerHTML = Array.from({length: total}, (_,i) =>
+    `<div style="width:${i===tutStep?16:6}px;height:6px;border-radius:3px;background:${i===tutStep?'var(--accent)':'var(--border)'};transition:all 0.3s"></div>`
+  ).join('');
+
+  // Highlight target element
+  const highlight = document.getElementById('tutorial-highlight');
+  const card      = document.getElementById('tutorial-card');
+
+  if (step.target) {
+    const el = document.getElementById(step.target);
+    if (el) {
+      const r = el.getBoundingClientRect();
+      const pad = 8;
+      highlight.style.display = 'block';
+      highlight.style.left   = (r.left - pad) + 'px';
+      highlight.style.top    = (r.top  - pad) + 'px';
+      highlight.style.width  = (r.width  + pad*2) + 'px';
+      highlight.style.height = (r.height + pad*2) + 'px';
+
+      // Position card: below target if space, else above
+      const cardH = 180;
+      const spaceBelow = window.innerHeight - r.bottom - 20;
+      const cardTop = spaceBelow > cardH
+        ? r.bottom + 14
+        : r.top - cardH - 14;
+      card.style.top  = Math.max(10, cardTop) + 'px';
+      card.style.left = Math.min(Math.max(10, r.left - 10), window.innerWidth - 310) + 'px';
+    }
+  } else {
+    // Centered card, no highlight
+    highlight.style.display = 'none';
+    card.style.top  = '50%';
+    card.style.left = '50%';
+    card.style.transform = 'translate(-50%, -50%)';
+  }
+  if (step.target) card.style.transform = 'none';
+}
+
+// Auto-Tutorial beim ersten Login
+function checkFirstTime() {
+  if (!localStorage.getItem('tutorialSeen')) {
+    setTimeout(() => startTutorial(), 800);
+  }
+}
+
+// ── SERVICE WORKER REGISTRIERUNG ───────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(() => console.log('Service Worker aktiv – Offline-Modus bereit'))
+      .catch(err => console.log('Service Worker Fehler:', err));
+  });
+}
+
+// Offline-Status beim Start prüfen
+updateOnlineStatus();
+
+// Init theme on load
+initTheme();
+</script>
+</body>
+</html>
