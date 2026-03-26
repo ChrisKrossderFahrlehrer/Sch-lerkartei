@@ -289,6 +289,12 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
   font-size:0.8rem; font-weight:600; cursor:pointer; transition:all 0.15s; text-align:center;
 }
 .scope-btn.active { background:rgba(240,180,41,0.15); border-color:var(--accent); color:var(--accent); }
+.klasse-choice-btn {
+  width:100%; padding:13px 16px; border-radius:12px; border:1.5px solid var(--border);
+  background:var(--surface2); color:var(--text); font-family:'Manrope',sans-serif;
+  font-size:0.88rem; font-weight:600; cursor:pointer; text-align:left; transition:all 0.15s;
+}
+.klasse-choice-btn:active { background:rgba(240,180,41,0.12); border-color:var(--accent); }
 
 /* MODAL */
 .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.7); backdrop-filter:blur(6px); z-index:200; display:none; align-items:flex-end; justify-content:center; }
@@ -622,8 +628,9 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
     </div>
     <div class="filter-row" id="filter-row">
       <button class="filter-chip active" data-filter="alle"    onclick="setFilter('alle')">Alle</button>
-      <button class="filter-chip"        data-filter="klasseB" onclick="setFilter('klasseB')">🚗 Klasse B</button>
-      <button class="filter-chip"        data-filter="klasseA" onclick="setFilter('klasseA')">🏍️ Klasse A</button>
+      <button class="filter-chip"        data-filter="klasseB"  onclick="setFilter('klasseB')">🚗 Klasse B</button>
+      <button class="filter-chip"        data-filter="klasseBE" onclick="setFilter('klasseBE')">🔗 BE</button>
+      <button class="filter-chip"        data-filter="klasseA"  onclick="setFilter('klasseA')">🏍️ Klasse A</button>
       <button class="filter-chip"        data-filter="reif"    onclick="setFilter('reif')">🏆 Prüfungsreif</button>
       <button class="filter-chip"        data-filter="theorie" onclick="setFilter('theorie')">📋 Theorie offen</button>
       <button class="filter-chip"        data-filter="sonder"  onclick="setFilter('sonder')">⚠️ Pflichtf. offen</button>
@@ -679,11 +686,30 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
     <div class="form-group">
       <label class="form-label">Führerscheinklasse</label>
       <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap">
-        <button class="scope-btn active" id="klasse-b-btn" onclick="setKlasse('B')">🚗 Klasse B</button>
-        <button class="scope-btn" id="klasse-b197-btn" onclick="setKlasse('B197')">⚙️ B197</button>
-        <button class="scope-btn" id="klasse-a-btn" onclick="setKlasse('A')">🏍️ Klasse A</button>
+        <button class="scope-btn active" id="klasse-b-btn"    onclick="setKlasse('B')">🚗 B</button>
+        <button class="scope-btn" id="klasse-bauto-btn" onclick="setKlasse('B-Auto')">🤖 B-Auto</button>
+        <button class="scope-btn" id="klasse-b197-btn"  onclick="setKlasse('B197')">⚙️ B197</button>
+        <button class="scope-btn" id="klasse-be-btn"    onclick="setKlasse('BE')">🔗 BE</button>
+        <button class="scope-btn" id="klasse-a-btn"     onclick="setKlasse('A')">🏍️ A</button>
       </div>
-      <div id="b197-hint" style="display:none;font-size:0.7rem;color:var(--muted);margin-top:6px;line-height:1.4">⚙️ Automatik-Prüfung + min. 10 Schaltstunden + 15-min. Testfahrt erforderlich</div>
+      <!-- Klassen-Hinweise -->
+      <div id="klasse-hint-b"     style="display:block;font-size:0.7rem;color:var(--muted);margin-top:6px;padding:6px 10px;background:var(--surface2);border-radius:8px">🚗 Standard PKW mit Schaltgetriebe · 30 Fahrstunden</div>
+      <div id="klasse-hint-bauto" style="display:none;font-size:0.7rem;color:var(--muted);margin-top:6px;padding:6px 10px;background:var(--surface2);border-radius:8px">🤖 Nur Automatikfahrzeug · keine Schaltberechtigung · 30 Fahrstunden</div>
+      <div id="klasse-hint-b197"  style="display:none;font-size:0.7rem;color:#bc8cff;margin-top:6px;line-height:1.4;background:rgba(160,100,255,0.08);border:1px solid rgba(160,100,255,0.25);border-radius:8px;padding:8px 10px">⚙️ <strong>Automatik-Prüfung</strong> · min. 10 Schaltstunden (à 45 Min.) · 15-min. Testfahrt (½ innerorts, ½ außerorts)</div>
+      <div id="klasse-hint-be"    style="display:none;font-size:0.7rem;color:var(--accent2);margin-top:6px;padding:6px 10px;background:rgba(63,185,80,0.08);border:1px solid rgba(63,185,80,0.25);border-radius:8px">🔗 Anhänger · Voraussetzung: Klasse B vorhanden · keine Theorieprüfung · 3× Überland, 1× Autobahn, 1× Nacht</div>
+      <div id="klasse-hint-a"     style="display:none;font-size:0.7rem;color:var(--blue);margin-top:6px;padding:6px 10px;background:rgba(88,166,255,0.08);border:1px solid rgba(88,166,255,0.25);border-radius:8px">🏍️ Motorrad unbeschränkt · 20 Fahrstunden · Sonderfahrten: 5× Überland, 4× Autobahn, 3× Nacht</div>
+      <div id="b197-hint" style="display:none"></div>
+    </div>
+    <!-- B197: Ziel-Schaltstunden -->
+    <div class="form-group" id="b197-ziel-group" style="display:none">
+      <label class="form-label">Ziel-Schaltstunden</label>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+        <button onclick="document.getElementById('inp-schalt-ziel').value=Math.max(10,parseInt(document.getElementById('inp-schalt-ziel').value||10)-1)" style="width:36px;height:36px;border-radius:9px;border:1.5px solid var(--border);background:var(--surface2);cursor:pointer;font-size:1.1rem">−</button>
+        <input id="inp-schalt-ziel" type="number" min="10" max="99" value="10"
+          style="width:64px;height:36px;text-align:center;font-family:'Syne',sans-serif;font-weight:800;font-size:1rem;background:var(--surface2);border:1px solid var(--border);border-radius:9px;color:var(--text);-moz-appearance:textfield">
+        <button onclick="document.getElementById('inp-schalt-ziel').value=Math.min(99,parseInt(document.getElementById('inp-schalt-ziel').value||10)+1)" style="width:36px;height:36px;border-radius:9px;border:1.5px solid var(--accent);background:var(--accent);color:#0d1117;cursor:pointer;font-size:1.1rem">+</button>
+        <span style="font-size:0.75rem;color:var(--muted)">Min. 10 gesetzlich</span>
+      </div>
     </div>
     <div class="sheet-actions">
       <button class="btn-sheet-cancel" onclick="document.getElementById('add-modal').classList.remove('open')">Abbrechen</button>
@@ -1000,6 +1026,59 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
 </div>
 
 
+<!-- B197 EINSTELLUNGEN MODAL -->
+<div class="modal-overlay" id="b197-settings-modal" onclick="closeModal(event)">
+  <div class="modal-sheet">
+    <div class="sheet-title">⚙️ B197 – Ziel anpassen</div>
+    <div style="font-size:0.82rem;color:var(--muted);text-align:center;margin-bottom:16px">Gesetzliches Minimum: 10 Schaltstunden</div>
+    <div class="form-group">
+      <label class="form-label">Ziel-Schaltstunden</label>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
+        <button onclick="document.getElementById('inp-b197-ziel').value=Math.max(10,parseInt(document.getElementById('inp-b197-ziel').value||10)-1)" style="width:40px;height:40px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface2);cursor:pointer;font-size:1.2rem">−</button>
+        <input id="inp-b197-ziel" type="number" min="10" max="99" value="10"
+          style="flex:1;height:40px;text-align:center;font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);-moz-appearance:textfield">
+        <button onclick="document.getElementById('inp-b197-ziel').value=Math.min(99,parseInt(document.getElementById('inp-b197-ziel').value||10)+1)" style="width:40px;height:40px;border-radius:10px;border:1.5px solid var(--accent);background:var(--accent);color:#0d1117;cursor:pointer;font-size:1.2rem">+</button>
+      </div>
+      <div style="font-size:0.72rem;color:var(--muted);margin-top:8px;text-align:center">Schaltstunden können in die Sonderfahrten integriert werden (§5a FahrschAusbO)</div>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn-sheet-cancel" onclick="document.getElementById('b197-settings-modal').classList.remove('open')">Abbrechen</button>
+      <button class="btn-sheet-ok" onclick="saveB197Ziel()">Speichern ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- KLASSE ÄNDERN MODAL -->
+<div class="modal-overlay" id="klasse-aendern-modal" onclick="closeModal(event)">
+  <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
+    <div class="sheet-title">✎ Führerscheinklasse ändern</div>
+    <div style="font-size:0.8rem;color:var(--muted);text-align:center;margin-bottom:16px;padding:0 4px">ADK-Lernstand und Pflichtfahrten werden zurückgesetzt.<br>Fahrstunden und Protokoll bleiben erhalten.</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+      <button onclick="saveKlasseAendern('B')" class="klasse-choice-btn">
+        <div style="font-weight:700">🚗 Klasse B</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">Standard PKW · Schaltgetriebe · 30 Fahrstunden</div>
+      </button>
+      <button onclick="saveKlasseAendern('B-Auto')" class="klasse-choice-btn">
+        <div style="font-weight:700">🤖 B-Automatik</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">Nur Automatikgetriebe · keine Schaltberechtigung · 30 Fahrstunden</div>
+      </button>
+      <button onclick="saveKlasseAendern('B197')" class="klasse-choice-btn">
+        <div style="font-weight:700">⚙️ B197</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">Automatik-Prüfung + min. 10 Schaltstunden (45 Min.) + 15-min. Testfahrt</div>
+      </button>
+      <button onclick="saveKlasseAendern('BE')" class="klasse-choice-btn">
+        <div style="font-weight:700">🔗 Klasse BE</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">Anhängerführerschein · Voraussetzung: Klasse B · keine Theorieprüfung</div>
+      </button>
+      <button onclick="saveKlasseAendern('A')" class="klasse-choice-btn">
+        <div style="font-weight:700">🏍️ Klasse A</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">Motorrad unbeschränkt · 20 Fahrstunden</div>
+      </button>
+    </div>
+    <button class="btn-sheet-cancel" onclick="document.getElementById('klasse-aendern-modal').classList.remove('open')">Abbrechen</button>
+  </div>
+</div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -1213,6 +1292,66 @@ const ADK_THEMEN_A = [
       'Erste-Hilfe-Kurs absolviert',
       'Schutzkleidung vollständig vorhanden',
       'Simulierte Prüfungsfahrt absolviert',
+      'Prüfungsreife festgestellt',
+    ]
+  },
+];
+
+// ── BE Pflichtfahrten (§ FahrschAusbO) ──────────────────────
+// 5 Sonderfahrten: 3× Überland, 1× Autobahn, 1× Nacht
+const SONDERFAHRTEN_BE = [
+  { key:'ueber',    icon:'🌄', name:'Überland',       min:3 },
+  { key:'autobahn', icon:'🛣️', name:'Autobahn',       min:1 },
+  { key:'nacht',    icon:'🌙', name:'Nacht/Dunkelheit',min:1 },
+];
+
+// ── ADK Klasse BE – Anhängerführerschein ────────────────────
+const ADK_THEMEN_BE = [
+  {
+    gruppe: '🔗 Fahrzeugkunde & Verbinden',
+    items: [
+      'Anhänger ankuppeln & abkuppeln',
+      'Stützlast & Gewichtsverteilung prüfen',
+      'Beleuchtung & Bremsen des Anhängers prüfen',
+      'Reifen & Befestigung des Anhängers kontrollieren',
+      'Zulässige Gesamtmasse & Kombinationsgewicht kennen',
+    ]
+  },
+  {
+    gruppe: '🚗 Fahren mit Anhänger',
+    items: [
+      'Anfahren & Anhalten mit Anhänger',
+      'Kurvenfahren mit Anhänger (Überhang beachten)',
+      'Spurhalten auf der Autobahn',
+      'Überholen mit Gespann',
+      'Seitenwind & Pendeln erkennen',
+      'Bremsen mit Anhänger (längerer Bremsweg)',
+    ]
+  },
+  {
+    gruppe: '🔄 Rangieren & Sonderaufgaben',
+    items: [
+      'Rückwärtsfahren mit Anhänger geradeaus',
+      'Rückwärts in Kurve einlenken',
+      'Einparken mit Anhänger',
+      'Wenden mit Gespann',
+    ]
+  },
+  {
+    gruppe: '🛣️ Sonderfahrten',
+    items: [
+      'Überlandfahrt: Überholen & Fahrspurhaltung',
+      'Überlandfahrt: Bergab & Bremstechnik',
+      'Überlandfahrt: Kurven & Seitenwind',
+      'Autobahnfahrt: Einfahren & Ausfahren',
+      'Nachtfahrt: Beleuchtung & Sichtweite',
+    ]
+  },
+  {
+    gruppe: '📋 Abschluss',
+    items: [
+      'Klasse B bereits vorhanden (Voraussetzung)',
+      'Keine Theorieprüfung erforderlich',
       'Prüfungsreife festgestellt',
     ]
   },
@@ -1518,24 +1657,23 @@ const SONDER_B197 = [
 
 function overallProgress(s) {
   const fs=s.fahrstunden||0, ziel=s.zielStunden||30;
-  const isA    = s.klasse==='A';
-  const isB197 = s.klasse==='B197';
-  const ADK    = isA ? ADK_THEMEN_A : ADK_THEMEN;
-  const SONDER = isA ? [
-    { key:'ueber', min:5 }, { key:'autobahn', min:4 }, { key:'nacht', min:3 }
-  ] : SONDERFAHRTEN;
+  const klasse = s.klasse || 'B';
+  const isA    = klasse==='A';
+  const isB197 = klasse==='B197';
+  const isBE   = klasse==='BE';
+  const ADK = isA ? ADK_THEMEN_A : isBE ? ADK_THEMEN_BE : ADK_THEMEN;
+  const SONDER = isA
+    ? [{ key:'ueber', min:5 }, { key:'autobahn', min:4 }, { key:'nacht', min:3 }]
+    : isBE ? SONDERFAHRTEN_BE : SONDERFAHRTEN;
   const allThemen = ADK.flatMap(g => g.items);
   const themenVals = allThemen.map(t => (s.themen||{})[t]||0);
   const themaAvg = themenVals.length ? themenVals.reduce((a,v)=>a+Math.min(v,4),0)/themenVals.length/4 : 0;
-
   if (isB197) {
-    // B197: 35% Fahrstunden + 35% Themen + 15% Sonderfahrten + 10% Schaltstunden + 5% Testfahrt
     const sonderDone = SONDER_B197.filter(f=>(s.sonderfahrten||{})[f.key]>=f.min).length;
-    const schaltPct  = Math.min((s.schaltstunden||0)/10, 1);
+    const schaltPct  = Math.min((s.schaltstunden||0)/(s.zielSchaltstunden||10), 1);
     const testfahrt  = s.testfahrtBestanden ? 1 : 0;
     return Math.round(((fs/ziel)*0.35 + themaAvg*0.35 + (sonderDone/SONDER_B197.length)*0.15 + schaltPct*0.1 + testfahrt*0.05)*100);
   }
-
   const sonderDone=SONDER.filter(f=>(s.sonderfahrten||{})[f.key]>=f.min).length;
   return Math.round(((fs/ziel)*0.4 + themaAvg*0.4 + (sonderDone/SONDER.length)*0.2)*100);
 }
@@ -1574,10 +1712,12 @@ window.renderList = () => {
   // Apply active filter
   switch(activeFilter) {
     case 'klasseA':  filtered = filtered.filter(s => s.klasse === 'A'); break;
-    case 'klasseB':  filtered = filtered.filter(s => (s.klasse||'B') === 'B'); break;
+    case 'klasseB':  filtered = filtered.filter(s => ['B','B-Auto','B197'].includes(s.klasse||'B')); break;
+    case 'klasseBE': filtered = filtered.filter(s => s.klasse === 'BE'); break;
     case 'theorie':  filtered = filtered.filter(s => !s.theorieBestanden); break;
     case 'sonder':   filtered = filtered.filter(s => {
-      const SONDER = s.klasse==='A' ? [{key:'ueber',min:5},{key:'autobahn',min:4},{key:'nacht',min:3}] : SONDERFAHRTEN;
+      const SONDER = s.klasse==='A' ? [{key:'ueber',min:5},{key:'autobahn',min:4},{key:'nacht',min:3}]
+        : s.klasse==='BE' ? SONDERFAHRTEN_BE : SONDERFAHRTEN;
       return !SONDER.every(f => (s.sonderfahrten||{})[f.key] >= f.min);
     }); break;
     case 'reif':     filtered = filtered.filter(s => overallProgress(s) >= 90); break;
@@ -1639,7 +1779,8 @@ function renderStudentCard(s) {
   const c=getColor(s);
   const r=17, circ=2*Math.PI*r, offset=circ-(pct/100)*circ;
   const a=age(s.geburt);
-  const klasseLabel = s.klasse==='B197' ? '⚙️ B197' : s.klasse==='A' ? '🏍️ Klasse A' : '🚗 Klasse B';
+  const klasseLabels = {'B':'🚗 Klasse B','B-Auto':'🤖 B-Automatik','B197':'⚙️ B197','BE':'🔗 BE','A':'🏍️ Klasse A'};
+  const klasseLabel = klasseLabels[s.klasse] || '🚗 Klasse B';
   const meta=[klasseLabel, a?a+' Jahre':null, (s.fahrstunden||0)+' Std.', s.theorieBestanden?'📋 Theorie ✓':null].filter(Boolean).join(' · ');
   const badge = pct>=90?'<span class="badge badge-green">Prüfungsreif</span>':pct>=60?'<span class="badge badge-amber">Guter Fortschritt</span>':pct>0?'<span class="badge badge-blue">In Ausbildung</span>':'<span class="badge badge-gray">Neu</span>';
   return `<div class="student-card" onclick="openDetail('${s.id}')">
@@ -1711,7 +1852,9 @@ function renderDetail() {
   const klasse = s.klasse || 'B';
   const isA    = klasse === 'A';
   const isB197 = klasse === 'B197';
-  const ADK = isA ? ADK_THEMEN_A : ADK_THEMEN;
+  const isBE   = klasse === 'BE';
+  const isBAuto = klasse === 'B-Auto';
+  const ADK = isA ? ADK_THEMEN_A : isBE ? ADK_THEMEN_BE : ADK_THEMEN;
   const SONDER = isA ? [
     { key:'ueber',    icon:'🌄', name:'Überland',        min:5 },
     { key:'autobahn', icon:'🛣️', name:'Autobahn',        min:4 },
@@ -1720,25 +1863,49 @@ function renderDetail() {
     { key:'ueber',    icon:'🌄', name:'Überland',        min:5 },
     { key:'autobahn', icon:'🛣️', name:'Autobahn',        min:4 },
     { key:'nacht',    icon:'🌙', name:'Nacht/Dämmerung', min:3 },
-  ] : SONDERFAHRTEN;
+  ] : isBE ? SONDERFAHRTEN_BE.map(f=>({...f}))
+    : SONDERFAHRTEN;
 
-  const badgeColor = isA ? 'rgba(88,166,255,0.15)' : isB197 ? 'rgba(160,100,255,0.15)' : 'rgba(240,180,41,0.15)';
-  const badgeBorder= isA ? 'rgba(88,166,255,0.4)' : isB197 ? 'rgba(160,100,255,0.5)' : 'rgba(240,180,41,0.4)';
-  const badgeText  = isA ? 'var(--blue)' : isB197 ? '#bc8cff' : 'var(--accent)';
-  const badgeLabel = isA ? '🏍️ Klasse A' : isB197 ? '⚙️ B197' : '🚗 Klasse B';
+  const badgeMap = {
+    'A':      { color:'rgba(88,166,255,0.15)',  border:'rgba(88,166,255,0.4)',  text:'var(--blue)',    label:'🏍️ Klasse A' },
+    'B197':   { color:'rgba(160,100,255,0.15)', border:'rgba(160,100,255,0.5)', text:'#bc8cff',        label:'⚙️ B197' },
+    'BE':     { color:'rgba(63,185,80,0.15)',   border:'rgba(63,185,80,0.4)',   text:'var(--accent2)', label:'🔗 Klasse BE' },
+    'B-Auto': { color:'rgba(240,180,41,0.12)',  border:'rgba(240,180,41,0.35)', text:'var(--accent)',  label:'🤖 B-Automatik' },
+    'B':      { color:'rgba(240,180,41,0.15)',  border:'rgba(240,180,41,0.4)',  text:'var(--accent)',  label:'🚗 Klasse B' },
+  };
+  const badge = badgeMap[klasse] || badgeMap['B'];
 
   document.getElementById('profile-strip').innerHTML=`
     <div class="avatar" style="background:${c};width:50px;height:50px;font-size:1.1rem">${initials(s)}</div>
     <div class="profile-info">
       <div class="profile-name">${s.vorname} ${s.nachname}</div>
-      <div class="profile-meta" style="display:flex;align-items:center;gap:6px">
-        <span style="background:${badgeColor};color:${badgeText};border:1px solid ${badgeBorder};border-radius:6px;padding:2px 8px;font-size:0.72rem;font-weight:700">${badgeLabel}</span>
-        ${a?'<span>'+a+' Jahre</span>':''}${s.geburt?(a?' · ':'')+'Geb. '+formatDate(s.geburt):''}
+      <div class="profile-meta" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <span style="background:${badge.color};color:${badge.text};border:1px solid ${badge.border};border-radius:6px;padding:2px 8px;font-size:0.72rem;font-weight:700">${badge.label}</span>
+        ${a?'<span style="font-size:0.72rem;color:var(--muted)">'+a+' Jahre</span>':''}
       </div>
     </div>
     <div style="text-align:right">
       <div style="font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;color:${progressColor(pct)}">${pct}%</div>
       <div style="font-size:0.68rem;color:var(--muted)">Fortschritt</div>
+    </div>`;
+
+  // Klassen-Einstellungs-Block – immer sichtbar
+  const klasseSettingsHTML = `
+    <div class="section-block">
+      <div class="section-header">
+        <div class="section-title">🎓 Führerscheinklasse</div>
+      </div>
+      <div class="section-body" style="padding:12px 16px">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <span style="background:${badge.color};color:${badge.text};border:1px solid ${badge.border};border-radius:8px;padding:4px 12px;font-size:0.82rem;font-weight:700">${badge.label}</span>
+            ${isB197 ? `<div style="font-size:0.7rem;color:var(--muted);margin-top:6px">⚙️ Schaltstunden: ${s.schaltstunden||0}/${s.zielSchaltstunden||10} · Testfahrt: ${s.testfahrtBestanden?'✅':'⏳'}</div>` : ''}
+            ${isBE   ? `<div style="font-size:0.7rem;color:var(--muted);margin-top:4px">Voraussetzung: Klasse B vorhanden · keine Theorieprüfung</div>` : ''}
+            ${isBAuto? `<div style="font-size:0.7rem;color:var(--muted);margin-top:4px">Nur Automatikgetriebe · keine Schaltberechtigung</div>` : ''}
+          </div>
+          <button onclick="openKlasseAendern()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:10px;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:'Manrope',sans-serif;white-space:nowrap">✎ Ändern</button>
+        </div>
+      </div>
     </div>`;
 
   const fs=s.fahrstunden||0, ziel=s.zielStunden||30, fsPct=Math.min(Math.round((fs/ziel)*100),100);
@@ -1827,7 +1994,7 @@ function renderDetail() {
       }).join('')}
     </div>` : '';
 
-  document.getElementById('detail-body').innerHTML=`
+  document.getElementById('detail-body').innerHTML= klasseSettingsHTML + `
     <div class="section-block">
       <div class="section-header">
         <div class="section-title">Fahrstunden</div>
@@ -1874,7 +2041,7 @@ function renderDetail() {
     <div class="section-block">
       <div class="section-header">
         <div class="section-title">⚙️ B197 – Schaltausbildung</div>
-        <span style="font-size:0.65rem;color:#bc8cff;background:rgba(160,100,255,0.1);border:1px solid rgba(160,100,255,0.3);border-radius:4px;padding:1px 5px">§5a FahrschAusbO</span>
+        <button onclick="openB197Settings()" style="background:rgba(160,100,255,0.1);border:1px solid rgba(160,100,255,0.3);color:#bc8cff;padding:5px 10px;border-radius:7px;font-size:0.72rem;cursor:pointer;font-family:'Manrope',sans-serif;font-weight:600">⚙️ Ziel anpassen</button>
       </div>
       <div class="section-body">
         <div style="margin-bottom:12px">
@@ -1882,14 +2049,14 @@ function renderDetail() {
             <span style="font-size:0.88rem;font-weight:600">⚙️ Schaltstunden</span>
             <div style="display:flex;align-items:center;gap:8px">
               <button onclick="changeSchaltstunden(-1)" style="width:28px;height:28px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface2);cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center">−</button>
-              <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:1rem;min-width:48px;text-align:center;color:${(s.schaltstunden||0)>=10?'var(--accent2)':'var(--text)'}">${s.schaltstunden||0} / 10</span>
+              <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:1rem;min-width:56px;text-align:center;color:${(s.schaltstunden||0)>=(s.zielSchaltstunden||10)?'var(--accent2)':'var(--text)'}">${s.schaltstunden||0} / ${s.zielSchaltstunden||10}</span>
               <button onclick="changeSchaltstunden(1)" style="width:28px;height:28px;border-radius:8px;border:1.5px solid var(--accent);background:var(--accent);color:#0d1117;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center">+</button>
             </div>
           </div>
           <div class="bar-bg" style="height:5px">
-            <div class="bar-fill" style="width:${Math.min((s.schaltstunden||0)/10*100,100)}%;background:${(s.schaltstunden||0)>=10?'var(--accent2)':'var(--blue)'}"></div>
+            <div class="bar-fill" style="width:${Math.min((s.schaltstunden||0)/(s.zielSchaltstunden||10)*100,100)}%;background:${(s.schaltstunden||0)>=(s.zielSchaltstunden||10)?'var(--accent2)':'var(--blue)'}"></div>
           </div>
-          <div style="font-size:0.7rem;color:var(--muted);margin-top:4px">Mindestens 10 Fahrstunden (à 45 Min.) auf Schaltfahrzeug</div>
+          <div style="font-size:0.7rem;color:var(--muted);margin-top:4px">Min. ${s.zielSchaltstunden||10} Fahrstunden (à 45 Min.) auf Schaltfahrzeug · <a onclick="openB197Settings()" style="color:#bc8cff;cursor:pointer">Ziel ändern</a></div>
         </div>
 
         <div onclick="toggleTestfahrt()" style="cursor:pointer;display:flex;align-items:center;gap:14px;padding:12px;background:var(--surface2);border-radius:12px;border:1px solid ${s.testfahrtBestanden?'var(--accent2)':'var(--border)'}">
@@ -1951,7 +2118,8 @@ function renderDetail() {
 
 // ─── ADK GRUPPEN CHART ───────────────────────────────────────
 function renderAdkGruppenChart(s) {
-  const ADK = (s.klasse === 'A') ? ADK_THEMEN_A : ADK_THEMEN;
+  const klasse = s.klasse || 'B';
+  const ADK = klasse==='A' ? ADK_THEMEN_A : klasse==='BE' ? ADK_THEMEN_BE : ADK_THEMEN;
   const gruppen = ADK.map((g, gi) => {
     const vals = g.items.map(t => (s.themen||{})[t] || 0);
     const avg = vals.reduce((a,v) => a + Math.min(v,4), 0) / vals.length / 4 * 100;
@@ -2336,27 +2504,46 @@ window.openAddModal = () => {
   const geb = document.getElementById('inp-geb');
   if (geb) geb.value='';
   newStudentKlasse = 'B';
+  ['b','bauto','b197','be','a'].forEach(k => {
+    const btn = document.getElementById(`klasse-${k}-btn`);
+    if (btn) btn.classList.remove('active');
+    const hint = document.getElementById(`klasse-hint-${k}`);
+    if (hint) hint.style.display = 'none';
+  });
   document.getElementById('klasse-b-btn').classList.add('active');
-  document.getElementById('klasse-b197-btn').classList.remove('active');
-  document.getElementById('klasse-a-btn').classList.remove('active');
-  document.getElementById('b197-hint').style.display = 'none';
+  document.getElementById('klasse-hint-b').style.display = 'block';
+  document.getElementById('b197-ziel-group').style.display = 'none';
+  document.getElementById('inp-schalt-ziel').value = '10';
   document.getElementById('add-modal').classList.add('open');
   setTimeout(()=>document.getElementById('inp-vn').focus(),100);
 };
 
 window.setKlasse = (k) => {
   newStudentKlasse = k;
-  document.getElementById('klasse-b-btn').classList.toggle('active', k==='B');
-  document.getElementById('klasse-b197-btn').classList.toggle('active', k==='B197');
-  document.getElementById('klasse-a-btn').classList.toggle('active', k==='A');
-  document.getElementById('b197-hint').style.display = k==='B197' ? 'block' : 'none';
+  const keyMap = {'B':'b','B-Auto':'bauto','B197':'b197','BE':'be','A':'a'};
+  ['b','bauto','b197','be','a'].forEach(id => {
+    const btn = document.getElementById(`klasse-${id}-btn`);
+    if (btn) btn.classList.remove('active');
+    const hint = document.getElementById(`klasse-hint-${id}`);
+    if (hint) hint.style.display = 'none';
+  });
+  const key = keyMap[k] || k.toLowerCase();
+  const activeBtn = document.getElementById(`klasse-${key}-btn`);
+  if (activeBtn) activeBtn.classList.add('active');
+  const activeHint = document.getElementById(`klasse-hint-${key}`);
+  if (activeHint) activeHint.style.display = 'block';
+  document.getElementById('b197-ziel-group').style.display = k==='B197' ? 'block' : 'none';
 };
 
 window.addStudent = async () => {
   const vn=document.getElementById('inp-vn').value.trim();
   const nn=document.getElementById('inp-nn').value.trim();
   if (!vn||!nn) { toast('Bitte Vor- und Nachname eingeben.'); return; }
-  const ziel = newStudentKlasse==='A' ? 20 : 30;
+  const zielMap = {'A':20, 'BE':12, 'B-Auto':30, 'B197':30, 'B':30};
+  const ziel = zielMap[newStudentKlasse] || 30;
+  const zielSchalt = newStudentKlasse==='B197'
+    ? Math.max(10, parseInt(document.getElementById('inp-schalt-ziel').value)||10)
+    : 10;
   try {
     await addDoc(collection(db,'students'),{
       uid: currentUser.uid,
@@ -2364,6 +2551,7 @@ window.addStudent = async () => {
       geburt:document.getElementById('inp-geb').value,
       klasse: newStudentKlasse,
       zielStunden: ziel,
+      zielSchaltstunden: zielSchalt,
       fahrstunden:0, sonderfahrten:{}, themen:{}, customThemen:{}, customFields:{}, notes:'',
       schaltstunden: 0, testfahrtBestanden: false,
       createdAt: Date.now()
@@ -2427,8 +2615,9 @@ function renderDashboard() {
   const maxStunden = total ? Math.max(...aktive.map(s => s.fahrstunden||0)) : 0;
   const minStunden = total ? Math.min(...aktive.filter(s=>(s.fahrstunden||0)>0).map(s => s.fahrstunden||0)) : 0;
   const schnellster = [...aktive].sort((a,b) => overallProgress(b) - overallProgress(a))[0];
-  const klasseA = aktive.filter(s => s.klasse === 'A').length;
-  const klasseB = aktive.filter(s => (s.klasse||'B') === 'B').length;
+  const klasseA   = aktive.filter(s => s.klasse === 'A').length;
+  const klasseB   = aktive.filter(s => ['B','B-Auto','B197'].includes(s.klasse||'B')).length;
+  const klasseBE  = aktive.filter(s => s.klasse === 'BE').length;
 
   const rows = sorted.map(s => {
     const pct = Math.min(overallProgress(s), 100);
@@ -2462,6 +2651,7 @@ function renderDashboard() {
         <div class="dash-kpi"><div class="dash-kpi-val" style="color:var(--accent)">${total}</div><div class="dash-kpi-lbl">Aktive Schüler</div></div>
         <div class="dash-kpi"><div class="dash-kpi-val" style="color:var(--accent2)">${pruefungsreif}</div><div class="dash-kpi-lbl">Prüfungsreif</div></div>
         <div class="dash-kpi"><div class="dash-kpi-val" style="color:var(--blue)">${klasseB}</div><div class="dash-kpi-lbl">🚗 Klasse B</div></div>
+        <div class="dash-kpi"><div class="dash-kpi-val" style="color:var(--accent2)">${klasseBE}</div><div class="dash-kpi-lbl">🔗 BE</div></div>
         <div class="dash-kpi"><div class="dash-kpi-val" style="color:#bc8cff">${klasseA}</div><div class="dash-kpi-lbl">🏍️ Klasse A</div></div>
       </div>
 
@@ -2720,12 +2910,14 @@ function renderSchuelerAnsicht(s, protokoll) {
   document.getElementById('schueler-header-name').textContent = `${s.vorname} ${s.nachname}`;
 
   const pct = Math.min(overallProgress(s), 100);
-  const ADK = (s.klasse==='A') ? ADK_THEMEN_A : ADK_THEMEN;
-  const SONDER_DEF = (s.klasse==='A') ? [
+  const klasse = s.klasse || 'B';
+  const ADK = klasse==='A' ? ADK_THEMEN_A : klasse==='BE' ? ADK_THEMEN_BE : ADK_THEMEN;
+  const SONDER_DEF = klasse==='A' ? [
     {key:'ueber',icon:'🌄',label:'Überland',min:5},
     {key:'autobahn',icon:'🛣️',label:'Autobahn',min:4},
     {key:'nacht',icon:'🌙',label:'Nacht',min:3}
-  ] : SONDERFAHRTEN;
+  ] : klasse==='BE' ? SONDERFAHRTEN_BE.map(f=>({...f,label:f.name}))
+    : SONDERFAHRTEN;
   const STUFEN_EM = ['🔴','🟠','🟡','🟢','⭐'];
 
   // Sonderfahrten
@@ -2819,6 +3011,70 @@ window.changeSchaltstunden = async (delta) => {
   const s = getStudent(activeId);
   const neu = Math.max(0, (s.schaltstunden||0) + delta);
   await saveToFirestore(activeId, { schaltstunden: neu });
+};
+
+window.openKlasseAendern = () => {
+  const s = getStudent(activeId);
+  const aktuelleKlasse = s.klasse || 'B';
+  const keyMap = {'B':'b','B-Auto':'bauto','B197':'b197','BE':'be','A':'a'};
+  // Alle Buttons zurücksetzen, aktuelle hervorheben
+  document.querySelectorAll('.klasse-choice-btn').forEach(btn => {
+    btn.style.borderColor = '';
+    btn.style.background  = '';
+  });
+  const aktKey = keyMap[aktuelleKlasse];
+  if (aktKey) {
+    const buttons = document.querySelectorAll('.klasse-choice-btn');
+    buttons.forEach(btn => {
+      const onclick = btn.getAttribute('onclick') || '';
+      if (onclick.includes(`'${aktuelleKlasse}'`)) {
+        btn.style.borderColor = 'var(--accent)';
+        btn.style.background  = 'rgba(240,180,41,0.1)';
+      }
+    });
+  }
+  document.getElementById('klasse-aendern-modal').classList.add('open');
+};
+
+window.saveKlasseAendern = async (neueKlasse) => {
+  const s = getStudent(activeId);
+  const aktuelleKlasse = s.klasse || 'B';
+  if (aktuelleKlasse === neueKlasse) {
+    document.getElementById('klasse-aendern-modal').classList.remove('open');
+    return;
+  }
+  const zielMap = {'A':20, 'BE':12, 'B-Auto':30, 'B197':30, 'B':30};
+  const klasseNamen = {'B':'🚗 Klasse B','B-Auto':'🤖 B-Automatik','B197':'⚙️ B197','BE':'🔗 BE','A':'🏍️ Klasse A'};
+  const bestätigt = confirm(
+    `Klasse von ${klasseNamen[aktuelleKlasse]||aktuelleKlasse} auf ${klasseNamen[neueKlasse]||neueKlasse} ändern?\n\n` +
+    `ADK-Lernstand und Pflichtfahrten werden zurückgesetzt.\n` +
+    `Fahrstunden und Protokoll bleiben erhalten.`
+  );
+  if (!bestätigt) return;
+  await saveToFirestore(activeId, {
+    klasse: neueKlasse,
+    zielStunden: zielMap[neueKlasse] || 30,
+    themen: {},
+    sonderfahrten: {},
+    schaltstunden: 0,
+    testfahrtBestanden: false,
+    zielSchaltstunden: 10,
+  });
+  document.getElementById('klasse-aendern-modal').classList.remove('open');
+  toast(`Klasse geändert zu ${klasseNamen[neueKlasse]} ✓`);
+};
+
+window.openB197Settings = () => {
+  const s = getStudent(activeId);
+  document.getElementById('inp-b197-ziel').value = s.zielSchaltstunden || 10;
+  document.getElementById('b197-settings-modal').classList.add('open');
+};
+
+window.saveB197Ziel = async () => {
+  const neu = Math.max(10, parseInt(document.getElementById('inp-b197-ziel').value)||10);
+  await saveToFirestore(activeId, { zielSchaltstunden: neu });
+  document.getElementById('b197-settings-modal').classList.remove('open');
+  toast(`Ziel: ${neu} Schaltstunden gespeichert ✓`);
 };
 
 window.toggleTestfahrt = async () => {
