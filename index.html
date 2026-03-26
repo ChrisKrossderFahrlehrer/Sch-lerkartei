@@ -3045,21 +3045,52 @@ window.saveKlasseAendern = async (neueKlasse) => {
   }
   const zielMap = {'A':20, 'BE':12, 'B-Auto':30, 'B197':30, 'B':30};
   const klasseNamen = {'B':'🚗 Klasse B','B-Auto':'🤖 B-Automatik','B197':'⚙️ B197','BE':'🔗 BE','A':'🏍️ Klasse A'};
-  const bestätigt = confirm(
-    `Klasse von ${klasseNamen[aktuelleKlasse]||aktuelleKlasse} auf ${klasseNamen[neueKlasse]||neueKlasse} ändern?\n\n` +
-    `ADK-Lernstand und Pflichtfahrten werden zurückgesetzt.\n` +
-    `Fahrstunden und Protokoll bleiben erhalten.`
-  );
-  if (!bestätigt) return;
-  await saveToFirestore(activeId, {
+
+  // Verwandte Klassen – ADK und Fahrstunden bleiben erhalten
+  const verwandt = {
+    'B':     ['B-Auto','B197'],
+    'B-Auto':['B','B197'],
+    'B197':  ['B','B-Auto'],
+  };
+  const istVerwandt = (verwandt[aktuelleKlasse]||[]).includes(neueKlasse);
+
+  let bestaetigung = '';
+  if (istVerwandt) {
+    bestaetigung = `Klasse von ${klasseNamen[aktuelleKlasse]||aktuelleKlasse} auf ${klasseNamen[neueKlasse]||neueKlasse} ändern?\n\n` +
+      `✅ Fahrstunden, ADK-Lernstand und Protokoll bleiben erhalten.\n` +
+      (neueKlasse==='B197' ? `➕ Schaltstunden-Zähler und Testfahrt werden hinzugefügt.\n` : '') +
+      (aktuelleKlasse==='B197' && neueKlasse!=='B197' ? `⚠️ Schaltstunden und Testfahrt werden zurückgesetzt.\n` : '');
+  } else {
+    bestaetigung = `Klasse von ${klasseNamen[aktuelleKlasse]||aktuelleKlasse} auf ${klasseNamen[neueKlasse]||neueKlasse} ändern?\n\n` +
+      `⚠️ ADK-Lernstand und Pflichtfahrten werden zurückgesetzt.\n` +
+      `✅ Fahrstunden und Protokoll bleiben erhalten.`;
+  }
+
+  if (!confirm(bestaetigung)) return;
+
+  // Daten die gespeichert werden
+  const update = {
     klasse: neueKlasse,
     zielStunden: zielMap[neueKlasse] || 30,
-    themen: {},
-    sonderfahrten: {},
-    schaltstunden: 0,
-    testfahrtBestanden: false,
     zielSchaltstunden: 10,
-  });
+  };
+
+  if (istVerwandt) {
+    // ADK und Sonderfahrten bleiben – nur B197-spezifisches zurücksetzen falls nötig
+    if (neueKlasse !== 'B197') {
+      update.schaltstunden = 0;
+      update.testfahrtBestanden = false;
+    }
+    // Sonderfahrten bleiben erhalten (Überland/Autobahn/Nacht sind bei B, B-Auto und B197 gleich)
+  } else {
+    // Komplett anderes ADK (z.B. A oder BE) → alles zurücksetzen
+    update.themen = {};
+    update.sonderfahrten = {};
+    update.schaltstunden = 0;
+    update.testfahrtBestanden = false;
+  }
+
+  await saveToFirestore(activeId, update);
   document.getElementById('klasse-aendern-modal').classList.remove('open');
   toast(`Klasse geändert zu ${klasseNamen[neueKlasse]} ✓`);
 };
