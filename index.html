@@ -933,8 +933,71 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
     <button class="btn-main" onclick="changePassword()" style="margin-bottom:12px">Passwort ändern ✓</button>
     <div style="height:1px;background:var(--border);margin:0 0 16px"></div>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openHelp()" style="background:var(--surface2);margin-bottom:8px">❓ Hilfe & Funktionsübersicht</button>
-    <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');startTutorial()" style="background:var(--surface2);margin-bottom:12px">🎓 Tutorial nochmal anzeigen</button>
+    <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');startTutorial()" style="background:var(--surface2);margin-bottom:8px">🎓 Tutorial nochmal anzeigen</button>
+    <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openImpressum()" style="background:var(--surface2);margin-bottom:12px">📄 Impressum</button>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open')">Schließen</button>
+  </div>
+</div>
+
+<!-- ══ IMPRESSUM SCREEN ══ -->
+<div class="screen" id="screen-impressum" style="display:none;flex-direction:column">
+  <div class="header">
+    <button class="btn-back" onclick="closeImpressum()">←</button>
+    <div><div class="header-title">Impressum</div><div class="header-sub">Angaben gemäß § 5 TMG</div></div>
+    <div style="width:38px"></div>
+  </div>
+  <div class="detail-scroll" style="padding:20px 18px;display:flex;flex-direction:column;gap:20px">
+
+    <div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:24px 0 8px">
+      <img src="./icon-192.png" style="width:72px;height:72px;border-radius:18px" onerror="this.style.display='none'">
+      <div style="font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:800;color:var(--accent)">Schülerkartei</div>
+      <div style="font-size:0.78rem;color:var(--muted)">Digitale Fahrschul-Verwaltung</div>
+    </div>
+
+    <div class="section-block">
+      <div class="section-header"><div class="section-title">👤 Verantwortlich</div></div>
+      <div class="section-body">
+        <div style="font-size:0.9rem;line-height:1.8">
+          <strong>Chriskoo</strong><br>
+          Fahrlehrer<br>
+          Deutschland
+        </div>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <div class="section-header"><div class="section-title">📱 Kontakt</div></div>
+      <div class="section-body">
+        <div style="font-size:0.9rem;line-height:1.8;color:var(--muted)">
+          Instagram: <a href="https://instagram.com/ChrisKrossderFahrlehrer" style="color:var(--accent);text-decoration:none">@ChrisKrossderFahrlehrer</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <div class="section-header"><div class="section-title">🔒 Datenschutz</div></div>
+      <div class="section-body">
+        <div style="font-size:0.84rem;line-height:1.6;color:var(--muted)">
+          Diese App speichert Schülerdaten ausschließlich in Firebase (Google LLC) auf Servern in Frankfurt am Main (europe-west3). Es werden keine Daten an Dritte weitergegeben. Die Nutzung erfolgt ausschließlich durch autorisierte Fahrlehrer mit eigenem Login.<br><br>
+          Schülerdaten werden nur für die Zwecke der Fahrausbildung gespeichert und verarbeitet.
+        </div>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <div class="section-header"><div class="section-title">⚖️ Haftungsausschluss</div></div>
+      <div class="section-body">
+        <div style="font-size:0.84rem;line-height:1.6;color:var(--muted)">
+          Die Inhalte dieser App wurden mit größter Sorgfalt erstellt. Für die Richtigkeit, Vollständigkeit und Aktualität der Inhalte wird keine Gewähr übernommen.
+        </div>
+      </div>
+    </div>
+
+    <div style="text-align:center;padding:12px 0 32px">
+      <div style="font-size:0.72rem;color:var(--muted)">Version 1.0 · fahrschülerkartei.de</div>
+      <div style="font-size:0.7rem;color:var(--border);margin-top:4px">© 2025 Chriskoo · Alle Rechte vorbehalten</div>
+    </div>
+
   </div>
 </div>
 
@@ -1555,6 +1618,7 @@ onAuthStateChanged(auth, (user) => {
     document.getElementById('screen-detail').classList.remove('active');
     document.getElementById('screen-protokoll').style.display = 'none';
     document.getElementById('screen-help').style.display = 'none';
+    document.getElementById('screen-impressum').style.display = 'none';
     document.getElementById('tutorial-overlay').style.display = 'none';
     // Formular komplett zurücksetzen
     document.getElementById('login-username').value = '';
@@ -3447,6 +3511,15 @@ window.openNewEintragModal = () => {
 };
 
 // ─── HILFE-SCREEN ────────────────────────────────────────────
+window.openImpressum = () => {
+  document.querySelectorAll('.screen').forEach(sc => sc.style.display = 'none');
+  document.getElementById('screen-impressum').style.display = 'flex';
+};
+window.closeImpressum = () => {
+  document.getElementById('screen-impressum').style.display = 'none';
+  document.getElementById('screen-list').style.display = 'flex';
+};
+
 window.openHelp = () => {
   document.querySelectorAll('.screen').forEach(sc => sc.style.display = 'none');
   document.getElementById('screen-help').style.display = 'flex';
