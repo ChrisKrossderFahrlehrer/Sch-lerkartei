@@ -1,7 +1,7 @@
 {
-  "name": "Schülerkartei",
-  "short_name": "Schülerkartei",
-  "description": "Digitale Fahrschul-Verwaltung für Fahrlehrer",
+  "name": "ADK – Digitale Kartei",
+  "short_name": "ADK",
+  "description": "ADK – Digitale Fahrschul-Kartei für Fahrlehrer",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait",
@@ -22,6 +22,9 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["education", "productivity"],
+  "categories": [
+    "education",
+    "productivity"
+  ],
   "screenshots": []
 }
