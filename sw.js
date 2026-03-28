@@ -1,11 +1,14 @@
 // Schülerkartei Service Worker
 // Cached die App-Shell damit sie auch ohne Internet startet
 
-const CACHE_NAME = 'schuelerkartei-v1';
+const CACHE_NAME = 'schuelerkartei-v2';
 const APP_SHELL = [
   '/',
   '/index.html',
-  '/fahrschule-app.html',
+  '/sw.js',
+  '/manifest.json',
+  '/icon-192.png',
+  '/icon-512.png',
 ];
 
 // Installation: App-Dateien cachen
