@@ -1,0 +1,184 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── HILFSFUNKTIONEN ──────────────────────────────────────
+    
+    // Ist der User angemeldet?
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // Ist der User Superadmin?
+    function isSuperAdmin(chriskoo@mail.de) {
+      return isAuth() && (
+        request.auth.token.email == 'admin@adk-kartei.de' ||
+        exists(/databases/$(database)/documents/superadmins/$(request.auth.uid))
+      );
+    }
+
+    // User-Profil aus Firestore lesen
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Rolle des aktuellen Users
+    function userRolle() {
+      return getUserData().rolle;
+    }
+
+    // FahrschuleId des aktuellen Users
+    function userFsId() {
+      return getUserData().fahrschuleId;
+    }
+
+    // Ist User Fahrschul-Admin dieser Fahrschule?
+    function isFsAdmin(fahrschuleId) {
+      return isAuth() &&
+             userRolle() == 'fs_admin' &&
+             userFsId() == fahrschuleId;
+    }
+
+    // Ist User Fahrlehrer dieser Fahrschule?
+    function isFahrlehrer(fahrschuleId) {
+      return isAuth() &&
+             userRolle() == 'fahrlehrer' &&
+             userFsId() == fahrschuleId;
+    }
+
+    // Gehört das Dokument zur eigenen Fahrschule?
+    function gehoertZuFahrschule(fahrschuleId) {
+      return isFsAdmin(fahrschuleId) || isFahrlehrer(fahrschuleId);
+    }
+
+    // ── SUPERADMINS COLLECTION ───────────────────────────────
+    match /superadmins/{uid} {
+      allow read: if isSuperAdmin();
+      allow write: if false; // Nur direkt in Firebase Console
+    }
+
+    // ── FAHRSCHULEN ──────────────────────────────────────────
+    match /fahrschulen/{fsId} {
+      // Lesen: SuperAdmin sieht alle, FsAdmin/Fahrlehrer nur ihre eigene
+      allow read: if isSuperAdmin() ||
+                     (isAuth() && userFsId() == fsId);
+
+      // Erstellen: Jeder authentifizierte User (Registrierung)
+      // aber nur wenn er die adminUid auf sich selbst setzt
+      allow create: if isAuth() &&
+                       request.resource.data.adminUid == request.auth.uid &&
+                       request.resource.data.status == 'ausstehend';
+
+      // Updaten: SuperAdmin kann alles, FsAdmin nur eigene nicht-kritische Felder
+      allow update: if isSuperAdmin() ||
+                       (isFsAdmin(fsId) &&
+                        !request.resource.data.diff(resource.data).affectedKeys()
+                          .hasAny(['status', 'adminUid']));
+
+      // Löschen: nur SuperAdmin
+      allow delete: if isSuperAdmin();
+    }
+
+    // ── USERS (Fahrlehrer & Admins) ──────────────────────────
+    match /users/{uid} {
+      // Lesen: eigenes Profil, SuperAdmin, oder FsAdmin der gleichen Schule
+      allow read: if isAuth() && (
+        request.auth.uid == uid ||
+        isSuperAdmin() ||
+        (userRolle() == 'fs_admin' &&
+         get(/databases/$(database)/documents/users/$(uid)).data.fahrschuleId == userFsId())
+      );
+
+      // Erstellen: eigenes Profil (bei Registrierung)
+      allow create: if isAuth() && request.auth.uid == uid;
+
+      // Updaten: eigenes Profil oder FsAdmin für Fahrlehrer der eigenen Schule
+      allow update: if isAuth() && (
+        request.auth.uid == uid ||
+        (userRolle() == 'fs_admin' &&
+         resource.data.fahrschuleId == userFsId() &&
+         resource.data.rolle == 'fahrlehrer')
+      );
+
+      // Löschen: FsAdmin kann Fahrlehrer löschen, SuperAdmin alles
+      allow delete: if isSuperAdmin() ||
+                       (userRolle() == 'fs_admin' &&
+                        resource.data.fahrschuleId == userFsId() &&
+                        resource.data.rolle == 'fahrlehrer');
+    }
+
+    // ── SCHÜLER ──────────────────────────────────────────────
+    // KRITISCH: Strikte Isolation nach fahrschuleId!
+    match /students/{studentId} {
+      // Lesen: nur wenn fahrschuleId mit eigener übereinstimmt
+      allow read: if isAuth() &&
+                     resource.data.fahrschuleId == userFsId() &&
+                     (userRolle() == 'fs_admin' || userRolle() == 'fahrlehrer');
+
+      // Erstellen: Fahrlehrer/Admin der eigenen Schule
+      // fahrschuleId muss gesetzt und korrekt sein
+      allow create: if isAuth() &&
+                       request.resource.data.fahrschuleId == userFsId() &&
+                       (userRolle() == 'fs_admin' || userRolle() == 'fahrlehrer');
+
+      // Updaten: nur eigene Fahrschule
+      allow update: if isAuth() &&
+                       resource.data.fahrschuleId == userFsId() &&
+                       request.resource.data.fahrschuleId == userFsId() &&
+                       (userRolle() == 'fs_admin' || userRolle() == 'fahrlehrer');
+
+      // Löschen: Fahrlehrer (eigene Schüler) oder FsAdmin
+      allow delete: if isAuth() &&
+                       resource.data.fahrschuleId == userFsId() &&
+                       (userRolle() == 'fs_admin' ||
+                        (userRolle() == 'fahrlehrer' &&
+                         resource.data.uid == request.auth.uid));
+    }
+
+    // ── PROTOKOLL ────────────────────────────────────────────
+    match /protokoll/{eintragId} {
+      allow read: if isAuth() &&
+                     resource.data.fahrschuleId == userFsId();
+
+      allow create: if isAuth() &&
+                       request.resource.data.fahrschuleId == userFsId() &&
+                       (userRolle() == 'fahrlehrer' || userRolle() == 'fs_admin');
+
+      allow update: if isAuth() &&
+                       resource.data.fahrschuleId == userFsId();
+
+      allow delete: if isAuth() &&
+                       resource.data.fahrschuleId == userFsId() &&
+                       (resource.data.uid == request.auth.uid ||
+                        userRolle() == 'fs_admin');
+    }
+
+    // ── CUSTOM FIELDS ────────────────────────────────────────
+    match /customFields/{docId} {
+      allow read, write: if isAuth() &&
+                            (resource == null || resource.data.fahrschuleId == userFsId()) &&
+                            (request.resource == null || request.resource.data.fahrschuleId == userFsId());
+    }
+
+    // ── CUSTOM THEMEN ────────────────────────────────────────
+    match /customThemen/{docId} {
+      allow read, write: if isAuth() &&
+                            (resource == null || resource.data.fahrschuleId == userFsId()) &&
+                            (request.resource == null || request.resource.data.fahrschuleId == userFsId());
+    }
+
+    // ── ACCESS CODES (Schüler-Ansicht) ───────────────────────
+    match /accessCodes/{docId} {
+      // Schüler können lesen (für Code-Eingabe)
+      allow read: if true;
+      // Nur Fahrlehrer/Admin können Codes erstellen
+      allow write: if isAuth() &&
+                      (userRolle() == 'fahrlehrer' || userRolle() == 'fs_admin');
+    }
+
+    // ── ALLES ANDERE: VERBIETEN ──────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

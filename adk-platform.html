@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#f0b429">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ADK">
+<title>ADK – Digitale Kartei</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── RESET & VARS ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:      #0d1117;
+  --surface: #161b22;
+  --surface2:#1c2330;
+  --border:  #30363d;
+  --text:    #e6edf3;
+  --muted:   #7d8590;
+  --accent:  #f0b429;
+  --accent2: #3fb950;
+  --blue:    #58a6ff;
+  --danger:  #f85149;
+  --purple:  #bc8cff;
+  --radius:  14px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+body.light {
+  --bg:      #f4f6f8;
+  --surface: #ffffff;
+  --surface2:#f0f2f4;
+  --border:  #d0d7de;
+  --text:    #1f2328;
+  --muted:   #656d76;
+}
+html, body { height: 100%; overflow: hidden; font-family: 'Manrope', sans-serif; background: var(--bg); color: var(--text); }
+
+/* ── SCREENS ── */
+.screen { display: none; flex-direction: column; height: 100%; position: fixed; inset: 0; background: var(--bg); z-index: 10; }
+.screen.active { display: flex; }
+
+/* ── HEADER ── */
+.header { background: var(--surface); border-bottom: 1px solid var(--border); padding: calc(var(--safe-top) + 14px) 18px 14px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.header-title { font-family: 'Syne', sans-serif; font-size: 1.1rem; font-weight: 700; flex: 1; }
+.header-sub { font-size: 0.72rem; color: var(--muted); margin-top: 1px; }
+.btn-back { background: var(--surface2); border: 1px solid var(--border); color: var(--text); width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; cursor: pointer; flex-shrink: 0; }
+.btn-icon { background: var(--surface2); border: 1px solid var(--border); color: var(--text); width: 36px; height: 36px; border-radius: 10px; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+/* ── SCROLLABLE BODY ── */
+.scroll-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+/* ── LOADING ── */
+#loading { position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; z-index: 999; }
+.spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── FORMS ── */
+.form-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px 20px; margin: 16px; }
+.form-title { font-family: 'Syne', sans-serif; font-size: 1.2rem; font-weight: 800; margin-bottom: 4px; }
+.form-sub { font-size: 0.8rem; color: var(--muted); margin-bottom: 20px; }
+.form-group { margin-bottom: 14px; }
+.form-label { font-size: 0.78rem; font-weight: 600; color: var(--muted); margin-bottom: 6px; display: block; text-transform: uppercase; letter-spacing: 0.04em; }
+.form-input { width: 100%; padding: 11px 14px; background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; color: var(--text); font-size: 0.92rem; font-family: 'Manrope', sans-serif; outline: none; transition: border-color 0.15s; }
+.form-input:focus { border-color: var(--accent); }
+.btn-main { width: 100%; padding: 14px; background: var(--accent); color: #0d1117; border: none; border-radius: 10px; font-family: 'Syne', sans-serif; font-size: 0.95rem; font-weight: 700; cursor: pointer; transition: opacity 0.15s; }
+.btn-main:active { opacity: 0.85; }
+.btn-secondary { width: 100%; padding: 12px; background: var(--surface2); color: var(--text); border: 1px solid var(--border); border-radius: 10px; font-family: 'Manrope', sans-serif; font-size: 0.88rem; font-weight: 600; cursor: pointer; margin-top: 8px; }
+.error-msg { color: var(--danger); font-size: 0.8rem; text-align: center; min-height: 20px; margin: 8px 0; }
+.success-msg { color: var(--accent2); font-size: 0.8rem; text-align: center; min-height: 20px; margin: 8px 0; }
+
+/* ── TABS ── */
+.tab-row { display: flex; border-bottom: 1px solid var(--border); background: var(--surface); }
+.tab-btn { flex: 1; padding: 12px 8px; font-family: 'Manrope', sans-serif; font-size: 0.82rem; font-weight: 600; background: none; border: none; border-bottom: 2px solid transparent; color: var(--muted); cursor: pointer; transition: all 0.15s; }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ── CARDS ── */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin: 0 16px 10px; }
+.card-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.95rem; margin-bottom: 4px; }
+.card-sub { font-size: 0.75rem; color: var(--muted); }
+
+/* ── BADGES ── */
+.badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 700; }
+.badge-green  { background: rgba(63,185,80,0.15); color: var(--accent2); border: 1px solid rgba(63,185,80,0.3); }
+.badge-yellow { background: rgba(240,180,41,0.15); color: var(--accent); border: 1px solid rgba(240,180,41,0.3); }
+.badge-red    { background: rgba(248,81,73,0.15); color: var(--danger); border: 1px solid rgba(248,81,73,0.3); }
+.badge-blue   { background: rgba(88,166,255,0.15); color: var(--blue); border: 1px solid rgba(88,166,255,0.3); }
+.badge-purple { background: rgba(188,140,255,0.15); color: var(--purple); border: 1px solid rgba(188,140,255,0.3); }
+
+/* ── KPI ROW ── */
+.kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px; }
+.kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; text-align: center; }
+.kpi-val { font-family: 'Syne', sans-serif; font-size: 1.6rem; font-weight: 800; }
+.kpi-lbl { font-size: 0.68rem; color: var(--muted); margin-top: 2px; }
+
+/* ── LIST ITEMS ── */
+.list-item { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; }
+.list-item:active { background: var(--surface2); }
+.list-avatar { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1rem; flex-shrink: 0; }
+.list-info { flex: 1; min-width: 0; }
+.list-name { font-weight: 700; font-size: 0.92rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.list-sub { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+
+/* ── MODAL ── */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(6px); z-index: 200; display: none; align-items: flex-end; justify-content: center; }
+.modal-overlay.open { display: flex; }
+.modal-sheet { background: var(--surface); border-radius: 20px 20px 0 0; padding: 24px 20px calc(var(--safe-bottom) + 28px); width: 100%; max-width: 480px; animation: slideUp 0.25s ease; max-height: 88vh; overflow-y: auto; }
+@keyframes slideUp { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.modal-title { font-family: 'Syne', sans-serif; font-size: 1.1rem; font-weight: 700; margin-bottom: 20px; text-align: center; }
+
+/* ── TOAST ── */
+#toast { position: fixed; bottom: calc(var(--safe-bottom) + 80px); left: 50%; transform: translateX(-50%) translateY(20px); background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 10px 20px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; opacity: 0; transition: all 0.3s; z-index: 9999; white-space: nowrap; pointer-events: none; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── SECTION ── */
+.section-hd { font-family: 'Syne', sans-serif; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); padding: 16px 16px 8px; }
+
+/* ── LOGO LOGIN ── */
+.login-logo { font-family: 'Syne', sans-serif; font-size: 2.2rem; font-weight: 800; color: var(--accent); letter-spacing: -0.02em; }
+.login-logo span { color: var(--text); }
+</style>
+</head>
+<body>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- LOADING -->
+<div id="loading">
+  <div class="spinner"></div>
+  <p style="color:var(--muted);font-size:0.85rem">ADK wird geladen…</p>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- LOGIN SCREEN                              -->
+<!-- ══════════════════════════════════════════ -->
+<div class="screen" id="screen-login">
+  <div class="scroll-body" style="display:flex;flex-direction:column;justify-content:center;min-height:100%;padding:20px 0">
+
+    <!-- Logo -->
+    <div style="text-align:center;padding:32px 20px 24px">
+      <div class="login-logo">ADK<span>.</span></div>
+      <div style="font-size:0.8rem;color:var(--muted);margin-top:4px">Digitale Fahrschul-Kartei</div>
+    </div>
+
+    <!-- Tabs -->
+    <div style="margin:0 16px 0">
+      <div class="tab-row" style="border-radius:12px 12px 0 0;overflow:hidden">
+        <button class="tab-btn active" id="tab-login" onclick="showLoginTab('login')">Anmelden</button>
+        <button class="tab-btn" id="tab-register" onclick="showLoginTab('register')">Fahrschule registrieren</button>
+      </div>
+    </div>
+
+    <!-- Login Form -->
+    <div id="pane-login" class="form-card" style="margin-top:0;border-radius:0 0 14px 14px">
+      <div class="form-group">
+        <label class="form-label">E-Mail</label>
+        <input class="form-input" id="inp-login-email" type="email" placeholder="name@fahrschule.de" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Passwort</label>
+        <input class="form-input" id="inp-login-pw" type="password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <div class="error-msg" id="login-error"></div>
+      <button class="btn-main" id="btn-login" onclick="doLogin()">Anmelden →</button>
+    </div>
+
+    <!-- Register Form -->
+    <div id="pane-register" style="display:none" class="form-card" style="margin-top:0;border-radius:0 0 14px 14px">
+      <div style="background:rgba(240,180,41,0.1);border:1px solid rgba(240,180,41,0.3);border-radius:10px;padding:12px;margin-bottom:16px;font-size:0.8rem;color:var(--accent)">
+        ℹ️ Neue Fahrschule registrieren – nach Prüfung durch den Administrator wird Ihr Konto freigeschaltet.
+      </div>
+      <div class="form-group">
+        <label class="form-label">Name der Fahrschule</label>
+        <input class="form-input" id="inp-reg-name" placeholder="z.B. Fahrschule Müller" autocomplete="organization">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ihr Name (Inhaber)</label>
+        <input class="form-input" id="inp-reg-inhaber" placeholder="Vor- und Nachname" autocomplete="name">
+      </div>
+      <div class="form-group">
+        <label class="form-label">E-Mail</label>
+        <input class="form-input" id="inp-reg-email" type="email" placeholder="info@fahrschule.de" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Passwort (min. 8 Zeichen)</label>
+        <input class="form-input" id="inp-reg-pw" type="password" placeholder="••••••••" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Stadt</label>
+        <input class="form-input" id="inp-reg-stadt" placeholder="z.B. München" autocomplete="address-level2">
+      </div>
+
+      <!-- AGB & DSGVO Checkboxen -->
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px">
+        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:10px">Zustimmungen (Pflicht)</div>
+
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;margin-bottom:10px">
+          <input type="checkbox" id="chk-agb" style="margin-top:2px;width:18px;height:18px;flex-shrink:0;accent-color:var(--accent)">
+          <span style="font-size:0.8rem;line-height:1.5">Ich habe die <a onclick="openAGB()" style="color:var(--accent);cursor:pointer;text-decoration:underline">AGB</a> gelesen und akzeptiere sie.</span>
+        </label>
+
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;margin-bottom:10px">
+          <input type="checkbox" id="chk-dsgvo" style="margin-top:2px;width:18px;height:18px;flex-shrink:0;accent-color:var(--accent)">
+          <span style="font-size:0.8rem;line-height:1.5">Ich habe die <a onclick="openDSGVO()" style="color:var(--accent);cursor:pointer;text-decoration:underline">Datenschutzerklärung</a> gelesen und stimme der Verarbeitung meiner Daten gemäß DSGVO zu.</span>
+        </label>
+
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer">
+          <input type="checkbox" id="chk-avv" style="margin-top:2px;width:18px;height:18px;flex-shrink:0;accent-color:var(--accent)">
+          <span style="font-size:0.8rem;line-height:1.5">Ich bestätige, dass ich als Verantwortlicher i.S.d. DSGVO für die eingegebenen Schülerdaten zuständig bin und diese nur zur Fahrausbildung verarbeite (Auftragsverarbeitungsvertrag).</span>
+        </label>
+      </div>
+
+      <div class="error-msg" id="reg-error"></div>
+      <div class="success-msg" id="reg-success"></div>
+      <button class="btn-main" id="btn-register" onclick="doRegister()">Registrierung absenden →</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- AGB SCREEN                                -->
+<!-- ══════════════════════════════════════════ -->
+<div class="screen" id="screen-agb">
+  <div class="header">
+    <button class="btn-back" onclick="closeAGB()">←</button>
+    <div><div class="header-title">AGB</div><div class="header-sub">Allgemeine Geschäftsbedingungen</div></div>
+    <div style="width:38px"></div>
+  </div>
+  <div class="scroll-body" style="padding:20px 18px">
+
+    <div style="font-size:0.82rem;line-height:1.8;color:var(--text);display:flex;flex-direction:column;gap:16px">
+
+      <div><strong style="font-size:0.95rem">§ 1 Geltungsbereich</strong><br>
+      Diese AGB gelten für die Nutzung der Software „ADK – Digitale Kartei" (nachfolgend „Dienst") zwischen Chriskoo (nachfolgend „Anbieter") und dem registrierten Nutzer (nachfolgend „Fahrschule"). Die AGB gelten für alle Leistungen des Anbieters.</div>
+
+      <div><strong style="font-size:0.95rem">§ 2 Leistungsgegenstand</strong><br>
+      Der Anbieter stellt eine webbasierte Software zur digitalen Verwaltung von Fahrschülern und Ausbildungsnachweisen bereit. Die Software wird als Software-as-a-Service (SaaS) betrieben. Der Anbieter übernimmt keine Gewährleistung für ständige Verfügbarkeit.</div>
+
+      <div><strong style="font-size:0.95rem">§ 3 Nutzungsbedingungen</strong><br>
+      Die Fahrschule verpflichtet sich, den Dienst nur für legale Zwecke im Rahmen der Fahrausbildung zu nutzen. Eine Weitergabe von Zugangsdaten an unbefugte Dritte ist untersagt. Die Fahrschule ist für alle Aktivitäten unter ihrem Account verantwortlich.</div>
+
+      <div><strong style="font-size:0.95rem">§ 4 Datenschutz und Datenverantwortung</strong><br>
+      Die Fahrschule ist Verantwortlicher i.S.d. Art. 4 Nr. 7 DSGVO für alle eingegebenen Schülerdaten. Der Anbieter verarbeitet diese Daten als Auftragsverarbeiter i.S.d. Art. 28 DSGVO. Die Fahrschule stellt sicher, dass eine Rechtsgrundlage für die Verarbeitung der Schülerdaten vorliegt.</div>
+
+      <div><strong style="font-size:0.95rem">§ 5 Kündigung</strong><br>
+      Das Nutzungsverhältnis kann jederzeit durch den Anbieter oder die Fahrschule beendet werden. Bei Kündigung werden alle Daten der Fahrschule nach 30 Tagen unwiderruflich gelöscht.</div>
+
+      <div><strong style="font-size:0.95rem">§ 6 Haftungsbeschränkung</strong><br>
+      Der Anbieter haftet nicht für Datenverlust durch höhere Gewalt oder technische Ausfälle Dritter (insbesondere Google Firebase). Die Fahrschule ist für regelmäßige Datensicherungen selbst verantwortlich.</div>
+
+      <div><strong style="font-size:0.95rem">§ 7 Änderungen der AGB</strong><br>
+      Der Anbieter behält sich vor, diese AGB mit angemessener Vorankündigung (mind. 4 Wochen) zu ändern. Die fortgesetzte Nutzung nach Änderung gilt als Zustimmung.</div>
+
+      <div><strong style="font-size:0.95rem">§ 8 Anwendbares Recht</strong><br>
+      Es gilt das Recht der Bundesrepublik Deutschland. Gerichtsstand ist der Sitz des Anbieters.</div>
+
+      <div style="font-size:0.72rem;color:var(--muted);border-top:1px solid var(--border);padding-top:12px">Stand: Januar 2025 · Chriskoo · Deutschland</div>
+    </div>
+
+    <button class="btn-main" onclick="closeAGB()" style="margin-top:24px;margin-bottom:32px">Verstanden ✓</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- DSGVO SCREEN                              -->
+<!-- ══════════════════════════════════════════ -->
+<div class="screen" id="screen-dsgvo">
+  <div class="header">
+    <button class="btn-back" onclick="closeDSGVO()">←</button>
+    <div><div class="header-title">Datenschutz</div><div class="header-sub">Datenschutzerklärung gemäß DSGVO</div></div>
+    <div style="width:38px"></div>
+  </div>
+  <div class="scroll-body" style="padding:20px 18px">
+
+    <div style="font-size:0.82rem;line-height:1.8;color:var(--text);display:flex;flex-direction:column;gap:16px">
+
+      <div><strong style="font-size:0.95rem">1. Verantwortlicher</strong><br>
+      Chriskoo (Fahrlehrer)<br>Deutschland<br>Instagram: @ChrisKrossderFahrlehrer</div>
+
+      <div><strong style="font-size:0.95rem">2. Welche Daten werden verarbeitet?</strong><br>
+      <strong>Registrierungsdaten:</strong> Name der Fahrschule, Name des Inhabers, E-Mail-Adresse, Stadt.<br>
+      <strong>Schülerdaten:</strong> Werden ausschließlich von den Fahrschulen selbst eingegeben und verarbeitet. Der Anbieter hat keinen Zugriff auf individuelle Schülerdaten.<br>
+      <strong>Nutzungsstatistiken:</strong> Aggregierte, anonymisierte Nutzungsdaten (Anzahl Schüler, Anzahl Fahrstunden) ohne Personenbezug.</div>
+
+      <div><strong style="font-size:0.95rem">3. Rechtsgrundlagen (Art. 6 DSGVO)</strong><br>
+      Die Verarbeitung der Registrierungsdaten erfolgt auf Grundlage von Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung). Schülerdaten werden durch die Fahrschule als Verantwortliche verarbeitet; der Anbieter agiert als Auftragsverarbeiter gemäß Art. 28 DSGVO.</div>
+
+      <div><strong style="font-size:0.95rem">4. Datenspeicherung und -sicherheit</strong><br>
+      Alle Daten werden ausschließlich auf Servern von Google Firebase in Frankfurt am Main (EU, europe-west3) gespeichert. Die Übertragung erfolgt verschlüsselt (TLS/HTTPS). Der Zugriff ist durch Firebase Authentication und Firestore Security Rules strikt auf den jeweils berechtigten Nutzer beschränkt.</div>
+
+      <div><strong style="font-size:0.95rem">5. Datentrennung und -isolation</strong><br>
+      Jede Fahrschule kann ausschließlich auf ihre eigenen Daten zugreifen. Eine technische Isolation ist durch serverseitige Sicherheitsregeln gewährleistet. Kein Dritter kann auf die Daten einer Fahrschule zugreifen.</div>
+
+      <div><strong style="font-size:0.95rem">6. Weitergabe an Dritte</strong><br>
+      Eine Weitergabe an Dritte erfolgt nicht. Google LLC agiert als Auftragsverarbeiter für die Infrastruktur (Firebase) mit Serverstandort in der EU.</div>
+
+      <div><strong style="font-size:0.95rem">7. Betroffenenrechte (Art. 15–21 DSGVO)</strong><br>
+      Sie haben das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung und Datenübertragbarkeit. Wenden Sie sich an: @ChrisKrossderFahrlehrer (Instagram).<br>
+      Sie haben das Recht, Beschwerde bei einer Datenschutzaufsichtsbehörde einzulegen.</div>
+
+      <div><strong style="font-size:0.95rem">8. Aufbewahrungsfristen</strong><br>
+      Daten werden gelöscht, sobald die Fahrschule ihr Konto kündigt (nach 30 Tagen). Schülerdaten werden auf Anfrage sofort gelöscht.</div>
+
+      <div><strong style="font-size:0.95rem">9. Cookies und Tracking</strong><br>
+      Die App verwendet keine Cookies oder Tracking-Tools. Firebase Authentication verwendet lokale Browser-Speicher (IndexedDB) ausschließlich für die Anmeldesession.</div>
+
+      <div style="font-size:0.72rem;color:var(--muted);border-top:1px solid var(--border);padding-top:12px">Stand: Januar 2025 · Chriskoo · Deutschland</div>
+    </div>
+
+    <button class="btn-main" onclick="closeDSGVO()" style="margin-top:24px;margin-bottom:32px">Verstanden ✓</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- SUPERADMIN SCREEN                         -->
+<!-- ══════════════════════════════════════════ -->
+<div class="screen" id="screen-superadmin">
+  <div class="header">
+    <div style="flex:1">
+      <div class="header-title">🔱 Super-Admin</div>
+      <div class="header-sub" id="sa-greeting"></div>
+    </div>
+    <button class="btn-icon" onclick="doLogout()">⏻</button>
+  </div>
+
+  <div class="tab-row">
+    <button class="tab-btn active" id="sa-tab-pending"   onclick="saTab('pending')">⏳ Ausstehend</button>
+    <button class="tab-btn"        id="sa-tab-aktiv"     onclick="saTab('aktiv')">✅ Aktiv</button>
+    <button class="tab-btn"        id="sa-tab-analytics" onclick="saTab('analytics')">📊 Analytics</button>
+    <button class="tab-btn"        id="sa-tab-alle"      onclick="saTab('alle')">📋 Alle</button>
+  </div>
+
+  <div class="scroll-body" id="sa-body">
+    <div style="padding:40px;text-align:center;color:var(--muted)">Lädt…</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- FAHRSCHUL-ADMIN SCREEN                    -->
+<!-- ══════════════════════════════════════════ -->
+<div class="screen" id="screen-fsadmin">
+  <div class="header">
+    <div style="flex:1">
+      <div class="header-title" id="fsa-title">Meine Fahrschule</div>
+      <div class="header-sub" id="fsa-sub"></div>
+    </div>
+    <button class="btn-icon" onclick="doLogout()">⏻</button>
+  </div>
+
+  <div class="tab-row">
+    <button class="tab-btn active" id="fsa-tab-lehrer" onclick="fsaTab('lehrer')">👨‍🏫 Fahrlehrer</button>
+    <button class="tab-btn" id="fsa-tab-stats" onclick="fsaTab('stats')">📊 Übersicht</button>
+    <button class="tab-btn" id="fsa-tab-einst" onclick="fsaTab('einst')">⚙️ Einstellungen</button>
+  </div>
+
+  <div class="scroll-body" id="fsa-body">
+    <div style="padding:40px;text-align:center;color:var(--muted)">Lädt…</div>
+  </div>
+
+  <!-- FAB -->
+  <button onclick="openAddLehrer()" id="fsa-fab" style="position:fixed;bottom:calc(var(--safe-bottom)+24px);right:22px;width:56px;height:56px;border-radius:50%;background:var(--accent);border:none;color:#0d1117;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 20px rgba(240,180,41,0.4);display:none">+</button>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- FAHRLEHRER SCREEN (Weiterleitung zur ADK) -->
+<!-- ══════════════════════════════════════════ -->
+<div class="screen" id="screen-fahrlehrer">
+  <div class="header">
+    <div style="flex:1">
+      <div class="header-title">ADK – Digitale Kartei</div>
+      <div class="header-sub" id="fl-sub"></div>
+    </div>
+    <button class="btn-icon" onclick="doLogout()">⏻</button>
+  </div>
+  <div class="scroll-body" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px;gap:16px;text-align:center">
+    <div style="font-size:3rem">🎓</div>
+    <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem">Angemeldet als Fahrlehrer</div>
+    <div style="color:var(--muted);font-size:0.85rem" id="fl-info"></div>
+    <button class="btn-main" style="max-width:280px" onclick="openADKApp()">ADK App öffnen →</button>
+    <button class="btn-secondary" style="max-width:280px" onclick="doLogout()">Abmelden</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- GESPERRT SCREEN                           -->
+<!-- ══════════════════════════════════════════ -->
+<div class="screen" id="screen-gesperrt">
+  <div class="scroll-body" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:40px;text-align:center;gap:16px">
+    <div style="font-size:3rem">⏳</div>
+    <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.2rem">Konto wird geprüft</div>
+    <div style="color:var(--muted);font-size:0.85rem;max-width:300px">Ihre Fahrschule wurde registriert und wird vom Administrator geprüft. Sie erhalten eine Benachrichtigung sobald Ihr Konto freigeschaltet wurde.</div>
+    <button class="btn-secondary" style="max-width:280px;margin-top:8px" onclick="doLogout()">Abmelden</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- MODALS                                    -->
+<!-- ══════════════════════════════════════════ -->
+
+<!-- Fahrlehrer hinzufügen -->
+<div class="modal-overlay" id="modal-add-lehrer" onclick="closeModals(event)">
+  <div class="modal-sheet">
+    <div class="modal-title">👨‍🏫 Fahrlehrer anlegen</div>
+    <div class="form-group">
+      <label class="form-label">Vorname</label>
+      <input class="form-input" id="inp-fl-vn" placeholder="z.B. Max" autocomplete="given-name">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Nachname</label>
+      <input class="form-input" id="inp-fl-nn" placeholder="z.B. Mustermann" autocomplete="family-name">
+    </div>
+    <div class="form-group">
+      <label class="form-label">E-Mail (= Login)</label>
+      <input class="form-input" id="inp-fl-email" type="email" placeholder="max@fahrschule.de" autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Temporäres Passwort</label>
+      <input class="form-input" id="inp-fl-pw" type="password" placeholder="Min. 8 Zeichen" autocomplete="new-password">
+    </div>
+    <div class="error-msg" id="fl-error"></div>
+    <div style="display:flex;gap:10px;margin-top:4px">
+      <button class="btn-secondary" style="margin:0" onclick="document.getElementById('modal-add-lehrer').classList.remove('open')">Abbrechen</button>
+      <button class="btn-main" onclick="doAddLehrer()">Anlegen ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- Fahrschule Detail (SuperAdmin) -->
+<div class="modal-overlay" id="modal-fs-detail" onclick="closeModals(event)">
+  <div class="modal-sheet">
+    <div class="modal-title" id="modal-fs-name">Fahrschule</div>
+    <div id="modal-fs-content"></div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp }                                         from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+         signOut, onAuthStateChanged, updateProfile }            from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, enableIndexedDbPersistence,
+         collection, doc, addDoc, updateDoc, deleteDoc,
+         getDoc, getDocs, setDoc,
+         onSnapshot, query, where, orderBy }                     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+// ── FIREBASE CONFIG ──────────────────────────────────────────
+const firebaseConfig = {
+  apiKey:            "AIzaSyD490kLzTOq3h3VdQ9ZqWZd_aXcDRfxBOs",
+  authDomain:        "fahrschule-ebc65.firebaseapp.com",
+  projectId:         "fahrschule-ebc65",
+  storageBucket:     "fahrschule-ebc65.firebasestorage.app",
+  messagingSenderId: "194338111405",
+  appId:             "1:194338111405:web:73e2f31d69cde3ac9beb24"
+};
+
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getFirestore(app);
+
+enableIndexedDbPersistence(db).catch(() => {});
+
+// ── SUPERADMIN UID (nur dieser User ist Super-Admin) ─────────
+const SUPERADMIN_UID = 'DEINE_SUPERADMIN_UID'; // ← nach erstem Login ersetzen
+
+// ── STATE ────────────────────────────────────────────────────
+let currentUser   = null;
+let currentProfil = null; // { rolle, fahrschuleId, name, ... }
+let fahrschulen   = [];
+let saAktivTab    = 'pending';
+let fsaAktivTab   = 'lehrer';
+let unsubFahrschulen = null;
+let unsubLehrer      = null;
+
+// ── TOAST ────────────────────────────────────────────────────
+function toast(msg, dur=3000) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), dur);
+}
+
+// ── SCREENS ──────────────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ── LOGIN TABS ───────────────────────────────────────────────
+window.showLoginTab = (tab) => {
+  document.getElementById('pane-login').style.display    = tab==='login'    ? 'block' : 'none';
+  document.getElementById('pane-register').style.display = tab==='register' ? 'block' : 'none';
+  document.getElementById('tab-login').classList.toggle('active',    tab==='login');
+  document.getElementById('tab-register').classList.toggle('active', tab==='register');
+};
+
+// ── CLOSE MODALS ─────────────────────────────────────────────
+window.closeModals = (e) => {
+  if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('open');
+};
+
+// ── AGB & DSGVO SCREENS ──────────────────────────────────────
+window.openAGB = () => {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-agb').classList.add('active');
+};
+window.closeAGB = () => {
+  document.getElementById('screen-agb').classList.remove('active');
+  document.getElementById('screen-login').classList.add('active');
+  // Checkbox aktivieren wenn zurück
+  document.getElementById('chk-agb').checked = true;
+};
+window.openDSGVO = () => {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-dsgvo').classList.add('active');
+};
+window.closeDSGVO = () => {
+  document.getElementById('screen-dsgvo').classList.remove('active');
+  document.getElementById('screen-login').classList.add('active');
+  document.getElementById('chk-dsgvo').checked = true;
+};
+
+// ── AUTH: LOGIN ──────────────────────────────────────────────
+window.doLogin = async () => {
+  const email = document.getElementById('inp-login-email').value.trim();
+  const pw    = document.getElementById('inp-login-pw').value;
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+  if (!email || !pw) { errEl.textContent = 'Bitte E-Mail und Passwort eingeben.'; return; }
+  const btn = document.getElementById('btn-login');
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    await signInWithEmailAndPassword(auth, email, pw);
+  } catch(e) {
+    errEl.textContent = friendlyError(e.code);
+    btn.disabled = false; btn.textContent = 'Anmelden →';
+  }
+};
+
+// ── AUTH: REGISTRIERUNG MIT ZUSTIMMUNGSPFLICHT ───────────────
+window.doRegister = async () => {
+  const name    = document.getElementById('inp-reg-name').value.trim();
+  const inhaber = document.getElementById('inp-reg-inhaber').value.trim();
+  const email   = document.getElementById('inp-reg-email').value.trim();
+  const pw      = document.getElementById('inp-reg-pw').value;
+  const stadt   = document.getElementById('inp-reg-stadt').value.trim();
+  const agb     = document.getElementById('chk-agb').checked;
+  const dsgvo   = document.getElementById('chk-dsgvo').checked;
+  const avv     = document.getElementById('chk-avv').checked;
+  const errEl   = document.getElementById('reg-error');
+  const okEl    = document.getElementById('reg-success');
+  errEl.textContent = ''; okEl.textContent = '';
+
+  if (!name||!inhaber||!email||!pw||!stadt) { errEl.textContent = 'Bitte alle Felder ausfüllen.'; return; }
+  if (pw.length < 8) { errEl.textContent = 'Passwort muss mind. 8 Zeichen haben.'; return; }
+  if (!agb)   { errEl.textContent = '⚠️ Bitte AGB akzeptieren.'; return; }
+  if (!dsgvo) { errEl.textContent = '⚠️ Bitte Datenschutzerklärung akzeptieren.'; return; }
+  if (!avv)   { errEl.textContent = '⚠️ Bitte Datenverantwortung bestätigen.'; return; }
+
+  const btn = document.getElementById('btn-register');
+  btn.disabled = true; btn.textContent = '…';
+
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, email, pw);
+    await updateProfile(cred.user, { displayName: inhaber });
+
+    const fsRef = await addDoc(collection(db, 'fahrschulen'), {
+      name, inhaber, email, stadt,
+      adminUid: cred.user.uid,
+      status: 'ausstehend',
+      createdAt: Date.now(),
+      // DSGVO-Zustimmungen mit Zeitstempel speichern
+      zustimmungen: {
+        agb:   { akzeptiert: true, datum: Date.now(), version: 'Januar 2025' },
+        dsgvo: { akzeptiert: true, datum: Date.now(), version: 'Januar 2025' },
+        avv:   { akzeptiert: true, datum: Date.now(), version: 'Januar 2025' },
+      },
+    });
+
+    await setDoc(doc(db, 'users', cred.user.uid), {
+      name: inhaber, email,
+      rolle: 'fs_admin',
+      fahrschuleId: fsRef.id,
+      fahrschuleName: name,
+      createdAt: Date.now(),
+    });
+
+    okEl.textContent = '✓ Registrierung erfolgreich! Ihr Konto wird geprüft.';
+    btn.textContent = 'Gesendet ✓';
+  } catch(e) {
+    errEl.textContent = friendlyError(e.code);
+    btn.disabled = false; btn.textContent = 'Registrierung absenden →';
+  }
+};
+
+// ── AUTH: LOGOUT ─────────────────────────────────────────────
+window.doLogout = async () => {
+  if (unsubFahrschulen) { unsubFahrschulen(); unsubFahrschulen = null; }
+  if (unsubLehrer)      { unsubLehrer();      unsubLehrer = null; }
+  currentUser = null; currentProfil = null;
+  await signOut(auth);
+};
+
+// ── SUPERADMIN: Tabs ─────────────────────────────────────────
+window.saTab = (tab) => {
+  saAktivTab = tab;
+  ['pending','aktiv','analytics','alle'].forEach(t => {
+    const el = document.getElementById(`sa-tab-${t}`);
+    if (el) el.classList.toggle('active', t===tab);
+  });
+  if (tab === 'analytics') renderAnalytics();
+  else renderSuperadmin();
+};
+
+// ── SUPERADMIN: Analytics Dashboard ──────────────────────────
+async function renderAnalytics() {
+  const body = document.getElementById('sa-body');
+  body.innerHTML = `<div style="padding:40px;text-align:center;color:var(--muted)">📊 Wird geladen…</div>`;
+
+  try {
+    // Aggregierte Daten laden – KEIN Zugriff auf Schülernamen!
+    const aktiveFahrschulen = fahrschulen.filter(f => f.status === 'aktiv');
+
+    // Schüler-Zahlen pro Fahrschule (nur Anzahl, kein Name)
+    const fsStats = await Promise.all(aktiveFahrschulen.map(async fs => {
+      const [schuelerSnap, lehrerSnap, protokollSnap] = await Promise.all([
+        getDocs(query(collection(db,'students'),   where('fahrschuleId','==',fs.id))),
+        getDocs(query(collection(db,'users'),       where('fahrschuleId','==',fs.id), where('rolle','==','fahrlehrer'))),
+        getDocs(query(collection(db,'protokoll'),   where('fahrschuleId','==',fs.id))),
+      ]);
+      const schueler = schuelerSnap.docs.map(d => d.data());
+      return {
+        id: fs.id,
+        name: fs.name,
+        stadt: fs.stadt,
+        registriert: fs.createdAt,
+        anzahlSchueler:  schuelerSnap.size,
+        anzahlAktiv:     schueler.filter(s => !s.archiviert).length,
+        anzahlArchiviert:schueler.filter(s => s.archiviert).length,
+        anzahlLehrer:    lehrerSnap.size,
+        anzahlProtokolle:protokollSnap.size,
+        klassenVerteilung: {
+          B:     schueler.filter(s => ['B','B-Auto','B197'].includes(s.klasse||'B')).length,
+          BE:    schueler.filter(s => s.klasse === 'BE').length,
+          A:     schueler.filter(s => s.klasse === 'A').length,
+        },
+        // Letzter Eintrag im Protokoll (Aktivität)
+        letzteAktivitaet: protokollSnap.docs.reduce((max, d) => {
+          const t = d.data().createdAt || 0;
+          return t > max ? t : max;
+        }, 0),
+      };
+    }));
+
+    // Gesamtzahlen
+    const gesamt = {
+      fahrschulen:  fsStats.length,
+      schueler:     fsStats.reduce((s,f) => s + f.anzahlSchueler, 0),
+      aktiveSchueler: fsStats.reduce((s,f) => s + f.anzahlAktiv, 0),
+      protokolle:   fsStats.reduce((s,f) => s + f.anzahlProtokolle, 0),
+      lehrer:       fsStats.reduce((s,f) => s + f.anzahlLehrer, 0),
+    };
+
+    // Aktivitäts-Score (Protokolle / Schüler)
+    fsStats.sort((a,b) => (b.anzahlProtokolle / Math.max(b.anzahlSchueler,1)) - (a.anzahlProtokolle / Math.max(a.anzahlSchueler,1)));
+
+    const aktivLabel = (letzte) => {
+      if (!letzte) return '<span style="color:var(--muted)">Keine</span>';
+      const tage = Math.floor((Date.now() - letzte) / 86400000);
+      if (tage === 0) return '<span style="color:var(--accent2)">Heute</span>';
+      if (tage <= 7)  return `<span style="color:var(--accent2)">${tage}d</span>`;
+      if (tage <= 30) return `<span style="color:var(--accent)">${tage}d</span>`;
+      return `<span style="color:var(--danger)">${tage}d</span>`;
+    };
+
+    body.innerHTML = `
+      <!-- Gesamt KPIs -->
+      <div class="section-hd">📊 Plattform-Übersicht</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 16px 16px">
+        <div class="kpi"><div class="kpi-val" style="color:var(--accent)">${gesamt.fahrschulen}</div><div class="kpi-lbl">Fahrschulen</div></div>
+        <div class="kpi"><div class="kpi-val" style="color:var(--blue)">${gesamt.lehrer}</div><div class="kpi-lbl">Fahrlehrer</div></div>
+        <div class="kpi"><div class="kpi-val" style="color:var(--accent2)">${gesamt.aktiveSchueler}</div><div class="kpi-lbl">Aktive Schüler</div></div>
+        <div class="kpi"><div class="kpi-val" style="color:var(--purple)">${gesamt.protokolle}</div><div class="kpi-lbl">Protokoll-Einträge</div></div>
+      </div>
+
+      <!-- Klassen-Verteilung gesamt -->
+      <div class="section-hd">🎓 Klassen-Verteilung (Platform)</div>
+      <div class="card" style="margin-bottom:16px">
+        ${['B/B197/B-Auto','BE','A'].map((label, i) => {
+          const keys = [['B','BE','A'][i]];
+          const val = i===0
+            ? fsStats.reduce((s,f)=>s+f.klassenVerteilung.B,0)
+            : i===1 ? fsStats.reduce((s,f)=>s+f.klassenVerteilung.BE,0)
+            : fsStats.reduce((s,f)=>s+f.klassenVerteilung.A,0);
+          const pct = gesamt.schueler > 0 ? Math.round(val/gesamt.schueler*100) : 0;
+          const col = ['var(--accent)','var(--accent2)','var(--blue)'][i];
+          return `<div style="margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;font-size:0.8rem;margin-bottom:4px">
+              <span>${['🚗 Klasse B','🔗 BE','🏍️ Klasse A'][i]}</span>
+              <span style="color:${col};font-weight:700">${val} (${pct}%)</span>
+            </div>
+            <div style="background:var(--surface2);border-radius:4px;height:6px">
+              <div style="width:${pct}%;height:100%;background:${col};border-radius:4px"></div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <!-- Pro-Fahrschule Tabelle -->
+      <div class="section-hd">🏫 Aktivität pro Fahrschule</div>
+      <div style="margin:0 16px 8px;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden">
+        <div style="display:grid;grid-template-columns:1fr auto auto auto auto;gap:0;font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--border);background:var(--surface2)">
+          <span>Fahrschule</span><span style="text-align:center">Lehrer</span><span style="text-align:center">Schüler</span><span style="text-align:center">Protokolle</span><span style="text-align:center">Aktiv</span>
+        </div>
+        ${fsStats.map(fs => `
+          <div style="display:grid;grid-template-columns:1fr auto auto auto auto;gap:0;padding:10px 12px;border-bottom:1px solid var(--border);font-size:0.82rem;align-items:center">
+            <div>
+              <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px">${fs.name}</div>
+              <div style="font-size:0.68rem;color:var(--muted)">${fs.stadt}</div>
+            </div>
+            <span style="text-align:center;color:var(--blue);font-weight:700">${fs.anzahlLehrer}</span>
+            <span style="text-align:center;color:var(--accent2);font-weight:700">${fs.anzahlAktiv}</span>
+            <span style="text-align:center;color:var(--purple);font-weight:700">${fs.anzahlProtokolle}</span>
+            <span style="text-align:center;font-size:0.72rem">${aktivLabel(fs.letzteAktivitaet)}</span>
+          </div>`).join('')}
+      </div>
+
+      <div style="margin:12px 16px 32px;padding:12px;background:rgba(63,185,80,0.08);border:1px solid rgba(63,185,80,0.2);border-radius:10px;font-size:0.75rem;color:var(--muted);line-height:1.6">
+        🔒 <strong>Datenschutz:</strong> Dieses Dashboard zeigt ausschließlich aggregierte Zahlen. Namen, Daten oder Details von Schülern sind nicht einsehbar.
+      </div>
+    `;
+  } catch(e) {
+    body.innerHTML = `<div style="padding:40px;text-align:center;color:var(--danger)">Fehler beim Laden: ${e.message}</div>`;
+  }
+}
+
+
+// ── AUTH STATE CHANGED ────────────────────────────────────────
+onAuthStateChanged(auth, async (user) => {
+  document.getElementById('loading').style.display = 'none';
+
+  if (!user) {
+    showScreen('screen-login');
+    return;
+  }
+
+  currentUser = user;
+
+  // Superadmin?
+  if (user.uid === SUPERADMIN_UID || user.email === 'admin@adk-kartei.de') {
+    document.getElementById('sa-greeting').textContent = `Hallo, ${user.displayName || 'Admin'}`;
+    showScreen('screen-superadmin');
+    loadSuperadmin();
+    return;
+  }
+
+  // Profil laden
+  const profDoc = await getDoc(doc(db, 'users', user.uid));
+  if (!profDoc.exists()) {
+    showScreen('screen-gesperrt');
+    return;
+  }
+
+  currentProfil = profDoc.data();
+
+  if (currentProfil.rolle === 'fs_admin') {
+    // Fahrschule Status prüfen
+    const fsDoc = await getDoc(doc(db, 'fahrschulen', currentProfil.fahrschuleId));
+    const fsData = fsDoc.data();
+    if (!fsDoc.exists() || fsData.status !== 'aktiv') {
+      showScreen('screen-gesperrt');
+      return;
+    }
+    document.getElementById('fsa-title').textContent = fsData.name;
+    document.getElementById('fsa-sub').textContent   = `Admin · ${fsData.stadt}`;
+    showScreen('screen-fsadmin');
+    document.getElementById('fsa-fab').style.display = 'flex';
+    document.getElementById('fsa-fab').style.alignItems = 'center';
+    document.getElementById('fsa-fab').style.justifyContent = 'center';
+    fsaTab('lehrer');
+  } else if (currentProfil.rolle === 'fahrlehrer') {
+    // Fahrschule Status prüfen
+    const fsDoc = await getDoc(doc(db, 'fahrschulen', currentProfil.fahrschuleId));
+    if (!fsDoc.exists() || fsDoc.data().status !== 'aktiv') {
+      showScreen('screen-gesperrt');
+      return;
+    }
+    document.getElementById('fl-sub').textContent  = currentProfil.fahrschuleName || '';
+    document.getElementById('fl-info').textContent = `Fahrschule: ${currentProfil.fahrschuleName} · ${currentProfil.name}`;
+    showScreen('screen-fahrlehrer');
+  } else {
+    showScreen('screen-gesperrt');
+  }
+});
+
+// ── SUPERADMIN: Fahrschulen laden ────────────────────────────
+function loadSuperadmin() {
+  if (unsubFahrschulen) unsubFahrschulen();
+  const q = query(collection(db, 'fahrschulen'), orderBy('createdAt', 'desc'));
+  unsubFahrschulen = onSnapshot(q, snap => {
+    fahrschulen = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderSuperadmin();
+  });
+}
+
+window.saTab = (tab) => {
+  saAktivTab = tab;
+  ['pending','aktiv','analytics','alle'].forEach(t => {
+    const el = document.getElementById(`sa-tab-${t}`);
+    if (el) el.classList.toggle('active', t===tab);
+  });
+  if (tab === 'analytics') renderAnalytics();
+  else renderSuperadmin();
+};
+
+function renderSuperadmin() {
+  const body = document.getElementById('sa-body');
+  let list = [...fahrschulen];
+
+  if (saAktivTab === 'pending') list = list.filter(f => f.status === 'ausstehend');
+  else if (saAktivTab === 'aktiv') list = list.filter(f => f.status === 'aktiv');
+
+  // KPIs
+  const total    = fahrschulen.length;
+  const pending  = fahrschulen.filter(f=>f.status==='ausstehend').length;
+  const aktiv    = fahrschulen.filter(f=>f.status==='aktiv').length;
+
+  body.innerHTML = `
+    <div class="kpi-row">
+      <div class="kpi"><div class="kpi-val" style="color:var(--accent)">${total}</div><div class="kpi-lbl">Gesamt</div></div>
+      <div class="kpi"><div class="kpi-val" style="color:var(--accent2)">${aktiv}</div><div class="kpi-lbl">Aktiv</div></div>
+      <div class="kpi"><div class="kpi-val" style="color:var(--danger)">${pending}</div><div class="kpi-lbl">Ausstehend</div></div>
+    </div>
+    ${list.length === 0 ? `<div style="padding:40px;text-align:center;color:var(--muted)">Keine Einträge</div>` :
+      list.map(fs => {
+        const statusBadge = fs.status === 'aktiv'
+          ? '<span class="badge badge-green">✅ Aktiv</span>'
+          : fs.status === 'gesperrt'
+          ? '<span class="badge badge-red">🚫 Gesperrt</span>'
+          : '<span class="badge badge-yellow">⏳ Ausstehend</span>';
+        const initial = (fs.name||'?')[0].toUpperCase();
+        const colors = ['#f0b429','#3fb950','#58a6ff','#bc8cff'];
+        const color  = colors[fs.name.charCodeAt(0) % colors.length];
+        return `<div class="list-item" onclick="openFsDetail('${fs.id}')">
+          <div class="list-avatar" style="background:${color}20;color:${color}">${initial}</div>
+          <div class="list-info">
+            <div class="list-name">${fs.name}</div>
+            <div class="list-sub">${fs.inhaber} · ${fs.stadt} · ${new Date(fs.createdAt).toLocaleDateString('de-DE')}</div>
+          </div>
+          ${statusBadge}
+        </div>`;
+      }).join('')}
+  `;
+}
+
+// Fahrschule Detail öffnen (SuperAdmin)
+window.openFsDetail = (fsId) => {
+  const fs = fahrschulen.find(f => f.id === fsId);
+  if (!fs) return;
+  document.getElementById('modal-fs-name').textContent = fs.name;
+  const logoHTML = fs.logoUrl
+    ? `<img src="${fs.logoUrl}" style="width:60px;height:60px;border-radius:12px;object-fit:contain;border:1px solid var(--border);margin-bottom:8px">`
+    : '';
+  document.getElementById('modal-fs-content').innerHTML = `
+    <div style="text-align:center;margin-bottom:12px">${logoHTML}</div>
+    <div style="margin-bottom:16px">
+      <div style="display:flex;flex-direction:column;gap:8px;font-size:0.88rem">
+        <div><span style="color:var(--muted)">Inhaber:</span> <strong>${fs.inhaber}</strong></div>
+        <div><span style="color:var(--muted)">E-Mail:</span> ${fs.email}</div>
+        <div><span style="color:var(--muted)">Stadt:</span> ${fs.stadt}</div>
+        <div><span style="color:var(--muted)">Registriert:</span> ${new Date(fs.createdAt).toLocaleDateString('de-DE')}</div>
+        <div><span style="color:var(--muted)">Status:</span> <strong style="color:${fs.status==='aktiv'?'var(--accent2)':fs.status==='gesperrt'?'var(--danger)':'var(--accent)'}">${fs.status}</strong></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${fs.status !== 'aktiv'    ? `<button class="btn-main" onclick="setFsStatus('${fs.id}','aktiv')">✅ Fahrschule freischalten</button>` : ''}
+      ${fs.status === 'aktiv'    ? `<button class="btn-secondary" onclick="setFsStatus('${fs.id}','gesperrt')" style="border-color:var(--danger);color:var(--danger)">🚫 Fahrschule sperren</button>` : ''}
+      ${fs.status === 'gesperrt' ? `<button class="btn-main" onclick="setFsStatus('${fs.id}','aktiv')">🔓 Entsperren</button>` : ''}
+      <button class="btn-secondary" onclick="document.getElementById('modal-fs-detail').classList.remove('open')">Schließen</button>
+    </div>
+  `;
+  document.getElementById('modal-fs-detail').classList.add('open');
+};
+
+window.setFsStatus = async (fsId, status) => {
+  await updateDoc(doc(db, 'fahrschulen', fsId), { status });
+  document.getElementById('modal-fs-detail').classList.remove('open');
+  toast(status === 'aktiv' ? '✅ Fahrschule freigeschaltet!' : '🚫 Fahrschule gesperrt.');
+};
+
+// ── FAHRSCHUL-ADMIN ──────────────────────────────────────────
+window.fsaTab = (tab) => {
+  fsaAktivTab = tab;
+  ['lehrer','stats','einst'].forEach(t => {
+    document.getElementById(`fsa-tab-${t}`).classList.toggle('active', t===tab);
+  });
+  renderFsAdmin();
+};
+
+async function renderFsAdmin() {
+  const body = document.getElementById('fsa-body');
+  body.innerHTML = `<div style="padding:40px;text-align:center;color:var(--muted)">Lädt…</div>`;
+
+  // Listener immer abmelden beim Tab-Wechsel
+  if (unsubLehrer) { unsubLehrer(); unsubLehrer = null; }
+
+  if (fsaAktivTab === 'lehrer') {
+    const q = query(
+      collection(db, 'users'),
+      where('fahrschuleId', '==', currentProfil.fahrschuleId),
+      where('rolle', '==', 'fahrlehrer')
+    );
+    unsubLehrer = onSnapshot(q, snap => {
+      const lehrer = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      if (lehrer.length === 0) {
+        body.innerHTML = `
+          <div style="padding:60px 24px;text-align:center;color:var(--muted)">
+            <div style="font-size:2.5rem;margin-bottom:12px">👨‍🏫</div>
+            <div style="font-weight:700;margin-bottom:8px">Noch keine Fahrlehrer</div>
+            <div style="font-size:0.82rem">Tippe auf + um den ersten Fahrlehrer anzulegen</div>
+          </div>`;
+        return;
+      }
+      body.innerHTML = `
+        <div class="section-hd">Fahrlehrer (${lehrer.length})</div>
+        ${lehrer.map(l => `
+          <div class="list-item" onclick="openLehrerDetail('${l.id}')">
+            <div class="list-avatar" style="background:rgba(240,180,41,0.15);color:var(--accent)">
+              ${(l.name||'?').split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}
+            </div>
+            <div class="list-info">
+              <div class="list-name">${l.name}</div>
+              <div class="list-sub">${l.email}</div>
+            </div>
+            <span class="badge badge-green">Aktiv</span>
+          </div>`).join('')}
+      `;
+    });
+  } else if (fsaAktivTab === 'stats') {
+    // Schüler-Statistiken
+    const q = query(collection(db, 'students'), where('fahrschuleId', '==', currentProfil.fahrschuleId));
+    const snap = await getDocs(q);
+    const schueler = snap.docs.map(d => d.data());
+    const aktive   = schueler.filter(s => !s.archiviert).length;
+    const archiv   = schueler.filter(s => s.archiviert).length;
+
+    body.innerHTML = `
+      <div class="kpi-row">
+        <div class="kpi"><div class="kpi-val" style="color:var(--accent)">${schueler.length}</div><div class="kpi-lbl">Schüler gesamt</div></div>
+        <div class="kpi"><div class="kpi-val" style="color:var(--accent2)">${aktive}</div><div class="kpi-lbl">Aktiv</div></div>
+        <div class="kpi"><div class="kpi-val" style="color:var(--blue)">${archiv}</div><div class="kpi-lbl">Abgeschlossen</div></div>
+      </div>
+      <div class="card" style="margin-top:8px">
+        <div class="card-title">🔒 Datenschutz & Isolation</div>
+        <div class="card-sub" style="margin-top:6px;line-height:1.6">Alle Schülerdaten Ihrer Fahrschule sind vollständig von anderen Fahrschulen isoliert. Kein anderer Admin oder Fahrlehrer kann auf Ihre Daten zugreifen.</div>
+      </div>
+    `;
+  } else if (fsaAktivTab === 'einst') {
+    const fsDoc = await getDoc(doc(db, 'fahrschulen', currentProfil.fahrschuleId));
+    const fs = fsDoc.data();
+    const logoPreview = fs.logoUrl
+      ? `<img id="logo-preview" src="${fs.logoUrl}" style="width:80px;height:80px;border-radius:14px;object-fit:contain;border:1px solid var(--border);display:block;margin:0 auto 8px">`
+      : `<div id="logo-preview" style="width:80px;height:80px;border-radius:14px;background:var(--surface2);border:2px dashed var(--border);display:flex;align-items:center;justify-content:center;margin:0 auto 8px;font-size:2rem;color:var(--muted)">🏫</div>`;
+    body.innerHTML = `
+      <div class="section-hd">🖼️ Fahrschul-Logo</div>
+      <div class="card" style="text-align:center">
+        ${logoPreview}
+        <div style="font-size:0.75rem;color:var(--muted);margin-bottom:12px">${fs.logoUrl ? 'Aktuelles Logo' : 'Noch kein Logo hochgeladen'}</div>
+        <label style="display:inline-block;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 18px;border-radius:10px;font-size:0.85rem;font-weight:600;cursor:pointer">
+          📁 Logo auswählen
+          <input type="file" accept="image/*" style="display:none" onchange="uploadLogo(this)">
+        </label>
+        ${fs.logoUrl ? `<button onclick="removeLogo()" class="btn-secondary" style="margin-top:8px;color:var(--danger);border-color:rgba(248,81,73,0.3)">🗑 Logo entfernen</button>` : ''}
+        <div style="font-size:0.7rem;color:var(--muted);margin-top:10px">Max. 500KB · JPG, PNG, SVG</div>
+        <div id="logo-status" style="font-size:0.78rem;min-height:20px;margin-top:6px"></div>
+      </div>
+      <div class="section-hd" style="margin-top:8px">Fahrschul-Daten</div>
+      <div class="card">
+        <div style="display:flex;flex-direction:column;gap:10px;font-size:0.88rem">
+          <div><span style="color:var(--muted)">Name:</span> <strong>${fs.name}</strong></div>
+          <div><span style="color:var(--muted)">Inhaber:</span> ${fs.inhaber}</div>
+          <div><span style="color:var(--muted)">Stadt:</span> ${fs.stadt}</div>
+          <div><span style="color:var(--muted)">Status:</span> <span class="badge badge-green">✅ Aktiv</span></div>
+        </div>
+      </div>
+      <div class="section-hd" style="margin-top:8px">Mein Account</div>
+      <div class="card">
+        <div style="font-size:0.88rem;color:var(--muted);margin-bottom:12px">${currentUser?.email}</div>
+        <button class="btn-secondary" onclick="doLogout()">⏻ Abmelden</button>
+      </div>
+    `;
+  }
+}
+
+// ── LOGO UPLOAD (als Base64 in Firestore) ────────────────────
+window.uploadLogo = async (input) => {
+  const file = input.files[0];
+  if (!file) return;
+  const statusEl = document.getElementById('logo-status');
+  if (file.size > 500 * 1024) {
+    statusEl.textContent = '⚠️ Datei zu groß (max. 500KB)';
+    statusEl.style.color = 'var(--danger)';
+    return;
+  }
+  statusEl.textContent = '⏳ Wird hochgeladen…';
+  statusEl.style.color = 'var(--muted)';
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const base64 = e.target.result;
+    try {
+      await updateDoc(doc(db, 'fahrschulen', currentProfil.fahrschuleId), { logoUrl: base64 });
+      const preview = document.getElementById('logo-preview') || document.getElementById('logo-preview-img');
+      if (preview.tagName === 'DIV') {
+        const img = document.createElement('img');
+        img.id = 'logo-preview-img';
+        img.src = base64;
+        img.style.cssText = 'width:80px;height:80px;border-radius:14px;object-fit:contain;border:1px solid var(--border);display:block;margin:0 auto 8px';
+        preview.parentNode.replaceChild(img, preview);
+      } else {
+        preview.src = base64;
+      }
+      statusEl.textContent = '✓ Logo gespeichert!';
+      statusEl.style.color = 'var(--accent2)';
+      toast('✓ Logo gespeichert!');
+    } catch(e) {
+      statusEl.textContent = '⚠️ Fehler beim Speichern';
+      statusEl.style.color = 'var(--danger)';
+    }
+  };
+  reader.readAsDataURL(file);
+};
+
+window.removeLogo = async () => {
+  if (!confirm('Logo entfernen?')) return;
+  await updateDoc(doc(db, 'fahrschulen', currentProfil.fahrschuleId), { logoUrl: null });
+  fsaTab('einst');
+  toast('Logo entfernt.');
+};
+
+// Fahrlehrer Detail
+window.openLehrerDetail = async (uid) => {
+  const userDoc = await getDoc(doc(db, 'users', uid));
+  if (!userDoc.exists()) return;
+  const u = userDoc.data();
+  // Schüler-Anzahl
+  const q = query(collection(db, 'students'),
+    where('fahrschuleId', '==', currentProfil.fahrschuleId),
+    where('uid', '==', uid));
+  const snap = await getDocs(q);
+  toast(`${u.name} · ${snap.size} Schüler`);
+};
+
+// ── FAHRLEHRER ANLEGEN ───────────────────────────────────────
+window.openAddLehrer = () => {
+  ['inp-fl-vn','inp-fl-nn','inp-fl-email','inp-fl-pw'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('fl-error').textContent = '';
+  document.getElementById('modal-add-lehrer').classList.add('open');
+  setTimeout(() => document.getElementById('inp-fl-vn').focus(), 150);
+};
+
+window.doAddLehrer = async () => {
+  const vn    = document.getElementById('inp-fl-vn').value.trim();
+  const nn    = document.getElementById('inp-fl-nn').value.trim();
+  const email = document.getElementById('inp-fl-email').value.trim();
+  const pw    = document.getElementById('inp-fl-pw').value;
+  const errEl = document.getElementById('fl-error');
+  errEl.textContent = '';
+
+  if (!vn||!nn||!email||!pw) { errEl.textContent = 'Bitte alle Felder ausfüllen.'; return; }
+  if (pw.length < 8) { errEl.textContent = 'Passwort mind. 8 Zeichen.'; return; }
+
+  const btn = document.querySelector('#modal-add-lehrer .btn-main');
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+
+  try {
+    // Merke aktuelle Admin-Session
+    const adminUser = auth.currentUser;
+
+    // Fahrlehrer-Account erstellen
+    const cred = await createUserWithEmailAndPassword(auth, email, pw);
+    await updateProfile(cred.user, { displayName: `${vn} ${nn}` });
+
+    // Fahrlehrer-Profil in Firestore
+    await setDoc(doc(db, 'users', cred.user.uid), {
+      name: `${vn} ${nn}`,
+      vorname: vn,
+      nachname: nn,
+      email,
+      rolle: 'fahrlehrer',
+      fahrschuleId: currentProfil.fahrschuleId,
+      fahrschuleName: currentProfil.fahrschuleName || '',
+      createdAt: Date.now(),
+    });
+
+    // Sofort wieder als Admin einloggen
+    await signOut(auth);
+    await signInWithEmailAndPassword(auth, adminUser.email, '_wird_neu_geladen_');
+
+  } catch(e) {
+    if (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
+      // Admin-Session wiederherstellen durch Page Reload
+      document.getElementById('modal-add-lehrer').classList.remove('open');
+      toast(`✓ ${vn} ${nn} als Fahrlehrer angelegt – bitte neu anmelden`);
+      setTimeout(() => doLogout(), 2000);
+      return;
+    }
+    if (btn) { btn.disabled = false; btn.textContent = 'Anlegen ✓'; }
+    errEl.textContent = friendlyError(e.code);
+    return;
+  }
+  document.getElementById('modal-add-lehrer').classList.remove('open');
+  toast(`✓ ${vn} ${nn} als Fahrlehrer angelegt`);
+  if (btn) { btn.disabled = false; btn.textContent = 'Anlegen ✓'; }
+};
+
+// ── FAHRLEHRER: ADK App öffnen ───────────────────────────────
+window.openADKApp = () => {
+  // Fahrlehrer wird zur Haupt-ADK-App weitergeleitet
+  window.location.href = './index.html';
+};
+
+// ── HILFSFUNKTIONEN ─────────────────────────────────────────
+function friendlyError(code) {
+  const map = {
+    'auth/invalid-email':       'Ungültige E-Mail-Adresse.',
+    'auth/user-not-found':      'Kein Konto mit dieser E-Mail gefunden.',
+    'auth/wrong-password':      'Falsches Passwort.',
+    'auth/email-already-in-use':'Diese E-Mail ist bereits registriert.',
+    'auth/weak-password':       'Passwort zu schwach (min. 8 Zeichen).',
+    'auth/invalid-credential':  'E-Mail oder Passwort falsch.',
+    'auth/too-many-requests':   'Zu viele Versuche. Bitte kurz warten.',
+  };
+  return map[code] || 'Fehler: ' + code;
+}
+</script>
+</body>
+</html>
