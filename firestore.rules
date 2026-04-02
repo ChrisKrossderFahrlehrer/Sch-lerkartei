@@ -10,7 +10,7 @@ service cloud.firestore {
     }
 
     // Ist der User Superadmin?
-    function isSuperAdmin(chriskoo@mail.de) {
+    function isSuperAdmin() {
       return isAuth() && (
         request.auth.token.email == 'chriskoo@mail.de' ||
         exists(/databases/$(database)/documents/superadmins/$(request.auth.uid))
