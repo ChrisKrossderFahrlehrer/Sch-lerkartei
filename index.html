@@ -946,58 +946,8 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
     <div><div class="header-title">Impressum</div><div class="header-sub">Angaben gemäß § 5 TMG</div></div>
     <div style="width:38px"></div>
   </div>
-  <div class="detail-scroll" style="padding:20px 18px;display:flex;flex-direction:column;gap:20px">
-
-    <div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:24px 0 8px">
-      <img src="./icon-192.png" style="width:72px;height:72px;border-radius:18px" onerror="this.style.display='none'">
-      <div style="font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:800;color:var(--accent)">ADK – Digitale Kartei</div>
-      <div style="font-size:0.78rem;color:var(--muted)">Ausbildungsdiagrammkarte · Digital</div>
-    </div>
-
-    <div class="section-block">
-      <div class="section-header"><div class="section-title">👤 Verantwortlich</div></div>
-      <div class="section-body">
-        <div style="font-size:0.9rem;line-height:1.8">
-          <strong>Chriskoo</strong><br>
-          Fahrlehrer<br>
-          Deutschland
-        </div>
-      </div>
-    </div>
-
-    <div class="section-block">
-      <div class="section-header"><div class="section-title">📱 Kontakt</div></div>
-      <div class="section-body">
-        <div style="font-size:0.9rem;line-height:1.8;color:var(--muted)">
-          Instagram: <a href="https://instagram.com/ChrisKrossderFahrlehrer" style="color:var(--accent);text-decoration:none">@ChrisKrossderFahrlehrer</a>
-        </div>
-      </div>
-    </div>
-
-    <div class="section-block">
-      <div class="section-header"><div class="section-title">🔒 Datenschutz</div></div>
-      <div class="section-body">
-        <div style="font-size:0.84rem;line-height:1.6;color:var(--muted)">
-          Diese App speichert Schülerdaten ausschließlich in Firebase (Google LLC) auf Servern in Frankfurt am Main (europe-west3). Es werden keine Daten an Dritte weitergegeben. Die Nutzung erfolgt ausschließlich durch autorisierte Fahrlehrer mit eigenem Login.<br><br>
-          Schülerdaten werden nur für die Zwecke der Fahrausbildung gespeichert und verarbeitet.
-        </div>
-      </div>
-    </div>
-
-    <div class="section-block">
-      <div class="section-header"><div class="section-title">⚖️ Haftungsausschluss</div></div>
-      <div class="section-body">
-        <div style="font-size:0.84rem;line-height:1.6;color:var(--muted)">
-          Die Inhalte dieser App wurden mit größter Sorgfalt erstellt. Für die Richtigkeit, Vollständigkeit und Aktualität der Inhalte wird keine Gewähr übernommen.
-        </div>
-      </div>
-    </div>
-
-    <div style="text-align:center;padding:12px 0 32px">
-      <div style="font-size:0.72rem;color:var(--muted)">ADK – Digitale Kartei · v1.0</div>
-      <div style="font-size:0.7rem;color:var(--border);margin-top:4px">© 2025 Chriskoo · fahrschülerkartei.de</div>
-    </div>
-
+  <div class="detail-scroll" style="padding:20px 18px;display:flex;flex-direction:column;gap:20px" id="impressum-body">
+    <div style="text-align:center;padding:40px;color:var(--muted)">Lädt…</div>
   </div>
 </div>
 
@@ -3529,10 +3479,108 @@ window.openNewEintragModal = () => {
 };
 
 // ─── HILFE-SCREEN ────────────────────────────────────────────
-window.openImpressum = () => {
+window.openImpressum = async () => {
   document.querySelectorAll('.screen').forEach(sc => sc.style.display = 'none');
   document.getElementById('screen-impressum').style.display = 'flex';
+
+  const body = document.getElementById('impressum-body');
+
+  // Impressum-Daten aus Firestore laden
+  let imp = null;
+  let fsName = '';
+  let fsLogo = '';
+  try {
+    const fsId = currentUser?._fahrschuleId;
+    if (fsId) {
+      const fsDoc = await getDoc(doc(db, 'fahrschulen', fsId));
+      if (fsDoc.exists()) {
+        const fs = fsDoc.data();
+        imp = fs.impressum || null;
+        fsName = fs.name || '';
+        fsLogo = fs.logoUrl || '';
+      }
+    }
+  } catch(e) { /* offline fallback */ }
+
+  const logoHTML = fsLogo
+    ? `<img src="${fsLogo}" style="width:72px;height:72px;border-radius:18px;object-fit:contain;border:1px solid var(--border)" onerror="this.style.display='none'">`
+    : `<img src="./icon-192.png" style="width:72px;height:72px;border-radius:18px" onerror="this.style.display='none'">`;
+
+  const name    = imp?.name    || fsName || 'Fahrschule';
+  const inhaber = imp?.inhaber || '';
+  const strasse = imp?.strasse || '';
+  const ort     = imp?.ort     || '';
+  const tel     = imp?.tel     || '';
+  const email   = imp?.email   || '';
+  const web     = imp?.web     || '';
+  const fsnr    = imp?.fsnr    || '';
+
+  body.innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:24px 0 8px">
+      ${logoHTML}
+      <div style="font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;color:var(--accent)">${name}</div>
+      <div style="font-size:0.78rem;color:var(--muted)">ADK – Digitale Kartei</div>
+    </div>
+
+    <div class="section-block">
+      <div class="section-header"><div class="section-title">👤 Verantwortlich</div></div>
+      <div class="section-body">
+        <div style="font-size:0.9rem;line-height:1.8">
+          <strong>${name}</strong><br>
+          ${inhaber ? inhaber + '<br>' : ''}
+          ${strasse ? strasse + '<br>' : ''}
+          ${ort || ''}
+        </div>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <div class="section-header"><div class="section-title">📱 Kontakt</div></div>
+      <div class="section-body">
+        <div style="font-size:0.9rem;line-height:1.8;color:var(--muted)">
+          ${tel   ? '📞 ' + tel + '<br>' : ''}
+          ${email ? '✉️ <a href="mailto:'+email+'" style="color:var(--accent);text-decoration:none">'+email+'</a><br>' : ''}
+          ${web   ? '🌐 <a href="https://'+web+'" style="color:var(--accent);text-decoration:none">'+web+'</a>' : ''}
+          ${!tel&&!email&&!web ? 'Keine Kontaktdaten hinterlegt.' : ''}
+        </div>
+      </div>
+    </div>
+
+    ${fsnr ? `<div class="section-block">
+      <div class="section-header"><div class="section-title">📋 Berufsangaben</div></div>
+      <div class="section-body">
+        <div style="font-size:0.88rem;line-height:1.6;color:var(--muted)">
+          Fahrlehrerschein-Nr.: ${fsnr}<br>
+          Zuständige Behörde: Zuständige Fahrerlaubnisbehörde
+        </div>
+      </div>
+    </div>` : ''}
+
+    <div class="section-block">
+      <div class="section-header"><div class="section-title">🔒 Datenschutz</div></div>
+      <div class="section-body">
+        <div style="font-size:0.84rem;line-height:1.6;color:var(--muted)">
+          Schülerdaten werden ausschließlich auf Firebase-Servern in Frankfurt am Main (EU) gespeichert. Keine Weitergabe an Dritte. Nutzung nur durch autorisierte Fahrlehrer.
+        </div>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <div class="section-header"><div class="section-title">⚖️ Haftungsausschluss</div></div>
+      <div class="section-body">
+        <div style="font-size:0.84rem;line-height:1.6;color:var(--muted)">
+          Die Inhalte dieser App wurden mit größter Sorgfalt erstellt. Für die Richtigkeit, Vollständigkeit und Aktualität wird keine Gewähr übernommen.
+        </div>
+      </div>
+    </div>
+
+    <div style="text-align:center;padding:12px 0 32px">
+      <div style="font-size:0.72rem;color:var(--muted)">ADK – Digitale Kartei · v1.0</div>
+      <div style="font-size:0.7rem;color:var(--border);margin-top:4px">© ${new Date().getFullYear()} ${name}</div>
+    </div>
+  `;
 };
+
 window.closeImpressum = () => {
   document.getElementById('screen-impressum').style.display = 'none';
   document.getElementById('screen-list').style.display = 'flex';

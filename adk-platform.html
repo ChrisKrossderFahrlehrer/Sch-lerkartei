@@ -1022,9 +1022,77 @@ async function renderFsAdmin() {
         <div style="font-size:0.88rem;color:var(--muted);margin-bottom:12px">${currentUser?.email}</div>
         <button class="btn-secondary" onclick="doLogout()">⏻ Abmelden</button>
       </div>
+      <div class="section-hd" style="margin-top:8px">📄 Impressum</div>
+      <div class="card">
+        <div style="font-size:0.78rem;color:var(--muted);margin-bottom:12px;line-height:1.5">
+          Diese Angaben erscheinen im Impressum der ADK-App für deine Fahrschüler.
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fahrschulname</label>
+          <input class="form-input" id="imp-name" value="${fs.impressum?.name || fs.name || ''}" placeholder="z.B. Fahrschule Müller">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Inhaber</label>
+          <input class="form-input" id="imp-inhaber" value="${fs.impressum?.inhaber || fs.inhaber || ''}" placeholder="Vor- und Nachname">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Straße & Hausnummer</label>
+          <input class="form-input" id="imp-strasse" value="${fs.impressum?.strasse || ''}" placeholder="z.B. Hauptstraße 12">
+        </div>
+        <div class="form-group">
+          <label class="form-label">PLZ & Ort</label>
+          <input class="form-input" id="imp-ort" value="${fs.impressum?.ort || fs.stadt || ''}" placeholder="z.B. 12345 München">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Telefon (optional)</label>
+          <input class="form-input" id="imp-tel" value="${fs.impressum?.tel || ''}" placeholder="z.B. 089 123456">
+        </div>
+        <div class="form-group">
+          <label class="form-label">E-Mail</label>
+          <input class="form-input" id="imp-email" value="${fs.impressum?.email || fs.email || ''}" placeholder="info@fahrschule.de">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Webseite (optional)</label>
+          <input class="form-input" id="imp-web" value="${fs.impressum?.web || ''}" placeholder="www.fahrschule.de">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fahrlehrerschein-Nr. (optional)</label>
+          <input class="form-input" id="imp-fsnr" value="${fs.impressum?.fsnr || ''}" placeholder="z.B. DE-BY-12345">
+        </div>
+        <div id="imp-status" style="font-size:0.78rem;min-height:20px;margin-bottom:8px;text-align:center"></div>
+        <button class="btn-main" onclick="saveImpressum()">Impressum speichern ✓</button>
+      </div>
     `;
   }
 }
+
+// ── IMPRESSUM SPEICHERN ──────────────────────────────────────
+window.saveImpressum = async () => {
+  const statusEl = document.getElementById('imp-status');
+  statusEl.textContent = '⏳ Wird gespeichert…';
+  statusEl.style.color = 'var(--muted)';
+  try {
+    await updateDoc(doc(db, 'fahrschulen', currentProfil.fahrschuleId), {
+      impressum: {
+        name:    document.getElementById('imp-name').value.trim(),
+        inhaber: document.getElementById('imp-inhaber').value.trim(),
+        strasse: document.getElementById('imp-strasse').value.trim(),
+        ort:     document.getElementById('imp-ort').value.trim(),
+        tel:     document.getElementById('imp-tel').value.trim(),
+        email:   document.getElementById('imp-email').value.trim(),
+        web:     document.getElementById('imp-web').value.trim(),
+        fsnr:    document.getElementById('imp-fsnr').value.trim(),
+        geaendertAm: Date.now(),
+      }
+    });
+    statusEl.textContent = '✓ Impressum gespeichert!';
+    statusEl.style.color = 'var(--accent2)';
+    toast('✓ Impressum gespeichert');
+  } catch(e) {
+    statusEl.textContent = '⚠️ Fehler: ' + e.message;
+    statusEl.style.color = 'var(--danger)';
+  }
+};
 
 // ── LOGO UPLOAD (als Base64 in Firestore) ────────────────────
 window.uploadLogo = async (input) => {
