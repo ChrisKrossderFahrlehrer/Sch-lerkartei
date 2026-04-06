@@ -463,7 +463,7 @@ const db   = getFirestore(app);
 enableIndexedDbPersistence(db).catch(() => {});
 
 // ── SUPERADMIN UID (nur dieser User ist Super-Admin) ─────────
-const SUPERADMIN_UID = 'DEINE_SUPERADMIN_UID'; // ← nach erstem Login ersetzen
+const SUPERADMIN_UID = 'DEINE_SUPERADMIN_UID'; // Optional: nach erstem Login mit deiner UID ersetzen
 
 // ── STATE ────────────────────────────────────────────────────
 let currentUser   = null;
@@ -749,7 +749,7 @@ onAuthStateChanged(auth, async (user) => {
   currentUser = user;
 
   // Superadmin?
-  if (user.uid === SUPERADMIN_UID || user.email === 'admin@adk-kartei.de') {
+  if (user.uid === SUPERADMIN_UID || user.email === 'chriskoo@mail.de') {
     document.getElementById('sa-greeting').textContent = `Hallo, ${user.displayName || 'Admin'}`;
     showScreen('screen-superadmin');
     loadSuperadmin();

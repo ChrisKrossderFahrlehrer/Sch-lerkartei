@@ -1592,14 +1592,25 @@ function friendlyError(code) {
 // ─────────────────────────────────────────
 // AUTH STATE
 // ─────────────────────────────────────────
-onAuthStateChanged(auth, (user) => {
+onAuthStateChanged(auth, async (user) => {
   document.getElementById('loading').style.display = 'none';
   if (user) {
     currentUser = user;
+
+    // Profil aus Firestore laden (fahrschuleId etc.)
+    try {
+      const profDoc = await getDoc(doc(db, 'users', user.uid));
+      if (profDoc.exists()) {
+        const profil = profDoc.data();
+        currentUser._fahrschuleId = profil.fahrschuleId || null;
+        currentUser._rolle        = profil.rolle || 'fahrlehrer';
+        currentUser._fsName       = profil.fahrschuleName || '';
+      }
+    } catch(e) { /* offline – weiter mit uid-only */ }
+
     document.getElementById('screen-login').classList.remove('active');
     document.getElementById('screen-list').classList.add('active');
     document.getElementById('screen-detail').classList.remove('active');
-    // Show name in header
     const userBtn = document.getElementById('user-btn');
     if (userBtn) userBtn.textContent = '⏻';
     const greeting = document.getElementById('user-greeting');
@@ -1620,15 +1631,16 @@ onAuthStateChanged(auth, (user) => {
     document.getElementById('screen-help').style.display = 'none';
     document.getElementById('screen-impressum').style.display = 'none';
     document.getElementById('tutorial-overlay').style.display = 'none';
-    // Formular komplett zurücksetzen
-    document.getElementById('login-username').value = '';
-    document.getElementById('login-pw').value = '';
-    document.getElementById('btn-login').disabled = false;
-    document.getElementById('btn-login').textContent = 'Anmelden';
-    document.getElementById('btn-register').disabled = false;
-    document.getElementById('btn-register').textContent = 'Konto erstellen';
-    document.getElementById('auth-error').textContent = '';
-    // Zurück zum Login-Tab
+    const loginUser = document.getElementById('login-username');
+    if (loginUser) loginUser.value = '';
+    const loginPw = document.getElementById('login-pw');
+    if (loginPw) loginPw.value = '';
+    const btnLogin = document.getElementById('btn-login');
+    if (btnLogin) { btnLogin.disabled = false; btnLogin.textContent = 'Anmelden'; }
+    const btnReg = document.getElementById('btn-register');
+    if (btnReg) { btnReg.disabled = false; btnReg.textContent = 'Konto erstellen'; }
+    const authErr = document.getElementById('auth-error');
+    if (authErr) authErr.textContent = '';
     switchTab('login');
   }
 });
@@ -1638,7 +1650,11 @@ onAuthStateChanged(auth, (user) => {
 // ─────────────────────────────────────────
 function listenStudents() {
   if (unsubSnapshot) unsubSnapshot();
-  const q = query(collection(db, 'students'), where('uid', '==', currentUser.uid));
+  // Multi-Tenant: Nach fahrschuleId filtern wenn vorhanden, sonst nach uid (Rückwärtskompatibilität)
+  const fsId = currentUser._fahrschuleId;
+  const q = fsId
+    ? query(collection(db, 'students'), where('fahrschuleId', '==', fsId))
+    : query(collection(db, 'students'), where('uid', '==', currentUser.uid));
   unsubSnapshot = onSnapshot(q, (snap) => {
     students = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     students.sort((a,b) => (a.nachname||'').localeCompare(b.nachname||''));
@@ -2584,6 +2600,7 @@ window.addProtokollEintrag = async () => {
     await addDoc(collection(db, 'protokoll'), {
       studentId: activeId,
       uid: currentUser.uid,
+      fahrschuleId: currentUser._fahrschuleId || currentUser.uid,
       datum,
       notiz: notiz || '',
       maengel: [...aktiveMaengel],
@@ -2705,6 +2722,7 @@ window.addStudent = async () => {
   try {
     await addDoc(collection(db,'students'),{
       uid: currentUser.uid,
+      fahrschuleId: currentUser._fahrschuleId || currentUser.uid,
       vorname:vn, nachname:nn,
       geburt:document.getElementById('inp-geb').value,
       klasse: newStudentKlasse,
