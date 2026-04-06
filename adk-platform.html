@@ -401,6 +401,34 @@ html, body { height: 100%; overflow: hidden; font-family: 'Manrope', sans-serif;
 <!-- MODALS                                    -->
 <!-- ══════════════════════════════════════════ -->
 
+<!-- Fahrlehrer manuell eintragen -->
+<div class="modal-overlay" id="modal-manuell-lehrer" onclick="closeModals(event)">
+  <div class="modal-sheet">
+    <div class="modal-title">🔗 Bestehenden Nutzer eintragen</div>
+    <div style="background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.3);border-radius:10px;padding:12px;margin-bottom:16px;font-size:0.78rem;color:var(--blue);line-height:1.5">
+      Für Nutzer die bereits in Firebase Auth existieren aber noch nicht in der App sichtbar sind.<br><br>
+      <strong>UID findest du in:</strong> Firebase Console → Authentication → Users → Nutzer anklicken → UID kopieren
+    </div>
+    <div class="form-group">
+      <label class="form-label">Firebase UID</label>
+      <input class="form-input" id="inp-ml-uid" placeholder="z.B. abc123xyz..." autocomplete="off" style="font-size:0.8rem">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Name</label>
+      <input class="form-input" id="inp-ml-name" placeholder="Vor- und Nachname">
+    </div>
+    <div class="form-group">
+      <label class="form-label">E-Mail</label>
+      <input class="form-input" id="inp-ml-email" type="email" placeholder="fahrlehrer@fahrschule.de">
+    </div>
+    <div class="error-msg" id="ml-error"></div>
+    <div style="display:flex;gap:10px;margin-top:4px">
+      <button class="btn-secondary" style="margin:0" onclick="document.getElementById('modal-manuell-lehrer').classList.remove('open')">Abbrechen</button>
+      <button class="btn-main" onclick="doManuellerLehrer()">Eintragen ✓</button>
+    </div>
+  </div>
+</div>
+
 <!-- Fahrlehrer hinzufügen -->
 <div class="modal-overlay" id="modal-add-lehrer" onclick="closeModals(event)">
   <div class="modal-sheet">
@@ -925,6 +953,10 @@ async function renderFsAdmin() {
       }
       body.innerHTML = `
         <div class="section-hd">Fahrlehrer (${lehrer.length})</div>
+        <div style="margin:0 16px 8px;display:flex;gap:8px">
+          <button onclick="openAddLehrer()" class="btn-main" style="flex:1;padding:10px">+ Neu anlegen</button>
+          <button onclick="openManuellerLehrer()" class="btn-secondary" style="flex:1;padding:10px;margin:0">🔗 Bestehenden eintragen</button>
+        </div>
         ${lehrer.map(l => `
           <div class="list-item" onclick="openLehrerDetail('${l.id}')">
             <div class="list-avatar" style="background:rgba(240,180,41,0.15);color:var(--accent)">
@@ -1044,12 +1076,42 @@ window.openLehrerDetail = async (uid) => {
   const userDoc = await getDoc(doc(db, 'users', uid));
   if (!userDoc.exists()) return;
   const u = userDoc.data();
-  // Schüler-Anzahl
   const q = query(collection(db, 'students'),
     where('fahrschuleId', '==', currentProfil.fahrschuleId),
     where('uid', '==', uid));
   const snap = await getDocs(q);
   toast(`${u.name} · ${snap.size} Schüler`);
+};
+
+// ── FAHRLEHRER MANUELL EINTRAGEN (für bestehende Auth-User) ──
+window.openManuellerLehrer = () => {
+  ['inp-ml-uid','inp-ml-name','inp-ml-email'].forEach(id =>
+    document.getElementById(id).value = '');
+  document.getElementById('ml-error').textContent = '';
+  document.getElementById('modal-manuell-lehrer').classList.add('open');
+  setTimeout(() => document.getElementById('inp-ml-uid').focus(), 150);
+};
+
+window.doManuellerLehrer = async () => {
+  const uid   = document.getElementById('inp-ml-uid').value.trim();
+  const name  = document.getElementById('inp-ml-name').value.trim();
+  const email = document.getElementById('inp-ml-email').value.trim();
+  const errEl = document.getElementById('ml-error');
+  errEl.textContent = '';
+  if (!uid||!name||!email) { errEl.textContent = 'Alle Felder ausfüllen.'; return; }
+  try {
+    const existing = await getDoc(doc(db, 'users', uid));
+    if (existing.exists()) { errEl.textContent = 'Nutzer bereits eingetragen.'; return; }
+    await setDoc(doc(db, 'users', uid), {
+      name, email,
+      rolle: 'fahrlehrer',
+      fahrschuleId: currentProfil.fahrschuleId,
+      fahrschuleName: currentProfil.fahrschuleName || '',
+      createdAt: Date.now(),
+    });
+    document.getElementById('modal-manuell-lehrer').classList.remove('open');
+    toast(`✓ ${name} als Fahrlehrer eingetragen`);
+  } catch(e) { errEl.textContent = 'Fehler: ' + e.message; }
 };
 
 // ── FAHRLEHRER ANLEGEN ───────────────────────────────────────
