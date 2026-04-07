@@ -3560,7 +3560,7 @@ window.openImpressum = async () => {
       <div class="section-header"><div class="section-title">🔒 Datenschutz</div></div>
       <div class="section-body">
         <div style="font-size:0.84rem;line-height:1.6;color:var(--muted)">
-          Schülerdaten werden ausschließlich auf Firebase-Servern in Frankfurt am Main (EU) gespeichert. Keine Weitergabe an Dritte. Nutzung nur durch autorisierte Fahrlehrer.
+          Schülerdaten werden ausschließlich auf Firebase-Servern in Frankfurt am Main (EU, europe-west3) gespeichert. Keine Weitergabe an Dritte. Zugriff nur durch autorisierte Fahrlehrer mit eigenem Login. Schülerdaten werden ausschließlich für Zwecke der Fahrausbildung verarbeitet.
         </div>
       </div>
     </div>
@@ -3569,15 +3569,60 @@ window.openImpressum = async () => {
       <div class="section-header"><div class="section-title">⚖️ Haftungsausschluss</div></div>
       <div class="section-body">
         <div style="font-size:0.84rem;line-height:1.6;color:var(--muted)">
-          Die Inhalte dieser App wurden mit größter Sorgfalt erstellt. Für die Richtigkeit, Vollständigkeit und Aktualität wird keine Gewähr übernommen.
+          Die Inhalte dieser App wurden mit größter Sorgfalt erstellt. Für die Richtigkeit, Vollständigkeit und Aktualität der Inhalte wird keine Gewähr übernommen. Für externe Links wird keine Haftung übernommen.
         </div>
       </div>
     </div>
 
-    <div style="text-align:center;padding:12px 0 32px">
-      <div style="font-size:0.72rem;color:var(--muted)">ADK – Digitale Kartei · v1.0</div>
-      <div style="font-size:0.7rem;color:var(--border);margin-top:4px">© ${new Date().getFullYear()} ${name}</div>
+    <div class="section-block">
+      <div class="section-header"><div class="section-title">©️ Urheberrecht & Nutzungsrechte</div></div>
+      <div class="section-body">
+        <div style="font-size:0.84rem;line-height:1.7;color:var(--muted)">
+          Die Software <strong style="color:var(--text)">„ADK – Digitale Kartei"</strong> ist urheberrechtlich geschützt.<br><br>
+          <strong style="color:var(--text)">Entwicklung & Eigentumsrecht:</strong><br>
+          ADK – Digitale Kartei wurde entwickelt von <strong style="color:var(--accent)">Chriskoo</strong> (fahrschülerkartei.de). Alle Rechte vorbehalten.<br><br>
+          <strong style="color:var(--text)">Nutzungslizenz:</strong><br>
+          Die Nutzung der App erfolgt auf Basis einer nicht-übertragbaren Einzellizenz. Die Lizenz berechtigt ausschließlich zur bestimmungsgemäßen Nutzung als digitale Fahrschülerverwaltung.<br><br>
+          <strong style="color:var(--text)">Verboten ist:</strong><br>
+          • Die Vervielfältigung, Verbreitung oder öffentliche Zugänglichmachung der Software<br>
+          • Der Weiterverkauf, die Unterlizenzierung oder gewerbliche Weitergabe<br>
+          • Die Dekompilierung, Zerlegung oder Modifikation des Quellcodes<br>
+          • Die Nutzung unter einem anderen Namen oder als eigenes Produkt<br>
+          • Das Entfernen von Copyright-Hinweisen oder Herstellerangaben
+        </div>
+      </div>
     </div>
+
+    <div class="section-block">
+      <div class="section-header"><div class="section-title">📄 Allgemeine Geschäftsbedingungen</div></div>
+      <div class="section-body">
+        <div style="font-size:0.84rem;line-height:1.7;color:var(--muted)">
+          <strong style="color:var(--text)">§ 1 Leistungsgegenstand</strong><br>
+          ADK – Digitale Kartei stellt eine webbasierte Software zur Verwaltung von Fahrschülern und Ausbildungsnachweisen bereit.<br><br>
+          <strong style="color:var(--text)">§ 2 Nutzungsbedingungen</strong><br>
+          Die Nutzung erfolgt ausschließlich für legale Zwecke im Rahmen der Fahrausbildung. Zugangsdaten sind vertraulich zu behandeln und dürfen nicht an Dritte weitergegeben werden.<br><br>
+          <strong style="color:var(--text)">§ 3 Datenverantwortung</strong><br>
+          Der Nutzer ist Verantwortlicher i.S.d. Art. 4 Nr. 7 DSGVO für alle eingegebenen Schülerdaten und stellt sicher, dass eine Rechtsgrundlage für deren Verarbeitung vorliegt.<br><br>
+          <strong style="color:var(--text)">§ 4 Verfügbarkeit</strong><br>
+          Eine ständige Verfügbarkeit der Software wird nicht garantiert. Wartungsarbeiten können zu vorübergehenden Einschränkungen führen.<br><br>
+          <strong style="color:var(--text)">§ 5 Kündigung & Datenlöschung</strong><br>
+          Bei Beendigung des Nutzungsverhältnisses werden alle Daten nach 30 Tagen unwiderruflich gelöscht.<br><br>
+          <strong style="color:var(--text)">§ 6 Anwendbares Recht</strong><br>
+          Es gilt das Recht der Bundesrepublik Deutschland.
+        </div>
+      </div>
+    </div>
+
+    <div style="background:rgba(240,180,41,0.08);border:1px solid rgba(240,180,41,0.2);border-radius:12px;padding:14px;margin-top:4px">
+      <div style="font-size:0.78rem;line-height:1.6;color:var(--muted);text-align:center">
+        <strong style="color:var(--accent)">ADK – Digitale Kartei</strong><br>
+        Entwickelt von Chriskoo · fahrschülerkartei.de<br>
+        © ${new Date().getFullYear()} Chriskoo · Alle Rechte vorbehalten<br>
+        <span style="font-size:0.7rem">Version 1.0 · Powered by Firebase · Made in Germany 🇩🇪</span>
+      </div>
+    </div>
+
+    <div style="height:32px"></div>
   `;
 };
 
