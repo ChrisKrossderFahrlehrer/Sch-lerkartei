@@ -332,6 +332,7 @@ html, body { height: 100%; overflow: hidden; font-family: 'Manrope', sans-serif;
     <button class="tab-btn"        id="sa-tab-aktiv"     onclick="saTab('aktiv')">✅ Aktiv</button>
     <button class="tab-btn"        id="sa-tab-analytics" onclick="saTab('analytics')">📊 Analytics</button>
     <button class="tab-btn"        id="sa-tab-alle"      onclick="saTab('alle')">📋 Alle</button>
+    <button class="tab-btn"        id="sa-tab-einst"     onclick="saTab('einst')">⚙️</button>
   </div>
 
   <div class="scroll-body" id="sa-body">
@@ -634,11 +635,12 @@ window.doLogout = async () => {
 // ── SUPERADMIN: Tabs ─────────────────────────────────────────
 window.saTab = (tab) => {
   saAktivTab = tab;
-  ['pending','aktiv','analytics','alle'].forEach(t => {
+  ['pending','aktiv','analytics','alle','einst'].forEach(t => {
     const el = document.getElementById(`sa-tab-${t}`);
     if (el) el.classList.toggle('active', t===tab);
   });
-  if (tab === 'analytics') renderAnalytics();
+  if      (tab === 'analytics') renderAnalytics();
+  else if (tab === 'einst')     renderSuperAdminEinst();
   else renderSuperadmin();
 };
 
@@ -833,14 +835,93 @@ function loadSuperadmin() {
   });
 }
 
-window.saTab = (tab) => {
-  saAktivTab = tab;
-  ['pending','aktiv','analytics','alle'].forEach(t => {
-    const el = document.getElementById(`sa-tab-${t}`);
-    if (el) el.classList.toggle('active', t===tab);
-  });
-  if (tab === 'analytics') renderAnalytics();
-  else renderSuperadmin();
+
+// ── SUPERADMIN: Einstellungen ─────────────────────────────────
+async function renderSuperAdminEinst() {
+  const body = document.getElementById('sa-body');
+  body.innerHTML = `<div style="padding:40px;text-align:center;color:var(--muted)">Lädt…</div>`;
+
+  let imp = {};
+  try {
+    const impDoc = await getDoc(doc(db, 'platform', 'impressum'));
+    if (impDoc.exists()) imp = impDoc.data();
+  } catch(e) {
+    console.log('platform/impressum noch nicht vorhanden – wird beim Speichern angelegt');
+  }
+
+  body.innerHTML = `
+    <div class="section-hd">📄 Impressum bearbeiten</div>
+    <div class="card" style="margin-bottom:8px">
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:14px;line-height:1.5">
+        Diese Angaben erscheinen im Impressum der ADK-App bei allen Nutzern.
+      </div>
+      <div class="form-group">
+        <label class="form-label">Dein Name / Betreiber</label>
+        <input class="form-input" id="sa-imp-name" value="${imp.name||'Chriskoo'}" placeholder="z.B. Chriskoo">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Webseite</label>
+        <input class="form-input" id="sa-imp-web" value="${imp.web||'fahrschuelerkartei.de'}" placeholder="fahrschuelerkartei.de">
+      </div>
+      <div class="form-group">
+        <label class="form-label">E-Mail</label>
+        <input class="form-input" id="sa-imp-email" type="email" value="${imp.email||'chriskoo@mail.de'}" placeholder="chriskoo@mail.de">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Stadt / Land</label>
+        <input class="form-input" id="sa-imp-ort" value="${imp.ort||'Deutschland'}" placeholder="z.B. Berlin, Deutschland">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Straße & Hausnummer (optional)</label>
+        <input class="form-input" id="sa-imp-strasse" value="${imp.strasse||''}" placeholder="z.B. Hauptstraße 1">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Instagram (optional)</label>
+        <input class="form-input" id="sa-imp-instagram" value="${imp.instagram||'@ChrisKrossderFahrlehrer'}" placeholder="@username">
+      </div>
+      <div id="sa-imp-status" style="font-size:0.82rem;min-height:20px;margin-bottom:8px;text-align:center;padding:8px;border-radius:8px"></div>
+      <button class="btn-main" onclick="savePlatformImpressum()">💾 Impressum speichern</button>
+    </div>
+
+    <div class="section-hd" style="margin-top:8px">⚙️ Mein Account</div>
+    <div class="card">
+      <div style="font-size:0.88rem;color:var(--muted);margin-bottom:4px">${currentUser?.email}</div>
+      <div style="font-size:0.72rem;color:var(--accent);margin-bottom:12px">SuperAdmin</div>
+      <button class="btn-secondary" onclick="doLogout()">⏻ Abmelden</button>
+    </div>
+  `;
+}
+
+window.savePlatformImpressum = async () => {
+  const statusEl = document.getElementById('sa-imp-status');
+  statusEl.textContent = '⏳ Wird gespeichert…';
+  statusEl.style.color = 'var(--muted)';
+  statusEl.style.background = 'transparent';
+  try {
+    const data = {
+      name:      document.getElementById('sa-imp-name').value.trim(),
+      web:       document.getElementById('sa-imp-web').value.trim(),
+      email:     document.getElementById('sa-imp-email').value.trim(),
+      ort:       document.getElementById('sa-imp-ort').value.trim(),
+      strasse:   document.getElementById('sa-imp-strasse').value.trim(),
+      instagram: document.getElementById('sa-imp-instagram').value.trim(),
+      geaendertAm: Date.now(),
+    };
+    await setDoc(doc(db, 'platform', 'impressum'), data, { merge: true });
+    statusEl.textContent = '✅ Gespeichert!';
+    statusEl.style.color = 'var(--accent2)';
+    statusEl.style.background = 'rgba(63,185,80,0.1)';
+    toast('✓ Impressum gespeichert');
+  } catch(e) {
+    console.error('Impressum Fehler:', e);
+    if (e.code === 'permission-denied') {
+      statusEl.innerHTML = '⚠️ Keine Berechtigung.<br><span style="font-size:0.7rem">Firestore Rules aktualisieren und neu hochladen!</span>';
+    } else {
+      statusEl.textContent = '⚠️ Fehler: ' + e.message;
+    }
+    statusEl.style.color = 'var(--danger)';
+    statusEl.style.background = 'rgba(248,81,73,0.1)';
+  }
 };
 
 function renderSuperadmin() {
@@ -1022,77 +1103,9 @@ async function renderFsAdmin() {
         <div style="font-size:0.88rem;color:var(--muted);margin-bottom:12px">${currentUser?.email}</div>
         <button class="btn-secondary" onclick="doLogout()">⏻ Abmelden</button>
       </div>
-      <div class="section-hd" style="margin-top:8px">📄 Impressum</div>
-      <div class="card">
-        <div style="font-size:0.78rem;color:var(--muted);margin-bottom:12px;line-height:1.5">
-          Diese Angaben erscheinen im Impressum der ADK-App für deine Fahrschüler.
-        </div>
-        <div class="form-group">
-          <label class="form-label">Fahrschulname</label>
-          <input class="form-input" id="imp-name" value="${fs.impressum?.name || fs.name || ''}" placeholder="z.B. Fahrschule Müller">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Inhaber</label>
-          <input class="form-input" id="imp-inhaber" value="${fs.impressum?.inhaber || fs.inhaber || ''}" placeholder="Vor- und Nachname">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Straße & Hausnummer</label>
-          <input class="form-input" id="imp-strasse" value="${fs.impressum?.strasse || ''}" placeholder="z.B. Hauptstraße 12">
-        </div>
-        <div class="form-group">
-          <label class="form-label">PLZ & Ort</label>
-          <input class="form-input" id="imp-ort" value="${fs.impressum?.ort || fs.stadt || ''}" placeholder="z.B. 12345 München">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Telefon (optional)</label>
-          <input class="form-input" id="imp-tel" value="${fs.impressum?.tel || ''}" placeholder="z.B. 089 123456">
-        </div>
-        <div class="form-group">
-          <label class="form-label">E-Mail</label>
-          <input class="form-input" id="imp-email" value="${fs.impressum?.email || fs.email || ''}" placeholder="info@fahrschule.de">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Webseite (optional)</label>
-          <input class="form-input" id="imp-web" value="${fs.impressum?.web || ''}" placeholder="www.fahrschule.de">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Fahrlehrerschein-Nr. (optional)</label>
-          <input class="form-input" id="imp-fsnr" value="${fs.impressum?.fsnr || ''}" placeholder="z.B. DE-BY-12345">
-        </div>
-        <div id="imp-status" style="font-size:0.78rem;min-height:20px;margin-bottom:8px;text-align:center"></div>
-        <button class="btn-main" onclick="saveImpressum()">Impressum speichern ✓</button>
-      </div>
     `;
   }
 }
-
-// ── IMPRESSUM SPEICHERN ──────────────────────────────────────
-window.saveImpressum = async () => {
-  const statusEl = document.getElementById('imp-status');
-  statusEl.textContent = '⏳ Wird gespeichert…';
-  statusEl.style.color = 'var(--muted)';
-  try {
-    await updateDoc(doc(db, 'fahrschulen', currentProfil.fahrschuleId), {
-      impressum: {
-        name:    document.getElementById('imp-name').value.trim(),
-        inhaber: document.getElementById('imp-inhaber').value.trim(),
-        strasse: document.getElementById('imp-strasse').value.trim(),
-        ort:     document.getElementById('imp-ort').value.trim(),
-        tel:     document.getElementById('imp-tel').value.trim(),
-        email:   document.getElementById('imp-email').value.trim(),
-        web:     document.getElementById('imp-web').value.trim(),
-        fsnr:    document.getElementById('imp-fsnr').value.trim(),
-        geaendertAm: Date.now(),
-      }
-    });
-    statusEl.textContent = '✓ Impressum gespeichert!';
-    statusEl.style.color = 'var(--accent2)';
-    toast('✓ Impressum gespeichert');
-  } catch(e) {
-    statusEl.textContent = '⚠️ Fehler: ' + e.message;
-    statusEl.style.color = 'var(--danger)';
-  }
-};
 
 // ── LOGO UPLOAD (als Base64 in Firestore) ────────────────────
 window.uploadLogo = async (input) => {

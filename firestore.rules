@@ -176,6 +176,15 @@ service cloud.firestore {
                       (userRolle() == 'fahrlehrer' || userRolle() == 'fs_admin');
     }
 
+    // ── PLATFORM (SuperAdmin Einstellungen) ──────────────────
+    match /platform/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && (
+        request.auth.token.email == 'chriskoo@mail.de' ||
+        exists(/databases/$(database)/documents/superadmins/$(request.auth.uid))
+      );
+    }
+
     // ── ALLES ANDERE: VERBIETEN ──────────────────────────────
     match /{document=**} {
       allow read, write: if false;

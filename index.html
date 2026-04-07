@@ -3485,35 +3485,36 @@ window.openImpressum = async () => {
 
   const body = document.getElementById('impressum-body');
 
-  // Impressum-Daten aus Firestore laden
-  let imp = null;
+  // Plattform-Impressum aus Firestore laden
+  let platImp = {};
   let fsName = '';
   let fsLogo = '';
   try {
     const fsId = currentUser?._fahrschuleId;
+    const platDoc = await getDoc(doc(db, 'platform', 'impressum'));
+    if (platDoc.exists()) platImp = platDoc.data();
     if (fsId) {
       const fsDoc = await getDoc(doc(db, 'fahrschulen', fsId));
       if (fsDoc.exists()) {
-        const fs = fsDoc.data();
-        imp = fs.impressum || null;
-        fsName = fs.name || '';
-        fsLogo = fs.logoUrl || '';
+        fsName = fsDoc.data().name || '';
+        fsLogo = fsDoc.data().logoUrl || '';
       }
     }
   } catch(e) { /* offline fallback */ }
 
+  const imp     = {};
+  const name    = platImp.name    || 'Chriskoo';
+  const inhaber = '';
+  const strasse = '';
+  const ort     = platImp.ort    || 'Deutschland';
+  const tel     = '';
+  const email   = platImp.email  || 'chriskoo@mail.de';
+  const web     = platImp.web    || 'fahrschülerkartei.de';
+  const fsnr    = '';
+
   const logoHTML = fsLogo
     ? `<img src="${fsLogo}" style="width:72px;height:72px;border-radius:18px;object-fit:contain;border:1px solid var(--border)" onerror="this.style.display='none'">`
     : `<img src="./icon-192.png" style="width:72px;height:72px;border-radius:18px" onerror="this.style.display='none'">`;
-
-  const name    = imp?.name    || fsName || 'Fahrschule';
-  const inhaber = imp?.inhaber || '';
-  const strasse = imp?.strasse || '';
-  const ort     = imp?.ort     || '';
-  const tel     = imp?.tel     || '';
-  const email   = imp?.email   || '';
-  const web     = imp?.web     || '';
-  const fsnr    = imp?.fsnr    || '';
 
   body.innerHTML = `
     <div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:24px 0 8px">
@@ -3616,8 +3617,8 @@ window.openImpressum = async () => {
     <div style="background:rgba(240,180,41,0.08);border:1px solid rgba(240,180,41,0.2);border-radius:12px;padding:14px;margin-top:4px">
       <div style="font-size:0.78rem;line-height:1.6;color:var(--muted);text-align:center">
         <strong style="color:var(--accent)">ADK – Digitale Kartei</strong><br>
-        Entwickelt von Chriskoo · fahrschülerkartei.de<br>
-        © ${new Date().getFullYear()} Chriskoo · Alle Rechte vorbehalten<br>
+        Entwickelt von ${platImp.name||'Chriskoo'} · ${platImp.web||'fahrschülerkartei.de'}<br>
+        © ${new Date().getFullYear()} ${platImp.name||'Chriskoo'} · Alle Rechte vorbehalten<br>
         <span style="font-size:0.7rem">Version 1.0 · Powered by Firebase · Made in Germany 🇩🇪</span>
       </div>
     </div>
