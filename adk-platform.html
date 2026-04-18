@@ -120,6 +120,32 @@ html, body { height: 100%; overflow: hidden; font-family: 'Manrope', sans-serif;
 /* ── LOGO LOGIN ── */
 .login-logo { font-family: 'Syne', sans-serif; font-size: 2.2rem; font-weight: 800; color: var(--accent); letter-spacing: -0.02em; }
 .login-logo span { color: var(--text); }
+
+/* ── MOBILE IMPROVEMENTS ── */
+/* Mindest-Touch-Targets 44px (Apple HIG) */
+.tab-btn, .btn-main, .btn-secondary, .btn-icon, .btn-back,
+.list-item, button { min-height: 44px; }
+/* Verhindert Doppeltipp-Zoom auf iOS */
+button, input, textarea, select, .tab-btn, .list-item { touch-action: manipulation; }
+/* Verhindern dass iOS Inputs zoomen (min 16px) */
+.form-input, input, textarea, select { font-size: max(16px, 0.9rem) !important; }
+/* Bessere Fokus-Styles */
+.form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(240,180,41,0.15); outline: none; }
+/* Smooth scrolling */
+.scroll-body, .modal-sheet { scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
+/* Aktive Elemente Feedback */
+.list-item:active, .tab-btn:active { transform: scale(0.98); transition: transform 0.1s; }
+/* Kleine Screens */
+@media (max-width: 390px) {
+  .tab-btn { font-size: 0.72rem; padding: 10px 4px; }
+  .header-title { font-size: 0.95rem; }
+  .section-hd { font-size: 0.68rem; padding: 14px 12px 6px; }
+  .modal-sheet { padding: 20px 16px calc(var(--safe-bottom) + 20px); }
+}
+/* Zahlen besser lesbar im KPI */
+.kpi-val { font-size: 1.4rem !important; }
+/* Safari Fix: Prevent pull-to-refresh innerhalb der App */
+html, body { overscroll-behavior-y: contain; }
 </style>
 </head>
 <body>
@@ -780,6 +806,19 @@ onAuthStateChanged(auth, async (user) => {
 
   // Superadmin?
   if (user.uid === SUPERADMIN_UID || user.email === 'chriskoo@mail.de') {
+    // Users-Dokument für SuperAdmin anlegen falls fehlt (wichtig für Firestore-Regeln!)
+    try {
+      const profDoc = await getDoc(doc(db, 'users', user.uid));
+      if (!profDoc.exists()) {
+        await setDoc(doc(db, 'users', user.uid), {
+          name: user.displayName || 'Super Admin',
+          email: user.email,
+          rolle: 'superadmin',
+          createdAt: Date.now(),
+        });
+      }
+    } catch(e) { console.warn('Konnte SuperAdmin-Profil nicht anlegen:', e); }
+
     document.getElementById('sa-greeting').textContent = `Hallo, ${user.displayName || 'Admin'}`;
     showScreen('screen-superadmin');
     loadSuperadmin();
