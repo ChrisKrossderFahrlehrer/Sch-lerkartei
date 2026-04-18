@@ -51,6 +51,28 @@ body { font-family:'Manrope',sans-serif; background:var(--bg); color:var(--text)
 #offline-bar[style*="flex"] ~ .screen,
 #offline-bar[style*="flex"] ~ #loading { margin-top: 36px; }
 
+/* ── MOBILE IMPROVEMENTS ── */
+@media (max-width: 390px) {
+  .scope-btn    { font-size: 0.72rem; padding: 8px 4px; }
+  .section-title{ font-size: 0.8rem; }
+}
+/* Mindest-Touch-Targets 44px (Apple HIG) */
+.scope-btn, .btn-main, .btn-sheet-cancel,
+.klasse-choice-btn, .s-btn, .step-btn { min-height: 44px; }
+.s-btn { min-width: 36px; }
+/* Smooth scrolling */
+.detail-scroll, #chat-messages { scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
+/* Verhindert Doppeltipp-Zoom auf iOS */
+button, input, textarea, select { touch-action: manipulation; }
+/* Bessere Fokus-Styles */
+.form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(240,180,41,0.15); }
+/* Aktive Elemente Feedback */
+.list-item:active, .klasse-choice-btn:active { transform: scale(0.98); transition: transform 0.1s; }
+/* Chat Input */
+#chat-input:focus { border-color: var(--accent); outline: none; }
+/* Verhindern dass iOS Inputs zoomen (min 16px) */
+input, textarea, select { font-size: max(16px, 0.88rem); }
+
 /* SCREENS */
 .screen { display:none; flex-direction:column; height:100%; overflow:hidden; }
 .screen.active { display:flex; }
@@ -686,6 +708,19 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
   <div class="modal-sheet">
     <div class="sheet-title">⚙️ Optionen</div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+      <button onclick="document.getElementById('options-modal').classList.remove('open');exportPDF()" class="klasse-choice-btn">
+        <div style="font-weight:700">📋 Ausbildungsnachweis als PDF</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">ADK-Stand, Pflichtfahrten & Protokoll exportieren</div>
+      </button>
+      <button onclick="document.getElementById('options-modal').classList.remove('open');openChat()" class="klasse-choice-btn">
+        <div style="font-weight:700">💬 Chat mit Schüler</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">Nachrichten an Schüler senden</div>
+      </button>
+      <button onclick="document.getElementById('options-modal').classList.remove('open');openSchuelerBewertung()" class="klasse-choice-btn">
+        <div style="font-weight:700">⭐ Bewertungs-Link senden</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">Schüler bewertet die Fahrstunde anonym</div>
+      </button>
+      <div style="height:1px;background:var(--border);margin:4px 0"></div>
       <button onclick="document.getElementById('options-modal').classList.remove('open');openKlasseAendern()" class="klasse-choice-btn">
         <div style="font-weight:700">✎ Führerscheinklasse wechseln</div>
         <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">Klasse ändern – verwandte Klassen behalten ADK</div>
@@ -951,6 +986,48 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
   </div>
 </div>
 
+<!-- BEWERTUNGS-LINK MODAL -->
+<div class="modal-overlay" id="bewertung-modal" onclick="closeModal(event)">
+  <div class="modal-sheet">
+    <div class="sheet-title">⭐ Schüler-Bewertung</div>
+    <div style="font-size:0.82rem;color:var(--muted);margin-bottom:16px;line-height:1.5">
+      Schicke diesen Link dem Schüler – er kann damit die Fahrstunde bewerten ohne Login.
+    </div>
+    <div class="form-group">
+      <label class="form-label">Bewertungs-Link</label>
+      <input class="form-input" id="bewertung-url" readonly style="font-size:0.72rem;color:var(--muted)">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn-main" onclick="copyBewertungLink()">📋 Link kopieren</button>
+      <button class="btn-secondary" style="margin:0" onclick="document.getElementById('bewertung-modal').classList.remove('open')">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CHAT SCREEN ══ -->
+<div class="screen" id="screen-chat" style="display:none;flex-direction:column">
+  <div class="header">
+    <button class="btn-back" onclick="closeChat()">←</button>
+    <div style="flex:1">
+      <div class="header-title" id="chat-header-name">Chat</div>
+      <div class="header-sub">Nachricht an Schüler</div>
+    </div>
+  </div>
+  <div id="chat-messages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px">
+    <div style="text-align:center;padding:40px 20px;color:var(--muted)">
+      <div style="font-size:2rem;margin-bottom:8px">💬</div>
+      <div style="font-size:0.82rem">Keine Nachrichten</div>
+    </div>
+  </div>
+  <div style="padding:12px 16px calc(var(--safe-bottom) + 12px);border-top:1px solid var(--border);background:var(--surface);display:flex;gap:10px;align-items:flex-end">
+    <textarea id="chat-input" placeholder="Nachricht schreiben…"
+      style="flex:1;resize:none;height:42px;max-height:120px;padding:10px 14px;background:var(--surface2);border:1.5px solid var(--border);border-radius:12px;color:var(--text);font-family:'Manrope',sans-serif;font-size:0.9rem;outline:none;overflow:hidden"
+      oninput="this.style.height='42px';this.style.height=Math.min(this.scrollHeight,120)+'px'"
+      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage()}"></textarea>
+    <button onclick="sendChatMessage()" style="width:42px;height:42px;border-radius:12px;background:var(--accent);border:none;color:#0d1117;font-size:1.2rem;cursor:pointer;flex-shrink:0">➤</button>
+  </div>
+</div>
+
 <!-- ══ TUTORIAL OVERLAY ══ -->
 <div id="tutorial-overlay" style="display:none;position:fixed;inset:0;z-index:9000;pointer-events:none">
   <!-- Dimming layer with hole -->
@@ -1148,7 +1225,7 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, enableIndexedDbPersistence, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, enableIndexedDbPersistence, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, getDocs, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD490kLzTOq3h3VdQ9ZqWZd_aXcDRfxBOs",
@@ -1580,6 +1657,7 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById('screen-protokoll').style.display = 'none';
     document.getElementById('screen-help').style.display = 'none';
     document.getElementById('screen-impressum').style.display = 'none';
+    document.getElementById('screen-chat').style.display = 'none';
     document.getElementById('tutorial-overlay').style.display = 'none';
     const loginUser = document.getElementById('login-username');
     if (loginUser) loginUser.value = '';
@@ -1717,8 +1795,24 @@ window.setCustomThema = async (themaId, val) => {
 
 async function saveToFirestore(studentId, data) {
   try {
-    await updateDoc(doc(db, 'students', studentId), data);
-  } catch(e) { toast('Fehler beim Speichern.'); }
+    // fahrschuleId immer mitschicken – für neue Regeln und Rückwärtskompatibilität
+    const fsId = currentUser?._fahrschuleId || currentUser?.uid;
+    const payload = { ...data };
+    // Nur setzen falls nicht schon vorhanden im Update
+    if (fsId && !payload.fahrschuleId) {
+      payload.fahrschuleId = fsId;
+    }
+    await updateDoc(doc(db, 'students', studentId), payload);
+  } catch(e) {
+    console.error('saveToFirestore Fehler:', e.code, e.message);
+    if (e.code === 'permission-denied') {
+      toast('⚠️ Keine Berechtigung – Firestore-Regeln prüfen!');
+    } else if (e.code === 'not-found') {
+      toast('⚠️ Schüler nicht gefunden.');
+    } else {
+      toast('Fehler: ' + (e.message || e.code));
+    }
+  }
 }
 
 // ─────────────────────────────────────────
@@ -2216,10 +2310,17 @@ function renderDetail() {
       <div class="section-body">${renderAdkGruppenChart(s)}</div>
     </div>
     <div class="section-block">
-      <div class="section-header"><div class="section-title">Notizen & Bemerkungen</div></div>
+      <div class="section-header">
+        <div class="section-title">📝 Notizen & Bemerkungen</div>
+        <span style="font-size:0.65rem;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:1px 5px">Nur für Fahrlehrer sichtbar</span>
+      </div>
       <div class="section-body">
-        <textarea class="notes-textarea" id="notes-ta" placeholder="Beobachtungen, Förderziele, Besonderheiten…">${s.notes||''}</textarea>
-        <button class="save-btn" onclick="saveNotes()">Notizen speichern</button>
+        <textarea class="notes-textarea" id="notes-ta" placeholder="Beobachtungen, Förderziele, Schwächen, Besonderheiten, nächste Ziele…">${s.notes||''}</textarea>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="save-btn" onclick="saveNotes()" style="flex:1">Speichern</button>
+          <button onclick="document.getElementById('notes-ta').value='';saveNotes()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.78rem">Leeren</button>
+        </div>
+        ${s.notes ? `<div style="font-size:0.68rem;color:var(--muted);margin-top:6px">Zuletzt bearbeitet – privat & nicht für Schüler sichtbar</div>` : ''}
       </div>
     </div>
     <div class="section-block">
@@ -2383,35 +2484,89 @@ function renderLernkurve() {
   if (protokollEintraege.length < 2) {
     return `<div style="font-size:0.8rem;color:var(--muted);text-align:center;padding:12px 0 4px">📈 Lernkurve erscheint ab 2 Fahrstunden</div>`;
   }
-  const W = 320, H = 100, pad = 12;
-  const pts = protokollEintraege.filter(e => e.fortschritt != null);
+  const pts = protokollEintraege.filter(e => e.fortschritt != null).sort((a,b)=>a.datum.localeCompare(b.datum));
   if (pts.length < 2) return '';
-  const maxF = 100, minF = 0;
-  const xStep = (W - pad*2) / (pts.length - 1);
+
+  // Trend berechnen
+  const erster = pts[0].fortschritt, letzter = pts[pts.length-1].fortschritt;
+  const trend = letzter - erster;
+  const trendText = trend > 0 ? `+${trend}%` : `${trend}%`;
+  const trendColor = trend > 0 ? 'var(--accent2)' : 'var(--danger)';
+  const trendIcon  = trend > 5 ? '🚀' : trend > 0 ? '📈' : trend === 0 ? '➡️' : '📉';
+
+  // Durchschnittliche Sterne
+  const sterneEntries = protokollEintraege.filter(e => e.sterne > 0);
+  const avgSterne = sterneEntries.length
+    ? (sterneEntries.reduce((s,e)=>s+e.sterne,0)/sterneEntries.length).toFixed(1)
+    : null;
+
+  // SVG Lernkurve
+  const W = 320, H = 90, pad = 16;
+  const xStep = (W - pad*2) / Math.max(pts.length - 1, 1);
   const toX = i => pad + i * xStep;
-  const toY = v => H - pad - ((v - minF) / (maxF - minF)) * (H - pad*2);
+  const toY = v => H - pad - (v / 100) * (H - pad*2);
   const pathD = pts.map((p,i) => `${i===0?'M':'L'}${toX(i).toFixed(1)},${toY(p.fortschritt).toFixed(1)}`).join(' ');
   const areaD = pathD + ` L${toX(pts.length-1).toFixed(1)},${H-pad} L${pad},${H-pad} Z`;
   const lastPt = pts[pts.length-1];
+
+  // Sterne-Balken (letzte 7)
+  const letzteProto = [...protokollEintraege].sort((a,b)=>b.datum.localeCompare(a.datum)).slice(0,7).reverse();
+  const sterneBarHTML = letzteProto.map(e => {
+    const h = Math.max(4, (e.sterne||0) * 10);
+    const col = e.sterne >= 4 ? 'var(--accent2)' : e.sterne >= 2 ? 'var(--accent)' : 'var(--border)';
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1">
+      <div style="width:100%;max-width:24px;height:${h}px;background:${col};border-radius:3px 3px 0 0;transition:height 0.3s"></div>
+      <div style="font-size:8px;color:var(--muted)">${e.datum?.slice(5)||''}</div>
+    </div>`;
+  }).join('');
+
   return `
     <div style="margin-bottom:12px">
-      <div style="font-size:0.72rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">📈 Lernkurve – Fortschritt über Zeit</div>
-      <svg width="100%" viewBox="0 0 ${W} ${H}" style="overflow:visible">
+      <!-- Stats Row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+        <div style="background:var(--surface2);border-radius:10px;padding:8px;text-align:center">
+          <div style="font-size:1rem;font-weight:800;color:${trendColor}">${trendIcon} ${trendText}</div>
+          <div style="font-size:0.65rem;color:var(--muted)">Gesamttrend</div>
+        </div>
+        <div style="background:var(--surface2);border-radius:10px;padding:8px;text-align:center">
+          <div style="font-size:1rem;font-weight:800;color:var(--accent)">${letzter}%</div>
+          <div style="font-size:0.65rem;color:var(--muted)">Aktuell</div>
+        </div>
+        <div style="background:var(--surface2);border-radius:10px;padding:8px;text-align:center">
+          <div style="font-size:1rem;font-weight:800;color:var(--accent)">${avgSterne ? '⭐'+avgSterne : '–'}</div>
+          <div style="font-size:0.65rem;color:var(--muted)">Ø Bewertung</div>
+        </div>
+      </div>
+
+      <!-- Lernkurve SVG -->
+      <div style="font-size:0.7rem;color:var(--muted);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">📈 Fortschritt über Zeit</div>
+      <svg width="100%" viewBox="0 0 ${W} ${H}" style="overflow:visible;margin-bottom:8px">
         <defs>
           <linearGradient id="kurveGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.3"/>
+            <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.35"/>
             <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>
           </linearGradient>
         </defs>
+        <!-- Grid lines -->
+        ${[25,50,75].map(v=>`<line x1="${pad}" y1="${toY(v).toFixed(1)}" x2="${W-pad}" y2="${toY(v).toFixed(1)}" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3,3"/>`).join('')}
+        ${[25,50,75].map(v=>`<text x="${pad-2}" y="${(toY(v)+3).toFixed(1)}" text-anchor="end" font-size="8" fill="var(--muted)">${v}</text>`).join('')}
         <path d="${areaD}" fill="url(#kurveGrad)"/>
         <path d="${pathD}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-        ${pts.map((p,i) => `<circle cx="${toX(i).toFixed(1)}" cy="${toY(p.fortschritt).toFixed(1)}" r="3.5" fill="var(--accent)"/>`).join('')}
-        <text x="${toX(pts.length-1).toFixed(1)}" y="${(toY(lastPt.fortschritt)-8).toFixed(1)}" text-anchor="middle" font-size="10" fill="var(--accent)" font-weight="bold">${lastPt.fortschritt}%</text>
+        ${pts.map((p,i) => `<circle cx="${toX(i).toFixed(1)}" cy="${toY(p.fortschritt).toFixed(1)}" r="${i===pts.length-1?5:3}" fill="${i===pts.length-1?'var(--accent)':'var(--surface2)'}" stroke="var(--accent)" stroke-width="1.5"/>`).join('')}
+        <text x="${toX(pts.length-1).toFixed(1)}" y="${(toY(lastPt.fortschritt)-9).toFixed(1)}" text-anchor="middle" font-size="10" fill="var(--accent)" font-weight="bold">${lastPt.fortschritt}%</text>
         <text x="${pad}" y="${H-2}" font-size="9" fill="var(--muted)">${pts[0].datum?.slice(5)||''}</text>
         <text x="${toX(pts.length-1).toFixed(1)}" y="${H-2}" text-anchor="end" font-size="9" fill="var(--muted)">${lastPt.datum?.slice(5)||''}</text>
       </svg>
+
+      <!-- Sterne-Verlauf -->
+      ${sterneEntries.length >= 2 ? `
+      <div style="font-size:0.7rem;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">⭐ Bewertungsverlauf (letzte 7)</div>
+      <div style="display:flex;gap:4px;align-items:flex-end;height:44px;padding:0 4px">
+        ${sterneBarHTML}
+      </div>` : ''}
     </div>`;
 }
+
 
 function renderProtokollListe() {
   if (!protokollEintraege.length) {
@@ -2612,6 +2767,67 @@ window.saveNotes = async () => {
   await saveToFirestore(activeId,{notes});
   toast('Notizen gespeichert ✓');
 };
+
+// ─────────────────────────────────────────
+// 🏆 GAMIFICATION – Abzeichen & Meilensteine
+// ─────────────────────────────────────────
+const ABZEICHEN = [
+  { id:'erste_stunde',    icon:'🚗', name:'Erste Runde',       beschr:'Erste Fahrstunde absolviert',     check: s => (s.fahrstunden||0) >= 1 },
+  { id:'fuenf_stunden',   icon:'⭐', name:'Fünf Stunden',      beschr:'5 Fahrstunden absolviert',        check: s => (s.fahrstunden||0) >= 5 },
+  { id:'zehn_stunden',    icon:'🔟', name:'Zehn Stunden',      beschr:'10 Fahrstunden absolviert',       check: s => (s.fahrstunden||0) >= 10 },
+  { id:'zwanzig_stunden', icon:'💪', name:'Ausdauer',          beschr:'20 Fahrstunden absolviert',       check: s => (s.fahrstunden||0) >= 20 },
+  { id:'erste_sonder',    icon:'🌄', name:'Auf die Landstraße', beschr:'Erste Überlandfahrt absolviert',  check: s => ((s.sonderfahrten||{}).ueber||0) >= 1 },
+  { id:'alle_sonder',     icon:'🛣️', name:'Alle Pflichtfahrten',beschr:'Alle Pflichtfahrten erledigt',   check: s => SONDERFAHRTEN.every(f=>(s.sonderfahrten||{})[f.key]>=f.min) },
+  { id:'adk_halb',        icon:'📚', name:'Halbzeit',          beschr:'50% ADK abgehakt',                check: s => overallProgress(s) >= 50 },
+  { id:'adk_drei_viertel',icon:'🎯', name:'Fast fertig',       beschr:'75% Ausbildungsstand',            check: s => overallProgress(s) >= 75 },
+  { id:'prüfungsreif',    icon:'🎓', name:'Prüfungsreif',      beschr:'90% Ausbildungsstand erreicht',   check: s => overallProgress(s) >= 90 },
+  { id:'fuenf_sterne',    icon:'🌟', name:'Superstar',         beschr:'5× mit ⭐⭐⭐⭐⭐ bewertet',       check: (s,p) => (p||[]).filter(e=>e.sterne===5).length >= 5 },
+  { id:'b197_schalt',     icon:'⚙️', name:'Schaltprofi',       beschr:'B197 Schaltstunden abgeschlossen', check: s => s.klasse==='B197' && (s.schaltstunden||0)>=(s.zielSchaltstunden||10) },
+  { id:'testfahrt',       icon:'🏁', name:'Testfahrt',         beschr:'B197 Testfahrt bestanden',         check: s => s.testfahrtBestanden === true },
+];
+
+function getAbzeichen(s, proto) {
+  return ABZEICHEN.map(a => ({
+    ...a,
+    erreicht: (() => { try { return a.check(s, proto); } catch(e) { return false; } })()
+  }));
+}
+
+function renderGamification(s, proto) {
+  const alle     = getAbzeichen(s, proto);
+  const erreicht = alle.filter(a => a.erreicht);
+  const offen    = alle.filter(a => !a.erreicht);
+  return `
+    <div class="section-block">
+      <div class="section-header">
+        <div class="section-title">🏆 Abzeichen</div>
+        <div style="font-size:0.72rem;color:var(--accent);font-weight:700">${erreicht.length}/${alle.length}</div>
+      </div>
+      <div class="section-body" style="padding:12px 16px">
+        ${erreicht.length > 0 ? `
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+            ${erreicht.map(a => `
+              <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:68px">
+                <div style="width:48px;height:48px;border-radius:14px;background:rgba(240,180,41,0.15);border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:1.4rem">${a.icon}</div>
+                <div style="font-size:0.6rem;font-weight:700;text-align:center;line-height:1.2">${a.name}</div>
+              </div>`).join('')}
+          </div>` : '<div style="color:var(--muted);font-size:0.8rem;margin-bottom:10px">Noch keine Abzeichen – fang an zu fahren! 🚗</div>'}
+        ${offen.length > 0 ? `
+          <div style="font-size:0.7rem;color:var(--muted);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Nächste Ziele</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            ${offen.slice(0,3).map(a => `
+              <div style="display:flex;align-items:center;gap:10px;opacity:0.5">
+                <div style="width:36px;height:36px;border-radius:10px;background:var(--surface2);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:1rem;filter:grayscale(1)">${a.icon}</div>
+                <div>
+                  <div style="font-size:0.8rem;font-weight:600">${a.name}</div>
+                  <div style="font-size:0.68rem;color:var(--muted)">${a.beschr}</div>
+                </div>
+              </div>`).join('')}
+            ${offen.length > 3 ? `<div style="font-size:0.72rem;color:var(--muted);text-align:center;padding-top:4px">+${offen.length-3} weitere…</div>` : ''}
+          </div>` : '<div style="text-align:center;font-size:0.85rem;color:var(--accent2);padding:8px">🎉 Alle Abzeichen erreicht!</div>'}
+      </div>
+    </div>`;
+}
 
 window.deleteStudent = async () => {
   if (!confirm('Schüler wirklich löschen?')) return;
@@ -3426,6 +3642,9 @@ function renderProtokollScreen() {
       <!-- Lernkurve -->
       ${renderLernkurve()}
 
+      <!-- Abzeichen -->
+      ${renderGamification(s, protokollEintraege)}
+
       <!-- Monats-Kalender -->
       <div style="background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:14px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
@@ -3627,10 +3846,322 @@ window.openImpressum = async () => {
   `;
 };
 
+// ─────────────────────────────────────────
+// ⭐ SCHÜLER-BEWERTUNG
+// ─────────────────────────────────────────
+window.openSchuelerBewertung = () => {
+  const s = getStudent(activeId);
+  if (!s) return;
+  const codeData = s.schuelerAnsicht;
+  if (!codeData?.code) { toast('⚠️ Erst Zugangscode generieren (🔑)'); return; }
+  const url = `${window.location.origin}${window.location.pathname}?code=${codeData.code}&bewertung=1`;
+  document.getElementById('bewertung-url').value = url;
+  document.getElementById('bewertung-modal').classList.add('open');
+};
+
+window.copyBewertungLink = () => {
+  const url = document.getElementById('bewertung-url').value;
+  if (!url) { toast('Kein Link vorhanden'); return; }
+  navigator.clipboard.writeText(url)
+    .then(() => toast('✓ Link kopiert!'))
+    .catch(() => { document.getElementById('bewertung-url').select(); document.execCommand('copy'); toast('✓ Link kopiert!'); });
+};
+
 window.closeImpressum = () => {
   document.getElementById('screen-impressum').style.display = 'none';
   document.getElementById('screen-list').style.display = 'flex';
 };
+
+// ─────────────────────────────────────────
+// 📋 PDF EXPORT – Ausbildungsnachweis
+// ─────────────────────────────────────────
+window.exportPDF = () => {
+  const s = getStudent(activeId);
+  if (!s) return;
+
+  const klasse   = s.klasse || 'B';
+  const isA      = klasse === 'A';
+  const isBE     = klasse === 'BE';
+  const isB197   = klasse === 'B197';
+  const ADK      = isA ? ADK_THEMEN_A : isBE ? ADK_THEMEN_BE : ADK_THEMEN;
+  const SONDER   = isA
+    ? [{key:'ueber',name:'Überland',min:5},{key:'autobahn',name:'Autobahn',min:4},{key:'nacht',name:'Nacht',min:3}]
+    : isBE ? SONDERFAHRTEN_BE : SONDERFAHRTEN;
+  const pct      = Math.min(overallProgress(s), 100);
+  const heute    = new Date().toLocaleDateString('de-DE');
+  const klasseNamen = {'B':'Klasse B','B-Auto':'B-Automatik','B197':'B197','BE':'Klasse BE','A':'Klasse A'};
+
+  // ADK Fortschritt berechnen
+  const adkHTML = ADK.map(gruppe => {
+    const items = gruppe.items.map(item => {
+      const val = (s.themen||{})[item] || 0;
+      const stufen = ['○','◐','◕','●','★'];
+      const farben = ['#666','#f0b429','#f0b429','#3fb950','#3fb950'];
+      return `<tr>
+        <td style="padding:3px 8px;font-size:10px;color:#333">${item}</td>
+        <td style="padding:3px 8px;text-align:center;font-size:12px;color:${farben[val]}">${stufen[val]}</td>
+      </tr>`;
+    }).join('');
+    const done  = gruppe.items.filter(t => (s.themen||{})[t] >= 4).length;
+    const total = gruppe.items.length;
+    return `
+      <tr style="background:#f8f9fa">
+        <td colspan="2" style="padding:6px 8px;font-size:11px;font-weight:700;color:#0d1117">
+          ${gruppe.gruppe} <span style="color:#888;font-weight:400">(${done}/${total})</span>
+        </td>
+      </tr>
+      ${items}`;
+  }).join('');
+
+  // Pflichtfahrten
+  const sonderHTML = SONDER.map(f => {
+    const cnt  = (s.sonderfahrten||{})[f.key] || 0;
+    const done = cnt >= f.min;
+    return `<tr>
+      <td style="padding:4px 8px;font-size:11px">${f.icon||''} ${f.name}</td>
+      <td style="padding:4px 8px;text-align:center;font-size:11px;color:${done?'#3fb950':'#f0b429'}">${cnt} / ${f.min}</td>
+      <td style="padding:4px 8px;text-align:center;font-size:14px">${done?'✅':'⏳'}</td>
+    </tr>`;
+  }).join('');
+
+  // Protokoll (letzte 10)
+  const proto = [...protokollEintraege]
+    .sort((a,b) => b.datum.localeCompare(a.datum))
+    .slice(0, 10);
+  const protokollHTML = proto.length === 0
+    ? '<tr><td colspan="4" style="padding:8px;color:#888;font-size:11px;text-align:center">Keine Einträge</td></tr>'
+    : proto.map(e => `<tr>
+        <td style="padding:3px 8px;font-size:10px">${formatDate(e.datum)}</td>
+        <td style="padding:3px 8px;font-size:10px">${e.stunde||''}. Std.</td>
+        <td style="padding:3px 8px;font-size:10px">${'⭐'.repeat(e.sterne||0)}</td>
+        <td style="padding:3px 8px;font-size:10px;color:#555">${(e.notiz||'').slice(0,40)}</td>
+      </tr>`).join('');
+
+  // B197 Zeile
+  const b197HTML = isB197 ? `
+    <tr style="background:#f8f9fa">
+      <td colspan="2" style="padding:6px 8px;font-size:11px;font-weight:700">⚙️ B197 Schaltstunden</td>
+    </tr>
+    <tr>
+      <td style="padding:4px 8px;font-size:11px">Absolvierte Schaltstunden</td>
+      <td style="padding:4px 8px;font-size:11px;text-align:center">${s.schaltstunden||0} / ${s.zielSchaltstunden||10}</td>
+    </tr>
+    <tr>
+      <td style="padding:4px 8px;font-size:11px">15-min. Testfahrt</td>
+      <td style="padding:4px 8px;font-size:11px;text-align:center">${s.testfahrtBestanden?'✅ Bestanden':'⏳ Ausstehend'}</td>
+    </tr>` : '';
+
+  const html = `<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Ausbildungsnachweis – ${s.vorname} ${s.nachname}</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family: Arial, sans-serif; font-size:11px; color:#1a1a1a; background:#fff; }
+  .page { max-width:800px; margin:0 auto; padding:24px; }
+  h1 { font-size:20px; color:#0d1117; margin-bottom:4px; }
+  h2 { font-size:13px; color:#f0b429; margin:16px 0 8px; border-bottom:2px solid #f0b429; padding-bottom:4px; }
+  table { width:100%; border-collapse:collapse; margin-bottom:12px; }
+  tr:nth-child(even) { background:#fafafa; }
+  td { border:1px solid #e0e0e0; }
+  .header-box { background:#0d1117; color:#fff; padding:16px 20px; border-radius:8px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; }
+  .progress-bar { background:#333; border-radius:4px; height:8px; margin-top:6px; }
+  .progress-fill { background:#f0b429; border-radius:4px; height:100%; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:bold; }
+  .badge-gold { background:#f0b429; color:#0d1117; }
+  .badge-green { background:#3fb950; color:#fff; }
+  .footer { margin-top:24px; padding-top:12px; border-top:1px solid #ddd; font-size:9px; color:#888; display:flex; justify-content:space-between; }
+  @media print { body { print-color-adjust:exact; -webkit-print-color-adjust:exact; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header-box">
+    <div>
+      <div style="font-size:10px;color:#f0b429;text-transform:uppercase;letter-spacing:1px">Ausbildungsnachweis</div>
+      <div style="font-size:18px;font-weight:bold;margin:4px 0">${s.vorname} ${s.nachname}</div>
+      <div style="font-size:11px;color:#aaa">
+        <span class="badge badge-gold">${klasseNamen[klasse]||klasse}</span>
+        ${s.geburt ? '&nbsp;&nbsp;Geb. '+formatDate(s.geburt) : ''}
+      </div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:28px;font-weight:bold;color:#f0b429">${pct}%</div>
+      <div style="font-size:10px;color:#aaa">Ausbildungsstand</div>
+      <div class="progress-bar" style="width:120px">
+        <div class="progress-fill" style="width:${pct}%"></div>
+      </div>
+    </div>
+  </div>
+
+  <h2>📊 Fahrstunden</h2>
+  <table>
+    <tr>
+      <td style="padding:6px 8px;font-size:11px;font-weight:bold">Absolvierte Fahrstunden</td>
+      <td style="padding:6px 8px;font-size:11px;text-align:center">${s.fahrstunden||0} von ${s.zielStunden||30} Std.</td>
+    </tr>
+    ${b197HTML}
+  </table>
+
+  <h2>🛣️ Pflichtfahrten (Sonderfahrten)</h2>
+  <table>
+    <tr style="background:#0d1117;color:#fff">
+      <td style="padding:5px 8px;font-size:11px">Fahrt</td>
+      <td style="padding:5px 8px;font-size:11px;text-align:center">Absolviert</td>
+      <td style="padding:5px 8px;font-size:11px;text-align:center">Status</td>
+    </tr>
+    ${sonderHTML}
+  </table>
+
+  <h2>📚 ADK – Ausbildungsdiagrammkarte</h2>
+  <table>
+    <tr style="background:#0d1117;color:#fff">
+      <td style="padding:5px 8px;font-size:11px">Lerninhalt</td>
+      <td style="padding:5px 8px;font-size:11px;text-align:center">Stand</td>
+    </tr>
+    ${adkHTML}
+  </table>
+
+  <h2>📝 Protokoll (letzte 10 Einträge)</h2>
+  <table>
+    <tr style="background:#0d1117;color:#fff">
+      <td style="padding:5px 8px;font-size:11px">Datum</td>
+      <td style="padding:5px 8px;font-size:11px;text-align:center">Stunde</td>
+      <td style="padding:5px 8px;font-size:11px;text-align:center">Bewertung</td>
+      <td style="padding:5px 8px;font-size:11px">Notiz</td>
+    </tr>
+    ${protokollHTML}
+  </table>
+
+  <div style="margin-top:24px;padding:12px;border:2px dashed #e0e0e0;border-radius:8px;display:flex;gap:40px">
+    <div>
+      <div style="font-size:10px;color:#888;margin-bottom:20px">Unterschrift Fahrlehrer</div>
+      <div style="border-top:1px solid #333;width:160px;padding-top:4px;font-size:9px;color:#888">Datum, Unterschrift</div>
+    </div>
+    <div>
+      <div style="font-size:10px;color:#888;margin-bottom:20px">Unterschrift Fahrschüler</div>
+      <div style="border-top:1px solid #333;width:160px;padding-top:4px;font-size:9px;color:#888">Datum, Unterschrift</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>ADK – Digitale Kartei · fahrschuelerkartei.de</span>
+    <span>Erstellt am ${heute}</span>
+    <span>ADK Legende: ○ Nicht gezeigt · ◐ Gezeigt · ◕ Ausreichend · ● Beherrscht · ★ Sehr sicher</span>
+  </div>
+
+</div>
+</body>
+</html>`;
+
+  // PDF öffnen in neuem Tab → Browser-Druckdialog
+  const win = window.open('', '_blank');
+  if (!win) { toast('⚠️ Popup blockiert – bitte erlauben'); return; }
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 500);
+  toast('📋 PDF wird geöffnet…');
+};
+
+// ─────────────────────────────────────────
+// 💬 CHAT – Fahrlehrer ↔ Schüler
+// ─────────────────────────────────────────
+let unsubChat = null;
+let chatStudentId = null;
+
+window.openChat = () => {
+  const s = getStudent(activeId);
+  if (!s) return;
+  chatStudentId = activeId;
+  document.getElementById('chat-header-name').textContent = `${s.vorname} ${s.nachname}`;
+  document.querySelectorAll('.screen').forEach(sc => { sc.classList.remove('active'); sc.style.display=''; });
+  document.getElementById('screen-chat').style.display = 'flex';
+  loadChatMessages();
+};
+
+window.closeChat = () => {
+  if (unsubChat) { unsubChat(); unsubChat = null; }
+  document.getElementById('screen-chat').style.display = 'none';
+  document.getElementById('screen-detail').classList.add('active');
+};
+
+function loadChatMessages() {
+  if (unsubChat) unsubChat();
+  const messagesEl = document.getElementById('chat-messages');
+  const q = query(
+    collection(db, 'chat'),
+    where('studentId', '==', chatStudentId),
+    orderBy('createdAt', 'asc')
+  );
+  unsubChat = onSnapshot(q, snap => {
+    const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (msgs.length === 0) {
+      messagesEl.innerHTML = `
+        <div style="text-align:center;padding:40px 20px;color:var(--muted)">
+          <div style="font-size:2rem;margin-bottom:8px">💬</div>
+          <div style="font-size:0.82rem">Noch keine Nachrichten.<br>Schreib dem Schüler etwas!</div>
+        </div>`;
+      return;
+    }
+    messagesEl.innerHTML = msgs.map(msg => {
+      const vonFahrlehrer = msg.senderUid === currentUser.uid;
+      const zeit = msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit'}) : '';
+      const datum = msg.createdAt ? new Date(msg.createdAt).toLocaleDateString('de-DE') : '';
+      return `
+        <div style="display:flex;flex-direction:column;align-items:${vonFahrlehrer?'flex-end':'flex-start'};gap:2px">
+          <div style="
+            max-width:78%;padding:10px 14px;border-radius:${vonFahrlehrer?'16px 16px 4px 16px':'16px 16px 16px 4px'};
+            background:${vonFahrlehrer?'var(--accent)':'var(--surface2)'};
+            color:${vonFahrlehrer?'#0d1117':'var(--text)'};
+            font-size:0.88rem;line-height:1.4;word-break:break-word">
+            ${msg.text}
+          </div>
+          <div style="font-size:0.65rem;color:var(--muted);padding:0 4px">${datum} ${zeit}</div>
+        </div>`;
+    }).join('');
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }, err => {
+    if (err.code === 'failed-precondition') {
+      messagesEl.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);font-size:0.8rem">
+        ⚠️ Index wird erstellt… kurz warten und neu laden.<br>
+        <button onclick="loadChatMessages()" style="margin-top:8px;padding:6px 14px;background:var(--accent);border:none;border-radius:8px;cursor:pointer;font-size:0.8rem">🔄 Neu laden</button>
+      </div>`;
+    }
+  });
+}
+
+window.sendChatMessage = async () => {
+  const inp = document.getElementById('chat-input');
+  const text = inp.value.trim();
+  if (!text) return;
+  inp.value = '';
+  inp.style.height = '42px';
+  try {
+    await addDoc(collection(db, 'chat'), {
+      studentId:   chatStudentId,
+      fahrschuleId: currentUser._fahrschuleId || currentUser.uid,
+      senderUid:   currentUser.uid,
+      senderName:  currentUser.displayName || 'Fahrlehrer',
+      senderRolle: 'fahrlehrer',
+      text,
+      gelesen:     false,
+      createdAt:   Date.now(),
+    });
+  } catch(e) { toast('Fehler beim Senden.'); inp.value = text; }
+};
+
+// Chat beim Logout aufräumen
+const _origLogout = window.doLogout;
+window.doLogout = async () => {
+  if (unsubChat) { unsubChat(); unsubChat = null; }
+  document.getElementById('screen-chat').style.display = 'none';
+  if (_origLogout) await _origLogout();
+};
+
+
 
 window.openHelp = () => {
   document.querySelectorAll('.screen').forEach(sc => sc.style.display = 'none');
