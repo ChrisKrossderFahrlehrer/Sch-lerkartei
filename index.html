@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#f0b429">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -47,31 +47,84 @@ body.light {
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 html,body { height:100%; overflow:hidden; }
 body { font-family:'Manrope',sans-serif; background:var(--bg); color:var(--text); display:flex; flex-direction:column; }
+/* Prevent pull-to-refresh & overscroll bounce */
+html { overscroll-behavior-y: contain; }
+body { overscroll-behavior: none; }
 /* Wenn Offline-Banner sichtbar, Screens nach unten schieben */
 #offline-bar[style*="flex"] ~ .screen,
 #offline-bar[style*="flex"] ~ #loading { margin-top: 36px; }
 
-/* ── MOBILE IMPROVEMENTS ── */
-@media (max-width: 390px) {
-  .scope-btn    { font-size: 0.72rem; padding: 8px 4px; }
-  .section-title{ font-size: 0.8rem; }
-}
+/* ── MOBILE & TABLET IMPROVEMENTS ── */
 /* Mindest-Touch-Targets 44px (Apple HIG) */
 .scope-btn, .btn-main, .btn-sheet-cancel,
-.klasse-choice-btn, .s-btn, .step-btn { min-height: 44px; }
-.s-btn { min-width: 36px; }
+.klasse-choice-btn, .s-btn, .step-btn,
+button { min-height: 44px; }
+.s-btn { min-width: 44px; }
+/* Verhindert Doppeltipp-Zoom auf iOS/Android */
+button, input, textarea, select, a { touch-action: manipulation; }
+/* Verhindern dass iOS Inputs zoomen (min 16px) */
+input, textarea, select { font-size: max(16px, 0.88rem); }
 /* Smooth scrolling */
-.detail-scroll, #chat-messages { scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
-/* Verhindert Doppeltipp-Zoom auf iOS */
-button, input, textarea, select { touch-action: manipulation; }
+.detail-scroll, #chat-messages, .scroll-body { scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
 /* Bessere Fokus-Styles */
 .form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(240,180,41,0.15); }
 /* Aktive Elemente Feedback */
-.list-item:active, .klasse-choice-btn:active { transform: scale(0.98); transition: transform 0.1s; }
+.list-item:active, .klasse-choice-btn:active, .scope-btn:active { opacity: 0.75; transition: opacity 0.1s; }
 /* Chat Input */
 #chat-input:focus { border-color: var(--accent); outline: none; }
-/* Verhindern dass iOS Inputs zoomen (min 16px) */
-input, textarea, select { font-size: max(16px, 0.88rem); }
+/* Modals sicher über Tastatur */
+.modal-overlay { padding-bottom: env(keyboard-inset-height, 0px); }
+
+/* ── KLEINE PHONES (iPhone SE, < 375px) ── */
+@media (max-width: 374px) {
+  .scope-btn    { font-size: 0.68rem; padding: 8px 3px; }
+  .section-title{ font-size: 0.78rem; }
+  .header-title { font-size: 0.9rem; }
+  .step-btn     { font-size: 0.75rem; padding: 6px 8px; }
+  .list-item    { padding: 12px 14px; }
+}
+
+/* ── STANDARD PHONES (375px – 767px) ── */
+@media (min-width: 375px) and (max-width: 767px) {
+  .scope-btn { font-size: 0.78rem; }
+}
+
+/* ── TABLET (768px – 1023px) ── */
+@media (min-width: 768px) {
+  body { max-width: 768px; margin: 0 auto; }
+  .header { padding: 16px 24px; }
+  .detail-scroll, .scroll-body { padding-bottom: 32px; }
+  .login-box { max-width: 480px; padding: 48px 40px; }
+  .list-item { padding: 16px 24px; }
+  .section-body { padding: 16px 24px; }
+  .scope-btn { font-size: 0.88rem; padding: 10px 16px; }
+  .modal-sheet { max-width: 540px; margin: 0 auto; border-radius: 20px; }
+  .modal-overlay { align-items: center; padding: 20px; }
+  .klasse-choice-btn { padding: 16px 20px; }
+  .btn-main { font-size: 1rem; padding: 14px; }
+  .section-title { font-size: 0.95rem; }
+  input, textarea, select { font-size: 1rem !important; }
+}
+
+/* ── GROSSES TABLET / iPad Pro (1024px+) ── */
+@media (min-width: 1024px) {
+  body { max-width: 900px; }
+  .header-title { font-size: 1.3rem; }
+}
+
+/* ── DARK MODE SYSTEM PREFERENCE ── */
+@media (prefers-color-scheme: dark) {
+  /* bereits über data-theme gesteuert – kein Konflikt */
+}
+
+/* ── LANDSCAPE PHONE ── */
+@media (max-height: 500px) and (orientation: landscape) {
+  .header { padding: 8px 16px; min-height: 48px; }
+  .header-title { font-size: 0.9rem; }
+  .login-box { padding: 20px 24px; }
+  .login-logo { font-size: 1.4rem; margin-bottom: 4px; }
+  .login-sub { margin-bottom: 16px; }
+}
 
 /* SCREENS */
 .screen { display:none; flex-direction:column; height:100%; overflow:hidden; }
@@ -1240,33 +1293,8 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// ── OFFLINE-PERSISTENZ ──────────────────────────────────────
-// Firestore speichert alle Daten lokal in IndexedDB.
-// Änderungen offline werden automatisch synchronisiert sobald Internet zurück ist.
-enableIndexedDbPersistence(db).catch(err => {
-  if (err.code === 'failed-precondition') {
-    console.warn('Offline-Modus: Mehrere Tabs offen – nur ein Tab kann offline cachen.');
-  } else if (err.code === 'unimplemented') {
-    console.warn('Offline-Modus: Dieser Browser unterstützt IndexedDB nicht.');
-  }
-});
-
-// ── ONLINE/OFFLINE STATUS ───────────────────────────────────
-function updateOnlineStatus() {
-  const bar = document.getElementById('offline-bar');
-  if (!bar) return;
-  if (navigator.onLine) {
-    bar.style.display = 'none';
-  } else {
-    bar.style.display = 'flex';
-  }
-}
-window.addEventListener('online',  updateOnlineStatus);
-window.addEventListener('offline', updateOnlineStatus);
-
-
 // ─────────────────────────────────────────
-// STATE
+// KONSTANTEN – MÜSSEN VOR ALLEM ANDEREN DEFINIERT SEIN
 // ─────────────────────────────────────────
 const SONDERFAHRTEN = [
   { key:'ueber',    icon:'🌄', name:'Überland',  min:5 },
@@ -1500,6 +1528,33 @@ const ADK_THEMEN_BE = [
   },
 ];
 
+// ── OFFLINE-PERSISTENZ ──────────────────────────────────────
+// Firestore speichert alle Daten lokal in IndexedDB.
+// Änderungen offline werden automatisch synchronisiert sobald Internet zurück ist.
+enableIndexedDbPersistence(db).catch(err => {
+  if (err.code === 'failed-precondition') {
+    console.warn('Offline-Modus: Mehrere Tabs offen – nur ein Tab kann offline cachen.');
+  } else if (err.code === 'unimplemented') {
+    console.warn('Offline-Modus: Dieser Browser unterstützt IndexedDB nicht.');
+  }
+});
+
+// ── ONLINE/OFFLINE STATUS ───────────────────────────────────
+function updateOnlineStatus() {
+  const bar = document.getElementById('offline-bar');
+  if (!bar) return;
+  if (navigator.onLine) {
+    bar.style.display = 'none';
+  } else {
+    bar.style.display = 'flex';
+  }
+}
+window.addEventListener('online',  updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
+
+// ─────────────────────────────────────────
+// STATE VARIABLEN
+// ─────────────────────────────────────────
 let newStudentKlasse = 'B';
 let activeFilter = 'alle';
 let aktiveSterne = 0;
@@ -1621,6 +1676,14 @@ function friendlyError(code) {
 // ─────────────────────────────────────────
 onAuthStateChanged(auth, async (user) => {
   document.getElementById('loading').style.display = 'none';
+
+  // Prüfen ob URL einen Schüler-Code enthält
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('code') && !user) {
+    checkUrlCode();
+    return;
+  }
+
   if (user) {
     currentUser = user;
 
@@ -3175,67 +3238,143 @@ window.openCodeModal = async () => {
 
 window.generateCode = async () => {
   const code = generateCodeStr();
-  const expiresAt = Date.now() + 365*24*60*60*1000; // 1 Jahr gültig
+  const expiresAt = Date.now() + 365*24*60*60*1000; // 1 Jahr
   const s = getStudent(activeId);
+  if (!s) { toast('Kein Schüler ausgewählt'); return; }
+
   try {
-    // Delete old codes for this student
+    // Alte Codes für diesen Schüler löschen
     const q = query(collection(db,'accessCodes'), where('studentId','==',activeId));
     const snap = await getDocs(q);
     for (const d of snap.docs) await deleteDoc(doc(db,'accessCodes',d.id));
-    // Save new code
+
+    // Protokoll laden für Snapshot
+    const pq = query(collection(db,'protokoll'), where('studentId','==',activeId));
+    const pSnap = await getDocs(pq);
+    const protokollSnapshot = pSnap.docs.map(d=>({id:d.id,...d.data()}));
+
+    // Kompletten Schüler-Snapshot im Code-Dokument speichern
+    // → Schüler braucht keinen Login und keine direkte Firestore-Berechtigung
     await addDoc(collection(db,'accessCodes'), {
       code,
-      studentId: activeId,
-      teacherUid: currentUser.uid,
-      studentName: `${s.vorname} ${s.nachname}`,
+      studentId:        activeId,
+      teacherUid:       currentUser.uid,
+      fahrschuleId:     currentUser._fahrschuleId || currentUser.uid,
+      studentName:      `${s.vorname} ${s.nachname}`,
       expiresAt,
-      createdAt: Date.now()
+      createdAt:        Date.now(),
+      // Vollständiger Schüler-Snapshot
+      studentSnapshot:  {
+        id:               activeId,
+        vorname:          s.vorname,
+        nachname:         s.nachname,
+        geburt:           s.geburt || '',
+        klasse:           s.klasse || 'B',
+        klassen:          s.klassen || [s.klasse || 'B'],
+        fahrstunden:      s.fahrstunden || 0,
+        zielStunden:      s.zielStunden || 30,
+        sonderfahrten:    s.sonderfahrten || {},
+        themen:           s.themen || {},
+        schaltstunden:    s.schaltstunden || 0,
+        zielSchaltstunden:s.zielSchaltstunden || 10,
+        testfahrtBestanden:s.testfahrtBestanden || false,
+      },
+      protokollSnapshot: protokollSnapshot,
     });
+
     document.getElementById('code-display').textContent = code;
     const exp = new Date(expiresAt);
-    document.getElementById('code-valid-until').textContent = `Gültig bis: ${exp.toLocaleDateString('de-DE')}`;
-    toast('Code generiert ✓ – Gib ihn dem Schüler weiter');
-  } catch(e) { toast('Fehler beim Generieren.'); }
+    document.getElementById('code-valid-until').textContent =
+      `Gültig bis: ${exp.toLocaleDateString('de-DE')}`;
+    toast('✓ Code generiert – gib ihn dem Schüler');
+  } catch(e) {
+    console.error('generateCode Fehler:', e);
+    toast('Fehler: ' + (e.message||e.code));
+  }
 };
 
 // ─────────────────────────────────────────
 // SCHÜLER LOGIN mit Code
 // ─────────────────────────────────────────
 window.doSchuelerLogin = async () => {
-  const code = document.getElementById('inp-schueler-code').value.trim().toUpperCase();
+  const code  = document.getElementById('inp-schueler-code').value.trim().toUpperCase();
   const errEl = document.getElementById('schueler-code-error');
   const btn   = document.getElementById('btn-schueler-code');
   errEl.textContent = '';
   if (code.length < 6) { errEl.textContent = 'Bitte einen 6-stelligen Code eingeben.'; return; }
   btn.disabled = true; btn.textContent = '…';
+
   try {
-    const q = query(collection(db,'accessCodes'), where('code','==',code));
+    console.log('[DEBUG] Lade Code:', code);
+    
+    // accessCodes sind öffentlich lesbar – kein Login nötig
+    const q    = query(collection(db,'accessCodes'), where('code','==',code));
     const snap = await getDocs(q);
+    
+    console.log('[DEBUG] accessCodes gefunden:', !snap.empty);
+
     if (snap.empty) {
       errEl.textContent = 'Ungültiger Code. Bitte prüfe die Eingabe.';
       btn.disabled=false; btn.textContent='Akte öffnen →'; return;
     }
+
     const codeData = snap.docs[0].data();
+    console.log('[DEBUG] Code-Daten:', {
+      hasSnapshot: !!codeData.studentSnapshot,
+      expired: codeData.expiresAt < Date.now(),
+      studentId: codeData.studentId
+    });
+
     if (codeData.expiresAt < Date.now()) {
       errEl.textContent = 'Dieser Code ist abgelaufen. Bitte deinen Fahrlehrer um einen neuen.';
       btn.disabled=false; btn.textContent='Akte öffnen →'; return;
     }
-    // Load student and protokoll data
-    const studentDoc = await getDoc(doc(db,'students',codeData.studentId));
-    if (!studentDoc.exists()) {
-      errEl.textContent = 'Schüler nicht gefunden.';
+
+    // Schüler-Daten und Protokoll aus dem Snapshot in accessCodes laden
+    // → kein direkter Zugriff auf students/protokoll nötig
+    const schuelerData = codeData.studentSnapshot
+      ? { ...codeData.studentSnapshot, id: codeData.studentId }
+      : null;
+
+    if (!schuelerData) {
+      console.log('[DEBUG] Kein Snapshot vorhanden – alter Code');
+      errEl.textContent = '⚠️ Dieser Code ist veraltet. Bitte den Fahrlehrer um einen neuen Code.';
       btn.disabled=false; btn.textContent='Akte öffnen →'; return;
     }
-    const schuelerData = { id: studentDoc.id, ...studentDoc.data() };
-    // Load protokoll
-    const pq = query(collection(db,'protokoll'), where('studentId','==',codeData.studentId));
-    const pSnap = await getDocs(pq);
-    const protokoll = pSnap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>b.createdAt-a.createdAt);
-    // Show Schüler-Ansicht
+
+    console.log('[DEBUG] Schüler-Snapshot geladen:', schuelerData.vorname, schuelerData.nachname);
+
+    const protokoll = (codeData.protokollSnapshot || [])
+      .sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
+
+    console.log('[DEBUG] Protokoll-Einträge:', protokoll.length);
+    console.log('[DEBUG] Rendere Schüleransicht...');
+
     renderSchuelerAnsicht(schuelerData, protokoll);
+    
+    console.log('[DEBUG] Erfolgreich geladen!');
     btn.disabled=false; btn.textContent='Akte öffnen →';
+
   } catch(e) {
-    errEl.textContent = 'Fehler beim Laden. Bitte erneut versuchen.';
+    console.error('[FEHLER] doSchuelerLogin:', e);
+    console.error('[FEHLER] Code:', e.code);
+    console.error('[FEHLER] Message:', e.message);
+    console.error('[FEHLER] Stack:', e.stack);
+    
+    let errorMsg = 'Fehler beim Laden: ';
+    if (e.code === 'permission-denied') {
+      errorMsg += 'Keine Berechtigung (Firestore-Regeln Problem)';
+    } else if (e.code === 'not-found') {
+      errorMsg += 'Daten nicht gefunden';
+    } else if (e.code === 'failed-precondition') {
+      errorMsg += 'Firestore-Index fehlt';
+    } else if (e.message) {
+      errorMsg += e.message;
+    } else {
+      errorMsg += e.code || 'Unbekannter Fehler';
+    }
+    
+    errEl.textContent = errorMsg;
     btn.disabled=false; btn.textContent='Akte öffnen →';
   }
 };
@@ -3247,106 +3386,576 @@ window.schuelerLogout = () => {
 };
 
 function renderSchuelerAnsicht(s, protokoll) {
-  // Switch to Schüler screen
+  try {
+    console.log('[DEBUG] renderSchuelerAnsicht START');
+    console.log('[DEBUG] Schüler:', s);
+    console.log('[DEBUG] Protokoll Einträge:', (protokoll||[]).length);
+
+    document.getElementById('screen-login').classList.remove('active');
+    document.getElementById('screen-schueler').classList.add('active');
+
+    // ── Sicherer Datenzugriff mit Fallbacks ──
+    const vorname   = s.vorname  || '';
+    const nachname  = s.nachname || '';
+    const klasse    = s.klasse   || 'B';
+    const themen    = s.themen   || {};
+    const sonder    = s.sonderfahrten || {};
+    const fahrstd   = Number(s.fahrstunden) || 0;
+    const zielStd   = Number(s.zielStunden) || 30;
+
+    document.getElementById('schueler-header-name').textContent =
+      `${vorname} ${nachname}`.trim() || 'Schüler';
+
+    // ── ADK Themen wählen ──
+    let ADK;
+    if (klasse === 'A') {
+      ADK = typeof ADK_THEMEN_A !== 'undefined' ? ADK_THEMEN_A : [];
+    } else if (klasse === 'BE') {
+      ADK = typeof ADK_THEMEN_BE !== 'undefined' ? ADK_THEMEN_BE : [];
+    } else {
+      ADK = typeof ADK_THEMEN !== 'undefined' ? ADK_THEMEN : [];
+    }
+
+    console.log('[DEBUG] ADK Gruppen:', ADK.length);
+
+    // ── Fortschritt berechnen ──
+    let pct = 0;
+    try {
+      pct = Math.min(overallProgress(s), 100);
+    } catch(e) {
+      console.warn('[WARN] overallProgress Fehler:', e);
+      pct = 0;
+    }
+
+    // ── Sonderfahrten Definition ──
+    const SONDER_DEF = klasse === 'A' ? [
+      { key:'ueber',   icon:'🌄', name:'Überlandfahrt', min:5 },
+      { key:'autobahn',icon:'🛣️', name:'Autobahn',      min:4 },
+      { key:'nacht',   icon:'🌙', name:'Nachtfahrt',    min:3 },
+    ] : klasse === 'BE' ? [
+      { key:'ueber',   icon:'🌄', name:'Überlandfahrt', min:3 },
+      { key:'autobahn',icon:'🛣️', name:'Autobahn',      min:1 },
+      { key:'nacht',   icon:'🌙', name:'Nachtfahrt',    min:1 },
+    ] : [
+      { key:'ueber',   icon:'🌄', name:'Überlandfahrt', min:3 },
+      { key:'autobahn',icon:'🛣️', name:'Autobahnfahrt', min:1 },
+      { key:'nacht',   icon:'🌙', name:'Nachtfahrt',    min:1 },
+    ];
+
+    // ── Legende Emoji ──
+    const STUFEN = [
+      { em:'⬜', label:'Noch nicht',  col:'var(--muted)' },
+      { em:'🔴', label:'Angesprochen',col:'#f85149' },
+      { em:'🟠', label:'Gezeigt',     col:'#f0883e' },
+      { em:'🟡', label:'Ausreichend', col:'#f0b429' },
+      { em:'🟢', label:'Beherrscht',  col:'#3fb950' },
+      { em:'⭐', label:'Sehr sicher', col:'#f0b429' },
+    ];
+
+    // ── ADK pro Gruppe mit Fortschrittsbalken ──
+    const adkHTML = ADK.map(gruppe => {
+      const done  = gruppe.items.filter(t => (themen[t]||0) >= 4).length;
+      const total = gruppe.items.length;
+      const gpct  = total > 0 ? Math.round(done/total*100) : 0;
+      const gCol  = gpct===100 ? 'var(--accent2)' : gpct>=50 ? 'var(--accent)' : 'var(--muted)';
+
+      const itemsHTML = gruppe.items.map(t => {
+        const val   = themen[t] || 0;
+        const stufe = STUFEN[Math.min(val, STUFEN.length-1)];
+        return `
+          <div style="display:flex;align-items:center;justify-content:space-between;
+                      padding:8px 0;border-bottom:1px solid var(--border)">
+            <span style="font-size:0.82rem;color:var(--text);flex:1;padding-right:8px">${t}</span>
+            <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+              <span style="font-size:0.68rem;color:${stufe.col};white-space:nowrap">${stufe.label}</span>
+              <span style="font-size:1.1rem">${stufe.em}</span>
+            </div>
+          </div>`;
+      }).join('');
+
+      return `
+        <div style="background:var(--surface2);border:1px solid var(--border);
+                    border-radius:12px;overflow:hidden;margin-bottom:10px">
+          <div style="padding:10px 14px;display:flex;align-items:center;justify-content:space-between;
+                      background:var(--surface);border-bottom:1px solid var(--border)">
+            <span style="font-size:0.82rem;font-weight:700;color:var(--text)">${gruppe.gruppe}</span>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:0.75rem;font-weight:700;color:${gCol}">${done}/${total}</span>
+              <div style="width:48px;height:6px;background:var(--border);border-radius:3px">
+                <div style="width:${gpct}%;height:100%;background:${gCol};border-radius:3px;transition:width 0.4s"></div>
+              </div>
+            </div>
+          </div>
+          <div style="padding:0 14px">
+            ${itemsHTML}
+          </div>
+        </div>`;
+    }).join('');
+
+    // ── Sonderfahrten ──
+    const sonderHTML = SONDER_DEF.map(f => {
+      const val = Number(sonder[f.key]) || 0;
+      const ok  = val >= f.min;
+      const pct = Math.min(Math.round(val/f.min*100), 100);
+      return `
+        <div style="background:var(--surface2);border:1px solid ${ok?'rgba(63,185,80,0.4)':'var(--border)'};
+                    border-radius:10px;padding:11px 14px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <span style="font-size:0.85rem;font-weight:600">${f.icon} ${f.name}</span>
+            <span style="font-size:0.85rem;font-weight:700;color:${ok?'var(--accent2)':'var(--accent)'}">
+              ${val} / ${f.min} ${ok?'✅':''}
+            </span>
+          </div>
+          <div style="background:var(--border);border-radius:4px;height:5px">
+            <div style="width:${pct}%;height:100%;background:${ok?'var(--accent2)':'var(--accent)'};border-radius:4px;transition:width 0.4s"></div>
+          </div>
+        </div>`;
+    }).join('');
+
+    // ── Protokoll ──
+    const protokollHTML = (protokoll||[]).length
+      ? (protokoll||[]).map(e => {
+          const sterne    = Number(e.sterne)||0;
+          const stunde    = e.stunde != null ? e.stunde : '–';
+          const datum     = e.datum ? formatDate(e.datum) : '';
+          const maengel   = (e.maengel||[]).filter(Boolean);
+          const maengelHTML = maengel.length
+            ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">
+                ${maengel.map(m=>`<span style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);
+                  color:var(--danger);border-radius:10px;padding:2px 8px;font-size:0.68rem">${m}</span>`).join('')}
+              </div>` : '';
+          return `
+            <div style="background:var(--surface2);border:1px solid var(--border);
+                        border-radius:10px;padding:12px 14px;margin-bottom:8px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+                <span style="font-weight:700;color:var(--accent);font-family:'Syne',sans-serif">
+                  ${stunde !== '–' ? stunde+'. Fahrstunde' : 'Fahrstunde'}
+                </span>
+                <span style="font-size:0.75rem;color:var(--muted)">
+                  ${datum} ${'⭐'.repeat(sterne)}
+                </span>
+              </div>
+              ${maengelHTML}
+              ${e.notiz ? `<div style="font-size:0.8rem;color:var(--muted);margin-top:6px">📝 ${e.notiz}</div>` : ''}
+              ${e.unterschrift
+                ? `<div style="margin-top:8px">
+                    <div style="font-size:0.65rem;color:var(--muted);margin-bottom:3px">✍️ Unterschrift</div>
+                    <img src="${e.unterschrift}"
+                      style="width:100%;max-width:260px;border:1px solid var(--border);
+                             border-radius:8px;background:#fff;display:block">
+                  </div>` : ''}
+            </div>`;
+        }).join('')
+      : `<div style="font-size:0.82rem;color:var(--muted);text-align:center;padding:16px 0">
+          Noch keine Fahrstunden eingetragen.
+        </div>`;
+
+    // ── B197 Block ──
+    const b197HTML = klasse === 'B197' ? `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;
+                  overflow:hidden;margin-bottom:12px">
+        <div style="padding:13px 16px;border-bottom:1px solid var(--border)">
+          <span style="font-family:'Syne',sans-serif;font-size:0.8rem;font-weight:800;
+                       text-transform:uppercase;letter-spacing:0.08em;color:var(--muted)">
+            ⚙️ B197 Schaltstunden
+          </span>
+        </div>
+        <div style="padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:0.85rem">Schaltstunden absolviert</span>
+            <span style="font-weight:700;color:var(--accent)">
+              ${Number(s.schaltstunden)||0} / ${Number(s.zielSchaltstunden)||10}
+            </span>
+          </div>
+          <div style="background:var(--border);border-radius:4px;height:6px">
+            <div style="width:${Math.min(((Number(s.schaltstunden)||0)/(Number(s.zielSchaltstunden)||10))*100,100)}%;
+                        height:100%;background:var(--accent);border-radius:4px"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:0.85rem">15-min. Testfahrt</span>
+            <span style="font-weight:700;color:${s.testfahrtBestanden?'var(--accent2)':'var(--muted)'}">
+              ${s.testfahrtBestanden ? '✅ Bestanden' : '⏳ Ausstehend'}
+            </span>
+          </div>
+        </div>
+      </div>` : '';
+
+    // ── Gesamt-HTML ──
+    document.getElementById('schueler-body').innerHTML = `
+      <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+
+        <!-- Fortschritts-Card -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;text-align:center">
+          <div style="font-family:'Syne',sans-serif;font-size:3.5rem;font-weight:800;
+                      color:${progressColor(pct)};line-height:1">${pct}%</div>
+          <div style="font-size:0.8rem;color:var(--muted);margin:4px 0 14px">Gesamtfortschritt Ausbildung</div>
+          <div style="background:var(--surface2);border-radius:8px;height:12px;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:${progressColor(pct)};
+                        border-radius:8px;transition:width 0.6s"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:16px">
+            <div style="background:var(--surface2);border-radius:10px;padding:10px 6px;text-align:center">
+              <div style="font-family:'Syne',sans-serif;font-size:1.5rem;font-weight:800;
+                          color:var(--accent)">${fahrstd}</div>
+              <div style="font-size:0.65rem;color:var(--muted)">von ${zielStd} Std.</div>
+            </div>
+            <div style="background:var(--surface2);border-radius:10px;padding:10px 6px;text-align:center">
+              <div style="font-family:'Syne',sans-serif;font-size:1.5rem;font-weight:800;
+                          color:${s.theorieBestanden?'var(--accent2)':'var(--muted)'}">
+                ${s.theorieBestanden ? '✓' : '○'}
+              </div>
+              <div style="font-size:0.65rem;color:var(--muted)">Theorie</div>
+            </div>
+            <div style="background:var(--surface2);border-radius:10px;padding:10px 6px;text-align:center">
+              <div style="font-family:'Syne',sans-serif;font-size:1.5rem;font-weight:800;
+                          color:var(--blue)">${klasse}</div>
+              <div style="font-size:0.65rem;color:var(--muted)">Klasse</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- B197 -->
+        ${b197HTML}
+
+        <!-- Pflichtfahrten -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden">
+          <div style="padding:13px 16px;border-bottom:1px solid var(--border)">
+            <span style="font-family:'Syne',sans-serif;font-size:0.8rem;font-weight:800;
+                         text-transform:uppercase;letter-spacing:0.08em;color:var(--muted)">
+              🛣️ Pflichtfahrten
+            </span>
+          </div>
+          <div style="padding:14px 16px;display:flex;flex-direction:column;gap:8px">
+            ${sonderHTML}
+          </div>
+        </div>
+
+        <!-- ADK Lernstand -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden">
+          <div style="padding:13px 16px;border-bottom:1px solid var(--border)">
+            <span style="font-family:'Syne',sans-serif;font-size:0.8rem;font-weight:800;
+                         text-transform:uppercase;letter-spacing:0.08em;color:var(--muted)">
+              📚 ADK Lernstand – Klasse ${klasse}
+            </span>
+          </div>
+          <div style="padding:14px 16px">
+            <!-- Legende -->
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
+              ${STUFEN.map(st=>`
+                <span style="font-size:0.68rem;color:var(--muted);background:var(--surface2);
+                             border:1px solid var(--border);border-radius:6px;padding:3px 8px">
+                  ${st.em} ${st.label}
+                </span>`).join('')}
+            </div>
+            ${adkHTML}
+          </div>
+        </div>
+
+        <!-- Fahrstunden-Protokoll -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden">
+          <div style="padding:13px 16px;border-bottom:1px solid var(--border)">
+            <span style="font-family:'Syne',sans-serif;font-size:0.8rem;font-weight:800;
+                         text-transform:uppercase;letter-spacing:0.08em;color:var(--muted)">
+              📝 Fahrstunden-Protokoll (${(protokoll||[]).length})
+            </span>
+          </div>
+          <div style="padding:14px 16px">${protokollHTML}</div>
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align:center;font-size:0.7rem;color:var(--muted);padding:4px 0 16px;line-height:1.6">
+          Nur-Lesen Ansicht · Daten von deinem Fahrlehrer<br>
+          <strong style="color:var(--accent)">ADK – Digitale Kartei</strong>
+        </div>
+
+      </div>`;
+
+    console.log('[DEBUG] renderSchuelerAnsicht ERFOLG');
+
+  } catch(err) {
+    console.error('[CRITICAL] renderSchuelerAnsicht Fehler:', err);
+    console.error('[CRITICAL] Stack:', err.stack);
+    // Fallback UI zeigen
+    document.getElementById('schueler-body').innerHTML = `
+      <div style="padding:20px;text-align:center">
+        <div style="font-size:2rem;margin-bottom:12px">⚠️</div>
+        <div style="font-size:0.9rem;color:var(--danger);margin-bottom:8px">Fehler beim Anzeigen</div>
+        <div style="font-size:0.75rem;color:var(--muted);margin-bottom:16px">
+          ${err.message || 'Unbekannter Fehler'}
+        </div>
+        <button onclick="location.reload()" style="background:var(--accent);border:none;border-radius:8px;padding:10px 20px;color:#0d1117;font-weight:700;cursor:pointer">
+          Neu laden
+        </button>
+      </div>`;
+  }
+}
   document.getElementById('screen-login').classList.remove('active');
   document.getElementById('screen-schueler').classList.add('active');
-  document.getElementById('schueler-header-name').textContent = `${s.vorname} ${s.nachname}`;
 
+  // ── Sicherer Datenzugriff mit Fallbacks ──
+  const vorname   = s.vorname  || '';
+  const nachname  = s.nachname || '';
+  const klasse    = s.klasse   || 'B';
+  const themen    = s.themen   || {};
+  const sonder    = s.sonderfahrten || {};
+  const fahrstd   = Number(s.fahrstunden) || 0;
+  const zielStd   = Number(s.zielStunden) || 30;
+
+  document.getElementById('schueler-header-name').textContent =
+    `${vorname} ${nachname}`.trim() || 'Schüler';
+
+  // ── ADK Themen wählen ──
+  const ADK = klasse==='A' ? ADK_THEMEN_A
+            : klasse==='BE' ? ADK_THEMEN_BE
+            : ADK_THEMEN;
+
+  // ── Fortschritt berechnen ──
   const pct = Math.min(overallProgress(s), 100);
-  const klasse = s.klasse || 'B';
-  const ADK = klasse==='A' ? ADK_THEMEN_A : klasse==='BE' ? ADK_THEMEN_BE : ADK_THEMEN;
-  const SONDER_DEF = klasse==='A' ? [
-    {key:'ueber',icon:'🌄',label:'Überland',min:5},
-    {key:'autobahn',icon:'🛣️',label:'Autobahn',min:4},
-    {key:'nacht',icon:'🌙',label:'Nacht',min:3}
-  ] : klasse==='BE' ? SONDERFAHRTEN_BE.map(f=>({...f,label:f.name}))
-    : SONDERFAHRTEN;
-  const STUFEN_EM = ['🔴','🟠','🟡','🟢','⭐'];
 
-  // Sonderfahrten
-  const sonderHTML = SONDER_DEF.map(f => {
-    const val = (s.sonderfahrten||{})[f.key]||0;
-    const ok = val >= f.min;
-    return `<div style="background:var(--surface2);border:1px solid ${ok?'var(--accent2)':'var(--border)'};border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between">
-      <span style="font-size:0.85rem">${f.icon} ${f.label}</span>
-      <span style="font-weight:700;color:${ok?'var(--accent2)':'var(--muted)'}">${val}/${f.min} ${ok?'✓':''}</span>
-    </div>`;
-  }).join('');
+  // ── Sonderfahrten Definition ──
+  const SONDER_DEF = klasse === 'A' ? [
+    { key:'ueber',   icon:'🌄', name:'Überlandfahrt', min:5 },
+    { key:'autobahn',icon:'🛣️', name:'Autobahn',      min:4 },
+    { key:'nacht',   icon:'🌙', name:'Nachtfahrt',    min:3 },
+  ] : klasse === 'BE' ? [
+    { key:'ueber',   icon:'🌄', name:'Überlandfahrt', min:3 },
+    { key:'autobahn',icon:'🛣️', name:'Autobahn',      min:1 },
+    { key:'nacht',   icon:'🌙', name:'Nachtfahrt',    min:1 },
+  ] : [
+    { key:'ueber',   icon:'🌄', name:'Überlandfahrt', min:3 },
+    { key:'autobahn',icon:'🛣️', name:'Autobahnfahrt', min:1 },
+    { key:'nacht',   icon:'🌙', name:'Nachtfahrt',    min:1 },
+  ];
 
-  // ADK Themen
-  const adkHTML = ADK.map(g => {
-    const items = g.items.map(t => {
-      const val = (s.themen||{})[t]||0;
-      const em = val > 0 ? STUFEN_EM[val-1] : '⬜';
-      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)">
-        <span style="font-size:0.82rem;color:var(--text)">${t}</span>
-        <span style="font-size:1rem">${em}</span>
-      </div>`;
+  // ── Legende Emoji ──
+  const STUFEN = [
+    { em:'⬜', label:'Noch nicht',  col:'var(--muted)' },
+    { em:'🔴', label:'Angesprochen',col:'#f85149' },
+    { em:'🟠', label:'Gezeigt',     col:'#f0883e' },
+    { em:'🟡', label:'Ausreichend', col:'#f0b429' },
+    { em:'🟢', label:'Beherrscht',  col:'#3fb950' },
+    { em:'⭐', label:'Sehr sicher', col:'#f0b429' },
+  ];
+
+  // ── ADK pro Gruppe mit Fortschrittsbalken ──
+  const adkHTML = ADK.map(gruppe => {
+    const done  = gruppe.items.filter(t => (themen[t]||0) >= 4).length;
+    const total = gruppe.items.length;
+    const gpct  = total > 0 ? Math.round(done/total*100) : 0;
+    const gCol  = gpct===100 ? 'var(--accent2)' : gpct>=50 ? 'var(--accent)' : 'var(--muted)';
+
+    const itemsHTML = gruppe.items.map(t => {
+      const val   = themen[t] || 0;
+      const stufe = STUFEN[Math.min(val, STUFEN.length-1)];
+      return `
+        <div style="display:flex;align-items:center;justify-content:space-between;
+                    padding:8px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:0.82rem;color:var(--text);flex:1;padding-right:8px">${t}</span>
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+            <span style="font-size:0.68rem;color:${stufe.col};white-space:nowrap">${stufe.label}</span>
+            <span style="font-size:1.1rem">${stufe.em}</span>
+          </div>
+        </div>`;
     }).join('');
-    return `<div style="margin-bottom:14px">
-      <div style="font-size:0.78rem;font-weight:700;color:var(--muted);margin-bottom:6px">${g.gruppe}</div>
-      ${items}
-    </div>`;
+
+    return `
+      <div style="background:var(--surface2);border:1px solid var(--border);
+                  border-radius:12px;overflow:hidden;margin-bottom:10px">
+        <!-- Gruppen-Header mit Fortschritt -->
+        <div style="padding:10px 14px;display:flex;align-items:center;justify-content:space-between;
+                    background:var(--surface);border-bottom:1px solid var(--border)">
+          <span style="font-size:0.82rem;font-weight:700;color:var(--text)">${gruppe.gruppe}</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:0.75rem;font-weight:700;color:${gCol}">${done}/${total}</span>
+            <div style="width:48px;height:6px;background:var(--border);border-radius:3px">
+              <div style="width:${gpct}%;height:100%;background:${gCol};border-radius:3px;transition:width 0.4s"></div>
+            </div>
+          </div>
+        </div>
+        <!-- Items -->
+        <div style="padding:0 14px">
+          ${itemsHTML}
+        </div>
+      </div>`;
   }).join('');
 
-  // Protokoll
-  const protokollHTML = protokoll.length ? protokoll.map(e => {
-    const sterne = e.sterne ? '⭐'.repeat(e.sterne) : '';
-    const maengelHTML = (e.maengel||[]).length
-      ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">${(e.maengel||[]).map(m=>`<span style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);color:var(--danger);border-radius:10px;padding:2px 7px;font-size:0.68rem">${m}</span>`).join('')}</div>` : '';
-    return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;margin-bottom:7px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-        <span style="font-weight:700;color:var(--accent);font-family:'Syne',sans-serif">Std. ${e.stunde}</span>
-        <span style="font-size:0.75rem;color:var(--muted)">${formatDate(e.datum)} ${sterne}</span>
-      </div>
-      ${maengelHTML}
-      ${e.notiz ? `<div style="font-size:0.8rem;color:var(--muted);margin-top:5px">📝 ${e.notiz}</div>` : ''}
-      ${e.unterschrift ? `<div style="margin-top:7px"><div style="font-size:0.65rem;color:var(--muted);margin-bottom:3px">✍️ Unterschrift</div><img src="${e.unterschrift}" style="width:100%;max-width:260px;border:1px solid var(--border);border-radius:8px;background:#fff;display:block"></div>` : ''}
-    </div>`;
-  }).join('') : `<div style="font-size:0.82rem;color:var(--muted);text-align:center;padding:12px 0">Noch keine Fahrstunden eingetragen.</div>`;
+  // ── Sonderfahrten ──
+  const sonderHTML = SONDER_DEF.map(f => {
+    const val = Number(sonder[f.key]) || 0;
+    const ok  = val >= f.min;
+    const pct = Math.min(Math.round(val/f.min*100), 100);
+    return `
+      <div style="background:var(--surface2);border:1px solid ${ok?'rgba(63,185,80,0.4)':'var(--border)'};
+                  border-radius:10px;padding:11px 14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <span style="font-size:0.85rem;font-weight:600">${f.icon} ${f.name}</span>
+          <span style="font-size:0.85rem;font-weight:700;color:${ok?'var(--accent2)':'var(--accent)'}">
+            ${val} / ${f.min} ${ok?'✅':''}
+          </span>
+        </div>
+        <div style="background:var(--border);border-radius:4px;height:5px">
+          <div style="width:${pct}%;height:100%;background:${ok?'var(--accent2)':'var(--accent)'};border-radius:4px;transition:width 0.4s"></div>
+        </div>
+      </div>`;
+  }).join('');
 
-  document.getElementById('schueler-body').innerHTML = `
-    <div style="padding:16px">
-      <!-- Fortschritt -->
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:12px;text-align:center">
-        <div style="font-family:'Syne',sans-serif;font-size:3rem;font-weight:800;color:${progressColor(pct)}">${pct}%</div>
-        <div style="font-size:0.8rem;color:var(--muted);margin-bottom:14px">Gesamtfortschritt</div>
-        <div style="background:var(--surface2);border-radius:8px;height:10px;overflow:hidden">
-          <div style="height:100%;width:${pct}%;background:${progressColor(pct)};border-radius:8px;transition:width 0.6s"></div>
+  // ── Protokoll ──
+  const protokollHTML = (protokoll||[]).length
+    ? (protokoll||[]).map(e => {
+        const sterne    = Number(e.sterne)||0;
+        const stunde    = e.stunde != null ? e.stunde : '–';
+        const datum     = e.datum ? formatDate(e.datum) : '';
+        const maengel   = (e.maengel||[]).filter(Boolean);
+        const maengelHTML = maengel.length
+          ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">
+              ${maengel.map(m=>`<span style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);
+                color:var(--danger);border-radius:10px;padding:2px 8px;font-size:0.68rem">${m}</span>`).join('')}
+            </div>` : '';
+        return `
+          <div style="background:var(--surface2);border:1px solid var(--border);
+                      border-radius:10px;padding:12px 14px;margin-bottom:8px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+              <span style="font-weight:700;color:var(--accent);font-family:'Syne',sans-serif">
+                ${stunde !== '–' ? stunde+'. Fahrstunde' : 'Fahrstunde'}
+              </span>
+              <span style="font-size:0.75rem;color:var(--muted)">
+                ${datum} ${'⭐'.repeat(sterne)}
+              </span>
+            </div>
+            ${maengelHTML}
+            ${e.notiz ? `<div style="font-size:0.8rem;color:var(--muted);margin-top:6px">📝 ${e.notiz}</div>` : ''}
+            ${e.unterschrift
+              ? `<div style="margin-top:8px">
+                  <div style="font-size:0.65rem;color:var(--muted);margin-bottom:3px">✍️ Unterschrift</div>
+                  <img src="${e.unterschrift}"
+                    style="width:100%;max-width:260px;border:1px solid var(--border);
+                           border-radius:8px;background:#fff;display:block">
+                </div>` : ''}
+          </div>`;
+      }).join('')
+    : `<div style="font-size:0.82rem;color:var(--muted);text-align:center;padding:16px 0">
+        Noch keine Fahrstunden eingetragen.
+      </div>`;
+
+  // ── B197 Block ──
+  const b197HTML = klasse === 'B197' ? `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;
+                overflow:hidden;margin-bottom:12px">
+      <div style="padding:13px 16px;border-bottom:1px solid var(--border)">
+        <span style="font-family:'Syne',sans-serif;font-size:0.8rem;font-weight:800;
+                     text-transform:uppercase;letter-spacing:0.08em;color:var(--muted)">
+          ⚙️ B197 Schaltstunden
+        </span>
+      </div>
+      <div style="padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:0.85rem">Schaltstunden absolviert</span>
+          <span style="font-weight:700;color:var(--accent)">
+            ${Number(s.schaltstunden)||0} / ${Number(s.zielSchaltstunden)||10}
+          </span>
         </div>
-        <div style="display:flex;justify-content:space-around;margin-top:16px">
-          <div style="text-align:center"><div style="font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;color:var(--accent)">${s.fahrstunden||0}</div><div style="font-size:0.68rem;color:var(--muted)">Fahrstunden</div></div>
-          <div style="text-align:center"><div style="font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;color:${s.theorieBestanden?'var(--accent2)':'var(--muted)'}">${s.theorieBestanden?'✓':'○'}</div><div style="font-size:0.68rem;color:var(--muted)">Theorie</div></div>
-          <div style="text-align:center"><div style="font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;color:var(--blue)">${s.klasse||'B'}</div><div style="font-size:0.68rem;color:var(--muted)">Klasse</div></div>
+        <div style="background:var(--border);border-radius:4px;height:6px">
+          <div style="width:${Math.min(((Number(s.schaltstunden)||0)/(Number(s.zielSchaltstunden)||10))*100,100)}%;
+                      height:100%;background:var(--accent);border-radius:4px"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:0.85rem">15-min. Testfahrt</span>
+          <span style="font-weight:700;color:${s.testfahrtBestanden?'var(--accent2)':'var(--muted)'}">
+            ${s.testfahrtBestanden ? '✅ Bestanden' : '⏳ Ausstehend'}
+          </span>
         </div>
       </div>
+    </div>` : '';
+
+  // ── Gesamt-HTML ──
+  document.getElementById('schueler-body').innerHTML = `
+    <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+
+      <!-- Fortschritts-Card -->
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;text-align:center">
+        <div style="font-family:'Syne',sans-serif;font-size:3.5rem;font-weight:800;
+                    color:${progressColor(pct)};line-height:1">${pct}%</div>
+        <div style="font-size:0.8rem;color:var(--muted);margin:4px 0 14px">Gesamtfortschritt Ausbildung</div>
+        <div style="background:var(--surface2);border-radius:8px;height:12px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${progressColor(pct)};
+                      border-radius:8px;transition:width 0.6s"></div>
+        </div>
+        <!-- Kennzahlen -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:16px">
+          <div style="background:var(--surface2);border-radius:10px;padding:10px 6px;text-align:center">
+            <div style="font-family:'Syne',sans-serif;font-size:1.5rem;font-weight:800;
+                        color:var(--accent)">${fahrstd}</div>
+            <div style="font-size:0.65rem;color:var(--muted)">von ${zielStd} Std.</div>
+          </div>
+          <div style="background:var(--surface2);border-radius:10px;padding:10px 6px;text-align:center">
+            <div style="font-family:'Syne',sans-serif;font-size:1.5rem;font-weight:800;
+                        color:${s.theorieBestanden?'var(--accent2)':'var(--muted)'}">
+              ${s.theorieBestanden ? '✓' : '○'}
+            </div>
+            <div style="font-size:0.65rem;color:var(--muted)">Theorie</div>
+          </div>
+          <div style="background:var(--surface2);border-radius:10px;padding:10px 6px;text-align:center">
+            <div style="font-family:'Syne',sans-serif;font-size:1.5rem;font-weight:800;
+                        color:var(--blue)">${klasse}</div>
+            <div style="font-size:0.65rem;color:var(--muted)">Klasse</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- B197 -->
+      ${b197HTML}
 
       <!-- Pflichtfahrten -->
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:12px">
-        <div style="padding:13px 16px 11px;border-bottom:1px solid var(--border)"><span style="font-family:'Syne',sans-serif;font-size:0.8rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted)">Pflichtfahrten</span></div>
-        <div style="padding:14px 16px;display:flex;flex-direction:column;gap:8px">${sonderHTML}</div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden">
+        <div style="padding:13px 16px;border-bottom:1px solid var(--border)">
+          <span style="font-family:'Syne',sans-serif;font-size:0.8rem;font-weight:800;
+                       text-transform:uppercase;letter-spacing:0.08em;color:var(--muted)">
+            🛣️ Pflichtfahrten
+          </span>
+        </div>
+        <div style="padding:14px 16px;display:flex;flex-direction:column;gap:8px">
+          ${sonderHTML}
+        </div>
       </div>
 
-      <!-- ADK -->
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:12px">
-        <div style="padding:13px 16px 11px;border-bottom:1px solid var(--border)">
-          <span style="font-family:'Syne',sans-serif;font-size:0.8rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted)">ADK Lernstand Klasse ${s.klasse||'B'}</span>
+      <!-- ADK Lernstand -->
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden">
+        <div style="padding:13px 16px;border-bottom:1px solid var(--border)">
+          <span style="font-family:'Syne',sans-serif;font-size:0.8rem;font-weight:800;
+                       text-transform:uppercase;letter-spacing:0.08em;color:var(--muted)">
+            📚 ADK Lernstand – Klasse ${klasse}
+          </span>
         </div>
         <div style="padding:14px 16px">
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;font-size:0.7rem;color:var(--muted);background:var(--surface2);padding:8px 12px;border-radius:8px">
-            <span>🔴 Nicht gezeigt</span><span>🟠 Gezeigt</span><span>🟡 Ausreichend</span><span>🟢 Beherrscht</span><span>⭐ Sehr sicher</span>
+          <!-- Legende -->
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
+            ${STUFEN.map(st=>`
+              <span style="font-size:0.68rem;color:var(--muted);background:var(--surface2);
+                           border:1px solid var(--border);border-radius:6px;padding:3px 8px">
+                ${st.em} ${st.label}
+              </span>`).join('')}
           </div>
           ${adkHTML}
         </div>
       </div>
 
-      <!-- Protokoll -->
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:12px">
-        <div style="padding:13px 16px 11px;border-bottom:1px solid var(--border)"><span style="font-family:'Syne',sans-serif;font-size:0.8rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted)">Fahrstunden-Protokoll</span></div>
+      <!-- Fahrstunden-Protokoll -->
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden">
+        <div style="padding:13px 16px;border-bottom:1px solid var(--border)">
+          <span style="font-family:'Syne',sans-serif;font-size:0.8rem;font-weight:800;
+                       text-transform:uppercase;letter-spacing:0.08em;color:var(--muted)">
+            📝 Fahrstunden-Protokoll (${(protokoll||[]).length})
+          </span>
+        </div>
         <div style="padding:14px 16px">${protokollHTML}</div>
       </div>
 
-      <div style="text-align:center;font-size:0.72rem;color:var(--muted);padding:8px 0">Nur-Lesen Ansicht · Alle Daten von deinem Fahrlehrer</div>
+      <!-- Footer -->
+      <div style="text-align:center;font-size:0.7rem;color:var(--muted);padding:4px 0 16px;line-height:1.6">
+        Nur-Lesen Ansicht · Daten von deinem Fahrlehrer<br>
+        <strong style="color:var(--accent)">ADK – Digitale Kartei</strong>
+      </div>
+
     </div>`;
 }
 
@@ -4298,6 +4907,66 @@ function renderTutStep() {
 function checkFirstTime() {
   if (!localStorage.getItem('tutorialSeen')) {
     setTimeout(() => startTutorial(), 800);
+  }
+}
+
+// ── URL CODE CHECK (wenn Schüler Link aufruft) ──────────────
+async function checkUrlCode() {
+  const params = new URLSearchParams(window.location.search);
+  const code   = params.get('code');
+  if (!code) return;
+
+  // Login-Screen verstecken, Lade-Hinweis zeigen
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('loading').style.display = 'flex';
+
+  try {
+    const q    = query(collection(db,'accessCodes'), where('code','==',code.toUpperCase()));
+    const snap = await getDocs(q);
+
+    document.getElementById('loading').style.display = 'none';
+
+    if (snap.empty) {
+      // Ungültiger Code → zum Schüler-Login
+      document.getElementById('screen-login').classList.add('active');
+      switchTab('schueler');
+      document.getElementById('schueler-code-error').textContent = 'Ungültiger Code.';
+      return;
+    }
+
+    const codeData = snap.docs[0].data();
+    if (codeData.expiresAt < Date.now()) {
+      document.getElementById('screen-login').classList.add('active');
+      switchTab('schueler');
+      document.getElementById('schueler-code-error').textContent = 'Code abgelaufen – bitte neuen Code holen.';
+      return;
+    }
+
+    const schuelerData = codeData.studentSnapshot
+      ? { ...codeData.studentSnapshot, id: codeData.studentId }
+      : null;
+
+    if (!schuelerData) {
+      // Alter Code ohne Snapshot → Schüler-Login zeigen
+      document.getElementById('screen-login').classList.add('active');
+      switchTab('schueler');
+      document.getElementById('inp-schueler-code').value = code.toUpperCase();
+      document.getElementById('schueler-code-error').textContent = '⚠️ Bitte neuen Code beim Fahrlehrer holen.';
+      return;
+    }
+
+    const protokoll = (codeData.protokollSnapshot || [])
+      .sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
+
+    renderSchuelerAnsicht(schuelerData, protokoll);
+
+    // URL bereinigen (Code aus URL entfernen)
+    window.history.replaceState({}, document.title, window.location.pathname);
+
+  } catch(e) {
+    console.error('URL-Code Fehler:', e);
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('screen-login').classList.add('active');
   }
 }
 

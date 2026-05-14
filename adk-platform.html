@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#f0b429">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -121,31 +121,72 @@ html, body { height: 100%; overflow: hidden; font-family: 'Manrope', sans-serif;
 .login-logo { font-family: 'Syne', sans-serif; font-size: 2.2rem; font-weight: 800; color: var(--accent); letter-spacing: -0.02em; }
 .login-logo span { color: var(--text); }
 
-/* ── MOBILE IMPROVEMENTS ── */
-/* Mindest-Touch-Targets 44px (Apple HIG) */
+/* ── MOBILE & TABLET IMPROVEMENTS ── */
+/* Mindest-Touch-Targets 44px */
 .tab-btn, .btn-main, .btn-secondary, .btn-icon, .btn-back,
 .list-item, button { min-height: 44px; }
-/* Verhindert Doppeltipp-Zoom auf iOS */
-button, input, textarea, select, .tab-btn, .list-item { touch-action: manipulation; }
-/* Verhindern dass iOS Inputs zoomen (min 16px) */
+/* Kein Doppeltipp-Zoom */
+button, input, textarea, select, a { touch-action: manipulation; }
+/* iOS Input-Zoom verhindern */
 .form-input, input, textarea, select { font-size: max(16px, 0.9rem) !important; }
-/* Bessere Fokus-Styles */
+/* Fokus */
 .form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(240,180,41,0.15); outline: none; }
-/* Smooth scrolling */
+/* Smooth Scroll */
 .scroll-body, .modal-sheet { scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
-/* Aktive Elemente Feedback */
-.list-item:active, .tab-btn:active { transform: scale(0.98); transition: transform 0.1s; }
-/* Kleine Screens */
-@media (max-width: 390px) {
-  .tab-btn { font-size: 0.72rem; padding: 10px 4px; }
-  .header-title { font-size: 0.95rem; }
-  .section-hd { font-size: 0.68rem; padding: 14px 12px 6px; }
-  .modal-sheet { padding: 20px 16px calc(var(--safe-bottom) + 20px); }
-}
-/* Zahlen besser lesbar im KPI */
+/* Aktiv-Feedback */
+.list-item:active, .tab-btn:active { opacity: 0.75; transition: opacity 0.1s; }
+/* KPI Zahlen */
 .kpi-val { font-size: 1.4rem !important; }
-/* Safari Fix: Prevent pull-to-refresh innerhalb der App */
-html, body { overscroll-behavior-y: contain; }
+/* Overscroll */
+html { overscroll-behavior-y: contain; }
+
+/* ── KLEINE PHONES (< 375px) ── */
+@media (max-width: 374px) {
+  .tab-btn      { font-size: 0.68rem; padding: 10px 3px; }
+  .header-title { font-size: 0.88rem; }
+  .section-hd   { font-size: 0.65rem; padding: 12px 10px 5px; }
+  .modal-sheet  { padding: 18px 14px calc(var(--safe-bottom) + 16px); }
+  .btn-main     { font-size: 0.88rem; }
+}
+
+/* ── STANDARD PHONES (375px – 767px) ── */
+@media (max-width: 767px) {
+  .tab-btn      { font-size: 0.75rem; padding: 10px 6px; }
+  .modal-sheet  { padding: 22px 18px calc(var(--safe-bottom) + 22px); }
+}
+
+/* ── TABLET (768px+) ── */
+@media (min-width: 768px) {
+  .screen { max-width: 768px; margin: 0 auto; }
+  body    { background: var(--bg); }
+  .header { padding: 16px 28px; }
+  .scroll-body { padding-bottom: 32px; }
+  .tab-btn { font-size: 0.88rem; padding: 12px 18px; }
+  .list-item { padding: 16px 24px; }
+  .card { padding: 20px 24px; }
+  .modal-overlay { align-items: center; padding: 24px; }
+  .modal-sheet { max-width: 520px; margin: 0 auto; border-radius: 20px; padding: 32px 28px 36px; }
+  .btn-main { font-size: 1rem; padding: 14px; }
+  .form-input, input, textarea, select { font-size: 1rem !important; }
+  .kpi { padding: 16px; }
+  .kpi-val { font-size: 1.8rem !important; }
+  .section-hd { padding: 20px 24px 10px; font-size: 0.78rem; }
+}
+
+/* ── GROSSES TABLET / Desktop (1024px+) ── */
+@media (min-width: 1024px) {
+  .screen { max-width: 900px; }
+  .header-title { font-size: 1.2rem; }
+  .tab-btn { font-size: 0.92rem; }
+}
+
+/* ── LANDSCAPE PHONE ── */
+@media (max-height: 500px) and (orientation: landscape) {
+  .header { padding: 8px 20px; min-height: 48px; }
+  .header-title { font-size: 0.9rem; }
+  .tab-row { padding: 4px 12px 0; }
+  .tab-btn { padding: 8px 10px; }
+}
 </style>
 </head>
 <body>
