@@ -1702,7 +1702,6 @@ async function migrateOldAccessCodes() {
     });
     
     console.log(`[MIGRATION] Gefunden: ${myCodes.length} Codes von diesem User`);
-    console.log(`[MIGRATION] Gefunden: ${myCodes.length} Codes von diesem User`);
     
     let migratedCount = 0;
     let skippedCount = 0;
@@ -1832,8 +1831,8 @@ onAuthStateChanged(auth, async (user) => {
     listenCustomThemen();
     checkFirstTime();
     
-    // Auto-Migration: Alte Codes ohne Snapshot reparieren (non-blocking)
-    setTimeout(() => migrateOldAccessCodes(), 2000);
+    // Auto-Migration: TEMPORARILY DISABLED FOR TESTING
+    // setTimeout(() => migrateOldAccessCodes(), 2000);
   } else {
     currentUser = null;
     students = [];
