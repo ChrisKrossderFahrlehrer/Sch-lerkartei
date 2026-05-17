@@ -1674,6 +1674,128 @@ function friendlyError(code) {
 // ─────────────────────────────────────────
 // AUTH STATE
 // ─────────────────────────────────────────
+// ─────────────────────────────────────────
+// AUTO-MIGRATION: Alte Codes ohne Snapshot reparieren
+// ─────────────────────────────────────────
+async function migrateOldAccessCodes() {
+  try {
+    const migrationKey = `adk_migration_${currentUser.uid}_v1`;
+    
+    // Nur einmal pro User ausführen
+    if (localStorage.getItem(migrationKey)) {
+      console.log('[MIGRATION] Bereits durchgeführt für User:', currentUser.uid);
+      return;
+    }
+    
+    console.log('[MIGRATION] Prüfe AccessCodes auf fehlende Snapshots...');
+    
+    // Alle Codes laden (keine Where-Clause wegen fehlender Felder in alten Codes)
+    const snapshot = await getDocs(collection(db, 'accessCodes'));
+    
+    // Nur Codes dieses Users filtern
+    const myCodes = snapshot.docs.filter(doc => {
+      const data = doc.data();
+      // Alte Codes: uid Feld, Neue: teacherUid oder fahrschuleId
+      return data.uid === currentUser.uid || 
+             data.teacherUid === currentUser.uid ||
+             data.fahrschuleId === currentUser._fahrschuleId;
+    });
+    
+    console.log(`[MIGRATION] Gefunden: ${myCodes.length} Codes von diesem User`);
+    console.log(`[MIGRATION] Gefunden: ${myCodes.length} Codes von diesem User`);
+    
+    let migratedCount = 0;
+    let skippedCount = 0;
+    let errorCount = 0;
+    
+    for (const codeDoc of myCodes) {
+      const data = codeDoc.data();
+      
+      // Hat bereits Snapshot? Überspringen
+      if (data.studentSnapshot && data.protokollSnapshot) {
+        skippedCount++;
+        continue;
+      }
+      
+      // Kein StudentId? Kann nicht migriert werden
+      if (!data.studentId) {
+        console.warn('[MIGRATION] Code ohne studentId:', codeDoc.id);
+        errorCount++;
+        continue;
+      }
+      
+      try {
+        console.log('[MIGRATION] Repariere Code:', codeDoc.id, 'für Student:', data.studentId);
+        
+        // Schüler-Daten laden
+        const studentDoc = await getDoc(doc(db, 'students', data.studentId));
+        if (!studentDoc.exists()) {
+          console.warn('[MIGRATION] Student nicht gefunden:', data.studentId);
+          errorCount++;
+          continue;
+        }
+        
+        const s = studentDoc.data();
+        
+        // Protokoll laden
+        const pq = query(
+          collection(db, 'protokoll'),
+          where('studentId', '==', data.studentId)
+        );
+        const pSnap = await getDocs(pq);
+        const protokollSnapshot = pSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        
+        // Snapshot hinzufügen
+        await updateDoc(doc(db, 'accessCodes', codeDoc.id), {
+          studentSnapshot: {
+            id: data.studentId,
+            vorname: s.vorname,
+            nachname: s.nachname,
+            geburt: s.geburt || '',
+            klasse: s.klasse || 'B',
+            klassen: s.klassen || [s.klasse || 'B'],
+            fahrstunden: s.fahrstunden || 0,
+            zielStunden: s.zielStunden || 30,
+            sonderfahrten: s.sonderfahrten || {},
+            themen: s.themen || {},
+            schaltstunden: s.schaltstunden || 0,
+            zielSchaltstunden: s.zielSchaltstunden || 10,
+            testfahrtBestanden: s.testfahrtBestanden || false,
+          },
+          protokollSnapshot: protokollSnapshot,
+          migratedAt: Date.now()
+        });
+        
+        console.log('[MIGRATION] ✓ Code repariert:', data.code, '→', s.vorname, s.nachname);
+        migratedCount++;
+        
+      } catch (e) {
+        console.error('[MIGRATION] Fehler bei Code', codeDoc.id, ':', e);
+        errorCount++;
+      }
+    }
+    
+    // Migration als abgeschlossen markieren
+    localStorage.setItem(migrationKey, Date.now().toString());
+    
+    if (migratedCount > 0) {
+      console.log(`[MIGRATION] ✅ Erfolgreich: ${migratedCount} Codes repariert`);
+      toast(`✅ ${migratedCount} alte${migratedCount === 1 ? 'r' : ''} Code${migratedCount === 1 ? '' : 's'} aktualisiert`);
+    }
+    
+    if (skippedCount > 0) {
+      console.log(`[MIGRATION] ⏭ Übersprungen: ${skippedCount} (bereits OK)`);
+    }
+    
+    if (errorCount > 0) {
+      console.warn(`[MIGRATION] ⚠ Fehler: ${errorCount}`);
+    }
+    
+  } catch (e) {
+    console.error('[MIGRATION] Allgemeiner Fehler:', e);
+  }
+}
+
 onAuthStateChanged(auth, async (user) => {
   document.getElementById('loading').style.display = 'none';
 
@@ -1709,6 +1831,9 @@ onAuthStateChanged(auth, async (user) => {
     listenFields();
     listenCustomThemen();
     checkFirstTime();
+    
+    // Auto-Migration: Alte Codes ohne Snapshot reparieren (non-blocking)
+    setTimeout(() => migrateOldAccessCodes(), 2000);
   } else {
     currentUser = null;
     students = [];

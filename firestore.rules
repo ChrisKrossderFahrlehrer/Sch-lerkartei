@@ -11,8 +11,11 @@ service cloud.firestore {
     }
 
     function isSuperAdmin() {
-      return isAuth() &&
-             request.auth.token.email == 'chriskoo@mail.de';
+      return isAuth() && (
+        request.auth.token.email == 'chriskoo@mail.de' ||
+        (userDocExists() && userData().rolle == 'superadmin') ||
+        exists(/databases/$(database)/documents/superadmins/$(request.auth.uid))
+      );
     }
 
     function userDocExists() {
