@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>ADK - Code Generator</title>
+<style>
+body { 
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  padding: 20px; 
+  background: #0d1117; 
+  color: #fff; 
+  max-width: 800px;
+  margin: 0 auto;
+}
+h1 { color: #f0b429; }
+.section { 
+  background: #161b22; 
+  padding: 20px; 
+  border-radius: 8px; 
+  margin: 20px 0; 
+}
+button { 
+  background: #f0b429; 
+  border: none; 
+  padding: 12px 24px; 
+  border-radius: 6px; 
+  font-weight: bold; 
+  cursor: pointer; 
+  font-size: 14px; 
+  margin: 10px 5px 10px 0; 
+}
+button:hover { background: #d4a024; }
+button:disabled { background: #666; cursor: not-allowed; }
+.success { color: #3fb950; }
+.error { color: #f85149; }
+.warning { color: #f0b429; }
+.code-display { 
+  background: #0d1117; 
+  padding: 15px; 
+  border-radius: 6px; 
+  margin: 10px 0;
+  font-size: 20px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  text-align: center;
+  color: #f0b429;
+}
+select, input { 
+  width: 100%; 
+  padding: 10px; 
+  margin: 5px 0; 
+  border-radius: 6px; 
+  border: 1px solid #30363d;
+  background: #0d1117;
+  color: #fff;
+  font-size: 14px;
+}
+label { display: block; margin-top: 15px; font-weight: bold; }
+.student-list { max-height: 400px; overflow-y: auto; }
+.student-item { 
+  padding: 10px; 
+  margin: 5px 0; 
+  background: #0d1117; 
+  border-radius: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.student-item:hover { background: #1c2128; }
+</style>
+</head>
+<body>
+<h1>🔑 ADK - Zugangscode Generator</h1>
+
+<div class="section">
+  <h2>📝 Schritt 1: Login</h2>
+  <p style="color:#888">Logge dich mit deinem Fahrlehrer-Account ein</p>
+  
+  <input type="email" id="email" placeholder="Email" />
+  <input type="password" id="password" placeholder="Passwort" />
+  <button id="btnLogin">Anmelden</button>
+  
+  <div id="loginStatus"></div>
+</div>
+
+<div class="section" id="studentSection" style="display:none">
+  <h2>👥 Schritt 2: Schüler wählen</h2>
+  <div id="studentList" class="student-list"></div>
+</div>
+
+<div class="section" id="codeSection" style="display:none">
+  <h2>✅ Neuer Code generiert!</h2>
+  <div class="code-display" id="codeDisplay"></div>
+  <p style="color:#888;text-align:center">Diesen Code an den Schüler weitergeben</p>
+  <button id="btnCopy">📋 Code kopieren</button>
+  <button id="btnNew">➕ Weiteren Code generieren</button>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, doc, getDoc, getDocs, addDoc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyByy2FXkwxP4JjYX7gTKNIXLbRU0CPEf2o",
+  authDomain: "fahrschule-ebc65.firebaseapp.com",
+  projectId: "fahrschule-ebc65",
+  storageBucket: "fahrschule-ebc65.firebasestorage.app",
+  messagingSenderId: "488993632606",
+  appId: "1:488993632606:web:45c68ca6f5d52aee0a6677"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+let currentUser = null;
+let students = [];
+let lastGeneratedCode = '';
+
+// Login
+document.getElementById('btnLogin').addEventListener('click', async () => {
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const status = document.getElementById('loginStatus');
+  
+  if (!email || !password) {
+    status.innerHTML = '<span class="error">Bitte Email und Passwort eingeben!</span>';
+    return;
+  }
+  
+  try {
+    status.innerHTML = '<span class="warning">⏳ Logge ein...</span>';
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    currentUser = cred.user;
+    
+    status.innerHTML = '<span class="success">✅ Eingeloggt als ' + email + '</span>';
+    
+    // Lade Schüler
+    await loadStudents();
+    
+  } catch(e) {
+    status.innerHTML = '<span class="error">❌ Login fehlgeschlagen: ' + e.message + '</span>';
+  }
+});
+
+async function loadStudents() {
+  try {
+    const q = query(
+      collection(db, 'students'),
+      where('uid', '==', currentUser.uid)
+    );
+    const snap = await getDocs(q);
+    students = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    
+    if (students.length === 0) {
+      document.getElementById('studentList').innerHTML = '<span class="warning">Keine Schüler gefunden!</span>';
+      return;
+    }
+    
+    document.getElementById('studentSection').style.display = 'block';
+    renderStudents();
+    
+  } catch(e) {
+    document.getElementById('studentList').innerHTML = '<span class="error">Fehler beim Laden: ' + e.message + '</span>';
+  }
+}
+
+function renderStudents() {
+  const list = document.getElementById('studentList');
+  list.innerHTML = students.map(s => `
+    <div class="student-item">
+      <span>${s.vorname} ${s.nachname} <span style="color:#888">(Klasse ${s.klasse || 'B'})</span></span>
+      <button onclick="generateCode('${s.id}')">🔑 Code generieren</button>
+    </div>
+  `).join('');
+}
+
+window.generateCode = async (studentId) => {
+  try {
+    document.getElementById('codeSection').style.display = 'none';
+    document.getElementById('loginStatus').innerHTML = '<span class="warning">⏳ Generiere Code...</span>';
+    
+    const student = students.find(s => s.id === studentId);
+    if (!student) {
+      alert('Schüler nicht gefunden!');
+      return;
+    }
+    
+    // Protokoll laden
+    const pq = query(
+      collection(db, 'protokoll'),
+      where('studentId', '==', studentId),
+      orderBy('datum', 'desc')
+    );
+    const pSnap = await getDocs(pq);
+    const protokollSnapshot = pSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    
+    // 6-stelligen Code generieren
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+      code += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    
+    // Gültig 1 Jahr
+    const validUntil = new Date();
+    validUntil.setFullYear(validUntil.getFullYear() + 1);
+    
+    // In Firestore speichern MIT SNAPSHOT
+    await addDoc(collection(db, 'accessCodes'), {
+      code: code,
+      studentId: studentId,
+      uid: currentUser.uid,
+      teacherUid: currentUser.uid,
+      fahrschuleId: currentUser.uid, // Falls Multi-Tenant kommt
+      createdAt: Date.now(),
+      validUntil: validUntil.toISOString(),
+      
+      // WICHTIG: Kompletter Snapshot!
+      studentSnapshot: {
+        id: studentId,
+        vorname: student.vorname,
+        nachname: student.nachname,
+        geburt: student.geburt || '',
+        klasse: student.klasse || 'B',
+        klassen: student.klassen || [student.klasse || 'B'],
+        fahrstunden: student.fahrstunden || 0,
+        zielStunden: student.zielStunden || 30,
+        sonderfahrten: student.sonderfahrten || {},
+        themen: student.themen || {},
+        schaltstunden: student.schaltstunden || 0,
+        zielSchaltstunden: student.zielSchaltstunden || 10,
+        testfahrtBestanden: student.testfahrtBestanden || false,
+      },
+      
+      protokollSnapshot: protokollSnapshot
+    });
+    
+    lastGeneratedCode = code;
+    
+    // Anzeigen
+    document.getElementById('codeDisplay').textContent = code;
+    document.getElementById('codeSection').style.display = 'block';
+    document.getElementById('loginStatus').innerHTML = '<span class="success">✅ Code für ' + student.vorname + ' ' + student.nachname + ' generiert!</span>';
+    
+    console.log('[CODE] Generiert:', code, 'für', student.vorname, student.nachname);
+    console.log('[CODE] Snapshot enthält:', protokollSnapshot.length, 'Protokoll-Einträge');
+    
+  } catch(e) {
+    document.getElementById('loginStatus').innerHTML = '<span class="error">❌ Fehler: ' + e.message + '</span>';
+    console.error(e);
+  }
+};
+
+// Copy button
+document.getElementById('btnCopy').addEventListener('click', () => {
+  navigator.clipboard.writeText(lastGeneratedCode);
+  alert('Code kopiert: ' + lastGeneratedCode);
+});
+
+// New code button
+document.getElementById('btnNew').addEventListener('click', () => {
+  document.getElementById('codeSection').style.display = 'none';
+  document.getElementById('studentSection').style.display = 'block';
+});
+
+</script>
+</body>
+</html>
