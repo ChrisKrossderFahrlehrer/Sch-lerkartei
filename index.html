@@ -3373,7 +3373,11 @@ window.generateCode = async () => {
     for (const d of snap.docs) await deleteDoc(doc(db,'accessCodes',d.id));
 
     // Protokoll laden für Snapshot
-    const pq = query(collection(db,'protokoll'), where('studentId','==',activeId));
+    const pq = query(
+      collection(db,'protokoll'),
+      where('studentId','==',activeId),
+      where('uid','==',currentUser.uid)
+    );
     const pSnap = await getDocs(pq);
     const protokollSnapshot = pSnap.docs.map(d=>({id:d.id,...d.data()}));
 
