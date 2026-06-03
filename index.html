@@ -1988,13 +1988,11 @@ window.setCustomThema = async (themaId, val) => {
 
 async function saveToFirestore(studentId, data) {
   try {
-    // fahrschuleId immer mitschicken – für neue Regeln und Rückwärtskompatibilität
     const fsId = currentUser?._fahrschuleId || currentUser?.uid;
     const payload = { ...data };
-    // Nur setzen falls nicht schon vorhanden im Update
-    if (fsId && !payload.fahrschuleId) {
-      payload.fahrschuleId = fsId;
-    }
+    // uid + fahrschuleId IMMER mitsenden – migriert Legacy-Dokumente ohne uid
+    if (currentUser?.uid) payload.uid = currentUser.uid;
+    if (fsId && !payload.fahrschuleId) payload.fahrschuleId = fsId;
     await updateDoc(doc(db, 'students', studentId), payload);
   } catch(e) {
     console.error('saveToFirestore Fehler:', e.code, e.message);
@@ -2442,6 +2440,26 @@ function renderDetail() {
       <div class="section-body"><div class="sonder-grid">${sonderHTML}</div></div>
     </div>
 
+        <div class="section-block">
+      <div class="section-header">
+        <div class="section-title">🎓 Kommentar zur Prüfungsreife</div>
+        <span style="font-size:0.65rem;color:var(--accent2);background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:4px;padding:1px 5px">✓ Für Schüler sichtbar</span>
+      </div>
+      <div class="section-body">
+        <textarea class="notes-textarea" id="pruef-kommentar-ta"
+          placeholder="z. B. Bereit für die Prüfung! Noch etwas Übung beim Einparken nötig…"
+          style="min-height:90px">${s.pruefKommentar||''}</textarea>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="save-btn" onclick="savePruefKommentar()" style="flex:1">💾 Speichern</button>
+          <button onclick="document.getElementById('pruef-kommentar-ta').value='';savePruefKommentar()"
+            style="background:none;border:1px solid var(--border);color:var(--muted);padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.78rem">Leeren</button>
+        </div>
+        <div style="font-size:0.68rem;color:var(--accent2);margin-top:6px">
+          💡 Dieser Kommentar ist nach Code-Generierung für den Schüler lesbar.
+        </div>
+      </div>
+    </div>
+
     ${isB197 ? `
     <div class="section-block">
       <div class="section-header">
@@ -2496,6 +2514,7 @@ function renderDetail() {
       </div>
       <div class="section-body">${renderAdkGruppenChart(s)}</div>
     </div>
+
     <div class="section-block">
       <div class="section-header">
         <div class="section-title">📝 Notizen & Bemerkungen</div>
@@ -2955,6 +2974,28 @@ window.saveNotes = async () => {
   toast('Notizen gespeichert ✓');
 };
 
+window.savePruefKommentar = async () => {
+  const pruefKommentar = document.getElementById('pruef-kommentar-ta').value.trim();
+
+  // 1. Im Schüler-Dokument speichern
+  await saveToFirestore(activeId, { pruefKommentar });
+
+  // 2. Alle aktiven Codes dieses Schülers sofort aktualisieren
+  try {
+    const q = query(collection(db,'accessCodes'), where('studentId','==',activeId));
+    const snap = await getDocs(q);
+    await Promise.all(snap.docs.map(d =>
+      updateDoc(doc(db,'accessCodes',d.id), {
+        'studentSnapshot.pruefKommentar': pruefKommentar
+      })
+    ));
+    toast('✓ Kommentar gespeichert – sofort für Schüler sichtbar');
+  } catch(e) {
+    console.error('Code-Update Fehler:', e);
+    toast('Kommentar gespeichert ✓');
+  }
+};
+
 // ─────────────────────────────────────────
 // 🏆 GAMIFICATION – Abzeichen & Meilensteine
 // ─────────────────────────────────────────
@@ -3406,6 +3447,9 @@ window.generateCode = async () => {
         schaltstunden:    s.schaltstunden || 0,
         zielSchaltstunden:s.zielSchaltstunden || 10,
         testfahrtBestanden:s.testfahrtBestanden || false,
+        pruefKommentar:   s.pruefKommentar || '',
+        code:             code,
+        expiresAt:        expiresAt,
       },
       protokollSnapshot: protokollSnapshot,
     });
@@ -3428,6 +3472,7 @@ window.generateCode = async () => {
 // Nutze code-generator.html stattdessen!
 // ── SCHÜLER LOGOUT ────────────────────────────────────────────
 window.schuelerLogout = () => {
+  if (unsubSchuelerCode) { unsubSchuelerCode(); unsubSchuelerCode = null; }
   document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
   document.getElementById('screen-login').classList.add('active');
   const inp = document.getElementById('inp-schueler-code');
@@ -3436,6 +3481,9 @@ window.schuelerLogout = () => {
   if (err) err.textContent = '';
   switchTab('schueler');
 };
+
+// Aktiver Schüler-Listener (live updates)
+let unsubSchuelerCode = null;
 
 window.doSchuelerLogin = async () => {
   const code = (document.getElementById('inp-schueler-code').value || '').trim().toUpperCase();
@@ -3452,7 +3500,11 @@ window.doSchuelerLogin = async () => {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('loading').style.display = 'flex';
 
+  // Alten Listener aufräumen
+  if (unsubSchuelerCode) { unsubSchuelerCode(); unsubSchuelerCode = null; }
+
   try {
+    // Erst einmalig Code prüfen
     const q    = query(collection(db,'accessCodes'), where('code','==',code));
     const snap = await getDocs(q);
     document.getElementById('loading').style.display = 'none';
@@ -3464,7 +3516,8 @@ window.doSchuelerLogin = async () => {
       return;
     }
 
-    const codeData = snap.docs[0].data();
+    const codeDoc  = snap.docs[0];
+    const codeData = codeDoc.data();
 
     if (codeData.expiresAt && codeData.expiresAt < Date.now()) {
       document.getElementById('screen-login').classList.add('active');
@@ -3481,9 +3534,14 @@ window.doSchuelerLogin = async () => {
       return;
     }
 
-    const schuelerData = { ...codeData.studentSnapshot, id: codeData.studentId };
-    const protokoll = (codeData.protokollSnapshot || []).sort((a,b) => (b.createdAt||0)-(a.createdAt||0));
-    renderSchuelerAnsicht(schuelerData, protokoll);
+    // Live-Listener auf dieses Code-Dokument
+    unsubSchuelerCode = onSnapshot(doc(db,'accessCodes',codeDoc.id), (docSnap) => {
+      if (!docSnap.exists()) return;
+      const data      = docSnap.data();
+      const schueler  = { ...data.studentSnapshot, id: data.studentId };
+      const protokoll = (data.protokollSnapshot || []).sort((a,b) => (b.createdAt||0)-(a.createdAt||0));
+      renderSchuelerAnsicht(schueler, protokoll);
+    });
 
   } catch(e) {
     console.error('[SCHÜLER] Fehler:', e);
@@ -3495,13 +3553,14 @@ window.doSchuelerLogin = async () => {
 };
 
 function renderSchuelerAnsicht(s, protokoll) {
-  const vorname   = s.vorname   || '';
-  const nachname  = s.nachname  || '';
-  const klasse    = s.klasse    || 'B';
-  const fahrstd   = Number(s.fahrstunden)  || 0;
-  const zielStd   = Number(s.zielStunden)  || 30;
-  const themen    = s.themen    || {};
-  const sonder    = s.sonderfahrten || {};
+  const vorname        = s.vorname        || '';
+  const nachname       = s.nachname       || '';
+  const klasse         = s.klasse         || 'B';
+  const fahrstd        = Number(s.fahrstunden)  || 0;
+  const zielStd        = Number(s.zielStunden)  || 30;
+  const themen         = s.themen         || {};
+  const sonder         = s.sonderfahrten  || {};
+  const pruefKommentar = s.pruefKommentar || '';
 
   document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
   document.getElementById('screen-schueler').classList.add('active');
@@ -3511,8 +3570,19 @@ function renderSchuelerAnsicht(s, protokoll) {
 
   const pct = Math.min(100, Math.round((fahrstd / zielStd) * 100));
 
-  // Sonderfahrten
-  var SONDER = klasse === 'BE' ? SONDERFAHRTEN_BE : SONDERFAHRTEN;
+  // Kommentar-Block (nur wenn vorhanden)
+  var kommentarHTML = pruefKommentar
+    ? '<div style="background:rgba(63,185,80,0.08);border:1.5px solid rgba(63,185,80,0.4);border-radius:12px;padding:16px;margin-bottom:16px">'
+      + '<div style="font-weight:700;color:var(--accent2);margin-bottom:8px;font-size:0.95rem">🎓 Kommentar deines Fahrlehrers</div>'
+      + '<div style="font-size:0.93rem;line-height:1.55;white-space:pre-wrap">' + pruefKommentar.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>'
+      + '</div>'
+    : '';
+
+  // Sonderfahrten — korrekt nach Klasse
+  var SONDER = klasse === 'BE'   ? SONDERFAHRTEN_BE
+             : klasse === 'A'    ? [{key:'ueber',icon:'🌄',name:'Überland',min:5},{key:'autobahn',icon:'🛣️',name:'Autobahn',min:4},{key:'nacht',icon:'🌙',name:'Nacht/Dämmerung',min:3}]
+             : klasse === 'B197' ? [{key:'ueber',icon:'🌄',name:'Überland',min:5},{key:'autobahn',icon:'🛣️',name:'Autobahn',min:4},{key:'nacht',icon:'🌙',name:'Nacht/Dämmerung',min:3}]
+             : SONDERFAHRTEN;
   var sonderHTML = SONDER.map(function(f) {
     var cnt  = Number(sonder[f.key] || 0);
     var done = cnt >= f.min;
@@ -3560,6 +3630,8 @@ function renderSchuelerAnsicht(s, protokoll) {
   var contentEl = document.getElementById('schueler-body');
   if (contentEl) {
     contentEl.innerHTML = '<div style="padding:0 16px 32px;max-width:700px;margin:0 auto">'
+
+      + kommentarHTML
 
       + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
