@@ -2,7 +2,7 @@
 // HTML kommt IMMER frisch vom Server → kein Cache-Löschen mehr nötig!
 // Cache dient nur als Offline-Fallback.
 
-const CACHE_NAME = 'adk-v3';
+const CACHE_NAME = 'adk-v4';
 
 // Nur statische Assets die sich nie ändern → Cache-First erlaubt
 const STATIC_ASSETS = [
