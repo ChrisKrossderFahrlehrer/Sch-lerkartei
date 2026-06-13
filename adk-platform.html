@@ -1131,6 +1131,7 @@ function loadSuperadmin() {
   const q = query(collection(db, 'fahrschulen'), orderBy('createdAt', 'desc'));
   unsubFahrschulen = onSnapshot(q, snap => {
     fahrschulen = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    console.log('✅ Fahrschulen geladen:', fahrschulen.length, fahrschulen);
     // Live-Badge für ausstehende Anfragen
     const pending = fahrschulen.filter(f => f.status === 'ausstehend').length;
     const tabBtn  = document.getElementById('sa-tab-pending');
@@ -1141,6 +1142,26 @@ function loadSuperadmin() {
         : '⏳ Ausstehend';
     }
     renderSuperadmin();
+  }, err => {
+    // Fehler sichtbar machen statt still scheitern
+    console.error('❌ Fahrschulen-Listener Fehler:', err.code, err.message);
+    const body = document.getElementById('sa-body');
+    if (body) {
+      let hinweis = '';
+      if (err.code === 'permission-denied') {
+        hinweis = 'Die Datenbank-Regeln (firestore.rules) sind noch nicht in der Firebase Console veröffentlicht. '
+                + 'Bitte dort unter Firestore → Regeln den aktuellen Stand publishen.';
+      } else if (err.code === 'failed-precondition') {
+        hinweis = 'Firestore benötigt einen Index. Öffne die Browser-Konsole (F12) — dort ist ein Link zum Erstellen des Index.';
+      } else {
+        hinweis = err.message;
+      }
+      body.innerHTML = `<div style="margin:16px;padding:16px;background:rgba(248,81,73,0.08);border:1px solid rgba(248,81,73,0.3);border-radius:12px">
+        <div style="font-weight:800;color:var(--danger);margin-bottom:8px">⚠️ Daten konnten nicht geladen werden</div>
+        <div style="font-size:0.82rem;color:var(--text);line-height:1.6">${hinweis}</div>
+        <div style="font-size:0.7rem;color:var(--muted);margin-top:10px">Fehlercode: ${err.code}</div>
+      </div>`;
+    }
   });
 
   // Passwort-Reset-Anfragen live mithören
