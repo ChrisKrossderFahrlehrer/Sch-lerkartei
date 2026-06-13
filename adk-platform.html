@@ -1449,21 +1449,25 @@ window.uploadLogo = async (input) => {
 
 window.removeLogo = async () => {
   if (!confirm('Logo entfernen?')) return;
-  await updateDoc(doc(db, 'fahrschulen', currentProfil.fahrschuleId), { logoUrl: null });
-  fsaTab('einst');
-  toast('Logo entfernt.');
+  try {
+    await updateDoc(doc(db, 'fahrschulen', currentProfil.fahrschuleId), { logoUrl: null });
+    fsaTab('einst');
+    toast('Logo entfernt.');
+  } catch(e) { console.error('removeLogo:', e); toast('❌ Fehler: ' + e.message); }
 };
 
 // Fahrlehrer Detail
 window.openLehrerDetail = async (uid) => {
-  const userDoc = await getDoc(doc(db, 'users', uid));
-  if (!userDoc.exists()) return;
-  const u = userDoc.data();
-  const q = query(collection(db, 'students'),
-    where('fahrschuleId', '==', currentProfil.fahrschuleId),
-    where('uid', '==', uid));
-  const snap = await getDocs(q);
-  toast(`${u.name} · ${snap.size} Schüler`);
+  try {
+    const userDoc = await getDoc(doc(db, 'users', uid));
+    if (!userDoc.exists()) return;
+    const u = userDoc.data();
+    const q = query(collection(db, 'students'),
+      where('fahrschuleId', '==', currentProfil.fahrschuleId),
+      where('uid', '==', uid));
+    const snap = await getDocs(q);
+    toast(`${u.name} · ${snap.size} Schüler`);
+  } catch(e) { console.error('openLehrerDetail:', e); toast('Fehler: ' + e.message); }
 };
 
 // ── FAHRLEHRER MANUELL EINTRAGEN (für bestehende Auth-User) ──
