@@ -56,7 +56,8 @@ service cloud.firestore {
                      (isAuth() && userFsId() == fsId);
 
       allow create: if isAuth() &&
-                       request.resource.data.adminUid == request.auth.uid;
+                       (request.resource.data.adminUid == request.auth.uid ||
+                        fsId == request.auth.uid);
 
       allow update: if isSuperAdmin() ||
                        (isFsAdmin() && userFsId() == fsId);
@@ -96,7 +97,10 @@ service cloud.firestore {
       allow read:   if isAuth() && docBelongsToUser(resource.data);
       allow create: if isAuth() &&
                        request.resource.data.uid == request.auth.uid;
-      allow update: if isAuth() && docBelongsToUser(resource.data);
+      allow update: if isAuth() && (
+                       docBelongsToUser(resource.data) ||
+                       request.resource.data.uid == request.auth.uid
+                     );
       allow delete: if isAuth() && docBelongsToUser(resource.data);
     }
 
@@ -134,11 +138,43 @@ service cloud.firestore {
     }
 
     // ══════════════════════════════════════════════════════
+    // CUSTOM GRUPPEN (eigene Überschriften im Eigene-Tab)
+    // ══════════════════════════════════════════════════════
+    match /customGruppen/{docId} {
+      allow read:   if isAuth() && docBelongsToUser(resource.data);
+      allow create: if isAuth() &&
+                       request.resource.data.uid == request.auth.uid;
+      allow update: if isAuth() && docBelongsToUser(resource.data);
+      allow delete: if isAuth() && docBelongsToUser(resource.data);
+    }
+
+    // ══════════════════════════════════════════════════════
+    // PASSWORT-RESET ANFRAGEN
+    // create OHNE Auth (User ist ausgesperrt!) — streng validiert
+    // ══════════════════════════════════════════════════════
+    match /passwordResets/{docId} {
+      allow create: if request.resource.data.keys().hasOnly(['username','kontakt','status','createdAt']) &&
+                       request.resource.data.username is string &&
+                       request.resource.data.username.size() >= 3 &&
+                       request.resource.data.username.size() <= 50 &&
+                       request.resource.data.kontakt is string &&
+                       request.resource.data.kontakt.size() >= 5 &&
+                       request.resource.data.kontakt.size() <= 100 &&
+                       request.resource.data.status == 'offen';
+      allow read, update, delete: if isSuperAdmin();
+    }
+
+    // ══════════════════════════════════════════════════════
     // ACCESS CODES (für Schüler-Zugangscodes)
     // ══════════════════════════════════════════════════════
     match /accessCodes/{docId} {
       allow read: if true;
       allow write: if isAuth();
+      // Schüler-Portal: nur messages + plannedLessons updaten (kein Auth nötig)
+      allow update: if isAuth() ||
+                       request.resource.data.diff(resource.data)
+                         .affectedKeys()
+                         .hasOnly(['messages', 'plannedLessons']);
     }
 
     // ══════════════════════════════════════════════════════
