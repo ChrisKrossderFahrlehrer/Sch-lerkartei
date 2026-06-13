@@ -4115,6 +4115,42 @@ function renderDashboard() {
   const klasseB   = aktive.filter(s => ['B','B-Auto','B197'].includes(s.klasse||'B')).length;
   const klasseBE  = aktive.filter(s => s.klasse === 'BE').length;
 
+  // ── BUSINESS-KENNZAHLEN ──
+  // Ø Tage Anmeldung → Abschluss (nur abgeschlossene mit beiden Daten)
+  const mitDauer = archiviert.filter(s => s.createdAt && s.archiviertAm && s.archiviertAm > s.createdAt);
+  const avgTage = mitDauer.length
+    ? Math.round(mitDauer.reduce((a,s) => a + (s.archiviertAm - s.createdAt), 0) / mitDauer.length / 86400000)
+    : 0;
+
+  // Ø Fahrstunden bis Abschluss (Schüler haben bei Abschluss ihren Endstand)
+  const mitStunden = archiviert.filter(s => (s.fahrstunden||0) > 0);
+  const avgStdAbschluss = mitStunden.length
+    ? Math.round(mitStunden.reduce((a,s) => a + (s.fahrstunden||0), 0) / mitStunden.length)
+    : 0;
+
+  // Anmeldungen letzte 6 Monate (für Mini-Balkendiagramm)
+  const jetzt = new Date();
+  const monatsLabels = [];
+  const monatsWerte  = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(jetzt.getFullYear(), jetzt.getMonth() - i, 1);
+    const start = d.getTime();
+    const end   = new Date(jetzt.getFullYear(), jetzt.getMonth() - i + 1, 1).getTime();
+    const count = students.filter(s => s.createdAt && s.createdAt >= start && s.createdAt < end).length;
+    monatsLabels.push(d.toLocaleDateString('de-DE',{month:'short'}));
+    monatsWerte.push(count);
+  }
+  const maxMonat = Math.max(...monatsWerte, 1);
+
+  // Abschlüsse letzte 6 Monate
+  const abschluss6M = students.filter(s =>
+    s.archiviert && s.archiviertAm && s.archiviertAm >= new Date(jetzt.getFullYear(), jetzt.getMonth()-5, 1).getTime()
+  ).length;
+
+  // Erfolgs-/Abschlussquote
+  const gesamtJe = students.length;
+  const quote = gesamtJe ? Math.round((archiviert.length / gesamtJe) * 100) : 0;
+
   const rows = sorted.map(s => {
     const pct = Math.min(overallProgress(s), 100);
     const c = getColor(s);
@@ -4187,6 +4223,31 @@ function renderDashboard() {
           <div style="font-size:0.7rem;color:var(--muted)">Abschlüsse</div>
         </div>
       </div>` : ''}
+
+      <div style="font-family:'Syne',sans-serif;font-size:0.72rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin:4px 0 10px">💼 Geschäftszahlen</div>
+
+      <!-- Anmeldungen letzte 6 Monate -->
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:10px">
+        <div style="font-size:0.74rem;color:var(--muted);font-weight:600;margin-bottom:12px">📅 Neuanmeldungen (6 Monate)</div>
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:6px;height:90px">
+          ${monatsWerte.map((v,i) => {
+            const h = Math.round((v / maxMonat) * 70) + 4;
+            return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+              <div style="font-size:0.72rem;font-weight:700;color:var(--accent)">${v}</div>
+              <div style="width:100%;max-width:32px;height:${h}px;background:linear-gradient(to top,var(--accent),var(--accent2));border-radius:5px 5px 0 0"></div>
+              <div style="font-size:0.62rem;color:var(--muted)">${monatsLabels[i]}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- Kennzahlen-Kacheln -->
+      <div class="dash-kpi-row">
+        <div class="dash-kpi"><div class="dash-kpi-val" style="color:var(--accent2)">${avgTage||'–'}</div><div class="dash-kpi-lbl">Ø Tage b. Abschluss</div></div>
+        <div class="dash-kpi"><div class="dash-kpi-val" style="color:var(--blue)">${avgStdAbschluss||'–'}</div><div class="dash-kpi-lbl">Ø Std. b. Abschluss</div></div>
+        <div class="dash-kpi"><div class="dash-kpi-val" style="color:var(--accent)">${abschluss6M}</div><div class="dash-kpi-lbl">Abschlüsse 6 Mon.</div></div>
+        <div class="dash-kpi"><div class="dash-kpi-val" style="color:var(--accent2)">${quote}%</div><div class="dash-kpi-lbl">Abschlussquote</div></div>
+      </div>
 
       <div style="font-family:'Syne',sans-serif;font-size:0.72rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:10px">Alle Schüler – nach Fortschritt</div>
       ${rows}
