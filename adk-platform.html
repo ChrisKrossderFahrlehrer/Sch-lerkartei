@@ -561,6 +561,20 @@ const db   = getFirestore(app);
 
 enableIndexedDbPersistence(db).catch(() => {});
 
+// ⚡ LOADING-SCREEN SICHERHEITS-TIMEOUT (falls Firebase Auth nicht antwortet,
+// z.B. Safari/iPhone mit blockiertem IndexedDB) — sonst hängt die Seite ewig.
+setTimeout(() => {
+  const l = document.getElementById('loading');
+  if (l && l.style.display !== 'none') {
+    l.style.display = 'none';
+    // Falls noch kein Screen aktiv ist → Login zeigen
+    if (!document.querySelector('.screen.active')) {
+      const login = document.getElementById('screen-login');
+      if (login) login.classList.add('active');
+    }
+  }
+}, 3000);
+
 // ── SUPERADMIN UID (nur dieser User ist Super-Admin) ─────────
 const SUPERADMIN_UID = 'DEINE_SUPERADMIN_UID'; // Optional: nach erstem Login mit deiner UID ersetzen
 
