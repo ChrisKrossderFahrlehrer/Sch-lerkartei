@@ -613,6 +613,39 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
   </div>
 </div>
 
+<!-- ══ PRÜFUNGSVERSUCH MODAL ══ -->
+<div class="modal-overlay" id="versuch-modal" onclick="closeModal(event)">
+  <div class="modal-sheet">
+    <div class="sheet-title">🎯 Prüfung eintragen</div>
+    <div class="form-group">
+      <label class="form-label">Art der Prüfung</label>
+      <div style="display:flex;gap:8px">
+        <button id="vt-praxis" onclick="setVersuchTyp('praxis')">🚗 Praxis</button>
+        <button id="vt-theorie" onclick="setVersuchTyp('theorie')">📋 Theorie</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Ergebnis</label>
+      <div style="display:flex;gap:8px">
+        <button id="ve-durch" onclick="setVersuchErgebnis('durchgefallen')">❌ Nicht bestanden</button>
+        <button id="ve-best" onclick="setVersuchErgebnis('bestanden')">✅ Bestanden</button>
+      </div>
+    </div>
+    <div class="form-group" id="versuch-grund-wrap">
+      <label class="form-label">Woran lag's? (optional)</label>
+      <input class="form-input" id="inp-versuch-grund" type="text" placeholder="z. B. Vorfahrt übersehen, zu unsicher beim Abbiegen">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Datum</label>
+      <input class="form-input" id="inp-versuch-datum" type="date">
+    </div>
+    <div class="sheet-actions">
+      <button class="btn-sheet-cancel" onclick="document.getElementById('versuch-modal').classList.remove('open')">Abbrechen</button>
+      <button class="btn-sheet-ok" onclick="saveVersuch()">Speichern</button>
+    </div>
+  </div>
+</div>
+
 <!-- LOADING -->
 <div class="loading-screen" id="loading">
   <div class="spinner"></div>
@@ -1209,6 +1242,7 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
     <div style="height:1px;background:var(--border);margin:0 0 16px"></div>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openHelp()" style="background:var(--surface2);margin-bottom:8px">❓ Hilfe & Funktionsübersicht</button>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');startTutorial()" style="background:var(--surface2);margin-bottom:8px">🎓 Tutorial nochmal anzeigen</button>
+    <button class="btn-sheet-cancel" onclick="exportAlleDaten()" style="background:var(--surface2);margin-bottom:8px">💾 Alle Daten exportieren (Backup)</button>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openImpressum()" style="background:var(--surface2);margin-bottom:12px">📄 Impressum</button>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open')">Schließen</button>
   </div>
@@ -2622,6 +2656,8 @@ async function saveToFirestore(studentId, data) {
     // uid + fahrschuleId IMMER mitsenden – migriert Legacy-Dokumente ohne uid
     if (currentUser?.uid) payload.uid = currentUser.uid;
     if (fsId && !payload.fahrschuleId) payload.fahrschuleId = fsId;
+    // Letzte Aktivität automatisch stempeln (für Inaktivitäts-Hinweis)
+    payload.lastActivity = Date.now();
     await updateDoc(doc(db, 'students', studentId), payload);
   } catch(e) {
     console.error('saveToFirestore Fehler:', e.code, e.message);
@@ -2787,14 +2823,18 @@ function renderStudentCard(s) {
   const expiry = codeExpiryMap[s.id];
   const expiryBald = expiry && expiry > Date.now() && expiry < Date.now() + 14*24*60*60*1000;
   const expiryAbgelaufen = expiry && expiry <= Date.now();
+  // 💤 Inaktiv? (>21 Tage keine Aktivität, nur aktive Schüler mit Fortschritt)
+  const inaktivTage = s.lastActivity ? Math.floor((Date.now() - s.lastActivity)/86400000) : null;
+  const istInaktiv = !s.archiviert && inaktivTage !== null && inaktivTage >= 21;
   let notifHTML = '';
-  if (unread || expiryBald || expiryAbgelaufen) {
+  if (unread || expiryBald || expiryAbgelaufen || istInaktiv) {
     const parts = [];
     if (unread?.msgs)       parts.push('<span style="background:var(--danger);color:#fff;border-radius:999px;font-size:0.62rem;font-weight:800;padding:2px 7px;white-space:nowrap">💬 '+unread.msgs+'</span>');
     if (unread?.abgesagt)   parts.push('<span style="background:rgba(248,81,73,0.15);color:var(--danger);border:1px solid rgba(248,81,73,0.4);border-radius:999px;font-size:0.62rem;font-weight:800;padding:2px 7px;white-space:nowrap">❌ Absage</span>');
     if (unread?.bestaetigt) parts.push('<span style="background:rgba(63,185,80,0.15);color:var(--accent2);border:1px solid rgba(63,185,80,0.4);border-radius:999px;font-size:0.62rem;font-weight:800;padding:2px 7px;white-space:nowrap">✅ Termin</span>');
     if (expiryAbgelaufen)   parts.push('<span style="background:rgba(248,81,73,0.15);color:var(--danger);border:1px solid rgba(248,81,73,0.4);border-radius:999px;font-size:0.62rem;font-weight:800;padding:2px 7px;white-space:nowrap">⏰ Code abgelaufen</span>');
     else if (expiryBald)    parts.push('<span style="background:rgba(240,180,41,0.15);color:var(--accent);border:1px solid rgba(240,180,41,0.4);border-radius:999px;font-size:0.62rem;font-weight:800;padding:2px 7px;white-space:nowrap">⏰ '+Math.ceil((expiry-Date.now())/86400000)+' Tage</span>');
+    if (istInaktiv)         parts.push('<span style="background:rgba(148,148,148,0.15);color:var(--muted);border:1px solid var(--border);border-radius:999px;font-size:0.62rem;font-weight:800;padding:2px 7px;white-space:nowrap">💤 '+inaktivTage+' Tage inaktiv</span>');
     notifHTML = '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">'+parts.join('')+'</div>';
   }
 
@@ -3321,22 +3361,25 @@ function renderDetail() {
 
     <div class="section-block">
       <div class="section-header">
-        <div class="section-title">📝 Notizen & Bemerkungen</div>
-        <span style="font-size:0.65rem;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:1px 5px">Nur für Fahrlehrer sichtbar</span>
+        <div class="section-title">📝 Notizen & Verlauf</div>
+        <span style="font-size:0.65rem;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:1px 5px">Nur für Fahrlehrer</span>
       </div>
       <div class="section-body">
-        <textarea class="notes-textarea" id="notes-ta" placeholder="Beobachtungen, Förderziele, Schwächen, Besonderheiten, nächste Ziele…">${s.notes||''}</textarea>
-        <div style="display:flex;gap:8px;margin-top:8px">
-          <button class="save-btn" onclick="saveNotes()" style="flex:1">Speichern</button>
-          <button onclick="document.getElementById('notes-ta').value='';saveNotes()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:8px 12px;border-radius:8px;cursor:pointer;font-size:0.78rem">Leeren</button>
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <input id="inp-neue-notiz" type="text" placeholder="Neue Notiz… z. B. Einparken klappt jetzt"
+            style="flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;color:var(--text);padding:10px 12px;font-size:0.88rem;font-family:'Manrope',sans-serif;outline:none;min-width:0"
+            onkeydown="if(event.key==='Enter') addNotiz()"
+            onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+          <button onclick="addNotiz()" style="background:var(--accent);border:none;border-radius:10px;color:#0d1117;padding:10px 14px;font-weight:700;font-size:0.95rem;cursor:pointer;flex-shrink:0">+</button>
         </div>
-        ${s.notes ? `<div style="font-size:0.68rem;color:var(--muted);margin-top:6px">Zuletzt bearbeitet – privat & nicht für Schüler sichtbar</div>` : ''}
+        ${renderNotizHistorie(s)}
       </div>
     </div>
     <div class="section-block">
       <div class="section-header"><div class="section-title">Eigene Felder</div></div>
       <div class="section-body">${renderCustomFields(s)}</div>
     </div>
+    ${renderPruefungsversuche(s)}
     <button class="delete-btn" onclick="deleteStudent()">🗑 Schüler löschen</button>
     ${!s.archiviert ? `<button onclick="pruefungBestanden()" style="width:100%;margin:0 0 32px;padding:16px;background:var(--accent2);border:none;border-radius:var(--radius);color:#fff;font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;cursor:pointer;letter-spacing:0.02em">🎓 Prüfung bestanden!</button>` : ''}`;
 
@@ -3821,12 +3864,158 @@ window.setThema = async (thema, val) => {
   } catch(e) { console.error('setThema:', e); }
 };
 
-window.saveNotes = async () => {
+// ── PRÜFUNGSVERSUCHE (theoretisch + praktisch) ──────────────
+function renderPruefungsversuche(s) {
+  const versuche = Array.isArray(s.pruefungsversuche) ? [...s.pruefungsversuche] : [];
+  versuche.sort((a,b) => (b.ts||0)-(a.ts||0));
+  const bestanden = versuche.filter(v => v.ergebnis === 'bestanden').length;
+  const durchgefallen = versuche.filter(v => v.ergebnis === 'durchgefallen').length;
+
+  const liste = versuche.length ? versuche.map(v => {
+    const d = new Date(v.ts).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'});
+    const ok = v.ergebnis === 'bestanden';
+    const typIcon = v.typ === 'theorie' ? '📋' : '🚗';
+    const typName = v.typ === 'theorie' ? 'Theorie' : 'Praxis';
+    const grund = v.grund ? '<div style="font-size:0.74rem;color:var(--muted);margin-top:2px">' + (v.grund||'').replace(/</g,'&lt;') + '</div>' : '';
+    return '<div style="display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">'
+      + '<span style="font-size:1.1rem;flex-shrink:0">' + (ok?'✅':'❌') + '</span>'
+      + '<div style="flex:1;min-width:0">'
+      + '<div style="font-size:0.85rem;font-weight:600">' + typIcon + ' ' + typName + ' – ' + (ok?'bestanden':'nicht bestanden') + '</div>'
+      + grund
+      + '<div style="font-size:0.66rem;color:var(--muted);margin-top:2px">📅 ' + d + '</div>'
+      + '</div>'
+      + '<button onclick="deletePruefungsversuch(' + v.ts + ')" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:2px;font-size:0.8rem;flex-shrink:0">🗑</button>'
+      + '</div>';
+  }).join('') : '<div style="text-align:center;padding:16px;color:var(--muted);font-size:0.82rem">Noch keine Prüfungen eingetragen</div>';
+
+  const statBadges = versuche.length
+    ? '<div style="display:flex;gap:8px;margin-bottom:10px">'
+      + (durchgefallen ? '<span style="background:rgba(248,81,73,0.12);color:var(--danger);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:3px 10px;font-size:0.72rem;font-weight:700">❌ ' + durchgefallen + '× durchgefallen</span>' : '')
+      + (bestanden ? '<span style="background:rgba(63,185,80,0.12);color:var(--accent2);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:3px 10px;font-size:0.72rem;font-weight:700">✅ ' + bestanden + '× bestanden</span>' : '')
+      + '</div>'
+    : '';
+
+  return '<div class="section-block">'
+    + '<div class="section-header"><div class="section-title">🎯 Prüfungsversuche</div>'
+    + '<button onclick="openVersuchModal()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:5px 10px;border-radius:8px;font-size:0.72rem;cursor:pointer;font-family:\'Manrope\',sans-serif;font-weight:600">+ Eintragen</button></div>'
+    + '<div class="section-body">' + statBadges + liste + '</div>'
+    + '</div>';
+}
+
+window.openVersuchModal = () => {
+  document.getElementById('versuch-modal').classList.add('open');
+  // Reset
+  versuchTyp = 'praxis'; versuchErgebnis = 'durchgefallen';
+  setVersuchTyp('praxis'); setVersuchErgebnis('durchgefallen');
+  document.getElementById('inp-versuch-grund').value = '';
+  document.getElementById('inp-versuch-datum').value = new Date().toISOString().split('T')[0];
+};
+
+let versuchTyp = 'praxis';
+let versuchErgebnis = 'durchgefallen';
+
+window.setVersuchTyp = (t) => {
+  versuchTyp = t;
+  document.getElementById('vt-praxis').style.cssText = baseSeg(t==='praxis');
+  document.getElementById('vt-theorie').style.cssText = baseSeg(t==='theorie');
+};
+window.setVersuchErgebnis = (e) => {
+  versuchErgebnis = e;
+  const dEl = document.getElementById('ve-durch');
+  const bEl = document.getElementById('ve-best');
+  dEl.style.cssText = baseSeg(e==='durchgefallen', 'var(--danger)');
+  bEl.style.cssText = baseSeg(e==='bestanden', 'var(--accent2)');
+  // Grund-Feld nur bei durchgefallen sinnvoll
+  document.getElementById('versuch-grund-wrap').style.display = e==='durchgefallen' ? 'block' : 'none';
+};
+function baseSeg(active, col) {
+  const c = col || 'var(--accent)';
+  return 'flex:1;padding:9px;border-radius:8px;font-size:0.8rem;font-weight:700;cursor:pointer;'
+    + (active ? 'background:'+c+';color:#0d1117;border:1px solid '+c : 'background:none;color:var(--muted);border:1px solid var(--border)');
+}
+
+window.saveVersuch = async () => {
   try {
-    const notes = document.getElementById('notes-ta').value;
-    await saveToFirestore(activeId, { notes });
-    toast('Notizen gespeichert ✓');
-  } catch(e) { console.error('saveNotes:', e); toast('Fehler beim Speichern'); }
+    const s = getStudent(activeId);
+    if (!s) return;
+    const grund = document.getElementById('inp-versuch-grund').value.trim();
+    const datum = document.getElementById('inp-versuch-datum').value;
+    const ts = datum ? new Date(datum).getTime() : Date.now();
+    const versuche = Array.isArray(s.pruefungsversuche) ? [...s.pruefungsversuche] : [];
+    versuche.push({ typ: versuchTyp, ergebnis: versuchErgebnis, grund: versuchErgebnis==='durchgefallen' ? grund : '', ts });
+    await saveToFirestore(activeId, { pruefungsversuche: versuche });
+    document.getElementById('versuch-modal').classList.remove('open');
+    toast(versuchErgebnis==='bestanden' ? '✅ Prüfung eingetragen' : '❌ Versuch festgehalten');
+  } catch(e) { console.error('saveVersuch:', e); toast('Fehler: ' + e.message); }
+};
+
+window.deletePruefungsversuch = async (ts) => {
+  if (!confirm('Diesen Prüfungs-Eintrag löschen?')) return;
+  try {
+    const s = getStudent(activeId);
+    if (!s) return;
+    const versuche = (s.pruefungsversuche||[]).filter(v => v.ts !== ts);
+    await saveToFirestore(activeId, { pruefungsversuche: versuche });
+  } catch(e) { console.error('deletePruefungsversuch:', e); toast('Fehler'); }
+};
+
+// ── NOTIZ-HISTORIE (datierte Einträge) ──────────────────────
+function renderNotizHistorie(s) {
+  // Migration: altes s.notes als ersten Verlaufseintrag übernehmen
+  let historie = Array.isArray(s.notizHistorie) ? [...s.notizHistorie] : [];
+  if (s.notes && historie.length === 0) {
+    historie = [{ text: s.notes, ts: s.notesUpdatedAt || s.createdAt || Date.now(), migriert: true }];
+  }
+  if (!historie.length) {
+    return '<div style="text-align:center;padding:20px;color:var(--muted);font-size:0.82rem">Noch keine Notizen. Halte fest, was auffällt oder besser wird.</div>';
+  }
+  historie.sort((a,b) => (b.ts||0)-(a.ts||0)); // neueste oben
+  return historie.map(n => {
+    const d = new Date(n.ts);
+    const datum = d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'});
+    const zeit  = d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+    const txt = (n.text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return '<div style="display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">'
+      + '<div style="flex-shrink:0;width:6px;border-radius:3px;background:var(--accent);opacity:0.5"></div>'
+      + '<div style="flex:1;min-width:0">'
+      + '<div style="font-size:0.86rem;color:var(--text);line-height:1.4;word-break:break-word">' + txt + '</div>'
+      + '<div style="font-size:0.66rem;color:var(--muted);margin-top:3px">📅 ' + datum + ' · ' + zeit + (n.migriert?' · übernommen':'') + '</div>'
+      + '</div>'
+      + '<button onclick="deleteNotiz(' + n.ts + ')" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:2px;font-size:0.8rem;flex-shrink:0">🗑</button>'
+      + '</div>';
+  }).join('');
+}
+
+window.addNotiz = async () => {
+  const inp = document.getElementById('inp-neue-notiz');
+  const text = (inp?.value || '').trim();
+  if (!text) { inp?.focus(); return; }
+  try {
+    const s = getStudent(activeId);
+    if (!s) return;
+    let historie = Array.isArray(s.notizHistorie) ? [...s.notizHistorie] : [];
+    // Alt-Notiz einmalig migrieren
+    if (s.notes && historie.length === 0) {
+      historie.push({ text: s.notes, ts: s.notesUpdatedAt || s.createdAt || Date.now()-1000, migriert: true });
+    }
+    historie.push({ text, ts: Date.now() });
+    await saveToFirestore(activeId, { notizHistorie: historie, notes: '' });
+    if (inp) inp.value = '';
+    inp?.focus();
+  } catch(e) { console.error('addNotiz:', e); toast('Fehler beim Speichern'); }
+};
+
+window.deleteNotiz = async (ts) => {
+  try {
+    const s = getStudent(activeId);
+    if (!s) return;
+    let historie = Array.isArray(s.notizHistorie) ? [...s.notizHistorie] : [];
+    if (s.notes && historie.length === 0) {
+      historie.push({ text: s.notes, ts: s.notesUpdatedAt || s.createdAt || Date.now()-1000, migriert: true });
+    }
+    historie = historie.filter(n => n.ts !== ts);
+    await saveToFirestore(activeId, { notizHistorie: historie, notes: '' });
+  } catch(e) { console.error('deleteNotiz:', e); toast('Fehler beim Löschen'); }
 };
 
 window.savePruefKommentar = async () => {
@@ -4337,6 +4526,56 @@ function renderDashboard() {
 // ─────────────────────────────────────────
 // EINSTELLUNGEN & PASSWORT ÄNDERN
 // ─────────────────────────────────────────
+// ── DATEN-EXPORT / BACKUP ───────────────────────────────────
+window.exportAlleDaten = () => {
+  try {
+    if (!students.length) { toast('Keine Schüler zum Exportieren'); return; }
+    const datum = new Date().toISOString().split('T')[0];
+
+    // 1. JSON (vollständiges Backup)
+    const backup = {
+      exportiert:    new Date().toISOString(),
+      fahrschule:    currentUser?._fsName || currentUser?.displayName || '',
+      anzahlSchueler: students.length,
+      schueler:      students
+    };
+    const jsonBlob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    downloadBlob(jsonBlob, `ADK-Backup-${datum}.json`);
+
+    // 2. CSV (für Excel/Tabelle) — leicht versetzt, damit beide Downloads durchgehen
+    setTimeout(() => {
+      const headers = ['Vorname','Nachname','Klasse','Geburtsdatum','Fahrstunden','Theorie bestanden','Überland','Autobahn','Nacht','Fortschritt %','Archiviert','Angelegt'];
+      const escape = (v) => {
+        const str = String(v ?? '');
+        return /[",;\n]/.test(str) ? '"' + str.replace(/"/g,'""') + '"' : str;
+      };
+      const zeilen = students.map(s => [
+        s.vorname||'', s.nachname||'', s.klasse||'B', s.geburt||'',
+        s.fahrstunden||0, s.theorieBestanden?'ja':'nein',
+        (s.sonderfahrten||{}).ueber||0, (s.sonderfahrten||{}).autobahn||0, (s.sonderfahrten||{}).nacht||0,
+        Math.min(overallProgress(s),100),
+        s.archiviert?'ja':'nein',
+        s.createdAt ? new Date(s.createdAt).toLocaleDateString('de-DE') : ''
+      ].map(escape).join(';'));
+      const csv = '\uFEFF' + headers.join(';') + '\n' + zeilen.join('\n'); // BOM für Excel-Umlaute
+      const csvBlob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      downloadBlob(csvBlob, `ADK-Schueler-${datum}.csv`);
+    }, 400);
+
+    document.getElementById('settings-modal').classList.remove('open');
+    toast(`💾 ${students.length} Schüler exportiert (JSON + CSV)`);
+  } catch(e) { console.error('exportAlleDaten:', e); toast('Fehler beim Export: ' + e.message); }
+};
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 window.openSettings = () => {
   document.getElementById('inp-pw-alt').value = '';
   document.getElementById('inp-pw-neu').value = '';
