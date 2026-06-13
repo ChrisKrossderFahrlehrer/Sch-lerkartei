@@ -2,6 +2,8 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
+<!-- EmailJS: Benachrichtigung bei neuer Registrierung -->
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#f0b429">
 <meta name="mobile-web-app-capable" content="yes">
@@ -476,6 +478,14 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
 #screen-schueler.active { display:flex; }
 
 ::-webkit-scrollbar { display:none; }
+.qr-chip {
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text); border-radius: 16px; padding: 6px 12px;
+  font-size: 0.74rem; font-family: 'Manrope', sans-serif; font-weight: 600;
+  cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  transition: background .15s, border-color .15s;
+}
+.qr-chip:active { background: var(--accent); color: #0d1117; border-color: var(--accent); }
 </style>
 </head>
 <body>
@@ -483,6 +493,124 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
 <!-- OFFLINE-BANNER -->
 <div id="offline-bar" style="display:none;position:fixed;top:0;left:0;right:0;z-index:8000;background:#f0b429;color:#0d1117;padding:8px 16px;font-size:0.78rem;font-weight:700;align-items:center;justify-content:center;gap:8px;font-family:'Manrope',sans-serif">
   📵 Kein Internet – Änderungen werden gespeichert und später synchronisiert
+</div>
+
+<!-- ══ WERBEBANNER (nur Free-User) ══ -->
+<div id="ad-banner" style="display:none;position:fixed;bottom:60px;left:0;right:0;z-index:7000;
+     background:var(--surface);border-top:1px solid var(--border);padding:0">
+  <!-- Werbefläche: hier Google AdSense oder eigene Werbung einbinden -->
+  <div id="ad-content" style="padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+    <div style="flex:1;background:var(--surface2);border:1px dashed var(--border);border-radius:8px;
+         padding:10px;text-align:center;font-size:0.75rem;color:var(--muted)">
+      <!-- AdSense-Code hier einfügen -->
+      📢 Werbung
+    </div>
+    <button onclick="openUpgradeModal()" style="flex-shrink:0;background:var(--accent);color:#0d1117;
+        border:none;border-radius:8px;padding:8px 12px;font-size:0.72rem;font-weight:700;cursor:pointer;
+        white-space:nowrap">
+      ⭐ Kein Werbe
+    </button>
+  </div>
+</div>
+
+<!-- ══ UPGRADE MODAL ══ -->
+<div class="modal-overlay" id="upgrade-modal" onclick="closeModal(event)">
+  <div class="modal-sheet" style="padding:0;overflow:hidden">
+
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);padding:24px 20px;text-align:center">
+      <div style="font-size:2.2rem;margin-bottom:8px">⭐</div>
+      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.3rem;color:#fff">ADK Pro</div>
+      <div style="font-size:0.82rem;color:rgba(255,255,255,0.6);margin-top:4px">Alle Features, keine Werbung</div>
+    </div>
+
+    <div style="padding:20px">
+      <!-- Features -->
+      <div style="margin-bottom:20px">
+        ${['✅ Keine Werbung','✅ Unbegrenzt Schüler','✅ Chat mit Schülern',
+           '✅ Fahrstunden-Planer','✅ Schüler-Portal','✅ PDF-Export','✅ Alle zukünftigen Features']
+          .map(f=>`<div style="padding:6px 0;font-size:0.88rem;border-bottom:1px solid var(--border)">${f}</div>`)
+          .join('')}
+      </div>
+
+      <!-- Pläne -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+        <!-- Monatlich -->
+        <div id="plan-monat" onclick="selectPlan('monat')"
+          style="border:2px solid var(--border);border-radius:12px;padding:14px;text-align:center;cursor:pointer;transition:border-color .2s">
+          <div style="font-size:0.7rem;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:4px">Monatlich</div>
+          <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.4rem;color:var(--accent)">9,99 €</div>
+          <div style="font-size:0.68rem;color:var(--muted);margin-top:2px">pro Monat</div>
+        </div>
+        <!-- Jährlich (empfohlen) -->
+        <div id="plan-jahr" onclick="selectPlan('jahr')"
+          style="border:2px solid var(--accent);border-radius:12px;padding:14px;text-align:center;cursor:pointer;position:relative">
+          <div style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);
+               background:var(--accent);color:#0d1117;border-radius:999px;padding:2px 10px;
+               font-size:0.62rem;font-weight:800;white-space:nowrap">BELIEBT · 34% RABATT</div>
+          <div style="font-size:0.7rem;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:4px">Jährlich</div>
+          <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.4rem;color:var(--accent)">79 €</div>
+          <div style="font-size:0.68rem;color:var(--muted);margin-top:2px">= 6,58 € / Monat</div>
+        </div>
+      </div>
+
+      <!-- PayPal Button Container -->
+      <div id="paypal-button-container" style="margin-bottom:12px"></div>
+
+      <!-- Hinweis -->
+      <div style="font-size:0.68rem;color:var(--muted);text-align:center;line-height:1.5">
+        Sichere Zahlung über PayPal · Jederzeit kündbar<br>
+        Nach Zahlung wird dein Abo automatisch aktiviert
+      </div>
+    </div>
+
+    <div style="padding:0 20px 16px">
+      <button onclick="document.getElementById('upgrade-modal').classList.remove('open')"
+        style="width:100%;background:none;border:1px solid var(--border);color:var(--muted);
+               padding:10px;border-radius:10px;cursor:pointer;font-size:0.82rem">
+        Weiter mit Free (mit Werbung)
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PASSWORT-RESET ANFRAGE MODAL ══ -->
+<div class="modal-overlay" id="pw-reset-modal" onclick="closeModal(event)">
+  <div class="modal-sheet">
+    <div class="sheet-title">🔑 Passwort vergessen</div>
+    <div id="pw-reset-step1">
+      <div style="font-size:0.82rem;color:var(--muted);line-height:1.6;margin-bottom:16px">
+        Kein Problem! Sende eine Anfrage — der Administrator setzt dein Passwort
+        zurück und meldet sich bei dir.
+      </div>
+      <div class="form-group">
+        <label class="form-label">Dein Benutzername</label>
+        <input class="form-input" id="inp-reset-username" type="text"
+          placeholder="z. B. max.mustermann" autocapitalize="none" autocorrect="off">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Wie können wir dich erreichen?</label>
+        <input class="form-input" id="inp-reset-kontakt" type="text"
+          placeholder="Telefon oder E-Mail">
+        <div style="font-size:0.7rem;color:var(--muted);margin-top:5px">
+          Du bekommst dein neues Passwort über diesen Weg mitgeteilt.
+        </div>
+      </div>
+      <div id="pw-reset-error" style="color:var(--danger);font-size:0.78rem;min-height:18px;margin-bottom:8px"></div>
+      <div class="sheet-actions">
+        <button class="btn-sheet-cancel" onclick="document.getElementById('pw-reset-modal').classList.remove('open')">Abbrechen</button>
+        <button class="btn-sheet-ok" id="btn-pw-reset" onclick="requestPasswordReset()">Anfrage senden</button>
+      </div>
+    </div>
+    <div id="pw-reset-step2" style="display:none;text-align:center;padding:12px 0">
+      <div style="font-size:2.6rem;margin-bottom:10px">✅</div>
+      <div style="font-weight:700;margin-bottom:6px">Anfrage gesendet!</div>
+      <div style="font-size:0.82rem;color:var(--muted);line-height:1.6;margin-bottom:16px">
+        Der Administrator wurde benachrichtigt und meldet sich<br>schnellstmöglich bei dir.
+      </div>
+      <button class="btn-main" onclick="document.getElementById('pw-reset-modal').classList.remove('open')">Alles klar</button>
+    </div>
+  </div>
 </div>
 
 <!-- LOADING -->
@@ -584,6 +712,12 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
         <input class="form-input" id="login-pw" type="password" placeholder="••••••••" autocomplete="current-password">
       </div>
       <button class="btn-main" id="btn-login" onclick="doLogin()">Anmelden</button>
+      <div style="text-align:center;margin-top:10px">
+        <button onclick="openPwReset()" style="background:none;border:none;color:var(--muted);
+          font-size:0.78rem;cursor:pointer;text-decoration:underline;font-family:'Manrope',sans-serif">
+          Passwort vergessen?
+        </button>
+      </div>
     </div>
     <div id="register-form" style="display:none">
       <div class="form-group">
@@ -698,6 +832,10 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
         <div id="user-greeting" style="font-size:0.72rem;color:var(--muted);margin-top:2px"></div>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
+        <button id="btn-upgrade" onclick="openUpgradeModal()" title="Upgrade auf Pro"
+          style="display:none;background:var(--accent);border:none;border-radius:8px;
+                 color:#0d1117;font-size:0.68rem;font-weight:800;padding:5px 9px;cursor:pointer;
+                 white-space:nowrap">⭐ Pro</button>
         <button class="btn-icon-sm" onclick="toggleTheme()" id="theme-btn" title="Design wechseln">☀️</button>
         <button class="btn-icon-sm" onclick="openDashboard()" title="Übersicht" id="btn-dashboard">📊</button>
         <button class="btn-icon-sm" onclick="openSettings()" title="Einstellungen" id="btn-settings-header">⚙️</button>
@@ -927,70 +1065,119 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
 
 <!-- PROTOKOLL MODAL -->
 <div class="modal-overlay" id="protokoll-modal" onclick="closeModal(event)">
-  <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
-    <div class="sheet-title">🗓️ Fahrstunde eintragen</div>
+  <div class="modal-sheet" style="max-height:92vh;overflow-y:auto;padding:0">
 
-    <div class="form-group">
-      <label class="form-label">Datum</label>
-      <input class="form-input" id="inp-proto-datum" type="date">
+    <!-- Header -->
+    <div style="padding:16px 16px 0;display:flex;align-items:center;justify-content:space-between">
+      <div class="sheet-title" style="margin:0">🗓️ Fahrstunde eintragen</div>
+      <button onclick="document.getElementById('protokoll-modal').classList.remove('open')"
+        style="background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;padding:4px">✕</button>
     </div>
 
-    <div class="form-group">
-      <label class="form-label">Bewertung der Stunde</label>
-      <div id="stern-row" style="display:flex;gap:8px;margin-top:6px">
-        <button class="stern-btn" id="stern-1" onclick="setStern(1)" style="font-size:1.6rem;background:none;border:none;cursor:pointer;padding:0">⭐</button>
-        <button class="stern-btn" id="stern-2" onclick="setStern(2)" style="font-size:1.6rem;background:none;border:none;cursor:pointer;padding:0">⭐</button>
-        <button class="stern-btn" id="stern-3" onclick="setStern(3)" style="font-size:1.6rem;background:none;border:none;cursor:pointer;padding:0">⭐</button>
-        <button class="stern-btn" id="stern-4" onclick="setStern(4)" style="font-size:1.6rem;background:none;border:none;cursor:pointer;padding:0">⭐</button>
-        <button class="stern-btn" id="stern-5" onclick="setStern(5)" style="font-size:1.6rem;background:none;border:none;cursor:pointer;padding:0">⭐</button>
+    <!-- Kalender -->
+    <div style="padding:12px 16px 0">
+      <!-- Monat Navigation -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <button onclick="protoKalPrev()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);width:34px;height:34px;border-radius:8px;cursor:pointer;font-size:1rem">‹</button>
+        <div id="proto-kal-titel" style="font-weight:700;font-size:0.95rem"></div>
+        <button onclick="protoKalNext()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);width:34px;height:34px;border-radius:8px;cursor:pointer;font-size:1rem">›</button>
+      </div>
+      <!-- Wochentage -->
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px">
+        <div style="text-align:center;font-size:0.65rem;font-weight:600;color:var(--muted);padding:2px 0">Mo</div><div style="text-align:center;font-size:0.65rem;font-weight:600;color:var(--muted);padding:2px 0">Di</div><div style="text-align:center;font-size:0.65rem;font-weight:600;color:var(--muted);padding:2px 0">Mi</div><div style="text-align:center;font-size:0.65rem;font-weight:600;color:var(--muted);padding:2px 0">Do</div><div style="text-align:center;font-size:0.65rem;font-weight:600;color:var(--muted);padding:2px 0">Fr</div><div style="text-align:center;font-size:0.65rem;font-weight:600;color:var(--muted);padding:2px 0">Sa</div><div style="text-align:center;font-size:0.65rem;font-weight:600;color:var(--muted);padding:2px 0">So</div>
+      </div>
+      <!-- Tage -->
+      <div id="proto-kal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px"></div>
+      <!-- Legende -->
+      <div style="display:flex;gap:12px;margin-top:8px;padding-bottom:8px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:4px;font-size:0.65rem;color:var(--muted)">
+          <div style="width:10px;height:10px;border-radius:50%;background:var(--accent)"></div>Fahrstunde
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;font-size:0.65rem;color:var(--muted)">
+          <div style="width:10px;height:10px;border-radius:50%;background:var(--blue)"></div>Planung
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;font-size:0.65rem;color:var(--muted)">
+          <div style="width:10px;height:10px;border-radius:50%;background:var(--surface2);border:1.5px solid var(--accent)"></div>Heute
+        </div>
       </div>
     </div>
 
-    <div class="form-group">
-      <label class="form-label">Mängel (antippbar)</label>
-      <div id="maengel-grid" style="display:flex;flex-wrap:wrap;gap:7px;margin-top:6px">
-        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🅿️ Einparken">🅿️ Einparken</button>
-        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="↩️ Umkehren">↩️ Umkehren</button>
-        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🔄 Rückwärtsfahren">🔄 Rückwärtsfahren</button>
-        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="⚡ Anfahren/Anhalten">⚡ Anfahren/Anhalten</button>
-        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🔀 Spurwechsel">🔀 Spurwechsel</button>
-        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="↗️ Abbiegen">↗️ Abbiegen</button>
-        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🛑 Vorfahrt">🛑 Vorfahrt</button>
-        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="📏 Abstand halten">📏 Abstand halten</button>
-        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🏎️ Geschwindigkeit">🏎️ Geschwindigkeit</button>
-        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🌙 Nachtfahrt">🌙 Nachtfahrt</button>
-        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🛣️ Autobahn">🛣️ Autobahn</button>
-        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🌄 Überland">🌄 Überland</button>
-        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🔁 Kreisverkehr">🔁 Kreisverkehr</button>
-        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🚦 Ampelverhalten">🚦 Ampelverhalten</button>
-        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="👁️ Schulterblick">👁️ Schulterblick</button>
-        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🅱️ Bremstechnik">🅱️ Bremstechnik</button>
-        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="⚙️ Schalten">⚙️ Schalten</button>
-        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🎯 Lenken &amp; Spurhalten">🎯 Lenken &amp; Spurhalten</button>
-        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🚶 Fußgänger beachten">🚶 Fußgänger beachten</button>
-        <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🔦 Licht &amp; Signale">🔦 Licht &amp; Signale</button>
+    <!-- Gewähltes Datum + Typ-Badge -->
+    <div id="proto-datum-zeile" style="display:none;padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div id="proto-datum-label" style="font-weight:700;font-size:0.95rem"></div>
+        <div id="proto-typ-badge"></div>
       </div>
     </div>
 
-    <div class="form-group">
-      <label class="form-label">Notiz zur Stunde (optional)</label>
-      <textarea class="notes-textarea" id="inp-proto-notiz" placeholder="Was lief gut? Was muss nächste Stunde geübt werden?…" style="height:80px"></textarea>
-    </div>
+    <!-- Formular (erscheint nach Datum-Wahl) -->
+    <div id="proto-form" style="display:none;padding:14px 16px">
 
-    <div class="form-group">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <label class="form-label" style="margin:0">✍️ Unterschrift Schüler (optional)</label>
-        <button onclick="clearSignature()" style="background:none;border:1px solid var(--border);color:var(--muted);font-size:0.72rem;padding:3px 8px;border-radius:6px;cursor:pointer">Löschen</button>
+      <!-- Bewertung (nur bei Fahrstunde) -->
+      <div id="proto-form-bewertung" class="form-group">
+        <label class="form-label">Bewertung der Stunde</label>
+        <div id="stern-row" style="display:flex;gap:8px;margin-top:6px">
+          <button class="stern-btn" id="stern-1" onclick="setStern(1)" style="font-size:1.6rem;background:none;border:none;cursor:pointer;padding:0">⭐</button>
+          <button class="stern-btn" id="stern-2" onclick="setStern(2)" style="font-size:1.6rem;background:none;border:none;cursor:pointer;padding:0">⭐</button>
+          <button class="stern-btn" id="stern-3" onclick="setStern(3)" style="font-size:1.6rem;background:none;border:none;cursor:pointer;padding:0">⭐</button>
+          <button class="stern-btn" id="stern-4" onclick="setStern(4)" style="font-size:1.6rem;background:none;border:none;cursor:pointer;padding:0">⭐</button>
+          <button class="stern-btn" id="stern-5" onclick="setStern(5)" style="font-size:1.6rem;background:none;border:none;cursor:pointer;padding:0">⭐</button>
+        </div>
       </div>
-      <canvas id="sig-canvas" width="400" height="120"
-        style="width:100%;height:120px;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;touch-action:none;display:block;cursor:crosshair"></canvas>
-      <div style="font-size:0.68rem;color:var(--muted);margin-top:4px">Mit Finger oder Stift unterschreiben</div>
-    </div>
 
-    <div class="sheet-actions">
-      <button class="btn-sheet-cancel" onclick="document.getElementById('protokoll-modal').classList.remove('open')">Abbrechen</button>
-      <button class="btn-sheet-ok" onclick="addProtokollEintrag()">Eintragen ✓</button>
-    </div>
+      <!-- Mängel (nur bei Fahrstunde) -->
+      <div id="proto-form-maengel" class="form-group">
+        <label class="form-label">Mängel (antippbar)</label>
+        <div id="maengel-grid" style="display:flex;flex-wrap:wrap;gap:7px;margin-top:6px">
+          <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🅿️ Einparken">🅿️ Einparken</button>
+          <button class="mangel-chip" onclick="toggleMangel(this)" data-m="↩️ Umkehren">↩️ Umkehren</button>
+          <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🔄 Rückwärtsfahren">🔄 Rückwärtsfahren</button>
+          <button class="mangel-chip" onclick="toggleMangel(this)" data-m="⚡ Anfahren/Anhalten">⚡ Anfahren/Anhalten</button>
+          <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🔀 Spurwechsel">🔀 Spurwechsel</button>
+          <button class="mangel-chip" onclick="toggleMangel(this)" data-m="↗️ Abbiegen">↗️ Abbiegen</button>
+          <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🛑 Vorfahrt">🛑 Vorfahrt</button>
+          <button class="mangel-chip" onclick="toggleMangel(this)" data-m="📏 Abstand halten">📏 Abstand halten</button>
+          <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🏎️ Geschwindigkeit">🏎️ Geschwindigkeit</button>
+          <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🌙 Nachtfahrt">🌙 Nachtfahrt</button>
+          <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🛣️ Autobahn">🛣️ Autobahn</button>
+          <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🌄 Überland">🌄 Überland</button>
+          <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🔁 Kreisverkehr">🔁 Kreisverkehr</button>
+          <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🚦 Ampelverhalten">🚦 Ampelverhalten</button>
+          <button class="mangel-chip" onclick="toggleMangel(this)" data-m="👁️ Schulterblick">👁️ Schulterblick</button>
+          <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🅱️ Bremstechnik">🅱️ Bremstechnik</button>
+          <button class="mangel-chip" onclick="toggleMangel(this)" data-m="⚙️ Schalten">⚙️ Schalten</button>
+          <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🎯 Lenken &amp; Spurhalten">🎯 Lenken &amp; Spurhalten</button>
+          <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🚶 Fußgänger beachten">🚶 Fußgänger beachten</button>
+          <button class="mangel-chip" onclick="toggleMangel(this)" data-m="🔦 Licht &amp; Signale">🔦 Licht &amp; Signale</button>
+        </div>
+      </div>
+
+      <!-- Notiz -->
+      <div class="form-group">
+        <label class="form-label" id="proto-notiz-label">Notiz zur Stunde (optional)</label>
+        <textarea class="notes-textarea" id="inp-proto-notiz"
+          placeholder="Was lief gut? Was muss nächste Stunde geübt werden?…"
+          style="height:80px"></textarea>
+      </div>
+
+      <!-- Unterschrift (nur bei Fahrstunde) -->
+      <div id="proto-form-sig" class="form-group">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <label class="form-label" style="margin:0">✍️ Unterschrift Schüler (optional)</label>
+          <button onclick="clearSignature()" style="background:none;border:1px solid var(--border);color:var(--muted);font-size:0.72rem;padding:3px 8px;border-radius:6px;cursor:pointer">Löschen</button>
+        </div>
+        <canvas id="sig-canvas" width="400" height="120"
+          style="width:100%;height:120px;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;touch-action:none;display:block;cursor:crosshair"></canvas>
+        <div style="font-size:0.68rem;color:var(--muted);margin-top:4px">Mit Finger oder Stift unterschreiben</div>
+      </div>
+
+      <!-- Aktionen -->
+      <div class="sheet-actions" style="margin-top:12px">
+        <button class="btn-sheet-cancel" onclick="document.getElementById('protokoll-modal').classList.remove('open')">Abbrechen</button>
+        <button class="btn-sheet-ok" id="proto-ok-btn" onclick="addProtokollEintrag()">Eintragen ✓</button>
+      </div>
+
+    </div><!-- /proto-form -->
   </div>
 </div>
 
@@ -1028,6 +1215,36 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
 </div>
 
 <!-- ══ IMPRESSUM SCREEN ══ -->
+<!-- ══ WARTE-SCREEN (ausstehende Freischaltung) ══ -->
+<div class="screen" id="screen-warte">
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+       height:100%;padding:32px;text-align:center;gap:16px">
+    <div style="font-size:3.5rem">⏳</div>
+    <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.4rem">
+      Freischaltung ausstehend
+    </div>
+    <div style="color:var(--muted);font-size:0.9rem;max-width:320px;line-height:1.6">
+      Deine Registrierung wurde erfolgreich übermittelt.<br>
+      Du wirst freigeschaltet sobald der Administrator deine Anfrage geprüft hat.
+    </div>
+    <div id="warte-name" style="background:var(--surface2);border:1px solid var(--border);
+         border-radius:12px;padding:12px 20px;font-size:0.85rem;color:var(--muted)"></div>
+    <div style="background:rgba(240,180,41,0.1);border:1px solid rgba(240,180,41,0.3);
+         border-radius:12px;padding:14px 18px;max-width:320px">
+      <div style="font-size:0.78rem;color:var(--accent);font-weight:600;margin-bottom:4px">
+        ✉️ Was passiert als nächstes?
+      </div>
+      <div style="font-size:0.75rem;color:var(--muted);line-height:1.6">
+        Du erhältst eine E-Mail sobald dein Konto aktiviert wurde. Danach kannst du dich normal einloggen.
+      </div>
+    </div>
+    <button onclick="doLogout()" style="margin-top:8px;background:none;border:1px solid var(--border);
+      color:var(--muted);padding:10px 20px;border-radius:10px;cursor:pointer;font-size:0.82rem">
+      Abmelden
+    </button>
+  </div>
+</div>
+
 <div class="screen" id="screen-impressum">
   <div class="header">
     <button class="btn-back" onclick="closeImpressum()">←</button>
@@ -1202,12 +1419,78 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
   <div class="modal-sheet">
     <div class="sheet-title">📋 Schüler-Zugangscode</div>
     <div style="text-align:center;margin:10px 0 20px">
-      <div style="font-size:0.8rem;color:var(--muted);margin-bottom:16px">Dieser Code gibt dem Schüler Zugang zu seiner Akte (nur lesen).</div>
+      <div style="font-size:0.8rem;color:var(--muted);margin-bottom:16px">Dieser Code gibt dem Schüler Zugang zum Schüler-Portal.</div>
       <div id="code-display" style="font-family:'Syne',sans-serif;font-size:2.5rem;font-weight:800;letter-spacing:0.15em;color:var(--accent);background:var(--surface2);border:2px solid var(--border);border-radius:16px;padding:20px 24px;margin-bottom:12px">––––––</div>
       <div id="code-valid-until" style="font-size:0.72rem;color:var(--muted)"></div>
     </div>
-    <button class="btn-main" onclick="generateCode()" style="margin-bottom:10px">🔄 Neuen Code generieren</button>
+    <button class="btn-main" onclick="generateCode()" style="margin-bottom:8px">🔄 Neuen Code generieren</button>
+    <button onclick="verlaengereCode()" style="width:100%;margin-bottom:10px;background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.35);color:var(--accent2);padding:10px;border-radius:10px;cursor:pointer;font-size:0.82rem;font-weight:700">⏰ Gültigkeit +1 Jahr (Code bleibt)</button>
+    <!-- Portal Link -->
+    <div id="code-portal-link" style="display:none;background:rgba(74,158,255,0.08);border:1px solid rgba(74,158,255,0.3);border-radius:12px;padding:12px;margin-bottom:10px">
+      <div style="font-size:0.72rem;color:var(--muted);margin-bottom:6px">🔗 Schüler-Portal Link</div>
+      <div id="code-portal-url" style="font-size:0.75rem;color:var(--blue);word-break:break-all;line-height:1.4"></div>
+      <button onclick="copyPortalLink()" style="margin-top:8px;width:100%;background:rgba(74,158,255,0.15);border:1px solid rgba(74,158,255,0.4);color:var(--blue);padding:8px;border-radius:8px;cursor:pointer;font-size:0.78rem;font-weight:600">📋 Link kopieren</button>
+    </div>
+    <!-- Chat & Planer Buttons -->
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button onclick="openTeacherChat()" style="flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px;border-radius:10px;cursor:pointer;font-size:0.82rem;font-weight:600">💬 Chat</button>
+      <button onclick="openPlanLesson()" style="flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px;border-radius:10px;cursor:pointer;font-size:0.82rem;font-weight:600">📅 Fahrstunde planen</button>
+    </div>
     <button class="btn-sheet-cancel" onclick="document.getElementById('code-modal').classList.remove('open')">Schließen</button>
+  </div>
+</div>
+
+<!-- ══ CHAT MODAL (Fahrlehrer) ══ -->
+<div class="modal-overlay" id="teacher-chat-modal" onclick="closeModal(event)">
+  <div class="modal-sheet" style="height:80vh;display:flex;flex-direction:column;padding:0">
+    <div style="padding:16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+      <div class="sheet-title" style="margin:0">💬 Chat mit <span id="teacher-chat-name">Schüler</span></div>
+      <button onclick="closeTeacherChat()" style="background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer">✕</button>
+    </div>
+    <div id="teacher-chat-messages" style="flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:8px"></div>
+    <!-- ⚡ Schnellantworten -->
+    <div style="display:flex;gap:6px;overflow-x:auto;padding:8px 12px 0;background:var(--surface);-webkit-overflow-scrolling:touch;scrollbar-width:none;flex-shrink:0">
+      <button class="qr-chip" onclick="quickReply('Bis gleich! 🚗')">Bis gleich! 🚗</button>
+      <button class="qr-chip" onclick="quickReply('Termin bestätigt ✓')">Termin bestätigt ✓</button>
+      <button class="qr-chip" onclick="quickReply('Bitte Sehtest mitbringen 👓')">Sehtest 👓</button>
+      <button class="qr-chip" onclick="quickReply('Gut gemacht heute! 💪')">Gut gemacht! 💪</button>
+      <button class="qr-chip" onclick="quickReply('Bitte pünktlich sein ⏰')">Pünktlich ⏰</button>
+      <button class="qr-chip" onclick="quickReply('Melde dich kurz bei mir 📞')">Melde dich 📞</button>
+    </div>
+    <div style="padding:10px 12px;background:var(--surface);border-top:none;display:flex;gap:8px;align-items:flex-end;flex-shrink:0">
+      <textarea id="teacher-chat-input" rows="1" placeholder="Nachricht…"
+        style="flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:20px;color:var(--text);font-family:'Manrope',sans-serif;font-size:0.9rem;padding:10px 14px;resize:none;max-height:100px;outline:none"
+        oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendTeacherMessage()}"></textarea>
+      <button onclick="sendTeacherMessage()" style="width:40px;height:40px;background:var(--accent);border:none;border-radius:50%;cursor:pointer;font-size:1.1rem;color:#0d1117;flex-shrink:0">↑</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ FAHRSTUNDE PLANEN MODAL ══ -->
+<div class="modal-overlay" id="plan-lesson-modal" onclick="closeModal(event)">
+  <div class="modal-sheet">
+    <div class="sheet-title">📅 Fahrstunde planen</div>
+    <div class="form-group">
+      <label class="form-label">Datum</label>
+      <input type="date" id="inp-plan-datum" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:10px 12px;font-size:0.9rem;outline:none">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Uhrzeit (optional)</label>
+      <input type="time" id="inp-plan-uhrzeit" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:10px 12px;font-size:0.9rem;outline:none">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Treffpunkt (optional)</label>
+      <input type="text" id="inp-plan-ort" placeholder="z. B. Schule Hauptstraße" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:10px 12px;font-size:0.9rem;outline:none">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notiz (optional)</label>
+      <textarea id="inp-plan-notiz" rows="2" placeholder="z. B. Autobahn üben, Prüfungsfahrt…" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:10px 12px;font-size:0.9rem;outline:none;resize:none;font-family:'Manrope',sans-serif"></textarea>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn-sheet-cancel" onclick="document.getElementById('plan-lesson-modal').classList.remove('open')">Abbrechen</button>
+      <button class="btn-sheet-ok" onclick="savePlannedLesson()">📅 Planen</button>
+    </div>
   </div>
 </div>
 
@@ -1216,7 +1499,7 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
   <div class="header">
     <button class="btn-back" onclick="closeProtokoll()">←</button>
     <div><div class="header-title" id="protokoll-header-name">Protokoll</div><div class="header-sub">Was wann geübt wurde</div></div>
-    <button class="btn-icon-sm" onclick="openNewEintragModal()" title="Neuen Eintrag erstellen" style="background:var(--accent);border-color:var(--accent);color:#0d1117;font-size:1.1rem;font-weight:700">+</button>
+    <button class="btn-icon-sm" onclick="openNeuerEintrag()" title="Neuen Eintrag erstellen" style="background:var(--accent);border-color:var(--accent);color:#0d1117;font-size:1.1rem;font-weight:700">+</button>
   </div>
   <div class="detail-scroll" id="protokoll-screen-body"></div>
 </div>
@@ -1278,7 +1561,7 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, enableIndexedDbPersistence, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, getDocs, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, enableIndexedDbPersistence, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, getDocs, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD490kLzTOq3h3VdQ9ZqWZd_aXcDRfxBOs",
@@ -1575,6 +1858,8 @@ let unsubThemen = null;
 let unsubProtokoll = null;
 let customFields = [];
 let customThemen = [];
+let customGruppen = [];
+let unsubGruppen = null;
 let protokollEintraege = []; // { id, datum, notiz, fortschritt }
 let themaScope = 'all';
 
@@ -1642,8 +1927,33 @@ window.doRegister = async () => {
     const email = usernameToEmail(username);
     const cred = await createUserWithEmailAndPassword(auth, email, pw);
     await updateProfile(cred.user, { displayName: name });
-    // Speichere Benutzername für Schüler-Übertragung
-    await addDoc(collection(db, 'users'), { uid: cred.user.uid, username: username.toLowerCase().trim(), email, name, createdAt: Date.now() });
+
+    // 1. Fahrschule mit Status "ausstehend" anlegen (Freischaltungs-Workflow)
+    await setDoc(doc(db, 'fahrschulen', cred.user.uid), {
+      name:      name,
+      inhaber:   name,
+      stadt:     '',
+      email:     email,
+      username:  username.toLowerCase().trim(),
+      adminUid:  cred.user.uid,
+      status:    'ausstehend',
+      abo:       'free',
+      createdAt: Date.now()
+    });
+
+    // 2. User-Profil mit Fahrschul-Verknüpfung (Doc-ID = uid für Rules!)
+    await setDoc(doc(db, 'users', cred.user.uid), {
+      uid:          cred.user.uid,
+      username:     username.toLowerCase().trim(),
+      email, name,
+      fahrschuleId: cred.user.uid,
+      rolle:        'fahrlehrer',
+      createdAt:    Date.now()
+    });
+
+    // 3. E-Mail-Benachrichtigung an Admin (non-blocking)
+    sendRegistrationNotification({ name, email, username });
+
   } catch(e) {
     btn.disabled = false; btn.textContent = 'Konto erstellen';
     if (e.code === 'auth/email-already-in-use') {
@@ -1654,13 +1964,262 @@ window.doRegister = async () => {
   }
 };
 
+// ── E-MAIL BENACHRICHTIGUNG (EmailJS) ────────────────────────
+// ⚠️ Gleiche Keys wie in adk-platform.html eintragen (emailjs.com):
+const EMAILJS_PUBLIC_KEY  = 'DEIN_PUBLIC_KEY';
+const EMAILJS_SERVICE_ID  = 'DEIN_SERVICE_ID';
+const EMAILJS_TEMPLATE_ID = 'DEIN_TEMPLATE_ID';
+
+function sendRegistrationNotification({ name, email, username }) {
+  if (EMAILJS_PUBLIC_KEY.includes('DEIN_')) {
+    console.warn('EmailJS nicht konfiguriert — Benachrichtigung übersprungen');
+    return;
+  }
+  try {
+    emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
+    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+      to_email: 'chriskoo@mail.de',
+      fs_name:  name,
+      inhaber:  name,
+      email:    email,
+      stadt:    '– (über Hauptseite registriert: ' + username + ')',
+      datum:    new Date().toLocaleString('de-DE'),
+      link:     'https://fahrschuelerkartei.de/adk-platform.html'
+    }).then(() => console.log('✅ Registrierungs-Info an chriskoo@mail.de gesendet'))
+      .catch(err => console.error('EmailJS:', err));
+  } catch(e) { console.error('EmailJS Init:', e); }
+}
+
+// ── PASSWORT-RESET ANFRAGE ──────────────────────────────────
+window.openPwReset = () => {
+  document.getElementById('pw-reset-step1').style.display = 'block';
+  document.getElementById('pw-reset-step2').style.display = 'none';
+  document.getElementById('inp-reset-username').value = document.getElementById('login-username')?.value || '';
+  document.getElementById('inp-reset-kontakt').value = '';
+  document.getElementById('pw-reset-error').textContent = '';
+  document.getElementById('pw-reset-modal').classList.add('open');
+};
+
+window.requestPasswordReset = async () => {
+  const username = document.getElementById('inp-reset-username').value.trim().toLowerCase();
+  const kontakt  = document.getElementById('inp-reset-kontakt').value.trim();
+  const errEl    = document.getElementById('pw-reset-error');
+  const btn      = document.getElementById('btn-pw-reset');
+  errEl.textContent = '';
+  if (!username) { errEl.textContent = 'Bitte Benutzernamen eingeben.'; return; }
+  if (!kontakt || kontakt.length < 5) { errEl.textContent = 'Bitte Telefon oder E-Mail angeben.'; return; }
+
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    // 1. Anfrage in Firestore (SuperAdmin sieht sie im Dashboard)
+    await addDoc(collection(db, 'passwordResets'), {
+      username,
+      kontakt,
+      status:    'offen',
+      createdAt: Date.now()
+    });
+
+    // 2. E-Mail an Admin (non-blocking, nutzt EmailJS-Config oben)
+    if (!EMAILJS_PUBLIC_KEY.includes('DEIN_')) {
+      try {
+        emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
+        emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+          to_email: 'chriskoo@mail.de',
+          fs_name:  '🔑 PASSWORT-RESET ANFRAGE',
+          inhaber:  username,
+          email:    kontakt,
+          stadt:    'Firebase Console → Authentication → ' + username + '@fahrschule-kartei.app → Passwort zurücksetzen',
+          datum:    new Date().toLocaleString('de-DE'),
+          link:     'https://console.firebase.google.com/project/fahrschule-ebc65/authentication/users'
+        }).catch(err => console.error('EmailJS:', err));
+      } catch(e) { console.error('EmailJS:', e); }
+    }
+
+    document.getElementById('pw-reset-step1').style.display = 'none';
+    document.getElementById('pw-reset-step2').style.display = 'block';
+  } catch(e) {
+    console.error('requestPasswordReset:', e);
+    errEl.textContent = 'Fehler beim Senden: ' + (e.message || e.code);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Anfrage senden';
+  }
+};
+
 window.doLogout = async () => {
   if (unsubSnapshot) { unsubSnapshot(); unsubSnapshot = null; }
-  if (unsubFields) { unsubFields(); unsubFields = null; }
-  if (unsubThemen) { unsubThemen(); unsubThemen = null; }
-  if (unsubProtokoll) { unsubProtokoll(); unsubProtokoll = null; }
-  await signOut(auth);
+  if (unsubFields)   { unsubFields();   unsubFields   = null; }
+  if (unsubThemen)   { unsubThemen();   unsubThemen   = null; }
+  if (unsubGruppen)  { unsubGruppen();  unsubGruppen  = null; }
+  if (unsubBadges)   { unsubBadges();   unsubBadges   = null; }
+  teacherUnreadMap = {};
+  codeExpiryMap = {};
+  if (unsubProtokoll){ unsubProtokoll();unsubProtokoll= null; }
+  aboStatus = 'free';
+  hideBanner();
+  try { await signOut(auth); } catch(e) { console.error('doLogout:', e); }
 };
+// ABO-SYSTEM
+// ─────────────────────────────────────────
+// ⚙️ FEATURE-FLAG: Bezahlfunktion aktivieren/deaktivieren
+// Auf true setzen sobald PayPal-Pläne eingerichtet sind!
+const ABO_ENABLED = false;
+
+let aboStatus      = 'free';  // 'free' | 'pro_monat' | 'pro_jahr'
+let aboExpiry      = null;
+let selectedPlanId = 'jahr';  // default Jahres-Plan
+let paypalRendered = false;
+
+// ─ Abo laden & Banner steuern ───────────
+async function loadAboStatus(uid) {
+  // Bezahlfunktion deaktiviert: kein Banner, kein Pro-Button, App voll nutzbar
+  if (!ABO_ENABLED) {
+    hideBanner();
+    const upBtn = document.getElementById('btn-upgrade');
+    if (upBtn) upBtn.style.display = 'none';
+    return;
+  }
+  try {
+    // Abo steht in der Fahrschule (aus adk-platform gesetzt)
+    const userDoc = await getDoc(doc(db,'users',uid));
+    if (!userDoc.exists()) { showBanner(); return; }
+    const data   = userDoc.data();
+    const fsId   = data.fahrschuleId || uid;
+    const fsDoc  = await getDoc(doc(db,'fahrschulen',fsId));
+    if (fsDoc.exists()) {
+      const fs  = fsDoc.data();
+      aboStatus = fs.abo || 'free';
+      aboExpiry = fs.aboExpiry || null;
+      // Abgelaufen? → Free
+      if (aboExpiry && aboExpiry < Date.now()) {
+        aboStatus = 'free';
+        await updateDoc(doc(db,'fahrschulen',fsId), { abo:'free', aboExpiry:null });
+      }
+    }
+  } catch(e) { console.error('Abo-Check:', e); }
+  aboStatus === 'free' ? showBanner() : hideBanner();
+  updateAboUI();
+}
+
+function showBanner() {
+  document.getElementById('ad-banner').style.display = 'block';
+}
+function hideBanner() {
+  document.getElementById('ad-banner').style.display = 'none';
+}
+function updateAboUI() {
+  if (!ABO_ENABLED) {
+    const b = document.getElementById('btn-upgrade');
+    if (b) b.style.display = 'none';
+    return;
+  }
+  const upgradeBtn = document.getElementById('btn-upgrade');
+  if (upgradeBtn) upgradeBtn.style.display = aboStatus === 'free' ? 'block' : 'none';
+  const existingBadge = document.getElementById('abo-badge');
+  if (existingBadge) existingBadge.remove();
+  if (aboStatus !== 'free') {
+    const header = document.querySelector('.header-title');
+    if (header && !document.getElementById('abo-badge')) {
+      const badge = document.createElement('span');
+      badge.id = 'abo-badge';
+      badge.style.cssText = 'background:var(--accent);color:#0d1117;border-radius:6px;padding:1px 7px;font-size:0.6rem;font-weight:800;margin-left:6px;vertical-align:middle';
+      badge.textContent = '⭐ PRO';
+      header.appendChild(badge);
+    }
+  }
+}
+
+// ─ Upgrade Modal ────────────────────────
+window.openUpgradeModal = () => {
+  if (!ABO_ENABLED) { toast('💳 Abo-Funktion kommt bald'); return; }
+  document.getElementById('upgrade-modal').classList.add('open');
+  selectPlan('jahr');
+  if (!paypalRendered) initPayPal();
+};
+
+window.selectPlan = (plan) => {
+  selectedPlanId = plan;
+  ['monat','jahr'].forEach(p => {
+    const el = document.getElementById('plan-' + p);
+    if (el) el.style.borderColor = p === plan ? 'var(--accent)' : 'var(--border)';
+  });
+  // PayPal Buttons neu rendern wenn nötig
+  if (paypalRendered) {
+    document.getElementById('paypal-button-container').innerHTML = '';
+    paypalRendered = false;
+    initPayPal();
+  }
+};
+
+function initPayPal() {
+  if (typeof paypal === 'undefined') {
+    // PayPal SDK dynamisch laden
+    const script = document.createElement('script');
+    // ⚠️ DEINE PayPal Client-ID hier eintragen:
+    script.src = 'https://www.paypal.com/sdk/js?client-id=DEINE_PAYPAL_CLIENT_ID&vault=true&intent=subscription&currency=EUR';
+    script.onload  = () => renderPayPalButtons();
+    script.onerror = () => {
+      document.getElementById('paypal-button-container').innerHTML =
+        '<div style="text-align:center;padding:16px;color:var(--muted);font-size:0.82rem">PayPal konnte nicht geladen werden.<br>Bitte Internetverbindung prüfen.</div>';
+    };
+    document.head.appendChild(script);
+  } else {
+    renderPayPalButtons();
+  }
+}
+
+function renderPayPalButtons() {
+  // ⚠️ DEINE PayPal Subscription-Plan-IDs hier eintragen:
+  const planIds = {
+    monat: 'P-XXXXXXXXXXXXXXXXXXXXXX_MONAT',   // ← PayPal Plan-ID (monatlich)
+    jahr:  'P-XXXXXXXXXXXXXXXXXXXXXX_JAHR'     // ← PayPal Plan-ID (jährlich)
+  };
+  const planId = planIds[selectedPlanId];
+  if (!planId || planId.includes('XXXX')) {
+    document.getElementById('paypal-button-container').innerHTML =
+      `<div style="background:rgba(240,180,41,0.1);border:1px solid rgba(240,180,41,0.3);
+       border-radius:10px;padding:14px;text-align:center;font-size:0.78rem;color:var(--accent)">
+       ⚠️ PayPal noch nicht eingerichtet.<br>
+       <span style="color:var(--muted)">Plan-IDs in index.html eintragen.</span></div>`;
+    return;
+  }
+  paypal.Buttons({
+    style: { shape:'rect', color:'gold', layout:'vertical', label:'subscribe' },
+    createSubscription: (data, actions) => {
+      return actions.subscription.create({ plan_id: planId });
+    },
+    onApprove: async (data) => {
+      await activateAbo(data.subscriptionID, selectedPlanId);
+    },
+    onError: (err) => {
+      toast('❌ PayPal-Fehler: ' + err);
+    }
+  }).render('#paypal-button-container');
+  paypalRendered = true;
+}
+
+async function activateAbo(subscriptionId, plan) {
+  try {
+    if (!currentUser) return;
+    const expiry = plan === 'pro_monat'
+      ? Date.now() + 30*24*60*60*1000
+      : Date.now() + 365*24*60*60*1000;
+    const userDoc = await getDoc(doc(db,'users',currentUser.uid));
+    const fsId    = userDoc.exists() ? (userDoc.data().fahrschuleId || currentUser.uid) : currentUser.uid;
+    await updateDoc(doc(db,'fahrschulen',fsId), {
+      abo:            'pro_' + plan,
+      aboExpiry:      expiry,
+      aboPaypalId:    subscriptionId,
+      aboActivatedAt: Date.now()
+    });
+    aboStatus = 'pro_' + plan;
+    hideBanner();
+    updateAboUI();
+    document.getElementById('upgrade-modal').classList.remove('open');
+    toast(`🎉 ADK Pro aktiviert! ${plan === 'pro_monat' ? 'Monatlich' : 'Jährlich'}`);
+  } catch(e) {
+    toast('Fehler bei Aktivierung: ' + e.message);
+  }
+}
 
 function setAuthError(msg) { document.getElementById('auth-error').textContent = msg; }
 
@@ -1802,19 +2361,13 @@ async function migrateOldAccessCodes() {
 }
 
 onAuthStateChanged(auth, async (user) => {
-  // Loading bereits beim Script-Start versteckt!
-  
-  // Prüfen ob URL einen Schüler-Code enthält
   const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get('code') && !user) {
-    checkUrlCode();
-    return;
-  }
+  if (urlParams.get('code') && !user) { checkUrlCode(); return; }
 
   if (user) {
     currentUser = user;
 
-    // Profil aus Firestore laden (fahrschuleId etc.)
+    // Profil + Fahrschul-Status laden
     try {
       const profDoc = await getDoc(doc(db, 'users', user.uid));
       if (profDoc.exists()) {
@@ -1822,10 +2375,36 @@ onAuthStateChanged(auth, async (user) => {
         currentUser._fahrschuleId = profil.fahrschuleId || null;
         currentUser._rolle        = profil.rolle || 'fahrlehrer';
         currentUser._fsName       = profil.fahrschuleName || '';
+
+        // ── STATUS-CHECK: Ist die Fahrschule freigeschaltet? ──
+        const fsId = profil.fahrschuleId;
+        if (fsId) {
+          const fsDoc = await getDoc(doc(db, 'fahrschulen', fsId));
+          if (fsDoc.exists()) {
+            const fsStatus = fsDoc.data().status;
+            if (fsStatus === 'ausstehend') {
+              // Warte-Screen anzeigen
+              document.querySelectorAll('.screen').forEach(s => { s.classList.remove('active'); s.style.display=''; });
+              document.getElementById('screen-warte').classList.add('active');
+              document.getElementById('warte-name').textContent =
+                '👤 ' + (profil.fahrschuleName || profil.name || user.email);
+              return;
+            }
+            if (fsStatus === 'gesperrt') {
+              document.querySelectorAll('.screen').forEach(s => { s.classList.remove('active'); s.style.display=''; });
+              document.getElementById('screen-login').classList.add('active');
+              document.getElementById('auth-error').textContent =
+                '🚫 Dein Konto wurde gesperrt. Bitte Kontakt aufnehmen.';
+              await signOut(auth);
+              return;
+            }
+          }
+        }
       }
-    } catch(e) { /* offline – weiter mit uid-only */ }
+    } catch(e) { /* offline – weiter */ }
 
     document.getElementById('screen-login').classList.remove('active');
+    document.getElementById('screen-warte').classList.remove('active');
     document.getElementById('screen-list').classList.add('active');
     document.getElementById('screen-detail').classList.remove('active');
     const userBtn = document.getElementById('user-btn');
@@ -1835,9 +2414,10 @@ onAuthStateChanged(auth, async (user) => {
     listenStudents();
     listenFields();
     listenCustomThemen();
+    listenCustomGruppen();
+    listenTeacherBadges();
     checkFirstTime();
-    
-    // Auto-Migration: Alte Codes ohne Snapshot reparieren (non-blocking)
+    loadAboStatus(user.uid);
     setTimeout(() => migrateOldAccessCodes(), 2000);
   } else {
     currentUser = null;
@@ -1916,15 +2496,20 @@ window.addCustomField = async () => {
 
 window.deleteCustomField = async (fieldId) => {
   if (!confirm('Dieses Feld bei allen Schülern löschen?')) return;
-  await deleteDoc(doc(db, 'customFields', fieldId));
-  toast('Feld gelöscht.');
+  try {
+    await deleteDoc(doc(db, 'customFields', fieldId));
+    toast('Feld gelöscht.');
+  } catch(e) { console.error('deleteCustomField:', e); toast('❌ Fehler: ' + e.message); }
 };
 
 window.toggleCustomField = async (fieldId) => {
-  const s = getStudent(activeId);
-  const cf = { ...(s.customFields || {}) };
-  cf[fieldId] = !cf[fieldId];
-  await saveToFirestore(activeId, { customFields: cf });
+  try {
+    const s = getStudent(activeId);
+    if (!s) return;
+    const cf = { ...(s.customFields || {}) };
+    cf[fieldId] = !cf[fieldId];
+    await saveToFirestore(activeId, { customFields: cf });
+  } catch(e) { console.error('toggleCustomField:', e); }
 };
 
 // ── CUSTOM THEMEN ──
@@ -1936,6 +2521,45 @@ function listenCustomThemen() {
     customThemen.sort((a,b) => (a.createdAt||0)-(b.createdAt||0));
     if (activeId) renderDetail();
   });
+}
+
+function listenCustomGruppen() {
+  if (unsubGruppen) unsubGruppen();
+  const q = query(collection(db, 'customGruppen'), where('uid', '==', currentUser.uid));
+  unsubGruppen = onSnapshot(q, (snap) => {
+    customGruppen = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    customGruppen.sort((a,b) => (a.createdAt||0)-(b.createdAt||0));
+    if (activeId) renderDetail();
+  });
+}
+
+// ── BADGE-SYSTEM: Ungelesene Nachrichten + Termin-Reaktionen ──
+let unsubBadges      = null;
+let teacherUnreadMap = {}; // studentId → { msgs, abgesagt, bestaetigt }
+let codeExpiryMap    = {}; // studentId → expiresAt (für ⏰-Warnung)
+
+function listenTeacherBadges() {
+  if (unsubBadges) unsubBadges();
+  const q = query(collection(db, 'accessCodes'), where('uid', '==', currentUser.uid));
+  unsubBadges = onSnapshot(q, snap => {
+    teacherUnreadMap = {};
+    codeExpiryMap    = {};
+    snap.docs.forEach(d => {
+      const data     = d.data();
+      const lastRead = data.teacherLastRead || 0;
+      if (data.expiresAt) codeExpiryMap[data.studentId] = data.expiresAt;
+      const msgs = (data.messages || [])
+        .filter(m => m.sender === 'schueler' && (m.timestamp||0) > lastRead).length;
+      const abgesagt = (data.plannedLessons || [])
+        .filter(l => l.status === 'abgesagt' && (l.respondedAt||0) > lastRead).length;
+      const bestaetigt = (data.plannedLessons || [])
+        .filter(l => l.status === 'bestaetigt' && (l.respondedAt||0) > lastRead).length;
+      if (msgs || abgesagt || bestaetigt) {
+        teacherUnreadMap[data.studentId] = { msgs, abgesagt, bestaetigt };
+      }
+    });
+    try { renderList(); } catch(e) { /* Liste evtl. noch nicht sichtbar */ }
+  }, err => console.error('Badge-Listener:', err));
 }
 
 window.setThemaScope = (scope) => {
@@ -1975,15 +2599,20 @@ window.deleteCustomThema = async (themaId) => {
   const t = customThemen.find(x => x.id === themaId);
   const msg = t?.scope === 'all' ? 'Dieses Thema bei allen Schülern löschen?' : 'Dieses Thema löschen?';
   if (!confirm(msg)) return;
-  await deleteDoc(doc(db, 'customThemen', themaId));
-  toast('Thema gelöscht.');
+  try {
+    await deleteDoc(doc(db, 'customThemen', themaId));
+    toast('Thema gelöscht.');
+  } catch(e) { console.error('deleteCustomThema:', e); toast('❌ Fehler: ' + e.message); }
 };
 
 window.setCustomThema = async (themaId, val) => {
-  const s = getStudent(activeId);
-  const ct = { ...(s.customThemen || {}) };
-  ct[themaId] = ct[themaId] === val ? 0 : val;
-  await saveToFirestore(activeId, { customThemen: ct });
+  try {
+    const s = getStudent(activeId);
+    if (!s) return;
+    const ct = { ...(s.customThemen || {}) };
+    ct[themaId] = ct[themaId] === val ? 0 : val;
+    await saveToFirestore(activeId, { customThemen: ct });
+  } catch(e) { console.error('setCustomThema:', e); }
 };
 
 async function saveToFirestore(studentId, data) {
@@ -2151,9 +2780,27 @@ function renderStudentCard(s) {
   const klasseLabel = klasseLabels[s.klasse] || '🚗 Klasse B';
   const meta=[klasseLabel, a?a+' Jahre':null, (s.fahrstunden||0)+' Std.', s.theorieBestanden?'📋 Theorie ✓':null].filter(Boolean).join(' · ');
   const badge = pct>=90?'<span class="badge badge-green">Prüfungsreif</span>':pct>=60?'<span class="badge badge-amber">Guter Fortschritt</span>':pct>0?'<span class="badge badge-blue">In Ausbildung</span>':'<span class="badge badge-gray">Neu</span>';
-  return `<div class="student-card" onclick="openDetail('${s.id}')">
+
+  // 🔔 Ungelesene Nachrichten + Termin-Reaktionen
+  const unread = teacherUnreadMap[s.id];
+  // ⏰ Code läuft in <14 Tagen ab?
+  const expiry = codeExpiryMap[s.id];
+  const expiryBald = expiry && expiry > Date.now() && expiry < Date.now() + 14*24*60*60*1000;
+  const expiryAbgelaufen = expiry && expiry <= Date.now();
+  let notifHTML = '';
+  if (unread || expiryBald || expiryAbgelaufen) {
+    const parts = [];
+    if (unread?.msgs)       parts.push('<span style="background:var(--danger);color:#fff;border-radius:999px;font-size:0.62rem;font-weight:800;padding:2px 7px;white-space:nowrap">💬 '+unread.msgs+'</span>');
+    if (unread?.abgesagt)   parts.push('<span style="background:rgba(248,81,73,0.15);color:var(--danger);border:1px solid rgba(248,81,73,0.4);border-radius:999px;font-size:0.62rem;font-weight:800;padding:2px 7px;white-space:nowrap">❌ Absage</span>');
+    if (unread?.bestaetigt) parts.push('<span style="background:rgba(63,185,80,0.15);color:var(--accent2);border:1px solid rgba(63,185,80,0.4);border-radius:999px;font-size:0.62rem;font-weight:800;padding:2px 7px;white-space:nowrap">✅ Termin</span>');
+    if (expiryAbgelaufen)   parts.push('<span style="background:rgba(248,81,73,0.15);color:var(--danger);border:1px solid rgba(248,81,73,0.4);border-radius:999px;font-size:0.62rem;font-weight:800;padding:2px 7px;white-space:nowrap">⏰ Code abgelaufen</span>');
+    else if (expiryBald)    parts.push('<span style="background:rgba(240,180,41,0.15);color:var(--accent);border:1px solid rgba(240,180,41,0.4);border-radius:999px;font-size:0.62rem;font-weight:800;padding:2px 7px;white-space:nowrap">⏰ '+Math.ceil((expiry-Date.now())/86400000)+' Tage</span>');
+    notifHTML = '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">'+parts.join('')+'</div>';
+  }
+
+  return `<div class="student-card" onclick="openDetail('${s.id}')" style="${(unread||expiryAbgelaufen)?'border-color:rgba(248,81,73,0.4)':''}">
     <div class="avatar" style="background:${c}">${initials(s)}</div>
-    <div style="flex:1;min-width:0"><div class="sc-name">${s.vorname} ${s.nachname}</div><div class="sc-meta">${meta}</div></div>
+    <div style="flex:1;min-width:0"><div class="sc-name">${s.vorname} ${s.nachname}</div><div class="sc-meta">${meta}</div>${notifHTML}</div>
     <div class="sc-right">
       <div class="progress-ring-wrap">
         <svg class="ring-svg" width="40" height="40" viewBox="0 0 40 40">
@@ -2197,8 +2844,10 @@ window.scrollToLetter = (letter) => {
 // DETAIL
 // ─────────────────────────────────────────
 window.openDetail = (id) => {
+  if (activeId !== id) { aktiverLernTab = 'adk'; letzteGruppeId = ''; eigenScope = 'all'; }
   activeId = id;
   const s = getStudent(id);
+  if (!s) return;
   document.getElementById('screen-list').classList.remove('active');
   document.getElementById('screen-detail').classList.add('active');
   document.getElementById('detail-header-name').textContent = s.vorname+' '+s.nachname;
@@ -2495,16 +3144,91 @@ function renderDetail() {
         </div>
       </div>
     </div>` : ''}
-    <div class="section-block">
-      <div class="section-header">
-        <div class="section-title">ADK – Lernstand Klasse ${klasse}</div>
-        <button onclick="openCustomThemaModal()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:5px 10px;border-radius:7px;font-size:0.72rem;cursor:pointer;font-family:'Manrope',sans-serif;">+ Thema</button>
+    <div class="section-block" style="padding:0;overflow:hidden">
+      <!-- Tab-Header -->
+      <div style="display:flex;border-bottom:1px solid var(--border)">
+        <button id="tab-btn-adk" onclick="switchLernTab('adk')"
+          style="flex:1;padding:12px 8px;background:${aktiverLernTab==='adk'?'var(--surface2)':'none'};border:none;
+                 border-bottom:2px solid ${aktiverLernTab==='adk'?'var(--accent)':'transparent'};color:${aktiverLernTab==='adk'?'var(--text)':'var(--muted)'};
+                 font-family:'Manrope',sans-serif;font-weight:${aktiverLernTab==='adk'?'700':'600'};font-size:0.82rem;cursor:pointer">
+          📚 ADK
+        </button>
+        <button id="tab-btn-eigen" onclick="switchLernTab('eigen')"
+          style="flex:1;padding:12px 8px;background:${aktiverLernTab==='eigen'?'var(--surface2)':'none'};border:none;
+                 border-bottom:2px solid ${aktiverLernTab==='eigen'?'var(--accent)':'transparent'};color:${aktiverLernTab==='eigen'?'var(--text)':'var(--muted)'};
+                 font-family:'Manrope',sans-serif;font-weight:${aktiverLernTab==='eigen'?'700':'600'};font-size:0.82rem;cursor:pointer">
+          ✏️ Eigene
+          <span id="eigen-count" style="background:var(--surface2);border-radius:999px;
+            font-size:0.62rem;padding:1px 6px;margin-left:4px;color:var(--muted)">
+            ${myCustomThemen.length}
+          </span>
+        </button>
       </div>
-      <div class="section-body">
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;font-size:0.7rem;color:var(--muted);background:var(--surface2);padding:8px 12px;border-radius:8px">
-          <span>🔴 Nicht gezeigt</span><span>🟠 Gezeigt</span><span>🟡 Ausreichend</span><span>🟢 Beherrscht</span><span>⭐ Sehr sicher</span>
+
+      <!-- TAB 1: ADK -->
+      <div id="tab-adk" style="padding:14px;display:${aktiverLernTab==='adk'?'block':'none'}">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;font-size:0.7rem;
+             color:var(--muted);background:var(--surface2);padding:8px 12px;border-radius:8px">
+          <span>🔴 Nicht gezeigt</span><span>🟠 Gezeigt</span><span>🟡 Ausreichend</span>
+          <span>🟢 Beherrscht</span><span>⭐ Sehr sicher</span>
         </div>
-        <div class="themen-list">${themenHTML}${customThemenHTML}</div>
+        <div class="themen-list">${themenHTML}</div>
+      </div>
+
+      <!-- TAB 2: EIGENE KATEGORIEN -->
+      <div id="tab-eigen" style="display:${aktiverLernTab==='eigen'?'block':'none'};padding:14px">
+
+        <!-- Hinzufügen: Übung + Gruppen-Auswahl -->
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <input id="inp-eigen-name" type="text" placeholder="z. B. Parken, Kreisverkehr B12…"
+            style="flex:1;background:var(--surface2);border:1.5px solid var(--border);
+                   border-radius:10px;color:var(--text);padding:10px 12px;font-size:0.9rem;
+                   font-family:'Manrope',sans-serif;outline:none;min-width:0"
+            onkeydown="if(event.key==='Enter') addEigenThema()"
+            onfocus="this.style.borderColor='var(--accent)'"
+            onblur="this.style.borderColor='var(--border)'">
+          <button onclick="addEigenThema()"
+            style="background:var(--accent);border:none;border-radius:10px;color:#0d1117;
+                   padding:10px 14px;font-weight:700;font-size:0.95rem;cursor:pointer;
+                   white-space:nowrap;flex-shrink:0">+</button>
+        </div>
+
+        <!-- Gruppe wählen + Neue Gruppe -->
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <select id="sel-eigen-gruppe" onchange="letzteGruppeId=this.value"
+            style="flex:1;background:var(--surface2);border:1px solid var(--border);
+                   border-radius:10px;color:var(--text);padding:9px 10px;font-size:0.8rem;
+                   font-family:'Manrope',sans-serif;outline:none;cursor:pointer;min-width:0">
+            <option value="">📂 Ohne Gruppe</option>
+            ${customGruppen.filter(g => g.scope === 'all' || g.scope === activeId)
+              .map(g => `<option value="${g.id}"${g.id===letzteGruppeId?' selected':''}>📁 ${escapeHtmlEigen(g.name)}</option>`).join('')}
+          </select>
+          <button onclick="addEigenGruppe()"
+            style="background:none;border:1px solid var(--border);border-radius:10px;
+                   color:var(--muted);padding:9px 12px;font-size:0.75rem;font-weight:600;
+                   cursor:pointer;white-space:nowrap;flex-shrink:0">+ Gruppe</button>
+        </div>
+
+        <!-- Gültig für: alle Schüler / nur dieser -->
+        <div style="display:flex;gap:6px;margin-bottom:16px">
+          <button id="eigen-scope-all" onclick="setEigenScope('all')"
+            style="flex:1;padding:7px;border-radius:8px;font-size:0.75rem;font-weight:600;cursor:pointer;
+                   background:${eigenScope==='all'?'var(--accent)':'none'};
+                   color:${eigenScope==='all'?'#0d1117':'var(--muted)'};
+                   border:1px solid ${eigenScope==='all'?'var(--accent)':'var(--border)'}">
+            👥 Für alle Schüler
+          </button>
+          <button id="eigen-scope-single" onclick="setEigenScope('single')"
+            style="flex:1;padding:7px;border-radius:8px;font-size:0.75rem;font-weight:600;cursor:pointer;
+                   background:${eigenScope==='single'?'var(--blue)':'none'};
+                   color:${eigenScope==='single'?'#fff':'var(--muted)'};
+                   border:1px solid ${eigenScope==='single'?'var(--blue)':'var(--border)'}">
+            👤 Nur dieser Schüler
+          </button>
+        </div>
+
+        <!-- Gruppierte Liste -->
+        ${renderEigenTab(s, myCustomThemen)}
       </div>
     </div>
     <div class="section-block">
@@ -2829,7 +3553,7 @@ function renderProtokollListe() {
         <button onclick="deleteProtokollEintrag('${e.id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.8rem;padding:2px">🗑</button>
       </div>
       ${maengelHTML}
-      ${e.notiz ? `<div style="font-size:0.82rem;color:var(--text);line-height:1.4;margin-top:4px">📝 ${e.notiz}</div>` : ''}
+      ${e.notiz ? `<div style="font-size:0.82rem;color:var(--text);line-height:1.4;margin-top:4px">📝 ${(e.notiz||"").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>` : ''}
       ${e.fortschritt != null ? `<div style="font-size:0.68rem;color:var(--muted)">Fortschritt: ${e.fortschritt}%</div>` : ''}
     </div>`;
   }).join('');
@@ -2854,28 +3578,38 @@ function renderCustomFields(s) {
 
 window.pruefungBestanden = async () => {
   const s = getStudent(activeId);
+  if (!s) return;
   if (!confirm(`${s.vorname} ${s.nachname} als „Prüfung bestanden" archivieren?\n\nSie werden aus der aktiven Liste entfernt und sind im 🎓 Archiv-Filter noch sichtbar.`)) return;
-  await saveToFirestore(activeId, { archiviert: true, archiviertAm: Date.now() });
-  toast(`🎓 ${s.vorname} ${s.nachname} – Herzlichen Glückwunsch!`);
-  goBack();
+  try {
+    await saveToFirestore(activeId, { archiviert: true, archiviertAm: Date.now() });
+    toast(`🎓 ${s.vorname} ${s.nachname} – Herzlichen Glückwunsch!`);
+    goBack();
+  } catch(e) { console.error('pruefungBestanden:', e); toast('Fehler: ' + e.message); }
 };
 
 window.unarchiveStudent = async () => {
-  await saveToFirestore(activeId, { archiviert: false, archiviertAm: null });
-  toast('Schüler wieder aktiviert.');
+  try {
+    await saveToFirestore(activeId, { archiviert: false, archiviertAm: null });
+    toast('Schüler wieder aktiviert.');
+  } catch(e) { console.error('unarchiveStudent:', e); toast('Fehler: ' + e.message); }
 };
 
 window.changeStunden = async (delta) => {
-  const s = getStudent(activeId);
-  const neu = Math.max(0, (s.fahrstunden||0) + delta);
-  await saveToFirestore(activeId, { fahrstunden: neu });
+  try {
+    const s = getStudent(activeId);
+    if (!s) return;
+    const neu = Math.max(0, (s.fahrstunden||0) + delta);
+    await saveToFirestore(activeId, { fahrstunden: neu });
+  } catch(e) { console.error('changeStunden:', e); toast('Fehler beim Speichern'); }
 };
 
 window.setStundenDirekt = async (val) => {
-  const neu = Math.max(0, Math.min(999, parseInt(val)||0));
-  await saveToFirestore(activeId, { fahrstunden: neu });
-  const inp = document.getElementById('stunden-input');
-  if (inp) inp.value = neu;
+  try {
+    const neu = Math.max(0, Math.min(999, parseInt(val)||0));
+    await saveToFirestore(activeId, { fahrstunden: neu });
+    const inp = document.getElementById('stunden-input');
+    if (inp) inp.value = neu;
+  } catch(e) { console.error('setStundenDirekt:', e); toast('Fehler beim Speichern'); }
 };
 
 window.setStern = (n) => {
@@ -2897,34 +3631,62 @@ window.toggleMangel = (btn) => {
 };
 
 window.addProtokollEintrag = async () => {
-  const datum = document.getElementById('inp-proto-datum').value;
+  const datum = protoGewaehltesDatum;
+  if (!datum) { toast('Bitte zuerst ein Datum im Kalender wählen.'); return; }
+
+  const heute = new Date();
+  const heuteStr = `${heute.getFullYear()}-${String(heute.getMonth()+1).padStart(2,'0')}-${String(heute.getDate()).padStart(2,'0')}`;
+  const isPlanung = datum > heuteStr;
+
   const notiz = document.getElementById('inp-proto-notiz').value.trim();
-  if (!datum) { toast('Bitte ein Datum wählen.'); return; }
   const s = getStudent(activeId);
   const fortschritt = Math.min(overallProgress(s), 100);
   const anzahlBisher = protokollEintraege.length + 1;
-  // Unterschrift als Base64 (nur wenn nicht leer)
-  const unterschrift = (!isSignatureEmpty() && sigCanvas)
+  const unterschrift = (!isPlanung && !isSignatureEmpty() && sigCanvas)
     ? sigCanvas.toDataURL('image/png')
     : null;
+
   try {
     await addDoc(collection(db, 'protokoll'), {
-      studentId: activeId,
-      uid: currentUser.uid,
-      fahrschuleId: currentUser._fahrschuleId || currentUser.uid,
+      studentId:   activeId,
+      uid:         currentUser.uid,
+      fahrschuleId:currentUser._fahrschuleId || currentUser.uid,
       datum,
-      notiz: notiz || '',
-      maengel: [...aktiveMaengel],
-      sterne: aktiveSterne,
-      stunde: anzahlBisher,
-      fortschritt,
-      unterschrift: unterschrift || null,
-      createdAt: Date.now()
+      notiz:       notiz || '',
+      maengel:     isPlanung ? [] : [...aktiveMaengel],
+      sterne:      isPlanung ? 0  : aktiveSterne,
+      stunde:      isPlanung ? 0  : anzahlBisher,
+      fortschritt: isPlanung ? 0  : fortschritt,
+      unterschrift:unterschrift || null,
+      typ:         isPlanung ? 'planung' : 'fahrstunde',
+      createdAt:   Date.now()
     });
-    document.getElementById('protokoll-modal').classList.remove('open');
-    toast(`Eintrag vom ${formatDate(datum)} gespeichert ${aktiveSterne ? '⭐'.repeat(aktiveSterne) : '✓'}${unterschrift ? ' ✍️' : ''}`);
-    renderProtokollScreen();
-  } catch(e) { toast('Fehler beim Speichern.'); }
+  } catch(e) {
+    console.error('Protokoll speichern Fehler:', e);
+    toast('❌ Fehler beim Speichern: ' + (e.message || e.code));
+    return;
+  }
+
+  document.getElementById('protokoll-modal').classList.remove('open');
+  if (isPlanung) {
+    toast(`📌 Planung für ${datum.split('-').reverse().join('.')} gespeichert`);
+  } else {
+    toast(`✓ Eintrag vom ${datum.split('-').reverse().join('.')} gespeichert ${aktiveSterne ? '⭐'.repeat(aktiveSterne) : ''}${unterschrift ? ' ✍️' : ''}`);
+  }
+
+  try { renderProtokollScreen(); } catch(e) { console.error('renderProtokollScreen:', e); }
+
+  // Protokoll-Snapshot in accessCodes aktualisieren (Portal sync)
+  try {
+    const _cq = query(collection(db,'accessCodes'), where('studentId','==',activeId), where('uid','==',currentUser.uid));
+    const _cs = await getDocs(_cq);
+    if (!_cs.empty) {
+      const _proto = protokollEintraege
+        .sort((a,b) => (b.createdAt||0)-(a.createdAt||0)).slice(0,50)
+        .map(p => ({id:p.id,datum:p.datum,notiz:p.notiz||'',maengel:p.maengel||[],sterne:p.sterne||0,typ:p.typ||'fahrstunde',createdAt:p.createdAt||0}));
+      await updateDoc(doc(db,'accessCodes',_cs.docs[0].id), { protokollSnapshot: _proto, expiresAt: Date.now() + CODE_LAUFZEIT_MS });
+    }
+  } catch(_e) { console.error('ProtokollSnapshot-Update:', _e); }
 };
 
 function listenProtokoll(studentId) {
@@ -2943,35 +3705,48 @@ function listenProtokoll(studentId) {
 
 window.deleteProtokollEintrag = async (id) => {
   if (!confirm('Diesen Eintrag löschen?')) return;
-  await deleteDoc(doc(db, 'protokoll', id));
-  toast('Eintrag gelöscht.');
-  renderProtokollScreen();
+  try {
+    await deleteDoc(doc(db, 'protokoll', id));
+    toast('Eintrag gelöscht.');
+    try { renderProtokollScreen(); } catch(e) { console.error('renderProtokollScreen:', e); }
+  } catch(e) { console.error('deleteProtokollEintrag:', e); toast('❌ Fehler: ' + e.message); }
 };
 
 window.toggleTheorie = async () => {
-  const s = getStudent(activeId);
-  await saveToFirestore(activeId, { theorieBestanden: !s.theorieBestanden });
-  toast(s.theorieBestanden ? 'Theorie: offen' : 'Theorie: bestanden ✓');
+  try {
+    const s = getStudent(activeId);
+    if (!s) return;
+    await saveToFirestore(activeId, { theorieBestanden: !s.theorieBestanden });
+    toast(s.theorieBestanden ? 'Theorie: offen' : 'Theorie: bestanden ✓');
+  } catch(e) { console.error('toggleTheorie:', e); }
 };
 
-window.changeSonder = async (key,delta) => {
-  const s=getStudent(activeId);
-  const sf={...(s.sonderfahrten||{})};
-  sf[key]=Math.max(0,(sf[key]||0)+delta);
-  await saveToFirestore(activeId,{sonderfahrten:sf});
+window.changeSonder = async (key, delta) => {
+  try {
+    const s = getStudent(activeId);
+    if (!s) return;
+    const sf = { ...(s.sonderfahrten||{}) };
+    sf[key] = Math.max(0,(sf[key]||0)+delta);
+    await saveToFirestore(activeId, { sonderfahrten: sf });
+  } catch(e) { console.error('changeSonder:', e); toast('Fehler beim Speichern'); }
 };
 
 window.setThema = async (thema, val) => {
-  const s = getStudent(activeId);
-  const th = { ...(s.themen||{}) };
-  th[thema] = val;
-  await saveToFirestore(activeId, { themen: th });
+  try {
+    const s = getStudent(activeId);
+    if (!s) return;
+    const th = { ...(s.themen||{}) };
+    th[thema] = val;
+    await saveToFirestore(activeId, { themen: th });
+  } catch(e) { console.error('setThema:', e); }
 };
 
 window.saveNotes = async () => {
-  const notes=document.getElementById('notes-ta').value;
-  await saveToFirestore(activeId,{notes});
-  toast('Notizen gespeichert ✓');
+  try {
+    const notes = document.getElementById('notes-ta').value;
+    await saveToFirestore(activeId, { notes });
+    toast('Notizen gespeichert ✓');
+  } catch(e) { console.error('saveNotes:', e); toast('Fehler beim Speichern'); }
 };
 
 window.savePruefKommentar = async () => {
@@ -2986,7 +3761,8 @@ window.savePruefKommentar = async () => {
     const snap = await getDocs(q);
     await Promise.all(snap.docs.map(d =>
       updateDoc(doc(db,'accessCodes',d.id), {
-        'studentSnapshot.pruefKommentar': pruefKommentar
+        'studentSnapshot.pruefKommentar': pruefKommentar,
+        expiresAt: Date.now() + CODE_LAUFZEIT_MS
       })
     ));
     toast('✓ Kommentar gespeichert – sofort für Schüler sichtbar');
@@ -2994,6 +3770,153 @@ window.savePruefKommentar = async () => {
     console.error('Code-Update Fehler:', e);
     toast('Kommentar gespeichert ✓');
   }
+};
+
+// ── Code-Gültigkeit manuell verlängern (Code bleibt gleich!) ──
+window.verlaengereCode = async () => {
+  try {
+    const q    = query(collection(db,'accessCodes'), where('studentId','==',activeId));
+    const snap = await getDocs(q);
+    if (snap.empty) { toast('⚠️ Noch kein Code vorhanden'); return; }
+    const neuExpiry = Date.now() + CODE_LAUFZEIT_MS;
+    await updateDoc(doc(db,'accessCodes',snap.docs[0].id), { expiresAt: neuExpiry });
+    document.getElementById('code-valid-until').textContent =
+      'Gültig bis: ' + new Date(neuExpiry).toLocaleDateString('de-DE');
+    toast('⏰ Code um 1 Jahr verlängert ✓');
+  } catch(e) { console.error('verlaengereCode:', e); toast('❌ Fehler: ' + e.message); }
+};
+
+// Schnellantwort in Eingabefeld setzen
+window.quickReply = (text) => {
+  const input = document.getElementById('teacher-chat-input');
+  if (!input) return;
+  input.value = text;
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 100) + 'px';
+  input.focus();
+};
+
+// ── FAHRLEHRER CHAT ──────────────────────────────────────────────
+let teacherChatDocId = null;
+let teacherChatData  = null;
+let teacherChatUnsub  = null;
+
+window.closeTeacherChat = () => {
+  if (teacherChatUnsub) { teacherChatUnsub(); teacherChatUnsub = null; }
+  document.getElementById('teacher-chat-modal').classList.remove('open');
+};
+
+window.openTeacherChat = async () => {
+  const s = getStudent(activeId);
+  if (!s) return;
+  document.getElementById('teacher-chat-name').textContent = s.vorname + ' ' + s.nachname;
+  document.getElementById('code-modal').classList.remove('open');
+  document.getElementById('teacher-chat-modal').classList.add('open');
+  try {
+    const q    = query(collection(db,'accessCodes'), where('studentId','==',activeId));
+    const snap = await getDocs(q);
+    if (snap.empty) { toast('⚠️ Erst Code generieren!'); return; }
+    teacherChatDocId = snap.docs[0].id;
+    teacherChatData  = snap.docs[0].data();
+    renderTeacherChat();
+    // 🔔 Als gelesen markieren → Badges verschwinden (live via Badge-Listener)
+    updateDoc(doc(db,'accessCodes',teacherChatDocId), { teacherLastRead: Date.now() })
+      .catch(e => console.error('teacherLastRead:', e));
+    // Live-Listener
+    if (teacherChatUnsub) teacherChatUnsub();
+    teacherChatUnsub = onSnapshot(doc(db,'accessCodes',teacherChatDocId), (ds) => {
+      if (!ds.exists()) return;
+      teacherChatData = ds.data();
+      if (document.getElementById('teacher-chat-modal').classList.contains('open')) renderTeacherChat();
+    });
+  } catch(e) { toast('Fehler: ' + e.message); }
+};
+
+function renderTeacherChat() {
+  const msgs = ((teacherChatData || {}).messages || []).sort((a,b) => a.timestamp - b.timestamp);
+  const wrap = document.getElementById('teacher-chat-messages');
+  if (!wrap) return;
+  if (!msgs.length) {
+    wrap.innerHTML = `<div style="text-align:center;padding:32px;color:var(--muted);font-size:0.85rem">Noch keine Nachrichten</div>`;
+    return;
+  }
+  wrap.innerHTML = msgs.map(m => {
+    const isFL   = m.sender === 'fahrlehrer';
+    const time   = new Date(m.timestamp).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+    const date   = new Date(m.timestamp).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
+    const bg     = isFL ? 'var(--accent)' : 'var(--surface2)';
+    const color  = isFL ? '#0d1117' : 'var(--text)';
+    const align  = isFL ? 'flex-end' : 'flex-start';
+    const radius = isFL ? '18px 18px 4px 18px' : '18px 18px 18px 4px';
+    return `<div style="display:flex;flex-direction:column;align-items:${align}">
+      ${!isFL ? `<div style="font-size:0.65rem;color:var(--muted);margin-bottom:2px">${m.senderName||'Schüler'}</div>` : ''}
+      <div style="max-width:80%;background:${bg};color:${color};border-radius:${radius};padding:10px 14px;font-size:0.88rem;line-height:1.45;word-break:break-word">${(m.text||'').replace(/</g,'&lt;')}</div>
+      <div style="font-size:0.6rem;color:var(--muted);margin-top:2px">${date} ${time}</div>
+    </div>`;
+  }).join('');
+  setTimeout(() => { wrap.scrollTop = wrap.scrollHeight; }, 50);
+}
+
+window.sendTeacherMessage = async () => {
+  const input = document.getElementById('teacher-chat-input');
+  const text  = (input?.value || '').trim();
+  if (!text || !teacherChatDocId) return;
+  input.value = '';
+  input.style.height = 'auto';
+  const msg = {
+    id: Date.now().toString(), text,
+    sender: 'fahrlehrer',
+    senderName: currentUser?.displayName || 'Fahrlehrer',
+    timestamp: Date.now()
+  };
+  try {
+    const newMsgs = [...(teacherChatData?.messages || []), msg].slice(-50);
+    await updateDoc(doc(db,'accessCodes',teacherChatDocId), { messages: newMsgs, expiresAt: Date.now() + CODE_LAUFZEIT_MS });
+    teacherChatData = { ...teacherChatData, messages: newMsgs };
+    renderTeacherChat();
+    toast('✓ Nachricht gesendet');
+  } catch(e) { toast('Fehler: ' + e.message); }
+};
+
+// ── FAHRSTUNDE PLANEN ────────────────────────────────────────────
+window.openPlanLesson = async () => {
+  document.getElementById('code-modal').classList.remove('open');
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  document.getElementById('inp-plan-datum').value   = tomorrow.toISOString().split('T')[0];
+  document.getElementById('inp-plan-uhrzeit').value = '';
+  document.getElementById('inp-plan-ort').value     = '';
+  document.getElementById('inp-plan-notiz').value   = '';
+  try {
+    const q    = query(collection(db,'accessCodes'), where('studentId','==',activeId));
+    const snap = await getDocs(q);
+    if (snap.empty) { toast('⚠️ Erst Code generieren!'); document.getElementById('code-modal').classList.add('open'); return; }
+    document.getElementById('plan-lesson-modal').classList.add('open');
+  } catch(e) { toast('Fehler: ' + e.message); }
+};
+
+window.savePlannedLesson = async () => {
+  const datum   = document.getElementById('inp-plan-datum').value;
+  const uhrzeit = document.getElementById('inp-plan-uhrzeit').value;
+  const ort     = document.getElementById('inp-plan-ort').value.trim();
+  const notiz   = document.getElementById('inp-plan-notiz').value.trim();
+  if (!datum) { toast('Bitte ein Datum wählen.'); return; }
+  const newLesson = { id: Date.now().toString(), datum, uhrzeit, ort, notiz, status: 'geplant', createdAt: Date.now() };
+  try {
+    const snap = await getDocs(query(collection(db,'accessCodes'), where('studentId','==',activeId)));
+    if (snap.empty) { toast('⚠️ Code nicht gefunden'); return; }
+    const docRef   = snap.docs[0];
+    const existing = docRef.data().plannedLessons || [];
+    await updateDoc(doc(db,'accessCodes',docRef.id), { plannedLessons: [...existing, newLesson], expiresAt: Date.now() + CODE_LAUFZEIT_MS });
+    document.getElementById('plan-lesson-modal').classList.remove('open');
+    toast(`📅 Fahrstunde am ${datum.split('-').reverse().join('.')} geplant`);
+  } catch(e) { toast('Fehler: ' + e.message); }
+};
+
+window.copyPortalLink = () => {
+  const url = document.getElementById('code-portal-url')?.textContent;
+  if (!url) return;
+  navigator.clipboard.writeText(url).then(() => toast('✓ Link kopiert!'));
 };
 
 // ─────────────────────────────────────────
@@ -3059,10 +3982,12 @@ function renderGamification(s, proto) {
 
 window.deleteStudent = async () => {
   if (!confirm('Schüler wirklich löschen?')) return;
-  await deleteDoc(doc(db,'students',activeId));
-  activeId=null;
-  goBack();
-  toast('Schüler gelöscht.');
+  try {
+    await deleteDoc(doc(db,'students',activeId));
+    activeId = null;
+    goBack();
+    toast('Schüler gelöscht.');
+  } catch(e) { console.error('deleteStudent:', e); toast('❌ Fehler beim Löschen: ' + e.message); }
 };
 
 // ─────────────────────────────────────────
@@ -3383,7 +4308,7 @@ window.openCodeModal = async () => {
   document.getElementById('code-modal').classList.add('open');
   document.getElementById('code-display').textContent = '…';
   document.getElementById('code-valid-until').textContent = '';
-  // Load existing code for this student
+  document.getElementById('code-portal-link').style.display = 'none';
   try {
     const q = query(collection(db,'accessCodes'), where('studentId','==',activeId));
     const snap = await getDocs(q);
@@ -3392,6 +4317,11 @@ window.openCodeModal = async () => {
       document.getElementById('code-display').textContent = data.code;
       const exp = new Date(data.expiresAt);
       document.getElementById('code-valid-until').textContent = `Gültig bis: ${exp.toLocaleDateString('de-DE')}`;
+      // Portal-Link anzeigen
+      const base = window.location.href.replace('index.html','').replace(/\/$/, '');
+      const portalUrl = `${base}/schueler-portal.html?code=${data.code}`;
+      document.getElementById('code-portal-url').textContent = portalUrl;
+      document.getElementById('code-portal-link').style.display = 'block';
     } else {
       document.getElementById('code-display').textContent = '––––––';
       document.getElementById('code-valid-until').textContent = 'Noch kein Code generiert';
@@ -3401,9 +4331,12 @@ window.openCodeModal = async () => {
   }
 };
 
+// Code-Gültigkeit: 1 Jahr — wird bei jedem Fahrlehrer-Kontakt automatisch verlängert
+const CODE_LAUFZEIT_MS = 365*24*60*60*1000;
+
 window.generateCode = async () => {
   const code = generateCodeStr();
-  const expiresAt = Date.now() + 365*24*60*60*1000; // 1 Jahr
+  const expiresAt = Date.now() + CODE_LAUFZEIT_MS;
   const s = getStudent(activeId);
   if (!s) { toast('Kein Schüler ausgewählt'); return; }
 
@@ -3470,7 +4403,215 @@ window.generateCode = async () => {
 // ─────────────────────────────────────────
 // SCHÜLER-LOGIN ENTFERNT (Syntax-Fehler)
 // Nutze code-generator.html stattdessen!
-// ── SCHÜLER LOGOUT ────────────────────────────────────────────
+// ── EIGENE KATEGORIEN TAB-SYSTEM ────────────────────────────
+let eigenScope     = 'all';  // 'all' | 'single'
+let aktiverLernTab = 'adk';  // 'adk' | 'eigen' — überlebt Re-Render
+let letzteGruppeId = '';     // Dropdown-Auswahl — überlebt Re-Render
+
+// Eine Themen-Zeile rendern
+function renderEigenThemaRow(t, s) {
+  const STUFEN = ['🔴','🟠','🟡','🟢','⭐'];
+  const STUFEN_NAME = ['Nicht gezeigt','Gezeigt','Ausreichend','Beherrscht','Sehr sicher'];
+  const val  = (s.customThemen||{})[t.id] || 0;
+  const done = val >= 4;
+  const scopeLabel = t.scope === 'all'
+    ? '<span style="font-size:0.6rem;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1px 6px">Alle</span>'
+    : '<span style="font-size:0.6rem;color:var(--blue);background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.3);border-radius:4px;padding:1px 6px">Nur dieser</span>';
+  const dotsHTML = STUFEN.map(function(em,i){
+    const v=i+1;
+    return '<button class="dot-btn'+(val===v?' active-'+v:'')+'" title="'+STUFEN_NAME[i]+'" onclick="setCustomThema(\''+t.id+'\','+(val===v?0:v)+')" style="font-size:0.9rem">'+em+'</button>';
+  }).join('');
+  return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">'
+    +'<button onclick="toggleEigenDone(\''+t.id+'\','+val+')" style="width:28px;height:28px;border-radius:7px;border:2px solid '+(done?'var(--accent2)':'var(--border)')+';background:'+(done?'rgba(63,185,80,0.15)':'none')+';cursor:pointer;flex-shrink:0;font-size:1rem;display:flex;align-items:center;justify-content:center">'+(done?'✅':'⬜')+'</button>'
+    +'<div style="flex:1;min-width:0">'
+    +'<div style="font-size:0.88rem;font-weight:'+(done?'600':'400')+';color:'+(done?'var(--accent2)':'var(--text)')+'">'+escapeHtmlEigen(t.name)+'</div>'
+    +'<div style="margin-top:2px">'+scopeLabel+'</div>'
+    +'</div>'
+    +'<div style="display:flex;gap:3px;flex-shrink:0">'+dotsHTML+'</div>'
+    +'<button onclick="event.stopPropagation();deleteCustomThema(\''+t.id+'\')" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:4px;font-size:0.85rem;flex-shrink:0">🗑</button>'
+    +'</div>';
+}
+
+function escapeHtmlEigen(str) {
+  return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Kompletter Eigene-Tab Inhalt (Gruppen + Themen)
+function renderEigenTab(s, myCustomThemen) {
+  const meineGruppen = customGruppen.filter(g => g.scope === 'all' || g.scope === activeId);
+
+  if (myCustomThemen.length === 0 && meineGruppen.length === 0) {
+    return '<div style="text-align:center;padding:32px 16px;color:var(--muted)">'
+      +'<div style="font-size:2rem;margin-bottom:8px">✏️</div>'
+      +'<div style="font-weight:600;margin-bottom:4px">Noch keine eigenen Kategorien</div>'
+      +'<div style="font-size:0.8rem">Erstelle Übungen oben — optional mit eigenen Gruppen</div>'
+      +'</div>';
+  }
+
+  let html = '';
+
+  // ── Gruppen mit ihren Themen ──
+  meineGruppen.forEach(function(g) {
+    const themenInGruppe = myCustomThemen.filter(t => t.gruppeId === g.id);
+    const doneCount = themenInGruppe.filter(t => ((s.customThemen||{})[t.id]||0) >= 4).length;
+    const gruppeScopeBadge = g.scope === 'all'
+      ? '<span style="font-size:0.6rem;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1px 6px">Alle</span>'
+      : '<span style="font-size:0.6rem;color:var(--blue);background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.3);border-radius:4px;padding:1px 6px">Nur dieser</span>';
+    const transferBtn = g.scope !== 'all'
+      ? '<button onclick="event.stopPropagation();gruppeAufAlle(\''+g.id+'\')" title="Diese Gruppe für alle Schüler übernehmen" style="background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.35);color:var(--accent2);border-radius:7px;padding:3px 9px;font-size:0.65rem;font-weight:700;cursor:pointer;white-space:nowrap">👥 → Alle</button>'
+      : '';
+    html += '<div style="margin-bottom:18px">'
+      +'<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border-radius:10px;margin-bottom:4px">'
+      +'<div style="font-size:0.85rem;font-weight:800;font-family:\'Syne\',sans-serif;flex:1;min-width:0">📁 '+escapeHtmlEigen(g.name)+'</div>'
+      + gruppeScopeBadge
+      +'<span style="font-size:0.65rem;color:'+(doneCount===themenInGruppe.length&&themenInGruppe.length>0?'var(--accent2)':'var(--muted)')+';font-weight:700">'+doneCount+'/'+themenInGruppe.length+'</span>'
+      + transferBtn
+      +'<button onclick="event.stopPropagation();deleteEigenGruppe(\''+g.id+'\')" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:2px;font-size:0.82rem">🗑</button>'
+      +'</div>'
+      + (themenInGruppe.length
+          ? themenInGruppe.map(t => renderEigenThemaRow(t, s)).join('')
+          : '<div style="padding:10px;font-size:0.75rem;color:var(--muted);text-align:center">Noch keine Übungen — oben Gruppe „'+escapeHtmlEigen(g.name)+'" wählen und hinzufügen</div>')
+      +'</div>';
+  });
+
+  // ── Themen ohne Gruppe ──
+  const ohneGruppe = myCustomThemen.filter(t => !t.gruppeId);
+  if (ohneGruppe.length) {
+    html += '<div style="margin-bottom:8px">'
+      + (meineGruppen.length ? '<div style="font-size:0.75rem;font-weight:700;color:var(--muted);margin:4px 0 6px;text-transform:uppercase;letter-spacing:0.05em">📂 Ohne Gruppe</div>' : '')
+      + ohneGruppe.map(t => renderEigenThemaRow(t, s)).join('')
+      +'</div>';
+  }
+
+  return html;
+}
+
+window.switchLernTab = (tab) => {
+  aktiverLernTab = tab; // State merken — überlebt Re-Render
+  const isAdk   = tab === 'adk';
+  const tabAdk  = document.getElementById('tab-adk');
+  const tabEigen= document.getElementById('tab-eigen');
+  const btnAdk  = document.getElementById('tab-btn-adk');
+  const btnEigen= document.getElementById('tab-btn-eigen');
+  if (!tabAdk || !tabEigen) return;
+  tabAdk.style.display   = isAdk ? 'block' : 'none';
+  tabEigen.style.display = isAdk ? 'none'  : 'block';
+  if (btnAdk)  {
+    btnAdk.style.borderBottomColor = isAdk ? 'var(--accent)' : 'transparent';
+    btnAdk.style.background        = isAdk ? 'var(--surface2)' : 'none';
+    btnAdk.style.color             = isAdk ? 'var(--text)' : 'var(--muted)';
+    btnAdk.style.fontWeight        = isAdk ? '700' : '600';
+  }
+  if (btnEigen) {
+    btnEigen.style.borderBottomColor = !isAdk ? 'var(--accent)' : 'transparent';
+    btnEigen.style.background        = !isAdk ? 'var(--surface2)' : 'none';
+    btnEigen.style.color             = !isAdk ? 'var(--text)' : 'var(--muted)';
+    btnEigen.style.fontWeight        = !isAdk ? '700' : '600';
+  }
+};
+
+window.setEigenScope = (scope) => {
+  eigenScope = scope;
+  const btnAll    = document.getElementById('eigen-scope-all');
+  const btnSingle = document.getElementById('eigen-scope-single');
+  if (btnAll) {
+    btnAll.style.background   = scope==='all' ? 'var(--accent)' : 'none';
+    btnAll.style.color        = scope==='all' ? '#0d1117' : 'var(--muted)';
+    btnAll.style.borderColor  = scope==='all' ? 'var(--accent)' : 'var(--border)';
+  }
+  if (btnSingle) {
+    btnSingle.style.background  = scope==='single' ? 'var(--blue)' : 'none';
+    btnSingle.style.color       = scope==='single' ? '#fff' : 'var(--muted)';
+    btnSingle.style.borderColor = scope==='single' ? 'var(--blue)' : 'var(--border)';
+  }
+};
+
+window.addEigenThema = async () => {
+  const inp  = document.getElementById('inp-eigen-name');
+  const name = (inp?.value || '').trim();
+  if (!name) { inp?.focus(); return; }
+  if (!currentUser) return;
+  try {
+    const scope    = eigenScope === 'single' ? activeId : 'all';
+    const fsId     = currentUser._fahrschuleId || currentUser.uid;
+    const gruppeId = document.getElementById('sel-eigen-gruppe')?.value || null;
+    letzteGruppeId = gruppeId || ''; // Auswahl merken — überlebt Re-Render
+    await addDoc(collection(db, 'customThemen'), {
+      name,
+      scope,
+      gruppeId:     gruppeId || null,
+      uid:          currentUser.uid,
+      fahrschuleId: fsId,
+      createdAt:    Date.now(),
+      kategorie:    null,
+    });
+    if (inp) inp.value = '';
+    inp?.focus();
+    toast(`✓ "${name}" hinzugefügt`);
+  } catch(err) { console.error('addEigenThema:', err); toast('Fehler: ' + err.message); }
+};
+
+// ── GRUPPEN-VERWALTUNG ──────────────────────────────────────
+window.addEigenGruppe = async () => {
+  const name = (prompt('Name der neuen Gruppe:\n\nz. B. "Parkübungen", "Orte zum Üben", "Schwierige Stellen"') || '').trim();
+  if (!name) return;
+  if (!currentUser) return;
+  try {
+    const scope = eigenScope === 'single' ? activeId : 'all';
+    const fsId  = currentUser._fahrschuleId || currentUser.uid;
+    const docRef = await addDoc(collection(db, 'customGruppen'), {
+      name,
+      scope,
+      uid:          currentUser.uid,
+      fahrschuleId: fsId,
+      createdAt:    Date.now(),
+    });
+    letzteGruppeId = docRef.id; // Neue Gruppe direkt vorausgewählt (via Template-Re-Render)
+    toast(`📁 Gruppe "${name}" erstellt`);
+  } catch(err) { console.error('addEigenGruppe:', err); toast('Fehler: ' + err.message); }
+};
+
+window.deleteEigenGruppe = async (gruppeId) => {
+  const g = customGruppen.find(x => x.id === gruppeId);
+  const themenDrin = customThemen.filter(t => t.gruppeId === gruppeId);
+  const msg = themenDrin.length
+    ? `Gruppe "${g?.name||''}" löschen?\n\nDie ${themenDrin.length} Übung(en) darin bleiben erhalten und wandern zu „Ohne Gruppe".`
+    : `Gruppe "${g?.name||''}" löschen?`;
+  if (!confirm(msg)) return;
+  try {
+    // Themen aus der Gruppe lösen
+    await Promise.all(themenDrin.map(t =>
+      updateDoc(doc(db, 'customThemen', t.id), { gruppeId: null })
+    ));
+    await deleteDoc(doc(db, 'customGruppen', gruppeId));
+    toast('Gruppe gelöscht.');
+  } catch(err) { console.error('deleteEigenGruppe:', err); toast('❌ Fehler: ' + err.message); }
+};
+
+window.gruppeAufAlle = async (gruppeId) => {
+  const g = customGruppen.find(x => x.id === gruppeId);
+  if (!g) return;
+  const themenDrin = customThemen.filter(t => t.gruppeId === gruppeId && t.scope !== 'all');
+  if (!confirm(`Gruppe "${g.name}" für ALLE Schüler übernehmen?\n\n${themenDrin.length ? 'Die ' + themenDrin.length + ' Übung(en) darin werden ebenfalls für alle sichtbar.' : ''}`)) return;
+  try {
+    await updateDoc(doc(db, 'customGruppen', gruppeId), { scope: 'all' });
+    await Promise.all(themenDrin.map(t =>
+      updateDoc(doc(db, 'customThemen', t.id), { scope: 'all' })
+    ));
+    toast(`👥 "${g.name}" gilt jetzt für alle Schüler`);
+  } catch(err) { console.error('gruppeAufAlle:', err); toast('❌ Fehler: ' + err.message); }
+};
+
+window.toggleEigenDone = async (themaId, currentVal) => {
+  try {
+    const s = getStudent(activeId);
+    if (!s) return;
+    const ct = { ...(s.customThemen || {}) };
+    // Toggle: wenn >= 4 → 0, sonst → 4 (Beherrscht)
+    ct[themaId] = currentVal >= 4 ? 0 : 4;
+    await saveToFirestore(activeId, { customThemen: ct });
+  } catch(err) { console.error('toggleEigenDone:', err); }
+};
 window.schuelerLogout = () => {
   if (unsubSchuelerCode) { unsubSchuelerCode(); unsubSchuelerCode = null; }
   document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
@@ -3667,9 +4808,12 @@ function renderSchuelerAnsicht(s, protokoll) {
 }
 
 window.changeSchaltstunden = async (delta) => {
-  const s = getStudent(activeId);
-  const neu = Math.max(0, (s.schaltstunden||0) + delta);
-  await saveToFirestore(activeId, { schaltstunden: neu });
+  try {
+    const s = getStudent(activeId);
+    if (!s) return;
+    const neu = Math.max(0, (s.schaltstunden||0) + delta);
+    await saveToFirestore(activeId, { schaltstunden: neu });
+  } catch(e) { console.error('changeSchaltstunden:', e); toast('Fehler beim Speichern'); }
 };
 
 // ─── OPTIONS MENÜ ────────────────────────────────────────────
@@ -3718,39 +4862,35 @@ window.openZusatzKlasse = () => {
 };
 
 window.toggleZusatzKlasse = async (klasse) => {
-  const s = getStudent(activeId);
-  let aktiveKlassen = [...(s.klassen || [s.klasse || 'B'])];
+  try {
+    const s = getStudent(activeId);
+    if (!s) return;
+    let aktiveKlassen = [...(s.klassen || [s.klasse || 'B'])];
 
-  if (aktiveKlassen.includes(klasse)) {
-    // Entfernen – mindestens eine muss bleiben
-    if (aktiveKlassen.length <= 1) {
-      toast('Mindestens eine Klasse muss aktiv sein.');
-      return;
+    if (aktiveKlassen.includes(klasse)) {
+      if (aktiveKlassen.length <= 1) { toast('Mindestens eine Klasse muss aktiv sein.'); return; }
+      if (!confirm(`${klasse} entfernen?\n\nDer ADK-Lernstand für diese Klasse geht verloren.`)) return;
+      aktiveKlassen = aktiveKlassen.filter(k => k !== klasse);
+      const ADK_map = { 'A': ADK_THEMEN_A, 'BE': ADK_THEMEN_BE };
+      const adk = ADK_map[klasse] || ADK_THEMEN;
+      const keysToRemove = adk.flatMap(g => g.items);
+      const neueThemen = {...(s.themen||{})};
+      keysToRemove.forEach(k => delete neueThemen[k + '__' + klasse]);
+    } else {
+      aktiveKlassen.push(klasse);
+      toast(`${klasse} hinzugefügt ✓`);
     }
-    if (!confirm(`${klasse} entfernen?\n\nDer ADK-Lernstand für diese Klasse geht verloren.`)) return;
-    aktiveKlassen = aktiveKlassen.filter(k => k !== klasse);
-    // Themen für diese Klasse aus themen-Objekt entfernen
-    const ADK_map = { 'A': ADK_THEMEN_A, 'BE': ADK_THEMEN_BE };
-    const adk = ADK_map[klasse] || ADK_THEMEN;
-    const keysToRemove = adk.flatMap(g => g.items);
-    const neueThemen = {...(s.themen||{})};
-    keysToRemove.forEach(k => delete neueThemen[k + '__' + klasse]);
-  } else {
-    // Hinzufügen
-    aktiveKlassen.push(klasse);
-    toast(`${klasse} hinzugefügt ✓`);
-  }
 
-  const hauptKlasse = aktiveKlassen[0];
-  const zielMap = {'A':20,'BE':12,'B-Auto':30,'B197':30,'B':30};
-  await saveToFirestore(activeId, {
-    klassen: aktiveKlassen,
-    klasse: hauptKlasse,
-    zielStunden: zielMap[hauptKlasse] || 30,
-  });
-  document.getElementById('zusatz-klasse-modal').classList.remove('open');
-  // Neu öffnen um aktuellen Stand zu zeigen
-  setTimeout(() => openZusatzKlasse(), 300);
+    const hauptKlasse = aktiveKlassen[0];
+    const zielMap = {'A':20,'BE':12,'B-Auto':30,'B197':30,'B':30};
+    await saveToFirestore(activeId, {
+      klassen: aktiveKlassen,
+      klasse: hauptKlasse,
+      zielStunden: zielMap[hauptKlasse] || 30,
+    });
+    document.getElementById('zusatz-klasse-modal').classList.remove('open');
+    setTimeout(() => openZusatzKlasse(), 300);
+  } catch(e) { console.error('toggleZusatzKlasse:', e); toast('Fehler: ' + e.message); }
 };
 
 window.openKlasseAendern = () => {
@@ -3777,62 +4917,36 @@ window.openKlasseAendern = () => {
 };
 
 window.saveKlasseAendern = async (neueKlasse) => {
-  const s = getStudent(activeId);
-  const aktuelleKlasse = s.klasse || 'B';
-  if (aktuelleKlasse === neueKlasse) {
-    document.getElementById('klasse-aendern-modal').classList.remove('open');
-    return;
-  }
-  const zielMap = {'A':20, 'BE':12, 'B-Auto':30, 'B197':30, 'B':30};
-  const klasseNamen = {'B':'🚗 Klasse B','B-Auto':'🤖 B-Automatik','B197':'⚙️ B197','BE':'🔗 BE','A':'🏍️ Klasse A'};
-
-  // Verwandte Klassen – ADK und Fahrstunden bleiben erhalten
-  const verwandt = {
-    'B':     ['B-Auto','B197'],
-    'B-Auto':['B','B197'],
-    'B197':  ['B','B-Auto'],
-  };
-  const istVerwandt = (verwandt[aktuelleKlasse]||[]).includes(neueKlasse);
-
-  let bestaetigung = '';
-  if (istVerwandt) {
-    bestaetigung = `Klasse von ${klasseNamen[aktuelleKlasse]||aktuelleKlasse} auf ${klasseNamen[neueKlasse]||neueKlasse} ändern?\n\n` +
-      `✅ Fahrstunden, ADK-Lernstand und Protokoll bleiben erhalten.\n` +
-      (neueKlasse==='B197' ? `➕ Schaltstunden-Zähler und Testfahrt werden hinzugefügt.\n` : '') +
-      (aktuelleKlasse==='B197' && neueKlasse!=='B197' ? `⚠️ Schaltstunden und Testfahrt werden zurückgesetzt.\n` : '');
-  } else {
-    bestaetigung = `Klasse von ${klasseNamen[aktuelleKlasse]||aktuelleKlasse} auf ${klasseNamen[neueKlasse]||neueKlasse} ändern?\n\n` +
-      `⚠️ ADK-Lernstand und Pflichtfahrten werden zurückgesetzt.\n` +
-      `✅ Fahrstunden und Protokoll bleiben erhalten.`;
-  }
-
-  if (!confirm(bestaetigung)) return;
-
-  // Daten die gespeichert werden
-  const update = {
-    klasse: neueKlasse,
-    zielStunden: zielMap[neueKlasse] || 30,
-    zielSchaltstunden: 10,
-  };
-
-  if (istVerwandt) {
-    // ADK und Sonderfahrten bleiben – nur B197-spezifisches zurücksetzen falls nötig
-    if (neueKlasse !== 'B197') {
-      update.schaltstunden = 0;
-      update.testfahrtBestanden = false;
+  try {
+    const s = getStudent(activeId);
+    if (!s) return;
+    const aktuelleKlasse = s.klasse || 'B';
+    if (aktuelleKlasse === neueKlasse) {
+      document.getElementById('klasse-aendern-modal').classList.remove('open');
+      return;
     }
-    // Sonderfahrten bleiben erhalten (Überland/Autobahn/Nacht sind bei B, B-Auto und B197 gleich)
-  } else {
-    // Komplett anderes ADK (z.B. A oder BE) → alles zurücksetzen
-    update.themen = {};
-    update.sonderfahrten = {};
-    update.schaltstunden = 0;
-    update.testfahrtBestanden = false;
-  }
+    const zielMap    = {'A':20,'BE':12,'B-Auto':30,'B197':30,'B':30};
+    const klasseNamen= {'B':'🚗 Klasse B','B-Auto':'🤖 B-Automatik','B197':'⚙️ B197','BE':'🔗 BE','A':'🏍️ Klasse A'};
+    const verwandt   = {'B':['B-Auto','B197'],'B-Auto':['B','B197'],'B197':['B','B-Auto']};
+    const istVerwandt= (verwandt[aktuelleKlasse]||[]).includes(neueKlasse);
 
-  await saveToFirestore(activeId, update);
-  document.getElementById('klasse-aendern-modal').classList.remove('open');
-  toast(`Klasse geändert zu ${klasseNamen[neueKlasse]} ✓`);
+    let bestaetigung = istVerwandt
+      ? `Klasse von ${klasseNamen[aktuelleKlasse]||aktuelleKlasse} auf ${klasseNamen[neueKlasse]||neueKlasse} ändern?\n\n✅ Fahrstunden, ADK-Lernstand und Protokoll bleiben erhalten.\n${neueKlasse==='B197'?'➕ Schaltstunden-Zähler und Testfahrt werden hinzugefügt.\n':''}${aktuelleKlasse==='B197'&&neueKlasse!=='B197'?'⚠️ Schaltstunden und Testfahrt werden zurückgesetzt.\n':''}`
+      : `Klasse von ${klasseNamen[aktuelleKlasse]||aktuelleKlasse} auf ${klasseNamen[neueKlasse]||neueKlasse} ändern?\n\n⚠️ ADK-Lernstand und Pflichtfahrten werden zurückgesetzt.\n✅ Fahrstunden und Protokoll bleiben erhalten.`;
+
+    if (!confirm(bestaetigung)) return;
+
+    const update = { klasse: neueKlasse, zielStunden: zielMap[neueKlasse]||30, zielSchaltstunden: 10 };
+    if (istVerwandt) {
+      if (neueKlasse !== 'B197') { update.schaltstunden=0; update.testfahrtBestanden=false; }
+    } else {
+      update.themen={}; update.sonderfahrten={}; update.schaltstunden=0; update.testfahrtBestanden=false;
+    }
+
+    await saveToFirestore(activeId, update);
+    document.getElementById('klasse-aendern-modal').classList.remove('open');
+    toast(`Klasse geändert zu ${klasseNamen[neueKlasse]} ✓`);
+  } catch(e) { console.error('saveKlasseAendern:', e); toast('Fehler: ' + e.message); }
 };
 
 window.openB197Settings = () => {
@@ -3842,15 +4956,20 @@ window.openB197Settings = () => {
 };
 
 window.saveB197Ziel = async () => {
-  const neu = Math.max(10, parseInt(document.getElementById('inp-b197-ziel').value)||10);
-  await saveToFirestore(activeId, { zielSchaltstunden: neu });
-  document.getElementById('b197-settings-modal').classList.remove('open');
-  toast(`Ziel: ${neu} Schaltstunden gespeichert ✓`);
+  try {
+    const neu = Math.max(10, parseInt(document.getElementById('inp-b197-ziel').value)||10);
+    await saveToFirestore(activeId, { zielSchaltstunden: neu });
+    document.getElementById('b197-settings-modal').classList.remove('open');
+    toast(`Ziel: ${neu} Schaltstunden gespeichert ✓`);
+  } catch(e) { console.error('saveB197Ziel:', e); toast('Fehler beim Speichern'); }
 };
 
 window.toggleTestfahrt = async () => {
-  const s = getStudent(activeId);
-  await saveToFirestore(activeId, { testfahrtBestanden: !s.testfahrtBestanden });
+  try {
+    const s = getStudent(activeId);
+    if (!s) return;
+    await saveToFirestore(activeId, { testfahrtBestanden: !s.testfahrtBestanden });
+  } catch(e) { console.error('toggleTestfahrt:', e); toast('Fehler beim Speichern'); }
 };
 
 
@@ -3873,8 +4992,150 @@ window.closeProtokoll = () => {
   document.getElementById('screen-detail').classList.add('active');
 };
 
-let protokollKalMonat = new Date().getMonth();
-let protokollKalJahr  = new Date().getFullYear();
+// ── Kalender-Protokoll State ────────────────────────────────────
+let protoKalMonat   = new Date().getMonth();
+let protoKalJahr    = new Date().getFullYear();
+let protoGewaehltesDatum = null; // 'YYYY-MM-DD'
+
+// Modal öffnen + Kalender rendern
+window.openNeuerEintrag = () => {
+  protoKalMonat = new Date().getMonth();
+  protoKalJahr  = new Date().getFullYear();
+  protoGewaehltesDatum = null;
+  aktiveSterne  = 0;
+  aktiveMaengel.clear();
+  document.querySelectorAll('.mangel-chip').forEach(c => c.classList.remove('active'));
+  document.querySelectorAll('.stern-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('inp-proto-notiz').value = '';
+  if (typeof clearSignature === 'function') clearSignature();
+  // Form ausblenden bis Datum gewählt
+  document.getElementById('proto-datum-zeile').style.display = 'none';
+  document.getElementById('proto-form').style.display = 'none';
+  document.getElementById('protokoll-modal').classList.add('open');
+  renderProtoKalender();
+};
+
+function renderProtoKalender() {
+  const monatNamen = ['Januar','Februar','März','April','Mai','Juni','Juli',
+    'August','September','Oktober','November','Dezember'];
+  const heute   = new Date();
+  const heuteStr = `${heute.getFullYear()}-${String(heute.getMonth()+1).padStart(2,'0')}-${String(heute.getDate()).padStart(2,'0')}`;
+
+  document.getElementById('proto-kal-titel').textContent =
+    `${monatNamen[protoKalMonat]} ${protoKalJahr}`;
+
+  const firstDay   = (new Date(protoKalJahr, protoKalMonat, 1).getDay() + 6) % 7; // Mo=0
+  const daysInMonth = new Date(protoKalJahr, protoKalMonat + 1, 0).getDate();
+
+  // Vorhandene Einträge für farbige Punkte
+  const fahrtage  = new Map();
+  const plantage  = new Map();
+  protokollEintraege.forEach(e => {
+    if (!e.datum) return;
+    const prefix = `${protoKalJahr}-${String(protoKalMonat+1).padStart(2,'0')}`;
+    if (!e.datum.startsWith(prefix)) return;
+    const d = parseInt(e.datum.split('-')[2]);
+    if (e.typ === 'planung') plantage.set(d, true);
+    else fahrtage.set(d, true);
+  });
+
+  let cells = '';
+  // Leer-Zellen
+  for (let i = 0; i < firstDay; i++) cells += `<div></div>`;
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${protoKalJahr}-${String(protoKalMonat+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isHeute    = dateStr === heuteStr;
+    const isGewählt  = dateStr === protoGewaehltesDatum;
+    const isZukunft  = dateStr > heuteStr;
+    const hatFahrt   = fahrtage.has(d);
+    const hatPlan    = plantage.has(d);
+
+    const bg = isGewählt
+      ? (isZukunft ? 'var(--blue)' : 'var(--accent)')
+      : 'none';
+    const color = isGewählt
+      ? '#0d1117'
+      : isZukunft ? 'var(--muted)' : 'var(--text)';
+    const border = isHeute && !isGewählt ? '1.5px solid var(--accent)' : 'none';
+    const fontWeight = isHeute || isGewählt ? '800' : '400';
+    const opacity = isZukunft && !isGewählt ? '0.6' : '1';
+
+    // Punkt-Anzeige
+    const punkteHTML = (hatFahrt || hatPlan)
+      ? `<div style="position:absolute;bottom:1px;left:50%;transform:translateX(-50%);display:flex;gap:1px">
+          ${hatFahrt ? `<div style="width:4px;height:4px;border-radius:50%;background:${isGewählt?'#0d1117':'var(--accent)'}"></div>` : ''}
+          ${hatPlan  ? `<div style="width:4px;height:4px;border-radius:50%;background:${isGewählt?'#0d1117':'var(--blue)'}"></div>` : ''}
+        </div>`
+      : '';
+
+    cells += `<div onclick="protoWaehlDatum('${dateStr}')"
+      style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;
+             border-radius:50%;background:${bg};color:${color};border:${border};
+             font-weight:${fontWeight};font-size:0.82rem;cursor:pointer;
+             position:relative;opacity:${opacity};transition:background 0.15s">
+      ${d}${punkteHTML}
+    </div>`;
+  }
+
+  document.getElementById('proto-kal-grid').innerHTML = cells;
+}
+
+window.protoWaehlDatum = (dateStr) => {
+  protoGewaehltesDatum = dateStr;
+  renderProtoKalender();
+
+  const heute = new Date();
+  const heuteStr = `${heute.getFullYear()}-${String(heute.getMonth()+1).padStart(2,'0')}-${String(heute.getDate()).padStart(2,'0')}`;
+  const isZukunft = dateStr > heuteStr;
+
+  // Datum-Zeile
+  const datumZeile = document.getElementById('proto-datum-zeile');
+  datumZeile.style.display = 'block';
+
+  const [y, m, d] = dateStr.split('-');
+  const datumLabel = `${d}.${m}.${y}`;
+  document.getElementById('proto-datum-label').textContent = `📅 ${datumLabel}`;
+
+  const badge = document.getElementById('proto-typ-badge');
+  if (isZukunft) {
+    badge.innerHTML = `<span style="background:rgba(88,166,255,0.15);color:var(--blue);border:1px solid rgba(88,166,255,0.4);border-radius:6px;padding:2px 8px;font-size:0.7rem;font-weight:700">📌 Planung</span>`;
+  } else {
+    badge.innerHTML = `<span style="background:rgba(240,180,41,0.15);color:var(--accent);border:1px solid rgba(240,180,41,0.4);border-radius:6px;padding:2px 8px;font-size:0.7rem;font-weight:700">🚗 Fahrstunde</span>`;
+  }
+
+  // Formular anpassen
+  document.getElementById('proto-form').style.display = 'block';
+  document.getElementById('proto-form-bewertung').style.display = isZukunft ? 'none' : 'block';
+  document.getElementById('proto-form-maengel').style.display   = isZukunft ? 'none' : 'block';
+  document.getElementById('proto-form-sig').style.display       = isZukunft ? 'none' : 'block';
+  document.getElementById('proto-notiz-label').textContent      = isZukunft
+    ? '📌 Was soll geübt werden?'
+    : 'Notiz zur Stunde (optional)';
+  document.getElementById('inp-proto-notiz').placeholder        = isZukunft
+    ? 'z. B. Autobahn üben, Einparken wiederholen…'
+    : 'Was lief gut? Was muss nächste Stunde geübt werden?…';
+  document.getElementById('proto-ok-btn').textContent           = isZukunft
+    ? '📌 Planung speichern'
+    : 'Eintragen ✓';
+
+  // Smooth scroll zum Formular
+  setTimeout(() => {
+    document.getElementById('proto-form').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, 50);
+};
+
+window.protoKalPrev = () => {
+  protoKalMonat--;
+  if (protoKalMonat < 0) { protoKalMonat = 11; protoKalJahr--; }
+  renderProtoKalender();
+};
+
+window.protoKalNext = () => {
+  protoKalMonat++;
+  if (protoKalMonat > 11) { protoKalMonat = 0; protoKalJahr++; }
+  renderProtoKalender();
+};
 
 window.kalNavMonat = (delta) => {
   protokollKalMonat += delta;
@@ -3893,6 +5154,10 @@ window.kalNavMonat = (delta) => {
 function renderProtokollScreen() {
   const body = document.getElementById('protokoll-screen-body');
   if (!body) return;
+
+  // s für Gamification + Lernkurve
+  const s = getStudent(activeId);
+  if (!s) return;
 
   const monatNamen = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
   const year = protokollKalJahr, month = protokollKalMonat;
@@ -3933,20 +5198,28 @@ function renderProtokollScreen() {
   const alleEintraege = [...protokollEintraege].sort((a,b) => b.datum?.localeCompare(a.datum||'')||0);
 
   const renderEintrag = (e) => {
-    const sterne = e.sterne ? '⭐'.repeat(e.sterne) : '';
-    const maengelHTML = (e.maengel||[]).length
+    const isPlanung  = e.typ === 'planung';
+    const sterne     = e.sterne ? '⭐'.repeat(e.sterne) : '';
+    const borderColor = isPlanung ? 'var(--blue)' : 'var(--accent)';
+    const datumBg     = isPlanung ? 'var(--blue)'  : 'var(--accent)';
+    const datumColor  = '#0d1117';
+    const typBadge    = isPlanung
+      ? `<span style="background:rgba(88,166,255,0.15);color:var(--blue);border:1px solid rgba(88,166,255,0.35);border-radius:6px;padding:1px 7px;font-size:0.65rem;font-weight:700">📌 Planung</span>`
+      : '';
+    const maengelHTML = !isPlanung && (e.maengel||[]).length
       ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px">${(e.maengel||[]).map(m=>`<span style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.25);color:var(--danger);border-radius:10px;padding:2px 9px;font-size:0.68rem">${m}</span>`).join('')}</div>`
       : '';
-    return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:4px">
+    return `<div style="background:var(--surface2);border:1px solid ${isPlanung?'rgba(88,166,255,0.3)':'var(--border)'};border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:4px;${isPlanung?'opacity:0.85':''}">
       <div style="display:flex;align-items:center;justify-content:space-between">
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-          <div style="background:var(--accent);color:#0d1117;border-radius:8px;padding:2px 10px;font-family:'Syne',sans-serif;font-weight:800;font-size:0.88rem">${formatDate(e.datum)}</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <div style="background:${datumBg};color:${datumColor};border-radius:8px;padding:2px 10px;font-family:'Syne',sans-serif;font-weight:800;font-size:0.88rem">${formatDate(e.datum)}</div>
+          ${typBadge}
           ${sterne ? `<div style="font-size:0.82rem">${sterne}</div>` : ''}
         </div>
         <button onclick="deleteProtokollEintrag('${e.id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.9rem;padding:4px 6px">🗑</button>
       </div>
       ${maengelHTML}
-      ${e.notiz ? `<div style="font-size:0.84rem;color:var(--text);line-height:1.5;margin-top:6px;padding:8px 10px;background:var(--surface);border-radius:8px;border-left:3px solid var(--accent)">📝 ${e.notiz}</div>` : ''}
+      ${e.notiz ? `<div style="font-size:0.84rem;color:var(--text);line-height:1.5;margin-top:6px;padding:8px 10px;background:var(--surface);border-radius:8px;border-left:3px solid ${borderColor}">${isPlanung?'📌':'📝'} ${(e.notiz||"").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>` : ''}
       ${e.unterschrift ? `<div style="margin-top:8px"><div style="font-size:0.68rem;color:var(--muted);margin-bottom:4px">✍️ Unterschrift</div><img src="${e.unterschrift}" style="width:100%;max-width:280px;border:1px solid var(--border);border-radius:8px;background:#fff;display:block"></div>` : ''}
     </div>`;
   };
@@ -3993,23 +5266,8 @@ function renderProtokollScreen() {
 }
 
 window.openNewEintragModal = () => {
-  const today = new Date().toISOString().split('T')[0];
-  document.getElementById('inp-proto-datum').value = today;
-  document.getElementById('inp-proto-notiz').value = '';
-  aktiveSterne = 0;
-  [1,2,3,4,5].forEach(n => {
-    const b = document.getElementById('stern-'+n);
-    if (b) b.classList.remove('active');
-  });
-  aktiveMaengel = [];
-  document.querySelectorAll('.mangel-chip').forEach(c => c.classList.remove('selected'));
-  document.getElementById('protokoll-modal').classList.add('open');
-  // Unterschrift-Pad initialisieren (kurz warten bis Modal sichtbar)
-  setTimeout(() => {
-    clearSignature();
-    initSignaturePad();
-    document.getElementById('inp-proto-notiz').focus();
-  }, 150);
+  // Wird durch openNeuerEintrag (Kalender) ersetzt
+  openNeuerEintrag();
 };
 
 // ─── HILFE-SCREEN ────────────────────────────────────────────
@@ -4432,7 +5690,7 @@ function loadChatMessages() {
             background:${vonFahrlehrer?'var(--accent)':'var(--surface2)'};
             color:${vonFahrlehrer?'#0d1117':'var(--text)'};
             font-size:0.88rem;line-height:1.4;word-break:break-word">
-            ${msg.text}
+            ${(msg.text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
           </div>
           <div style="font-size:0.65rem;color:var(--muted);padding:0 4px">${datum} ${zeit}</div>
         </div>`;
@@ -4473,7 +5731,7 @@ const _origLogout = window.doLogout;
 window.doLogout = async () => {
   if (unsubChat) { unsubChat(); unsubChat = null; }
   document.getElementById('screen-chat').classList.remove('active');
-  if (_origLogout) await _origLogout();
+  try { if (_origLogout) await _origLogout(); } catch(e) { console.error('doLogout(chat):', e); }
 };
 
 
@@ -4676,12 +5934,24 @@ async function checkUrlCode() {
   }
 }
 
-// ── SERVICE WORKER REGISTRIERUNG ───────────────────────────
+// ── SERVICE WORKER REGISTRIERUNG + AUTO-UPDATE ──────────────
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js')
-      .then(() => console.log('Service Worker aktiv – Offline-Modus bereit'))
+      .then(reg => {
+        console.log('Service Worker aktiv – Offline-Modus bereit');
+        // Stündlich nach Updates suchen (zusätzlich zum Browser-Standard)
+        setInterval(() => reg.update().catch(()=>{}), 60 * 60 * 1000);
+      })
       .catch(err => console.log('Service Worker Fehler:', err));
+
+    // Neuer SW hat übernommen → Seite EINMAL neu laden (holt frisches HTML)
+    let swReloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (swReloaded) return; // Schutz vor Reload-Schleife
+      swReloaded = true;
+      window.location.reload();
+    });
   });
 }
 

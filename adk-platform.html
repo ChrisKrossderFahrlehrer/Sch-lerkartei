@@ -2,6 +2,8 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
+<!-- EmailJS für Benachrichtigungen -->
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#f0b429">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -397,7 +399,8 @@ html { overscroll-behavior-y: contain; }
   <div class="tab-row">
     <button class="tab-btn active" id="sa-tab-pending"   onclick="saTab('pending')">⏳ Ausstehend</button>
     <button class="tab-btn"        id="sa-tab-aktiv"     onclick="saTab('aktiv')">✅ Aktiv</button>
-    <button class="tab-btn"        id="sa-tab-analytics" onclick="saTab('analytics')">📊 Analytics</button>
+    <button class="tab-btn"        id="sa-tab-abos"      onclick="saTab('abos')">💳 Abos</button>
+    <button class="tab-btn"        id="sa-tab-analytics" onclick="saTab('analytics')">📊 Stats</button>
     <button class="tab-btn"        id="sa-tab-alle"      onclick="saTab('alle')">📋 Alle</button>
     <button class="tab-btn"        id="sa-tab-einst"     onclick="saTab('einst')">⚙️</button>
   </div>
@@ -565,6 +568,8 @@ const SUPERADMIN_UID = 'DEINE_SUPERADMIN_UID'; // Optional: nach erstem Login mi
 let currentUser   = null;
 let currentProfil = null; // { rolle, fahrschuleId, name, ... }
 let fahrschulen   = [];
+let passwordResets = [];
+let unsubPwResets  = null;
 let saAktivTab    = 'pending';
 let fsaAktivTab   = 'lehrer';
 let unsubFahrschulen = null;
@@ -685,6 +690,9 @@ window.doRegister = async () => {
 
     okEl.textContent = '✓ Registrierung erfolgreich! Ihr Konto wird geprüft.';
     btn.textContent = 'Gesendet ✓';
+
+    // ── E-MAIL AN CHRIS ──────────────────────────────────────
+    sendRegistrationNotification({ name, inhaber, email, stadt });
   } catch(e) {
     errEl.textContent = friendlyError(e.code);
     btn.disabled = false; btn.textContent = 'Registrierung absenden →';
@@ -692,21 +700,61 @@ window.doRegister = async () => {
 };
 
 // ── AUTH: LOGOUT ─────────────────────────────────────────────
+
+// ── E-MAIL BENACHRICHTIGUNG (EmailJS) ────────────────────────
+// ⚠️ SETUP (einmalig):
+//   1. emailjs.com → kostenlosen Account erstellen
+//   2. Email Service hinzufügen (Gmail: "chriskoo@mail.de")
+//   3. Email Template erstellen mit diesen Variablen:
+//      {{fs_name}}, {{inhaber}}, {{email}}, {{stadt}}, {{datum}}
+//   4. Public Key + Service ID + Template ID hier eintragen:
+
+const EMAILJS_PUBLIC_KEY  = 'DEIN_PUBLIC_KEY';   // ← emailjs.com → Account → Public Key
+const EMAILJS_SERVICE_ID  = 'DEIN_SERVICE_ID';   // ← emailjs.com → Email Services
+const EMAILJS_TEMPLATE_ID = 'DEIN_TEMPLATE_ID';  // ← emailjs.com → Email Templates
+
+function sendRegistrationNotification({ name, inhaber, email, stadt }) {
+  if (EMAILJS_PUBLIC_KEY.includes('DEIN_')) {
+    console.warn('EmailJS noch nicht konfiguriert — E-Mail-Benachrichtigung übersprungen');
+    return;
+  }
+
+  try {
+    emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
+    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+      to_email:  'chriskoo@mail.de',
+      fs_name:   name,
+      inhaber:   inhaber,
+      email:     email,
+      stadt:     stadt,
+      datum:     new Date().toLocaleString('de-DE'),
+      link:      'https://fahrschuelerkartei.de/adk-platform.html'
+    }).then(() => {
+      console.log('✅ Benachrichtigung gesendet an chriskoo@mail.de');
+    }).catch(err => {
+      console.error('EmailJS Fehler:', err);
+    });
+  } catch(e) {
+    console.error('EmailJS Init Fehler:', e);
+  }
+}
 window.doLogout = async () => {
   if (unsubFahrschulen) { unsubFahrschulen(); unsubFahrschulen = null; }
+  if (unsubPwResets)    { unsubPwResets();    unsubPwResets = null; }
   if (unsubLehrer)      { unsubLehrer();      unsubLehrer = null; }
   currentUser = null; currentProfil = null;
-  await signOut(auth);
+  try { await signOut(auth); } catch(e) { console.error('doLogout:', e); }
 };
 
 // ── SUPERADMIN: Tabs ─────────────────────────────────────────
 window.saTab = (tab) => {
   saAktivTab = tab;
-  ['pending','aktiv','analytics','alle','einst'].forEach(t => {
+  ['pending','aktiv','abos','analytics','alle','einst'].forEach(t => {
     const el = document.getElementById(`sa-tab-${t}`);
     if (el) el.classList.toggle('active', t===tab);
   });
   if      (tab === 'analytics') renderAnalytics();
+  else if (tab === 'abos')      renderAbos();
   else if (tab === 'einst')     renderSuperAdminEinst();
   else renderSuperadmin();
 };
@@ -834,6 +882,114 @@ async function renderAnalytics() {
 }
 
 
+// ── SUPERADMIN: Abos Dashboard ───────────────────────────────
+async function renderAbos() {
+  const body = document.getElementById('sa-body');
+  body.innerHTML = `<div style="padding:40px;text-align:center;color:var(--muted)">💳 Lädt…</div>`;
+
+  try {
+    // Alle Fahrschulen laden (inklusive Abo-Daten)
+    const fsSnap = await getDocs(query(collection(db,'fahrschulen'), orderBy('createdAt','desc')));
+    const alle   = fsSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+
+    // Abo-Statistiken
+    const free     = alle.filter(f => !f.abo || f.abo === 'free');
+    const proMonat = alle.filter(f => f.abo === 'pro_monat');
+    const proJahr  = alle.filter(f => f.abo === 'pro_jahr');
+    const gesamt   = alle.length;
+    const mrr      = proMonat.length * 9.99 + proJahr.length * (79/12);
+
+    // KPI-Kacheln
+    const kpiHTML = `
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:16px">
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center">
+          <div style="font-size:1.8rem;font-weight:800;font-family:'Syne',sans-serif;color:var(--accent)">${gesamt}</div>
+          <div style="font-size:0.7rem;color:var(--muted)">Registrierte Schulen</div>
+        </div>
+        <div style="background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:12px;padding:14px;text-align:center">
+          <div style="font-size:1.8rem;font-weight:800;font-family:'Syne',sans-serif;color:var(--accent2)">${proMonat.length + proJahr.length}</div>
+          <div style="font-size:0.7rem;color:var(--muted)">Pro-Abonnenten</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center">
+          <div style="font-size:1.8rem;font-weight:800;font-family:'Syne',sans-serif;color:var(--muted)">${free.length}</div>
+          <div style="font-size:0.7rem;color:var(--muted)">Free-Nutzer</div>
+        </div>
+        <div style="background:rgba(240,180,41,0.1);border:1px solid rgba(240,180,41,0.3);border-radius:12px;padding:14px;text-align:center">
+          <div style="font-size:1.8rem;font-weight:800;font-family:'Syne',sans-serif;color:var(--accent)">${mrr.toFixed(2)} €</div>
+          <div style="font-size:0.7rem;color:var(--muted)">MRR (geschätzt)</div>
+        </div>
+      </div>`;
+
+    // Abo-Tabelle
+    const aboLabel = { free:'Free', pro_monat:'Pro Monat', pro_jahr:'Pro Jahr' };
+    const aboBg    = { free:'var(--surface)', pro_monat:'rgba(63,185,80,0.1)', pro_jahr:'rgba(240,180,41,0.1)' };
+    const aboColor = { free:'var(--muted)', pro_monat:'var(--accent2)', pro_jahr:'var(--accent)' };
+
+    const rowsHTML = alle.map(fs => {
+      const abo     = fs.abo || 'free';
+      const expiry  = fs.aboExpiry ? new Date(fs.aboExpiry).toLocaleDateString('de-DE') : '–';
+      const created = fs.createdAt ? new Date(fs.createdAt).toLocaleDateString('de-DE') : '–';
+      const ppId    = fs.aboPaypalId ? `<span style="font-size:0.6rem;color:var(--muted)">${fs.aboPaypalId.substring(0,16)}…</span>` : '';
+      return `
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:700;font-size:0.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${fs.name || fs.email || fs.id}</div>
+              <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">${fs.email||''} · ${created} ${ppId}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+              <span style="background:${aboBg[abo]||'var(--surface)'};color:${aboColor[abo]||'var(--muted)'};border-radius:8px;padding:3px 10px;font-size:0.72rem;font-weight:700">
+                ${aboLabel[abo]||abo}
+              </span>
+              <select onchange="setFsAbo('${fs.id}', this.value)"
+                style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:4px 8px;font-size:0.72rem;cursor:pointer">
+                <option value="free"      ${abo==='free'?'selected':''}>Free</option>
+                <option value="pro_monat" ${abo==='pro_monat'?'selected':''}>Pro Monat</option>
+                <option value="pro_jahr"  ${abo==='pro_jahr'?'selected':''}>Pro Jahr</option>
+              </select>
+            </div>
+          </div>
+          ${abo !== 'free' ? `<div style="font-size:0.7rem;color:var(--muted);margin-top:6px">Läuft bis: ${expiry}</div>` : ''}
+        </div>`;
+    }).join('');
+
+    body.innerHTML = kpiHTML +
+      `<div style="padding:0 16px">
+        <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">
+          Alle Nutzer (${alle.length})
+        </div>
+        ${rowsHTML || '<div style="text-align:center;padding:32px;color:var(--muted)">Keine Nutzer</div>'}
+        <div style="padding:20px 0;font-size:0.7rem;color:var(--muted);text-align:center">
+          Pro Monat: 9,99 € · Pro Jahr: 79 € (6,58 €/Monat)
+        </div>
+      </div>`;
+
+  } catch(e) {
+    body.innerHTML = `<div style="padding:40px;text-align:center;color:var(--danger)">Fehler: ${e.message}</div>`;
+  }
+}
+
+window.setFsAbo = async (fsId, abo) => {
+  try {
+    const now      = Date.now();
+    const expiry   = abo === 'pro_monat'
+      ? now + 30*24*60*60*1000
+      : abo === 'pro_jahr'
+        ? now + 365*24*60*60*1000
+        : null;
+    await updateDoc(doc(db,'fahrschulen',fsId), {
+      abo,
+      aboExpiry:     expiry,
+      aboSetByAdmin: true,
+      aboUpdatedAt:  now
+    });
+    toast(`✅ Abo auf "${abo}" gesetzt`);
+  } catch(e) {
+    toast('Fehler: ' + e.message);
+  }
+};
+
+
 // ── AUTH STATE CHANGED ────────────────────────────────────────
 onAuthStateChanged(auth, async (user) => {
   document.getElementById('loading').style.display = 'none';
@@ -911,8 +1067,25 @@ function loadSuperadmin() {
   const q = query(collection(db, 'fahrschulen'), orderBy('createdAt', 'desc'));
   unsubFahrschulen = onSnapshot(q, snap => {
     fahrschulen = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Live-Badge für ausstehende Anfragen
+    const pending = fahrschulen.filter(f => f.status === 'ausstehend').length;
+    const tabBtn  = document.getElementById('sa-tab-pending');
+    if (tabBtn) {
+      tabBtn.innerHTML = pending > 0
+        ? `⏳ Ausstehend <span style="background:var(--danger);color:#fff;border-radius:999px;
+             font-size:0.6rem;font-weight:800;padding:1px 6px;margin-left:4px">${pending}</span>`
+        : '⏳ Ausstehend';
+    }
     renderSuperadmin();
   });
+
+  // Passwort-Reset-Anfragen live mithören
+  if (unsubPwResets) unsubPwResets();
+  unsubPwResets = onSnapshot(collection(db, 'passwordResets'), snap => {
+    passwordResets = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a,b) => (b.createdAt||0)-(a.createdAt||0));
+    renderSuperadmin();
+  }, err => console.error('passwordResets listener:', err));
 }
 
 
@@ -1011,36 +1184,74 @@ function renderSuperadmin() {
   if (saAktivTab === 'pending') list = list.filter(f => f.status === 'ausstehend');
   else if (saAktivTab === 'aktiv') list = list.filter(f => f.status === 'aktiv');
 
-  // KPIs
-  const total    = fahrschulen.length;
-  const pending  = fahrschulen.filter(f=>f.status==='ausstehend').length;
-  const aktiv    = fahrschulen.filter(f=>f.status==='aktiv').length;
+  const total   = fahrschulen.length;
+  const pending = fahrschulen.filter(f=>f.status==='ausstehend').length;
+  const aktiv   = fahrschulen.filter(f=>f.status==='aktiv').length;
 
-  body.innerHTML = `
+  const emptyMsg = saAktivTab === 'pending'
+    ? '✅ Keine ausstehenden Anfragen'
+    : 'Keine Einträge';
+
+  // 🔑 Offene Passwort-Reset-Anfragen (nur im Pending-Tab)
+  const offeneResets = passwordResets.filter(r => r.status === 'offen');
+  const resetCardHTML = (saAktivTab === 'pending' && offeneResets.length)
+    ? '<div style="margin:0 16px 14px;background:rgba(248,81,73,0.08);border:1.5px solid rgba(248,81,73,0.35);border-radius:14px;padding:14px">'
+      + '<div style="font-weight:800;font-family:\'Syne\',sans-serif;font-size:0.9rem;color:var(--danger);margin-bottom:10px">🔑 '
+      + offeneResets.length + ' Passwort-Anfrage' + (offeneResets.length>1?'n':'') + '</div>'
+      + offeneResets.map(function(r){
+          var datum = r.createdAt ? new Date(r.createdAt).toLocaleString('de-DE') : '';
+          var un = (r.username||'').replace(/</g,'&lt;');
+          var ko = (r.kontakt||'').replace(/</g,'&lt;');
+          return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border)">'
+            + '<div style="flex:1;min-width:0">'
+            + '<div style="font-weight:700;font-size:0.85rem">👤 ' + un + '</div>'
+            + '<div style="font-size:0.75rem;color:var(--muted);margin-top:2px">📞 ' + ko + ' · ' + datum + '</div>'
+            + '</div>'
+            + '<button onclick="resolvePwReset(\'' + r.id + '\')" style="background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.4);color:var(--accent2);border-radius:8px;padding:6px 10px;font-size:0.7rem;font-weight:700;cursor:pointer;white-space:nowrap">✓ Erledigt</button>'
+            + '</div>';
+        }).join('')
+      + '<a href="https://console.firebase.google.com/project/fahrschule-ebc65/authentication/users" target="_blank" '
+      + 'style="display:block;margin-top:10px;text-align:center;font-size:0.72rem;color:var(--blue);text-decoration:underline">→ Firebase Console öffnen (Passwort zurücksetzen)</a>'
+      + '</div>'
+    : '';
+
+  body.innerHTML = resetCardHTML + `
     <div class="kpi-row">
       <div class="kpi"><div class="kpi-val" style="color:var(--accent)">${total}</div><div class="kpi-lbl">Gesamt</div></div>
       <div class="kpi"><div class="kpi-val" style="color:var(--accent2)">${aktiv}</div><div class="kpi-lbl">Aktiv</div></div>
-      <div class="kpi"><div class="kpi-val" style="color:var(--danger)">${pending}</div><div class="kpi-lbl">Ausstehend</div></div>
+      <div class="kpi"><div class="kpi-val" style="color:${pending>0?'var(--danger)':'var(--muted)'}">${pending}</div><div class="kpi-lbl">Ausstehend</div></div>
     </div>
-    ${list.length === 0 ? `<div style="padding:40px;text-align:center;color:var(--muted)">Keine Einträge</div>` :
-      list.map(fs => {
-        const statusBadge = fs.status === 'aktiv'
+    ${(function(){
+      if(list.length===0) return '<div style="padding:40px;text-align:center;color:var(--muted)">'+emptyMsg+'</div>';
+      return list.map(function(fs){
+        var statusBadge = fs.status==='aktiv'
           ? '<span class="badge badge-green">✅ Aktiv</span>'
-          : fs.status === 'gesperrt'
+          : fs.status==='gesperrt'
           ? '<span class="badge badge-red">🚫 Gesperrt</span>'
           : '<span class="badge badge-yellow">⏳ Ausstehend</span>';
-        const initial = (fs.name||'?')[0].toUpperCase();
-        const colors = ['#f0b429','#3fb950','#58a6ff','#bc8cff'];
-        const color  = colors[fs.name.charCodeAt(0) % colors.length];
-        return `<div class="list-item" onclick="openFsDetail('${fs.id}')">
-          <div class="list-avatar" style="background:${color}20;color:${color}">${initial}</div>
-          <div class="list-info">
-            <div class="list-name">${fs.name}</div>
-            <div class="list-sub">${fs.inhaber} · ${fs.stadt} · ${new Date(fs.createdAt).toLocaleDateString('de-DE')}</div>
-          </div>
-          ${statusBadge}
-        </div>`;
-      }).join('')}
+        var initial = (fs.name||'?')[0].toUpperCase();
+        var colors  = ['#f0b429','#3fb950','#58a6ff','#bc8cff'];
+        var color   = colors[fs.name.charCodeAt(0) % colors.length];
+        var created = fs.createdAt ? new Date(fs.createdAt).toLocaleDateString('de-DE') : '';
+        var actionBtns = fs.status==='ausstehend'
+          ? '<div style="display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'
+            +'<button onclick="event.stopPropagation();setFsStatus(''+fs.id+'','aktiv')" style="flex:1;background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.4);color:var(--accent2);border-radius:8px;padding:8px;font-size:0.78rem;font-weight:700;cursor:pointer">✅ Freischalten</button>'
+            +'<button onclick="event.stopPropagation();setFsStatus(''+fs.id+'','gesperrt')" style="flex:1;background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);color:var(--danger);border-radius:8px;padding:8px;font-size:0.78rem;font-weight:700;cursor:pointer">🚫 Ablehnen</button>'
+            +'</div>'
+          : '';
+        var borderStyle = fs.status==='ausstehend' ? 'border:1px solid rgba(240,180,41,0.3);background:rgba(240,180,41,0.04)' : '';
+        return '<div class="list-item" onclick="openFsDetail(''+fs.id+'')" style="'+borderStyle+'">'
+          +'<div class="list-avatar" style="background:'+color+'20;color:'+color+'">'+initial+'</div>'
+          +'<div class="list-info" style="flex:1">'
+          +'<div class="list-name">'+fs.name+'</div>'
+          +'<div class="list-sub">'+(fs.inhaber||'')+' · '+(fs.stadt||'')+' · '+created+'</div>'
+          +'<div class="list-sub" style="color:var(--muted)">'+(fs.email||'')+'</div>'
+          +actionBtns
+          +'</div>'
+          +(fs.status!=='ausstehend' ? statusBadge : '')
+          +'</div>';
+      }).join('');
+    })()}
   `;
 }
 
@@ -1073,10 +1284,21 @@ window.openFsDetail = (fsId) => {
   document.getElementById('modal-fs-detail').classList.add('open');
 };
 
+// ── Passwort-Reset-Anfrage erledigt ──────────────────────────
+window.resolvePwReset = async (resetId) => {
+  try {
+    await deleteDoc(doc(db, 'passwordResets', resetId));
+    toast('✓ Anfrage erledigt');
+  } catch(e) { console.error('resolvePwReset:', e); toast('❌ Fehler: ' + e.message); }
+};
+
 window.setFsStatus = async (fsId, status) => {
-  await updateDoc(doc(db, 'fahrschulen', fsId), { status });
-  document.getElementById('modal-fs-detail').classList.remove('open');
-  toast(status === 'aktiv' ? '✅ Fahrschule freigeschaltet!' : '🚫 Fahrschule gesperrt.');
+  try {
+    await updateDoc(doc(db, 'fahrschulen', fsId), { status, statusUpdatedAt: Date.now() });
+    const modalEl = document.getElementById('modal-fs-detail');
+    if (modalEl) modalEl.classList.remove('open');
+    toast(status === 'aktiv' ? '✅ Fahrschule freigeschaltet!' : status === 'gesperrt' ? '🚫 Fahrschule gesperrt.' : '✓ Status aktualisiert');
+  } catch(e) { console.error('setFsStatus:', e); toast('❌ Fehler: ' + e.message); }
 };
 
 // ── FAHRSCHUL-ADMIN ──────────────────────────────────────────

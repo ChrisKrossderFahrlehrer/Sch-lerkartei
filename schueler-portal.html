@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0a0f1e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>ADK – Schüler-Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ─── RESET & BASE ─────────────────────────────── */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+:root {
+  --bg:       #0a0f1e;
+  --surface:  #111827;
+  --surface2: #1c2640;
+  --border:   #2a3655;
+  --text:     #e8eef8;
+  --muted:    #6b7fa8;
+  --accent:   #f0b429;
+  --accent2:  #3fb950;
+  --blue:     #4a9eff;
+  --danger:   #f85149;
+  --radius:   16px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bot: env(safe-area-inset-bottom, 0px);
+}
+html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--text);
+  font-family:'Manrope',sans-serif; font-size:15px; }
+
+/* ─── SCREENS ──────────────────────────────────── */
+.screen { display:none; position:fixed; inset:0; flex-direction:column; overflow:hidden; }
+.screen.active { display:flex; }
+
+/* ─── HEADER ───────────────────────────────────── */
+.portal-header {
+  padding: calc(var(--safe-top) + 12px) 16px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0;
+}
+.portal-header-title { font-family:'Syne',sans-serif; font-weight:800; font-size:1rem; }
+.portal-header-sub { font-size:0.7rem; color:var(--muted); margin-top:1px; }
+
+/* ─── BOTTOM NAV ───────────────────────────────── */
+.bottom-nav {
+  display: flex;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding-bottom: var(--safe-bot);
+  flex-shrink: 0;
+}
+.nav-btn {
+  flex: 1; display:flex; flex-direction:column; align-items:center;
+  gap:2px; padding:10px 4px 8px;
+  background:none; border:none; color:var(--muted); cursor:pointer;
+  font-family:'Manrope',sans-serif; font-size:0.58rem; font-weight:600;
+  transition: color .2s; position:relative;
+}
+.nav-btn.active { color:var(--accent); }
+.nav-btn .nav-icon { font-size:1.25rem; }
+.nav-badge {
+  position:absolute; top:7px; right:calc(50% - 16px);
+  background:var(--danger); color:#fff; border-radius:999px;
+  font-size:0.55rem; font-weight:800; min-width:15px; height:15px;
+  display:flex; align-items:center; justify-content:center; padding:0 3px;
+}
+
+/* ─── SCROLL BODY ──────────────────────────────── */
+.scroll-body { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:16px; }
+
+/* ─── CARDS ────────────────────────────────────── */
+.card {
+  background: var(--surface2); border:1px solid var(--border);
+  border-radius: var(--radius); padding:16px; margin-bottom:12px;
+}
+.card-title {
+  font-family:'Syne',sans-serif; font-weight:700; font-size:0.9rem;
+  margin-bottom:12px; display:flex; align-items:center; gap:8px;
+}
+
+/* ─── PROGRESS BAR ─────────────────────────────── */
+.prog-bar-wrap { background:var(--surface); border-radius:999px; height:10px; overflow:hidden; margin:8px 0; }
+.prog-bar      { height:100%; border-radius:999px; background:linear-gradient(90deg,var(--accent),#ffca4a); transition:width .6s ease; }
+.prog-pct      { font-family:'Syne',sans-serif; font-weight:800; font-size:2rem; color:var(--accent); }
+
+/* ─── LOGIN SCREEN ─────────────────────────────── */
+#screen-login { background:var(--bg); align-items:center; justify-content:center; }
+.login-wrap { width:100%; max-width:360px; padding:32px 24px; }
+.login-logo {
+  text-align:center; margin-bottom:32px;
+}
+.login-logo-icon {
+  width:72px; height:72px; background:linear-gradient(135deg,var(--accent),#ff8c00);
+  border-radius:20px; display:flex; align-items:center; justify-content:center;
+  font-size:2.2rem; margin:0 auto 12px;
+  box-shadow: 0 8px 32px rgba(240,180,41,0.3);
+}
+.login-title { font-family:'Syne',sans-serif; font-weight:800; font-size:1.6rem; }
+.login-sub { color:var(--muted); font-size:0.85rem; margin-top:6px; }
+.code-input {
+  width:100%; background:var(--surface2); border:2px solid var(--border);
+  border-radius:12px; color:var(--text); font-family:'Syne',sans-serif;
+  font-size:1.8rem; font-weight:800; text-align:center; letter-spacing:0.18em;
+  padding:16px; margin:24px 0 12px; text-transform:uppercase;
+  outline:none; transition:border-color .2s;
+}
+.code-input:focus { border-color:var(--accent); }
+.code-input::placeholder { color:var(--muted); letter-spacing:0.1em; font-size:1.2rem; }
+.btn-login {
+  width:100%; padding:16px; background:var(--accent); color:#0d1117;
+  border:none; border-radius:12px; font-family:'Syne',sans-serif;
+  font-weight:800; font-size:1rem; cursor:pointer; letter-spacing:0.04em;
+  box-shadow:0 4px 20px rgba(240,180,41,0.3);
+  transition: transform .15s, box-shadow .15s;
+}
+.btn-login:active { transform:scale(0.98); }
+.login-error { color:var(--danger); font-size:0.82rem; text-align:center; margin-top:8px; min-height:20px; }
+
+/* ─── CHAT ─────────────────────────────────────── */
+.chat-messages { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:12px 16px; display:flex; flex-direction:column; gap:8px; }
+.msg-bubble {
+  max-width:80%; padding:10px 14px; border-radius:18px;
+  font-size:0.88rem; line-height:1.45; word-break:break-word;
+}
+.msg-bubble.fahrlehrer {
+  background:var(--surface2); border:1px solid var(--border);
+  border-bottom-left-radius:4px; align-self:flex-start;
+}
+.msg-bubble.schueler {
+  background:var(--accent); color:#0d1117;
+  border-bottom-right-radius:4px; align-self:flex-end;
+}
+.msg-meta { font-size:0.6rem; color:var(--muted); margin-top:3px; }
+.msg-bubble.schueler .msg-meta { color:rgba(0,0,0,0.4); text-align:right; }
+.chat-input-wrap {
+  padding:10px 12px calc(10px + var(--safe-bot));
+  background:var(--surface); border-top:1px solid var(--border);
+  display:flex; gap:8px; align-items:flex-end;
+}
+.chat-input {
+  flex:1; background:var(--surface2); border:1.5px solid var(--border);
+  border-radius:20px; color:var(--text); font-family:'Manrope',sans-serif;
+  font-size:0.9rem; padding:10px 14px; resize:none; max-height:100px;
+  outline:none; transition:border-color .2s; line-height:1.4;
+}
+.chat-input:focus { border-color:var(--blue); }
+.chat-send-btn {
+  width:40px; height:40px; background:var(--blue); border:none;
+  border-radius:50%; cursor:pointer; display:flex; align-items:center;
+  justify-content:center; font-size:1.1rem; flex-shrink:0;
+  transition:transform .15s;
+}
+.chat-send-btn:active { transform:scale(0.92); }
+.chat-empty { text-align:center; padding:32px 16px; color:var(--muted); font-size:0.85rem; }
+
+/* ─── PLANNER ──────────────────────────────────── */
+.lesson-card {
+  background:var(--surface2); border:1px solid var(--border);
+  border-radius:14px; padding:14px; margin-bottom:10px;
+  display:flex; gap:14px; align-items:flex-start;
+}
+.lesson-date-box {
+  background:var(--accent); color:#0d1117; border-radius:10px;
+  padding:6px 10px; text-align:center; flex-shrink:0; min-width:52px;
+}
+.lesson-date-day   { font-family:'Syne',sans-serif; font-weight:800; font-size:1.3rem; line-height:1; }
+.lesson-date-month { font-size:0.6rem; font-weight:700; text-transform:uppercase; }
+.lesson-info { flex:1; }
+.lesson-title { font-weight:700; font-size:0.9rem; }
+.lesson-detail { font-size:0.78rem; color:var(--muted); margin-top:4px; line-height:1.5; }
+.lesson-status {
+  font-size:0.65rem; font-weight:700; border-radius:6px; padding:2px 8px;
+  display:inline-flex; align-items:center; gap:4px; margin-top:6px;
+}
+.status-geplant     { background:rgba(240,180,41,0.15);  color:var(--accent);  border:1px solid rgba(240,180,41,0.3); }
+.status-bestaetigt  { background:rgba(63,185,80,0.15);   color:var(--accent2); border:1px solid rgba(63,185,80,0.3); }
+.status-abgesagt    { background:rgba(248,81,73,0.15);   color:var(--danger);  border:1px solid rgba(248,81,73,0.3); }
+.lesson-actions { display:flex; gap:6px; margin-top:8px; }
+.lesson-btn {
+  flex:1; padding:7px; border-radius:8px; font-family:'Manrope',sans-serif;
+  font-weight:600; font-size:0.75rem; cursor:pointer; border:1px solid var(--border);
+  background:var(--surface); color:var(--text); transition:background .15s;
+}
+.lesson-btn.confirm { background:rgba(63,185,80,0.15); color:var(--accent2); border-color:rgba(63,185,80,0.4); }
+.lesson-btn.cancel  { background:rgba(248,81,73,0.1);  color:var(--danger);  border-color:rgba(248,81,73,0.3); }
+
+/* ─── ADK FORTSCHRITT ──────────────────────────── */
+.thema-row {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:8px 0; border-bottom:1px solid var(--border); font-size:0.84rem;
+}
+.thema-dot {
+  width:10px; height:10px; border-radius:50%; flex-shrink:0;
+}
+.gruppe-header {
+  font-family:'Syne',sans-serif; font-weight:700; font-size:0.8rem;
+  color:var(--muted); text-transform:uppercase; letter-spacing:0.08em;
+  margin:16px 0 6px; display:flex; justify-content:space-between;
+}
+
+/* ─── LOADING ──────────────────────────────────── */
+#loading-overlay {
+  position:fixed; inset:0; background:var(--bg);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:16px; z-index:9999;
+}
+.spinner {
+  width:44px; height:44px; border:3px solid var(--border);
+  border-top-color:var(--accent); border-radius:50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* ─── TOAST ────────────────────────────────────── */
+#portal-toast {
+  position:fixed; bottom:calc(72px + var(--safe-bot) + 8px); left:50%;
+  transform:translateX(-50%) translateY(20px); opacity:0;
+  background:var(--surface2); border:1px solid var(--border); color:var(--text);
+  border-radius:12px; padding:10px 18px; font-size:0.84rem; font-weight:600;
+  white-space:nowrap; transition:all .25s; pointer-events:none; z-index:8888;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+#portal-toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+/* ─── KOMMENTAR LEHRER ─────────────────────────── */
+.lehrer-kommentar {
+  background:rgba(63,185,80,0.08); border:1.5px solid rgba(63,185,80,0.35);
+  border-radius:14px; padding:14px; margin-bottom:12px;
+}
+.lehrer-kommentar-header { font-weight:700; color:var(--accent2); font-size:0.88rem; margin-bottom:6px; }
+.lehrer-kommentar-text { font-size:0.88rem; line-height:1.55; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <div style="font-size:0.8rem;color:var(--muted)">Laden…</div>
+</div>
+
+<!-- Toast -->
+<div id="portal-toast"></div>
+
+<!-- ════ LOGIN ════ -->
+<div class="screen active" id="screen-login">
+  <div class="login-wrap">
+    <div class="login-logo">
+      <div class="login-logo-icon">🚗</div>
+      <div class="login-title">Schüler-Portal</div>
+      <div class="login-sub">ADK – Digitale Kartei</div>
+    </div>
+    <input class="code-input" id="inp-code" type="text" maxlength="8"
+      placeholder="CODE" autocomplete="off" autocorrect="off" spellcheck="false"
+      oninput="this.value=this.value.toUpperCase()"
+      onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn-login" onclick="doLogin()">Einloggen →</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- ════ HAUPT-APP (nach Login) ════ -->
+<div class="screen" id="screen-app">
+
+  <!-- Header -->
+  <div class="portal-header">
+    <div>
+      <div class="portal-header-title" id="header-name">Schüler-Portal</div>
+      <div class="portal-header-sub" id="header-klasse"></div>
+    </div>
+    <button onclick="doLogout()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:5px 10px;border-radius:8px;font-size:0.72rem;cursor:pointer">Abmelden</button>
+  </div>
+
+  <!-- Tab-Content -->
+  <div id="tab-dashboard" class="scroll-body"><!-- wird gerendert --></div>
+  <div id="tab-chat" style="display:none;flex:1;flex-direction:column;overflow:hidden">
+    <div class="chat-messages" id="chat-messages"></div>
+    <div class="chat-input-wrap">
+      <textarea class="chat-input" id="chat-input" rows="1" placeholder="Nachricht…"
+        oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
+      <button class="chat-send-btn" onclick="sendMessage()">↑</button>
+    </div>
+  </div>
+  <div id="tab-planner" class="scroll-body" style="display:none"><!-- wird gerendert --></div>
+  <div id="tab-protokoll" class="scroll-body" style="display:none"><!-- wird gerendert --></div>
+  <div id="tab-fortschritt" class="scroll-body" style="display:none"><!-- wird gerendert --></div>
+
+  <!-- Bottom Nav -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" id="nav-dashboard" onclick="switchPortalTab('dashboard')">
+      <span class="nav-icon">🏠</span>Dashboard
+    </button>
+    <button class="nav-btn" id="nav-chat" onclick="switchPortalTab('chat')">
+      <span class="nav-icon">💬</span>Chat
+      <span class="nav-badge" id="chat-badge" style="display:none">0</span>
+    </button>
+    <button class="nav-btn" id="nav-planner" onclick="switchPortalTab('planner')">
+      <span class="nav-icon">📅</span>Termine
+    </button>
+    <button class="nav-btn" id="nav-protokoll" onclick="switchPortalTab('protokoll')">
+      <span class="nav-icon">📋</span>Protokoll
+    </button>
+    <button class="nav-btn" id="nav-fortschritt" onclick="switchPortalTab('fortschritt')">
+      <span class="nav-icon">📚</span>Lernstand
+    </button>
+  </nav>
+
+</div><!-- /screen-app -->
+
+<script type="module">
+import { initializeApp }    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, collection, doc, getDocs, onSnapshot,
+         query, where, updateDoc }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey:            'AIzaSyD490kLzTOq3h3VdQ9ZqWZd_aXcDRfxBOs',
+  authDomain:        'fahrschule-ebc65.firebaseapp.com',
+  projectId:         'fahrschule-ebc65',
+  storageBucket:     'fahrschule-ebc65.firebasestorage.app',
+  messagingSenderId: '194338111405',
+  appId:             '1:194338111405:web:73e2f31d69cde3ac9beb24'
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+
+// ── State ──────────────────────────────────────────────────────
+let codeDocId      = null;   // Firestore-Dokument-ID des accessCode
+let codeData       = null;   // Aktueller Snapshot des accessCode-Dokuments
+let unsubLive      = null;   // Live-Listener
+let schuelerName   = '';
+let lastReadMsgTs  = 0;
+const ADK_FARBEN   = ['#555','#f85149','#f0b429','#f0b429','#3fb950','#3fb950','#f0b429'];
+const STUFEN_NAME  = ['–','Noch nicht','Kaum','Manchmal','Meistens','Sicher','⭐ Sehr sicher'];
+
+// ── Loading ────────────────────────────────────────────────────
+setTimeout(() => {
+  document.getElementById('loading-overlay').style.display = 'none';
+  // Auto-Login: aus URL-Parameter oder sessionStorage
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlCode   = urlParams.get('code');
+  if (urlCode) {
+    document.getElementById('inp-code').value = urlCode.toUpperCase();
+    doLogin();
+    return;
+  }
+  const saved = sessionStorage.getItem('adk_portal_code_doc');
+  if (saved) {
+    const { docId, code } = JSON.parse(saved);
+    startLiveSession(docId, code);
+  }
+}, 300);
+
+// ── Login ──────────────────────────────────────────────────────
+window.doLogin = async () => {
+  const code  = (document.getElementById('inp-code').value || '').trim().toUpperCase();
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+  if (!code || code.length < 4) { errEl.textContent = 'Bitte Code eingeben.'; return; }
+
+  document.querySelector('.btn-login').textContent = '…';
+  try {
+    const q    = query(collection(db,'accessCodes'), where('code','==',code));
+    const snap = await getDocs(q);
+    if (snap.empty) { errEl.textContent = '❌ Code nicht gefunden.'; return; }
+
+    const docRef  = snap.docs[0];
+    const data    = docRef.data();
+
+    if (data.expiresAt && data.expiresAt < Date.now()) {
+      errEl.textContent = 'Code abgelaufen – neuen Code beim Fahrlehrer holen.'; return;
+    }
+    if (!data.studentSnapshot) {
+      errEl.textContent = '⚠️ Bitte neuen Code beim Fahrlehrer holen.'; return;
+    }
+
+    sessionStorage.setItem('adk_portal_code_doc', JSON.stringify({ docId: docRef.id, code }));
+    startLiveSession(docRef.id, code);
+
+  } catch(e) {
+    errEl.textContent = 'Fehler: ' + e.message;
+  } finally {
+    document.querySelector('.btn-login').textContent = 'Einloggen →';
+  }
+};
+
+window.doLogout = () => {
+  if (unsubLive) { unsubLive(); unsubLive = null; }
+  sessionStorage.removeItem('adk_portal_code_doc');
+  codeDocId = null; codeData = null;
+  document.getElementById('screen-app').classList.remove('active');
+  document.getElementById('screen-login').classList.add('active');
+  document.getElementById('inp-code').value = '';
+};
+
+// ── Live-Session ───────────────────────────────────────────────
+function startLiveSession(docId, code) {
+  codeDocId = docId;
+  if (unsubLive) { unsubLive(); }
+
+  unsubLive = onSnapshot(doc(db,'accessCodes',docId), (snap) => {
+    if (!snap.exists()) { doLogout(); return; }
+    codeData = snap.data();
+    onDataUpdate();
+  });
+}
+
+function onDataUpdate() {
+  const s = codeData.studentSnapshot || {};
+  schuelerName = ((s.vorname||'') + ' ' + (s.nachname||'')).trim() || 'Schüler';
+
+  document.getElementById('screen-login').classList.remove('active');
+  document.getElementById('screen-app').classList.add('active');
+  document.getElementById('loading-overlay').style.display = 'none';
+  document.getElementById('header-name').textContent = schuelerName;
+  document.getElementById('header-klasse').textContent =
+    'Führerschein Klasse ' + (s.klasse || 'B');
+
+  // Ungelesene Nachrichten
+  const msgs   = codeData.messages || [];
+  const unread = msgs.filter(m => m.sender === 'fahrlehrer' && m.timestamp > lastReadMsgTs).length;
+  const badge  = document.getElementById('chat-badge');
+  badge.textContent = unread;
+  badge.style.display = unread > 0 ? 'flex' : 'none';
+
+  // Aktiven Tab neu rendern
+  renderCurrentTab();
+}
+
+// ── Tab-System ─────────────────────────────────────────────────
+let activeTab = 'dashboard';
+
+window.switchPortalTab = (tab) => {
+  activeTab = tab;
+  ['dashboard','chat','planner','protokoll','fortschritt'].forEach(t => {
+    const content = document.getElementById('tab-' + t);
+    const btn     = document.getElementById('nav-' + t);
+    if (!content) return;
+    const isActive = t === tab;
+    content.style.display  = isActive ? (t === 'chat' ? 'flex' : 'block') : 'none';
+    if (btn) btn.classList.toggle('active', isActive);
+  });
+  if (tab === 'chat') {
+    lastReadMsgTs = Date.now();
+    document.getElementById('chat-badge').style.display = 'none';
+    renderChat();
+    setTimeout(() => {
+      const msgs = document.getElementById('chat-messages');
+      msgs.scrollTop = msgs.scrollHeight;
+    }, 50);
+  } else {
+    renderCurrentTab();
+  }
+};
+
+function renderCurrentTab() {
+  if      (activeTab === 'dashboard')   renderDashboard();
+  else if (activeTab === 'planner')     renderPlanner();
+  else if (activeTab === 'protokoll')   renderProtokoll();
+  else if (activeTab === 'fortschritt') renderFortschritt();
+  else if (activeTab === 'chat')        renderChat();
+}
+
+// ── Dashboard ──────────────────────────────────────────────────
+function renderDashboard() {
+  const s    = codeData.studentSnapshot || {};
+  const msgs = codeData.messages || [];
+  const lessons = (codeData.plannedLessons || [])
+    .filter(l => l.status !== 'abgesagt')
+    .sort((a,b) => a.datum.localeCompare(b.datum));
+
+  const pct      = Math.min(100, Math.round(((s.fahrstunden||0) / (s.zielStunden||30)) * 100));
+  const nextLesson = lessons.find(l => l.datum >= new Date().toISOString().split('T')[0]);
+  const unreadMsg  = msgs.filter(m => m.sender === 'fahrlehrer' && m.timestamp > lastReadMsgTs).length;
+
+  // Kommentar
+  const kommentarHTML = s.pruefKommentar
+    ? `<div class="lehrer-kommentar">
+        <div class="lehrer-kommentar-header">🎓 Kommentar deines Fahrlehrers</div>
+        <div class="lehrer-kommentar-text">${escHtml(s.pruefKommentar)}</div>
+       </div>`
+    : '';
+
+  // Nächste Fahrstunde
+  const nextLessonHTML = nextLesson
+    ? (() => {
+        const [y,m,d] = nextLesson.datum.split('-');
+        const mo = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'][parseInt(m)-1];
+        return `<div class="card" onclick="switchPortalTab('planner')" style="cursor:pointer">
+          <div class="card-title">📅 Nächste Fahrstunde</div>
+          <div style="display:flex;gap:14px;align-items:center">
+            <div style="background:var(--accent);color:#0d1117;border-radius:10px;padding:8px 12px;text-align:center">
+              <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.4rem;line-height:1">${d}</div>
+              <div style="font-size:0.65rem;font-weight:700;text-transform:uppercase">${mo}</div>
+            </div>
+            <div>
+              ${nextLesson.uhrzeit ? `<div style="font-weight:700">${nextLesson.uhrzeit} Uhr</div>` : ''}
+              ${nextLesson.ort     ? `<div style="font-size:0.82rem;color:var(--muted);margin-top:2px">📍 ${escHtml(nextLesson.ort)}</div>` : ''}
+              ${nextLesson.notiz  ? `<div style="font-size:0.82rem;color:var(--muted);margin-top:2px">📝 ${escHtml(nextLesson.notiz)}</div>` : ''}
+              <div class="lesson-status status-${nextLesson.status || 'geplant'}" style="margin-top:6px">
+                ${{geplant:'⏳ Geplant',bestaetigt:'✅ Bestätigt',abgesagt:'❌ Abgesagt'}[nextLesson.status||'geplant']}
+              </div>
+            </div>
+          </div>
+        </div>`;
+      })()
+    : '';
+
+  // Ungelesene Nachrichten
+  const chatHintHTML = unreadMsg > 0
+    ? `<div class="card" onclick="switchPortalTab('chat')" style="cursor:pointer;border-color:rgba(74,158,255,0.4)">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="font-size:1.6rem">💬</div>
+          <div>
+            <div style="font-weight:700">${unreadMsg} neue Nachricht${unreadMsg>1?'en':''}</div>
+            <div style="font-size:0.78rem;color:var(--blue);margin-top:2px">Vom Fahrlehrer → Tippen zum Lesen</div>
+          </div>
+        </div>
+       </div>`
+    : '';
+
+  document.getElementById('tab-dashboard').innerHTML = `
+    <div style="padding-bottom:8px">
+      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.2rem;margin-bottom:16px">
+        Hallo ${escHtml(s.vorname||schuelerName)} 👋
+      </div>
+
+      ${kommentarHTML}
+      ${chatHintHTML}
+      ${nextLessonHTML}
+
+      <!-- Fortschritt -->
+      <div class="card">
+        <div class="card-title">📊 Dein Ausbildungsstand</div>
+        <div class="prog-pct">${pct}%</div>
+        <div class="prog-bar-wrap"><div class="prog-bar" style="width:${pct}%"></div></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
+          <div style="background:var(--surface);border-radius:10px;padding:10px;text-align:center">
+            <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.3rem;color:var(--accent)">${s.fahrstunden||0}</div>
+            <div style="font-size:0.68rem;color:var(--muted)">von ${s.zielStunden||30} Stunden</div>
+          </div>
+          <div style="background:var(--surface);border-radius:10px;padding:10px;text-align:center">
+            <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.3rem;color:var(--accent2)">${getAbgeschlosseneThemen(s)}%</div>
+            <div style="font-size:0.68rem;color:var(--muted)">ADK-Themen sicher</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pflichtfahrten -->
+      <div class="card">
+        <div class="card-title">🚗 Pflichtfahrten</div>
+        ${renderSonderfahrtenMini(s)}
+      </div>
+
+    </div>`;
+}
+
+// ── Chat ───────────────────────────────────────────────────────
+function renderChat() {
+  const msgs = (codeData.messages || []).sort((a,b) => a.timestamp - b.timestamp);
+  const wrap = document.getElementById('chat-messages');
+
+  if (msgs.length === 0) {
+    wrap.innerHTML = `<div class="chat-empty">💬 Noch keine Nachrichten.<br>Schreib deinem Fahrlehrer!</div>`;
+    return;
+  }
+
+  wrap.innerHTML = msgs.map(m => {
+    const isFL = m.sender === 'fahrlehrer';
+    const time = new Date(m.timestamp).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+    const date = new Date(m.timestamp).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
+    return `<div class="msg-bubble ${m.sender}" style="display:flex;flex-direction:column">
+      ${isFL ? `<div style="font-size:0.68rem;color:var(--muted);margin-bottom:3px;font-weight:600">${escHtml(m.senderName||'Fahrlehrer')}</div>` : ''}
+      <div>${escHtml(m.text)}</div>
+      <div class="msg-meta">${date} ${time}</div>
+    </div>`;
+  }).join('');
+  setTimeout(() => { wrap.scrollTop = wrap.scrollHeight; }, 30);
+}
+
+window.sendMessage = async () => {
+  const input = document.getElementById('chat-input');
+  const text  = input.value.trim();
+  if (!text || !codeDocId) return;
+  input.value = '';
+  input.style.height = 'auto';
+
+  const msg = {
+    id:         Date.now().toString(),
+    text,
+    sender:     'schueler',
+    senderName: schuelerName,
+    timestamp:  Date.now()
+  };
+
+  try {
+    // Letzte 50 Nachrichten behalten
+    const currentMsgs = codeData.messages || [];
+    const newMsgs     = [...currentMsgs, msg].slice(-50);
+    await updateDoc(doc(db,'accessCodes',codeDocId), { messages: newMsgs });
+    lastReadMsgTs = Date.now();
+  } catch(e) {
+    portalToast('❌ Fehler: ' + e.message);
+  }
+};
+
+// ── Planner ────────────────────────────────────────────────────
+function renderPlanner() {
+  const heute   = new Date().toISOString().split('T')[0];
+  const lessons = (codeData.plannedLessons || []).sort((a,b) => a.datum.localeCompare(b.datum));
+  const upcoming = lessons.filter(l => l.datum >= heute);
+  const past     = lessons.filter(l => l.datum <  heute);
+
+  if (lessons.length === 0) {
+    document.getElementById('tab-planner').innerHTML = `
+      <div style="text-align:center;padding:48px 24px;color:var(--muted)">
+        <div style="font-size:3rem;margin-bottom:12px">📅</div>
+        <div style="font-weight:600">Noch keine Termine geplant</div>
+        <div style="font-size:0.82rem;margin-top:6px">Dein Fahrlehrer plant bald die nächste Fahrstunde</div>
+      </div>`;
+    return;
+  }
+
+  const renderLesson = (l) => {
+    const [y,m,d] = l.datum.split('-');
+    const mo = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'][parseInt(m)-1];
+    const isPast = l.datum < heute;
+    const statusMap = { geplant:'⏳ Geplant', bestaetigt:'✅ Bestätigt', abgesagt:'❌ Abgesagt' };
+    const actionsHTML = !isPast && l.status !== 'abgesagt'
+      ? `<div class="lesson-actions">
+          <button class="lesson-btn confirm" onclick="respondLesson('${l.id}','bestaetigt')">✅ Bestätigen</button>
+          <button class="lesson-btn cancel"  onclick="respondLesson('${l.id}','abgesagt')">❌ Absagen</button>
+        </div>`
+      : '';
+    return `<div class="lesson-card" style="${isPast?'opacity:0.5':''}">
+      <div class="lesson-date-box" style="${isPast?'background:var(--muted)':''}">
+        <div class="lesson-date-day">${d}</div>
+        <div class="lesson-date-month">${mo}</div>
+      </div>
+      <div class="lesson-info">
+        <div class="lesson-title">${l.uhrzeit ? l.uhrzeit + ' Uhr' : 'Fahrstunde'}</div>
+        <div class="lesson-detail">
+          ${l.ort   ? `📍 ${escHtml(l.ort)}<br>` : ''}
+          ${l.notiz ? `📝 ${escHtml(l.notiz)}` : ''}
+        </div>
+        <div class="lesson-status status-${l.status||'geplant'}">${statusMap[l.status||'geplant']}</div>
+        ${actionsHTML}
+      </div>
+    </div>`;
+  };
+
+  document.getElementById('tab-planner').innerHTML = `
+    ${upcoming.length > 0
+      ? `<div style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.85rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">Geplant</div>
+         ${upcoming.map(renderLesson).join('')}`
+      : `<div style="text-align:center;padding:20px;color:var(--muted);font-size:0.85rem">Keine bevorstehenden Termine</div>`}
+    ${past.length > 0
+      ? `<div style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.85rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin:16px 0 10px">Vergangen</div>
+         ${past.map(renderLesson).join('')}`
+      : ''}`;
+}
+
+window.respondLesson = async (lessonId, status) => {
+  if (!codeDocId) return;
+  try {
+    const updated = (codeData.plannedLessons || []).map(l =>
+      l.id === lessonId ? { ...l, status, respondedAt: Date.now() } : l
+    );
+    await updateDoc(doc(db,'accessCodes',codeDocId), { plannedLessons: updated });
+    portalToast(status === 'bestaetigt' ? '✅ Termin bestätigt!' : '❌ Termin abgesagt');
+  } catch(e) {
+    portalToast('Fehler: ' + e.message);
+  }
+};
+
+// ── Protokoll ──────────────────────────────────────────────────
+function renderProtokoll() {
+  const proto = (codeData.protokollSnapshot || [])
+    .sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
+
+  if (!proto.length) {
+    document.getElementById('tab-protokoll').innerHTML = `
+      <div style="text-align:center;padding:48px 24px;color:var(--muted)">
+        <div style="font-size:3rem;margin-bottom:12px">📋</div>
+        <div style="font-weight:600">Noch keine Fahrstunden eingetragen</div>
+        <div style="font-size:0.82rem;margin-top:6px">Dein Fahrlehrer trägt die Stunden ein</div>
+      </div>`;
+    return;
+  }
+
+  const rows = proto.map(e => {
+    const isPlanung = e.typ === 'planung';
+    const sterne    = !isPlanung && e.sterne ? '⭐'.repeat(e.sterne) : '';
+    const datumFmt  = e.datum ? e.datum.split('-').reverse().join('.') : '–';
+    const maengelHTML = !isPlanung && (e.maengel||[]).length
+      ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px">
+          ${(e.maengel||[]).map(m =>
+            `<span style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.25);
+             color:var(--danger);border-radius:10px;padding:1px 8px;font-size:0.68rem">${escHtml(m)}</span>`
+          ).join('')}
+        </div>`
+      : '';
+    return `
+      <div style="background:var(--surface2);border:1px solid ${isPlanung?'rgba(74,158,255,0.3)':'var(--border)'};
+           border-radius:12px;padding:12px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
+          <div style="background:${isPlanung?'var(--blue)':'var(--accent)'};color:#0d1117;
+               border-radius:8px;padding:2px 10px;font-family:'Syne',sans-serif;
+               font-weight:800;font-size:0.85rem">${datumFmt}</div>
+          <div style="display:flex;align-items:center;gap:6px">
+            ${sterne ? `<span style="font-size:0.8rem">${sterne}</span>` : ''}
+            ${isPlanung ? `<span style="background:rgba(74,158,255,0.15);color:var(--blue);
+              border:1px solid rgba(74,158,255,0.3);border-radius:6px;
+              padding:1px 7px;font-size:0.65rem;font-weight:700">📌 Planung</span>` : ''}
+          </div>
+        </div>
+        ${maengelHTML}
+        ${e.notiz ? `<div style="margin-top:8px;font-size:0.83rem;color:var(--text);
+             line-height:1.5;padding:7px 10px;background:var(--surface);border-radius:8px;
+             border-left:3px solid ${isPlanung?'var(--blue)':'var(--accent)'}">
+             ${isPlanung?'📌':'📝'} ${escHtml(e.notiz)}</div>` : ''}
+      </div>`;
+  }).join('');
+
+  document.getElementById('tab-protokoll').innerHTML = `
+    <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.78rem;
+         color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">
+      ${proto.length} Einträge
+    </div>
+    ${rows}`;
+}
+
+// ── Fortschritt ────────────────────────────────────────────────
+function renderFortschritt() {
+  const s     = codeData.studentSnapshot || {};
+  const klasse = s.klasse || 'B';
+
+  // ADK-Themen: hardcoded Grundstruktur (aus index.html übernommen)
+  // Wir bekommen die vollständigen Themen aus dem snapshot
+  const themen = s.themen || {};
+
+  // Baue Fortschritt aus Snapshot-Themen
+  const themenList = Object.entries(themen);
+  const sicher     = themenList.filter(([,v]) => v >= 4).length;
+  const gesamt     = themenList.length;
+  const pct        = gesamt > 0 ? Math.round((sicher/gesamt)*100) : 0;
+
+  // Gruppiere nach Niveau
+  const byLevel = {5:[], 4:[], 3:[], 2:[], 1:[], 0:[]};
+  themenList.forEach(([name, val]) => {
+    byLevel[Math.min(5, Math.max(0, val||0))].push(name);
+  });
+
+  const levelConfig = [
+    { level:5, label:'⭐ Sehr sicher', color:'#f0b429' },
+    { level:4, label:'✅ Sicher',      color:'#3fb950' },
+    { level:3, label:'🟡 Meistens',   color:'#f0b429' },
+    { level:2, label:'🟠 Manchmal',   color:'#e87e04' },
+    { level:1, label:'🔴 Kaum',       color:'#f85149' },
+    { level:0, label:'⚪ Noch nicht', color:'#6b7fa8' },
+  ];
+
+  const levelsHTML = levelConfig.map(({level, label, color}) =>
+    byLevel[level].length === 0 ? '' : `
+      <div class="gruppe-header" style="color:${color}">
+        <span>${label}</span>
+        <span>${byLevel[level].length}</span>
+      </div>
+      ${byLevel[level].map(name => `
+        <div class="thema-row">
+          <span>${name}</span>
+          <div class="thema-dot" style="background:${color}"></div>
+        </div>`).join('')}
+    `).join('');
+
+  document.getElementById('tab-fortschritt').innerHTML = `
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">📚 ADK-Lernstand Klasse ${klasse}</div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+        <div class="prog-pct" style="font-size:1.6rem">${pct}%</div>
+        <div style="font-size:0.8rem;color:var(--muted)">${sicher} von ${gesamt} Themen sicher beherrscht</div>
+      </div>
+      <div class="prog-bar-wrap"><div class="prog-bar" style="width:${pct}%"></div></div>
+    </div>
+    ${themenList.length === 0
+      ? `<div style="text-align:center;padding:32px;color:var(--muted)">
+           Noch keine Themen bewertet.<br>Dein Fahrlehrer trägt deinen Fortschritt ein.
+         </div>`
+      : `<div class="card">${levelsHTML}</div>`}`;
+}
+
+// ── Helpers ────────────────────────────────────────────────────
+function escHtml(str) {
+  return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function getAbgeschlosseneThemen(s) {
+  const themen = Object.values(s.themen || {});
+  if (!themen.length) return 0;
+  return Math.round(themen.filter(v => v >= 4).length / themen.length * 100);
+}
+
+function renderSonderfahrtenMini(s) {
+  const sf = s.sonderfahrten || {};
+  const klasse = s.klasse || 'B';
+  const items = klasse === 'BE'
+    ? [{key:'ueber',name:'Überland',min:3},{key:'autobahn',name:'Autobahn',min:1},{key:'nacht',name:'Nacht',min:1}]
+    : [{key:'ueber',name:'Überland',min:5},{key:'autobahn',name:'Autobahn',min:4},{key:'nacht',name:'Nacht',min:3}];
+  return items.map(f => {
+    const cnt  = sf[f.key] || 0;
+    const done = cnt >= f.min;
+    const pct  = Math.min(100, Math.round(cnt / f.min * 100));
+    return `<div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;font-size:0.82rem;margin-bottom:4px">
+        <span>${f.name}</span>
+        <span style="color:${done?'var(--accent2)':'var(--muted)'}">
+          ${cnt}/${f.min} ${done?'✓':''}
+        </span>
+      </div>
+      <div class="prog-bar-wrap" style="height:6px">
+        <div class="prog-bar" style="width:${pct}%;background:${done?'var(--accent2)':'var(--accent)'}"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+let toastTimer = null;
+function portalToast(msg) {
+  const el = document.getElementById('portal-toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+window.portalToast = portalToast;
+
+</script>
+</body>
+</html>
