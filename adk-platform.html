@@ -207,31 +207,45 @@ html { overscroll-behavior-y: contain; }
 <script>
   // Klassisches Script (kein Modul) — läuft IMMER, unabhängig von Firebase-Imports.
   window.__adkLoaded = false;
-  // Modul-Script meldet sich; falls nicht binnen 4s → Notbremse + Hinweis
+  window.__adkErrors = [];
+
+  // Alle JS-Fehler einsammeln (auch Modul-Lade-Fehler) für die Diagnose
+  window.addEventListener('error', function(e) {
+    var msg = e.message || (e.target && e.target.src ? 'Laden fehlgeschlagen: ' + e.target.src : 'Unbekannter Fehler');
+    window.__adkErrors.push(msg);
+    if (e.target && e.target.tagName === 'SCRIPT') {
+      window.__adkErrors.push('SCRIPT-Block: ' + (e.target.src || 'inline module') + ' lud nicht');
+    }
+  }, true);
+
+  // Diagnose-Box anzeigen
+  window.__showDiag = function(extra) {
+    var box = document.getElementById('diag-box');
+    if (!box) return;
+    var online = navigator.onLine ? 'Online ✅' : 'OFFLINE ❌';
+    var loaded = window.__adkLoaded ? 'Firebase geladen ✅' : 'Firebase NICHT geladen ❌';
+    var errs = window.__adkErrors.length ? window.__adkErrors.join(' | ') : 'keine';
+    var fnOk = (typeof window.doLogin === 'function') ? 'doLogin() da ✅' : 'doLogin() FEHLT ❌';
+    box.innerHTML = '<b>Diagnose:</b><br>' + online + '<br>' + loaded + '<br>' + fnOk +
+      '<br>Fehler: ' + errs + (extra ? '<br><br>' + extra : '');
+    box.style.display = 'block';
+  };
+
+  // Nach 4s: wenn Modul nicht geladen → Login zeigen + Diagnose
   setTimeout(function() {
     if (window.__adkLoaded) return;
     var l = document.getElementById('loading');
-    var hint = document.getElementById('loading-hint');
     var login = document.getElementById('screen-login');
     if (login) login.classList.add('active');
     if (l) l.style.display = 'none';
-    if (hint) {
-      hint.style.display = 'block';
-      hint.textContent = 'Hinweis: Falls die Anmeldung nicht erscheint, prüfe deine Internetverbindung.';
-    }
-    console.warn('ADK: Firebase-Modul lud nicht binnen 4s — Notbremse aktiv.');
+    window.__showDiag('Das Anmelde-System (Firebase) konnte nicht geladen werden. Meist blockiert ein Werbeblocker, VPN oder WLAN-Filter die Adresse gstatic.com.');
   }, 4000);
-  // Fängt Lade-Fehler des Modul-Scripts ab (z.B. CDN blockiert)
-  window.addEventListener('error', function(e) {
-    if (e.target && e.target.tagName === 'SCRIPT' && e.target.type === 'module') {
-      var l = document.getElementById('loading');
-      var hint = document.getElementById('loading-hint');
-      var login = document.getElementById('screen-login');
-      if (login) login.classList.add('active');
-      if (l) l.style.display = 'none';
-      if (hint) { hint.style.display='block'; hint.textContent='Firebase konnte nicht geladen werden. Bitte Internetverbindung prüfen und Seite neu laden.'; }
-    }
-  }, true);
+
+  // Notfall-Login-Handler: fängt Klick ab, falls doLogin fehlt
+  window.__safeLogin = function() {
+    if (typeof window.doLogin === 'function') { window.doLogin(); return; }
+    window.__showDiag('Anmelden nicht möglich, weil Firebase nicht geladen wurde (siehe oben).');
+  };
 </script>
 
 <!-- ══════════════════════════════════════════ -->
@@ -265,7 +279,9 @@ html { overscroll-behavior-y: contain; }
         <input class="form-input" id="inp-login-pw" type="password" placeholder="••••••••" autocomplete="current-password">
       </div>
       <div class="error-msg" id="login-error"></div>
-      <button class="btn-main" id="btn-login" onclick="doLogin()">Anmelden →</button>
+      <button class="btn-main" id="btn-login" onclick="(window.doLogin||window.__safeLogin)()">Anmelden →</button>
+      <button onclick="window.__showDiag()" style="width:100%;margin-top:10px;background:none;border:1px solid var(--border);color:var(--muted);padding:8px;border-radius:8px;font-size:0.74rem;cursor:pointer">🔍 Diagnose anzeigen</button>
+      <div id="diag-box" style="display:none;margin-top:12px;padding:12px;background:rgba(248,81,73,0.08);border:1px solid rgba(248,81,73,0.3);border-radius:10px;font-size:0.72rem;line-height:1.6;color:var(--text);word-break:break-word"></div>
     </div>
 
     <!-- Register Form -->
