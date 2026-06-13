@@ -200,7 +200,39 @@ html { overscroll-behavior-y: contain; }
 <div id="loading">
   <div class="spinner"></div>
   <p style="color:var(--muted);font-size:0.85rem">ADK wird geladen…</p>
+  <p id="loading-hint" style="color:var(--muted);font-size:0.72rem;max-width:280px;text-align:center;margin-top:8px;display:none;line-height:1.5"></p>
 </div>
+
+<!-- GARANTIERTE NOTBREMSE: läuft auch wenn das Firebase-Modul-Script scheitert -->
+<script>
+  // Klassisches Script (kein Modul) — läuft IMMER, unabhängig von Firebase-Imports.
+  window.__adkLoaded = false;
+  // Modul-Script meldet sich; falls nicht binnen 4s → Notbremse + Hinweis
+  setTimeout(function() {
+    if (window.__adkLoaded) return;
+    var l = document.getElementById('loading');
+    var hint = document.getElementById('loading-hint');
+    var login = document.getElementById('screen-login');
+    if (login) login.classList.add('active');
+    if (l) l.style.display = 'none';
+    if (hint) {
+      hint.style.display = 'block';
+      hint.textContent = 'Hinweis: Falls die Anmeldung nicht erscheint, prüfe deine Internetverbindung.';
+    }
+    console.warn('ADK: Firebase-Modul lud nicht binnen 4s — Notbremse aktiv.');
+  }, 4000);
+  // Fängt Lade-Fehler des Modul-Scripts ab (z.B. CDN blockiert)
+  window.addEventListener('error', function(e) {
+    if (e.target && e.target.tagName === 'SCRIPT' && e.target.type === 'module') {
+      var l = document.getElementById('loading');
+      var hint = document.getElementById('loading-hint');
+      var login = document.getElementById('screen-login');
+      if (login) login.classList.add('active');
+      if (l) l.style.display = 'none';
+      if (hint) { hint.style.display='block'; hint.textContent='Firebase konnte nicht geladen werden. Bitte Internetverbindung prüfen und Seite neu laden.'; }
+    }
+  }, true);
+</script>
 
 <!-- ══════════════════════════════════════════ -->
 <!-- LOGIN SCREEN                              -->
@@ -558,6 +590,8 @@ const firebaseConfig = {
 const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db   = getFirestore(app);
+
+window.__adkLoaded = true; // Signal an HTML-Notbremse: Firebase-Modul läuft
 
 enableIndexedDbPersistence(db).catch(() => {});
 
