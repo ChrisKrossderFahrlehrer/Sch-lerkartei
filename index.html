@@ -2865,6 +2865,85 @@ window.goBack = () => {
 // Aktiver Tab bei mehreren Klassen (wird pro Schüler gespeichert)
 let aktivKlasseTab = {};
 
+// ── "Bis zur Prüfung fehlt noch" Übersicht ──────────────────
+function buildPruefungsCheckliste(s, klasse, ADK, SONDER) {
+  const items = [];
+
+  // Theorie
+  items.push({
+    done: !!s.theorieBestanden,
+    label: s.theorieBestanden ? 'Theorie bestanden' : 'Theorieprüfung noch offen',
+    icon: '📋'
+  });
+
+  // Fahrstunden
+  const zielMap = {'A':20,'BE':12,'B-Auto':30,'B197':30,'B':30};
+  const ziel = s.zielStunden || zielMap[klasse] || 30;
+  const fs = s.fahrstunden || 0;
+  items.push({
+    done: fs >= ziel,
+    label: fs >= ziel ? `Fahrstunden erreicht (${fs})` : `Noch ${ziel - fs} Fahrstunden (${fs}/${ziel})`,
+    icon: '🚗'
+  });
+
+  // Pflichtfahrten einzeln
+  (SONDER || []).forEach(f => {
+    const ist = (s.sonderfahrten||{})[f.key] || 0;
+    const fehlt = Math.max(0, f.min - ist);
+    items.push({
+      done: ist >= f.min,
+      label: ist >= f.min ? `${f.name} komplett (${ist}/${f.min})` : `Noch ${fehlt}× ${f.name} (${ist}/${f.min})`,
+      icon: f.icon
+    });
+  });
+
+  // B197: Schaltstunden + Testfahrt
+  if (klasse === 'B197') {
+    const sch = s.schaltstunden || 0;
+    const zielSch = s.zielSchaltstunden || 10;
+    items.push({ done: sch >= zielSch, label: sch >= zielSch ? `Schaltstunden komplett (${sch})` : `Noch ${zielSch-sch} Schaltstunden (${sch}/${zielSch})`, icon: '⚙️' });
+    items.push({ done: !!s.testfahrtBestanden, label: s.testfahrtBestanden ? '15-Min-Testfahrt bestanden' : '15-Min-Testfahrt offen', icon: '✅' });
+  }
+
+  // ADK-Lernstand: alle Themen mind. "Beherrscht" (>=4)?
+  const adkKeys = (ADK || []).flatMap(g => g.items);
+  const suffix = (s.klassen && s.klassen.length>1) ? '__'+klasse : '';
+  const adkOffen = adkKeys.filter(k => ((s.themen||{})[k + (suffix||'')] || (s.themen||{})[k] || 0) < 4).length;
+  items.push({
+    done: adkOffen === 0 && adkKeys.length > 0,
+    label: adkOffen === 0 ? 'Alle ADK-Themen beherrscht' : `${adkOffen} ADK-Themen noch nicht sicher`,
+    icon: '📚'
+  });
+
+  const offen = items.filter(i => !i.done);
+  const erledigt = items.filter(i => i.done);
+  const alleFertig = offen.length === 0;
+
+  // Sortierung: offene zuerst, dann erledigte
+  const sortiert = [...offen, ...erledigt];
+
+  const rows = sortiert.map(i =>
+    '<div style="display:flex;align-items:center;gap:9px;padding:6px 0;font-size:0.85rem;'
+    + (i.done ? 'color:var(--muted)' : 'color:var(--text);font-weight:600') + '">'
+    + '<span style="font-size:1rem;flex-shrink:0">' + (i.done ? '✅' : '⬜') + '</span>'
+    + '<span style="flex-shrink:0">' + i.icon + '</span>'
+    + '<span>' + i.label + '</span>'
+    + '</div>'
+  ).join('');
+
+  const headerColor = alleFertig ? 'var(--accent2)' : 'var(--accent)';
+  const headerText  = alleFertig
+    ? '🎉 Prüfungsreif – alles erledigt!'
+    : '🎯 Bis zur Prüfung – noch ' + offen.length + ' offen';
+
+  return '<div class="section-block" style="border:1.5px solid ' + (alleFertig?'rgba(63,185,80,0.4)':'rgba(240,180,41,0.35)') + '">'
+    + '<div style="background:' + (alleFertig?'rgba(63,185,80,0.08)':'rgba(240,180,41,0.06)') + ';padding:12px 16px;border-radius:13px 13px 0 0">'
+    + '<div style="font-family:\'Syne\',sans-serif;font-weight:800;font-size:0.95rem;color:' + headerColor + '">' + headerText + '</div>'
+    + '</div>'
+    + '<div class="section-body" style="padding:10px 16px 14px">' + rows + '</div>'
+    + '</div>';
+}
+
 function renderDetail() {
   const s = getStudent(activeId);
   if (!s) return;
@@ -3046,7 +3125,8 @@ function renderDetail() {
       })()}
     </div>` : '';
 
-  document.getElementById('detail-body').innerHTML= klasseSettingsHTML + `
+  document.getElementById('detail-body').innerHTML= klasseSettingsHTML +
+    buildPruefungsCheckliste(s, klasse, ADK, SONDER) + `
     <div class="section-block">
       <div class="section-header">
         <div class="section-title">Fahrstunden</div>
