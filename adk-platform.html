@@ -1299,12 +1299,12 @@ function renderSuperadmin() {
         var created = fs.createdAt ? new Date(fs.createdAt).toLocaleDateString('de-DE') : '';
         var actionBtns = fs.status==='ausstehend'
           ? '<div style="display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'
-            +'<button onclick="event.stopPropagation();setFsStatus(''+fs.id+'','aktiv')" style="flex:1;background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.4);color:var(--accent2);border-radius:8px;padding:8px;font-size:0.78rem;font-weight:700;cursor:pointer">✅ Freischalten</button>'
-            +'<button onclick="event.stopPropagation();setFsStatus(''+fs.id+'','gesperrt')" style="flex:1;background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);color:var(--danger);border-radius:8px;padding:8px;font-size:0.78rem;font-weight:700;cursor:pointer">🚫 Ablehnen</button>'
+            +'<button onclick="event.stopPropagation();setFsStatus(\''+fs.id+'\',\'aktiv\')" style="flex:1;background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.4);color:var(--accent2);border-radius:8px;padding:8px;font-size:0.78rem;font-weight:700;cursor:pointer">✅ Freischalten</button>'
+            +'<button onclick="event.stopPropagation();setFsStatus(\''+fs.id+'\',\'gesperrt\')" style="flex:1;background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);color:var(--danger);border-radius:8px;padding:8px;font-size:0.78rem;font-weight:700;cursor:pointer">🚫 Ablehnen</button>'
             +'</div>'
           : '';
         var borderStyle = fs.status==='ausstehend' ? 'border:1px solid rgba(240,180,41,0.3);background:rgba(240,180,41,0.04)' : '';
-        return '<div class="list-item" onclick="openFsDetail(''+fs.id+'')" style="'+borderStyle+'">'
+        return '<div class="list-item" onclick="openFsDetail(\''+fs.id+'\')" style="'+borderStyle+'">'
           +'<div class="list-avatar" style="background:'+color+'20;color:'+color+'">'+initial+'</div>'
           +'<div class="list-info" style="flex:1">'
           +'<div class="list-name">'+fs.name+'</div>'
