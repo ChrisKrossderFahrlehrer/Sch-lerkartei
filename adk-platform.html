@@ -978,6 +978,12 @@ function renderLehrer() {
     + '<div class="kpi"><div class="kpi-val" style="color:'+(pend.length>0?'var(--danger)':'var(--muted)')+'">'+pend.length+'</div><div class="kpi-lbl">Ausstehend</div></div>'
     + '</div>';
 
+  // Button: fehlenden Fahrlehrer manuell eintragen (für Konten ohne users-Dokument)
+  html += '<div style="margin:4px 16px 0">'
+    + '<button onclick="openManuellerLehrer()" style="width:100%;background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.35);color:var(--blue);padding:11px;border-radius:10px;font-size:0.8rem;font-weight:600;cursor:pointer">🔗 Fehlenden Fahrlehrer eintragen</button>'
+    + '<div style="font-size:0.7rem;color:var(--muted);text-align:center;margin-top:6px">Falls ein Fahrlehrer sich anmelden kann, aber hier nicht erscheint</div>'
+    + '</div>';
+
   if (alleFahrlehrer.length === 0) {
     html += '<div style="padding:40px;text-align:center;color:var(--muted)">Noch keine einzelnen Fahrlehrer registriert.<br><span style="font-size:0.8rem">Sie erscheinen hier, sobald sich jemand über die App als „Fahrlehrer" anmeldet.</span></div>';
   } else {
@@ -1777,13 +1783,21 @@ window.doManuellerLehrer = async () => {
     const existing = await getDoc(doc(db, 'users', uid));
     if (existing.exists()) { errEl.textContent = 'Nutzer bereits eingetragen.'; return; }
     await setDoc(doc(db, 'users', uid), {
+      uid,
+      username:     (email||'').split('@')[0] || '',
       name, email,
-      rolle: 'fahrlehrer',
-      fahrschuleId: currentProfil.fahrschuleId,
-      fahrschuleName: currentProfil.fahrschuleName || '',
-      createdAt: Date.now(),
+      rolle:        'fahrlehrer',
+      typ:          'fahrlehrer',
+      fahrschuleId: uid,            // eigenständig (SuperAdmin trägt ihn ein)
+      fahrschuleName: null,
+      status:       'aktiv',
+      createdAt:    Date.now(),
+      manuellEingetragen: true
     });
     document.getElementById('modal-manuell-lehrer').classList.remove('open');
+    document.getElementById('inp-ml-uid').value = '';
+    document.getElementById('inp-ml-name').value = '';
+    document.getElementById('inp-ml-email').value = '';
     toast(`✓ ${name} als Fahrlehrer eingetragen`);
   } catch(e) { errEl.textContent = 'Fehler: ' + e.message; }
 };
