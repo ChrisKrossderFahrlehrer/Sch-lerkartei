@@ -2631,6 +2631,20 @@ function listenStudents() {
     students.sort((a,b) => (a.nachname||'').localeCompare(b.nachname||''));
     renderList();
     if (activeId) renderDetail();
+
+    // Datenschutzfreundlich: nur die ANZAHL (nicht die Daten) ins eigene users-Doc
+    // schreiben, damit der SuperAdmin sie sehen kann, ohne Schülerzugriff.
+    // Nur aktive Schüler zählen (nicht archivierte).
+    try {
+      const aktiveAnzahl = students.filter(s => !s.archiviert).length;
+      if (currentUser && currentUser.uid && window.__lastStudentCount !== aktiveAnzahl) {
+        window.__lastStudentCount = aktiveAnzahl;
+        updateDoc(doc(db, 'users', currentUser.uid), {
+          studentCount: aktiveAnzahl,
+          studentCountUpdated: Date.now()
+        }).catch(() => {}); // still scheitern lassen (z.B. Alt-Konto ohne Doc)
+      }
+    } catch(e) {}
   });
 }
 
