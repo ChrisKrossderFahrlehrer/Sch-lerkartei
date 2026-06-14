@@ -753,18 +753,44 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
       </div>
     </div>
     <div id="register-form" style="display:none">
+      <!-- Rollen-Auswahl -->
       <div class="form-group">
-        <label class="form-label">Vollständiger Name</label>
-        <input class="form-input" id="reg-name" type="text" placeholder="z. B. Max Mustermann">
+        <label class="form-label">Ich registriere mich als…</label>
+        <div style="display:flex;gap:8px">
+          <button type="button" id="role-fahrschule" onclick="setRegRole('fahrschule')"
+            style="flex:1;padding:14px 8px;border-radius:12px;cursor:pointer;text-align:center;
+                   background:var(--accent);color:#0d1117;border:1px solid var(--accent)">
+            <div style="font-size:1.3rem;margin-bottom:2px">🏫</div>
+            <div style="font-size:0.78rem;font-weight:700">Fahrschule</div>
+            <div style="font-size:0.62rem;opacity:0.8;margin-top:1px">Inhaber / Chef</div>
+          </button>
+          <button type="button" id="role-fahrlehrer" onclick="setRegRole('fahrlehrer')"
+            style="flex:1;padding:14px 8px;border-radius:12px;cursor:pointer;text-align:center;
+                   background:none;color:var(--muted);border:1px solid var(--border)">
+            <div style="font-size:1.3rem;margin-bottom:2px">👨‍🏫</div>
+            <div style="font-size:0.78rem;font-weight:700">Fahrlehrer</div>
+            <div style="font-size:0.62rem;opacity:0.8;margin-top:1px">Einzelner Lehrer</div>
+          </button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" id="reg-name-label">Name der Fahrschule</label>
+        <input class="form-input" id="reg-name" type="text" placeholder="z. B. Fahrschule Mustermann">
       </div>
       <div class="form-group">
         <label class="form-label">Benutzername</label>
-        <input class="form-input" id="reg-username" type="text" placeholder="z. B. max.mustermann" autocapitalize="none">
+        <input class="form-input" id="reg-username" type="text" placeholder="z. B. fahrschule.mustermann" autocapitalize="none">
         <div style="font-size:0.72rem;color:var(--muted);margin-top:5px">Nur Buchstaben, Zahlen und Punkte. Wird zum Anmelden verwendet.</div>
       </div>
       <div class="form-group">
         <label class="form-label">Passwort (min. 6 Zeichen)</label>
         <input class="form-input" id="reg-pw" type="password" placeholder="••••••••" autocomplete="new-password">
+      </div>
+      <!-- Fahrschul-Code (nur für Fahrlehrer, optional) -->
+      <div class="form-group" id="reg-fscode-wrap" style="display:none">
+        <label class="form-label">Fahrschul-Code <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+        <input class="form-input" id="reg-fscode" type="text" placeholder="z. B. FS-A7K9" autocapitalize="characters">
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:5px">Hast du einen Code von deiner Fahrschule? Dann hier eingeben. Sonst einfach leer lassen – du kannst ihn später ergänzen.</div>
       </div>
       <button class="btn-main" id="btn-register" onclick="doRegister()">Konto erstellen</button>
     </div>
@@ -1908,6 +1934,9 @@ window.switchTab = (tab) => {
     if (btn)  btn.classList.toggle('active', t===tab);
   });
   document.getElementById('auth-error').textContent = '';
+  if (tab==='register') {
+    if (typeof setRegRole === 'function') setRegRole('fahrschule'); // Default-Rolle setzen
+  }
   if (tab==='schueler') {
     const errEl = document.getElementById('schueler-code-error');
     const inp   = document.getElementById('inp-schueler-code');
@@ -1948,10 +1977,39 @@ window.doLogin = async () => {
   }
 };
 
+// Aktuelle Registrierungs-Rolle
+let regRole = 'fahrschule'; // 'fahrschule' | 'fahrlehrer'
+
+window.setRegRole = (role) => {
+  regRole = role;
+  const isFs = role === 'fahrschule';
+  // Button-Optik
+  const fsBtn = document.getElementById('role-fahrschule');
+  const flBtn = document.getElementById('role-fahrlehrer');
+  if (fsBtn) fsBtn.style.cssText = `flex:1;padding:14px 8px;border-radius:12px;cursor:pointer;text-align:center;${isFs?'background:var(--accent);color:#0d1117;border:1px solid var(--accent)':'background:none;color:var(--muted);border:1px solid var(--border)'}`;
+  if (flBtn) flBtn.style.cssText = `flex:1;padding:14px 8px;border-radius:12px;cursor:pointer;text-align:center;${!isFs?'background:var(--blue);color:#fff;border:1px solid var(--blue)':'background:none;color:var(--muted);border:1px solid var(--border)'}`;
+  // Label + Code-Feld
+  const nameLabel = document.getElementById('reg-name-label');
+  const nameInput = document.getElementById('reg-name');
+  const codeWrap  = document.getElementById('reg-fscode-wrap');
+  if (nameLabel) nameLabel.textContent = isFs ? 'Name der Fahrschule' : 'Dein Name';
+  if (nameInput) nameInput.placeholder = isFs ? 'z. B. Fahrschule Mustermann' : 'z. B. Max Mustermann';
+  if (codeWrap)  codeWrap.style.display = isFs ? 'none' : 'block';
+};
+
+// Generiert einen lesbaren Fahrschul-Code: FS-XXXX (ohne verwechselbare Zeichen)
+function generateFahrschulCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // kein I,O,0,1
+  let code = 'FS-';
+  for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
 window.doRegister = async () => {
   const name = document.getElementById('reg-name').value.trim();
   const username = document.getElementById('reg-username').value.trim();
   const pw = document.getElementById('reg-pw').value;
+  const fsCode = (document.getElementById('reg-fscode')?.value || '').trim().toUpperCase();
   const btn = document.getElementById('btn-register');
   if (!name || !username || !pw) { setAuthError('Bitte alle Felder ausfüllen.'); return; }
   if (!validateUsername(username)) { setAuthError('Benutzername: nur Buchstaben, Zahlen, Punkte und Bindestriche (min. 3 Zeichen).'); return; }
@@ -1962,31 +2020,62 @@ window.doRegister = async () => {
     const cred = await createUserWithEmailAndPassword(auth, email, pw);
     await updateProfile(cred.user, { displayName: name });
 
-    // 1. Fahrschule mit Status "ausstehend" anlegen (Freischaltungs-Workflow)
-    await setDoc(doc(db, 'fahrschulen', cred.user.uid), {
-      name:      name,
-      inhaber:   name,
-      stadt:     '',
-      email:     email,
-      username:  username.toLowerCase().trim(),
-      adminUid:  cred.user.uid,
-      status:    'ausstehend',
-      abo:       'free',
-      createdAt: Date.now()
-    });
+    // Falls Fahrlehrer einen Code eingegeben hat: Fahrschule suchen (jetzt authentifiziert)
+    let zielFahrschule = null;
+    if (regRole === 'fahrlehrer' && fsCode) {
+      try {
+        const fsQ = query(collection(db, 'fahrschulen'), where('fahrschulCode', '==', fsCode));
+        const fsSnap = await getDocs(fsQ);
+        if (!fsSnap.empty) {
+          zielFahrschule = { id: fsSnap.docs[0].id, ...fsSnap.docs[0].data() };
+        } else {
+          toast('⚠️ Code "' + fsCode + '" nicht gefunden – du wurdest als eigenständiger Lehrer angelegt.');
+        }
+      } catch(codeErr) {
+        console.warn('Code-Suche fehlgeschlagen:', codeErr);
+      }
+    }
 
-    // 2. User-Profil mit Fahrschul-Verknüpfung (Doc-ID = uid für Rules!)
-    await setDoc(doc(db, 'users', cred.user.uid), {
-      uid:          cred.user.uid,
-      username:     username.toLowerCase().trim(),
-      email, name,
-      fahrschuleId: cred.user.uid,
-      rolle:        'fahrlehrer',
-      createdAt:    Date.now()
-    });
+    if (regRole === 'fahrschule') {
+      // ── FAHRSCHULE (Inhaber) ──
+      const code = generateFahrschulCode();
+      await setDoc(doc(db, 'fahrschulen', cred.user.uid), {
+        name, inhaber: name, stadt: '', email,
+        username:      username.toLowerCase().trim(),
+        adminUid:      cred.user.uid,
+        fahrschulCode: code,         // ← eigener Code zum Lehrer-Aufnehmen
+        typ:           'fahrschule',
+        status:        'ausstehend',
+        abo:           'free',
+        createdAt:     Date.now()
+      });
+      await setDoc(doc(db, 'users', cred.user.uid), {
+        uid: cred.user.uid, username: username.toLowerCase().trim(), email, name,
+        fahrschuleId: cred.user.uid,
+        rolle:        'fahrschul-admin',
+        typ:          'fahrschule',
+        status:       'ausstehend',
+        createdAt:    Date.now()
+      });
+      sendRegistrationNotification({ name, email, username, typ: 'Fahrschule', code });
 
-    // 3. E-Mail-Benachrichtigung an Admin (non-blocking)
-    sendRegistrationNotification({ name, email, username });
+    } else {
+      // ── FAHRLEHRER (einzeln) ──
+      await setDoc(doc(db, 'users', cred.user.uid), {
+        uid: cred.user.uid, username: username.toLowerCase().trim(), email, name,
+        // Wenn Code passte: direkt zuordnen. Sonst eigenständig (eigene uid als fahrschuleId).
+        fahrschuleId:    zielFahrschule ? zielFahrschule.id : cred.user.uid,
+        fahrschuleName:  zielFahrschule ? zielFahrschule.name : null,
+        rolle:           'fahrlehrer',
+        typ:             'fahrlehrer',
+        status:          'ausstehend',
+        createdAt:       Date.now()
+      });
+      sendRegistrationNotification({
+        name, email, username,
+        typ: zielFahrschule ? 'Fahrlehrer (→ ' + zielFahrschule.name + ')' : 'Fahrlehrer (eigenständig)'
+      });
+    }
 
   } catch(e) {
     btn.disabled = false; btn.textContent = 'Konto erstellen';
@@ -2004,7 +2093,7 @@ const EMAILJS_PUBLIC_KEY  = 'DEIN_PUBLIC_KEY';
 const EMAILJS_SERVICE_ID  = 'DEIN_SERVICE_ID';
 const EMAILJS_TEMPLATE_ID = 'DEIN_TEMPLATE_ID';
 
-function sendRegistrationNotification({ name, email, username }) {
+function sendRegistrationNotification({ name, email, username, typ, code }) {
   if (EMAILJS_PUBLIC_KEY.includes('DEIN_')) {
     console.warn('EmailJS nicht konfiguriert — Benachrichtigung übersprungen');
     return;
@@ -2013,10 +2102,10 @@ function sendRegistrationNotification({ name, email, username }) {
     emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
     emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
       to_email: 'chriskoo@mail.de',
-      fs_name:  name,
+      fs_name:  (typ ? '[' + typ + '] ' : '') + name,
       inhaber:  name,
       email:    email,
-      stadt:    '– (über Hauptseite registriert: ' + username + ')',
+      stadt:    'Benutzername: ' + username + (code ? ' · Fahrschul-Code: ' + code : ''),
       datum:    new Date().toLocaleString('de-DE'),
       link:     'https://fahrschuelerkartei.de/adk-platform.html'
     }).then(() => console.log('✅ Registrierungs-Info an chriskoo@mail.de gesendet'))
@@ -2410,29 +2499,41 @@ onAuthStateChanged(auth, async (user) => {
         currentUser._rolle        = profil.rolle || 'fahrlehrer';
         currentUser._fsName       = profil.fahrschuleName || '';
 
-        // ── STATUS-CHECK: Ist die Fahrschule freigeschaltet? ──
+        // ── STATUS-CHECK ──
+        // SuperAdmin nie sperren
+        const istSuperadmin = profil.rolle === 'superadmin' || user.email === 'chriskoo@mail.de';
+
+        // Status kommt von der Fahrschule (falls zugeordnet) ODER vom User selbst (eigenständiger Lehrer)
+        let effektiverStatus = profil.status || null;
         const fsId = profil.fahrschuleId;
-        if (fsId) {
-          const fsDoc = await getDoc(doc(db, 'fahrschulen', fsId));
-          if (fsDoc.exists()) {
-            const fsStatus = fsDoc.data().status;
-            if (fsStatus === 'ausstehend') {
-              // Warte-Screen anzeigen
-              document.querySelectorAll('.screen').forEach(s => { s.classList.remove('active'); s.style.display=''; });
-              document.getElementById('screen-warte').classList.add('active');
-              document.getElementById('warte-name').textContent =
-                '👤 ' + (profil.fahrschuleName || profil.name || user.email);
-              return;
-            }
-            if (fsStatus === 'gesperrt') {
-              document.querySelectorAll('.screen').forEach(s => { s.classList.remove('active'); s.style.display=''; });
-              document.getElementById('screen-login').classList.add('active');
-              document.getElementById('auth-error').textContent =
-                '🚫 Dein Konto wurde gesperrt. Bitte Kontakt aufnehmen.';
-              await signOut(auth);
-              return;
-            }
-          }
+        if (fsId && fsId !== user.uid) {
+          // Fahrlehrer gehört zu fremder Fahrschule → deren Status zählt zusätzlich
+          try {
+            const fsDoc = await getDoc(doc(db, 'fahrschulen', fsId));
+            if (fsDoc.exists() && fsDoc.data().status) effektiverStatus = fsDoc.data().status;
+          } catch(e) {}
+        } else if (fsId === user.uid) {
+          // Fahrschule (Inhaber): eigener fahrschulen-Doc-Status
+          try {
+            const fsDoc = await getDoc(doc(db, 'fahrschulen', fsId));
+            if (fsDoc.exists() && fsDoc.data().status) effektiverStatus = fsDoc.data().status;
+          } catch(e) {}
+        }
+
+        if (!istSuperadmin && effektiverStatus === 'ausstehend') {
+          document.querySelectorAll('.screen').forEach(s => { s.classList.remove('active'); s.style.display=''; });
+          document.getElementById('screen-warte').classList.add('active');
+          document.getElementById('warte-name').textContent =
+            '👤 ' + (profil.fahrschuleName || profil.name || user.email);
+          return;
+        }
+        if (!istSuperadmin && effektiverStatus === 'gesperrt') {
+          document.querySelectorAll('.screen').forEach(s => { s.classList.remove('active'); s.style.display=''; });
+          document.getElementById('screen-login').classList.add('active');
+          document.getElementById('auth-error').textContent =
+            '🚫 Dein Konto wurde gesperrt. Bitte Kontakt aufnehmen.';
+          await signOut(auth);
+          return;
         }
       }
     } catch(e) { /* offline – weiter */ }
