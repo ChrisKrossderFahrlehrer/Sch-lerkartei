@@ -835,7 +835,7 @@ window.saTab = (tab) => {
 function renderLehrer() {
   const body = document.getElementById('sa-body');
   const pend = alleFahrlehrer.filter(l => l.status === 'ausstehend');
-  const aktiv = alleFahrlehrer.filter(l => l.status === 'aktiv');
+  const aktiv = alleFahrlehrer.filter(l => l.status === 'aktiv' || !l.status); // Alt-Konten ohne status = aktiv
   const gesperrt = alleFahrlehrer.filter(l => l.status === 'gesperrt');
 
   function lehrerKarte(l) {
@@ -845,7 +845,7 @@ function renderLehrer() {
     const zuordnung = l.fahrschuleName
       ? '🏫 ' + (l.fahrschuleName||'').replace(/</g,'&lt;')
       : (l.fahrschuleId === l.uid ? '👤 Eigenständig' : '🏫 zugeordnet');
-    const statusBadge = l.status === 'aktiv'
+    const statusBadge = (l.status === 'aktiv' || !l.status)
       ? '<span class="badge badge-green">✅ Aktiv</span>'
       : l.status === 'gesperrt'
       ? '<span class="badge badge-red">🚫 Gesperrt</span>'
@@ -1267,14 +1267,24 @@ function loadSuperadmin() {
     renderSuperadmin();
   }, err => console.error('passwordResets listener:', err));
 
-  // Einzelne Fahrlehrer live mithören (typ:'fahrlehrer' aus users)
+  // Alle Fahrlehrer live mithören — inkl. Alt-Konten OHNE typ-Feld
   if (unsubAlleLehrer) unsubAlleLehrer();
   unsubAlleLehrer = onSnapshot(
-    query(collection(db, 'users'), where('typ', '==', 'fahrlehrer')),
+    collection(db, 'users'),
     snap => {
-      alleFahrlehrer = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      // Fahrlehrer = alle, die KEINE Fahrschule und KEIN SuperAdmin sind.
+      // Erfasst auch Legacy-Konten (kein typ-Feld) und explizite typ:'fahrlehrer'.
+      alleFahrlehrer = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(u => {
+          if (u.typ === 'fahrschule') return false;            // Inhaber raus
+          if (u.rolle === 'superadmin') return false;          // SuperAdmin raus
+          if (u.email === 'chriskoo@mail.de') return false;    // du selbst raus
+          if (u.rolle === 'fahrschul-admin') return false;     // FS-Admin raus
+          return true; // alles andere = Fahrlehrer (auch ohne typ-Feld)
+        })
         .sort((a,b) => (b.createdAt||0)-(a.createdAt||0));
-      // Badge auf Lehrer-Tab: ausstehende
+      // Badge auf Lehrer-Tab: ausstehende (Alt-Konten ohne status zählen als aktiv)
       const pendL = alleFahrlehrer.filter(l => l.status === 'ausstehend').length;
       const tab = document.getElementById('sa-tab-lehrer');
       if (tab) tab.innerHTML = pendL > 0
