@@ -454,9 +454,6 @@ html { overscroll-behavior-y: contain; }
     <button class="tab-btn"        id="sa-tab-einst"     onclick="saTab('einst')">⚙️</button>
   </div>
 
-  <!-- Sichtbare Lade-Diagnose (zeigt Verbindungsstatus zur Datenbank) -->
-  <div id="sa-diag"></div>
-
   <div class="scroll-body" id="sa-body">
     <div style="padding:40px;text-align:center;color:var(--muted)">Lädt…</div>
   </div>
@@ -828,32 +825,75 @@ window.saTab = (tab) => {
   else if (tab === 'abos')      renderAbos();
   else if (tab === 'einst')     renderSuperAdminEinst();
   else if (tab === 'lehrer')    renderLehrer();
+  else if (tab === 'alle')      renderAlleNutzer();
   else renderSuperadmin();
 };
+
+// ── SUPERADMIN: Gesamtübersicht ALLER Nutzer (Fahrschulen + Lehrer) ──
+function renderAlleNutzer() {
+  const body = document.getElementById('sa-body');
+
+  // Fahrschulen (Inhaber)
+  const fsListe = fahrschulen.map(f => {
+    const name = (f.name || '?').replace(/</g,'&lt;');
+    const inhaber = (f.inhaber || f.name || '').replace(/</g,'&lt;');
+    const code = f.fahrschulCode ? ' · Code: <b>' + f.fahrschulCode + '</b>' : '';
+    const statusBadge = f.status === 'aktiv'
+      ? '<span class="badge badge-green">✅</span>'
+      : f.status === 'gesperrt' ? '<span class="badge badge-red">🚫</span>'
+      : '<span class="badge badge-yellow">⏳</span>';
+    const datum = f.createdAt ? new Date(f.createdAt).toLocaleDateString('de-DE') : '';
+    return '<div class="list-item">'
+      + '<div class="list-avatar" style="background:#f0b42920;color:#f0b429">🏫</div>'
+      + '<div class="list-info" style="flex:1">'
+      + '<div class="list-name">' + name + '</div>'
+      + '<div class="list-sub">Inhaber: ' + inhaber + code + '</div>'
+      + '<div class="list-sub" style="color:var(--muted)">Seit ' + datum + '</div>'
+      + '</div>' + statusBadge + '</div>';
+  }).join('');
+
+  // Fahrlehrer
+  const flListe = alleFahrlehrer.map(l => {
+    const name = (l.name || '?').replace(/</g,'&lt;');
+    const zuordnung = l.fahrschuleName
+      ? '🏫 ' + (l.fahrschuleName||'').replace(/</g,'&lt;')
+      : '👤 Eigenständig';
+    const statusBadge = (l.status === 'aktiv' || !l.status)
+      ? '<span class="badge badge-green">✅</span>'
+      : l.status === 'gesperrt' ? '<span class="badge badge-red">🚫</span>'
+      : '<span class="badge badge-yellow">⏳</span>';
+    const datum = l.createdAt ? new Date(l.createdAt).toLocaleDateString('de-DE') : '';
+    return '<div class="list-item">'
+      + '<div class="list-avatar" style="background:#58a6ff20;color:#58a6ff">👤</div>'
+      + '<div class="list-info" style="flex:1">'
+      + '<div class="list-name">' + name + '</div>'
+      + '<div class="list-sub">' + zuordnung + '</div>'
+      + '<div class="list-sub" style="color:var(--muted)">Seit ' + datum + '</div>'
+      + '</div>' + statusBadge + '</div>';
+  }).join('');
+
+  const gesamt = fahrschulen.length + alleFahrlehrer.length;
+
+  body.innerHTML =
+    '<div class="kpi-row">'
+    + '<div class="kpi"><div class="kpi-val" style="color:var(--accent)">' + gesamt + '</div><div class="kpi-lbl">Angemeldet gesamt</div></div>'
+    + '<div class="kpi"><div class="kpi-val" style="color:#f0b429">' + fahrschulen.length + '</div><div class="kpi-lbl">🏫 Fahrschulen</div></div>'
+    + '<div class="kpi"><div class="kpi-val" style="color:#58a6ff">' + alleFahrlehrer.length + '</div><div class="kpi-lbl">👤 Fahrlehrer</div></div>'
+    + '</div>'
+    + (fahrschulen.length
+        ? '<div style="margin:16px 16px 8px;font-family:\'Syne\',sans-serif;font-weight:800;font-size:0.82rem;color:#f0b429">🏫 Fahrschulen (' + fahrschulen.length + ')</div>' + fsListe
+        : '')
+    + (alleFahrlehrer.length
+        ? '<div style="margin:16px 16px 8px;font-family:\'Syne\',sans-serif;font-weight:800;font-size:0.82rem;color:#58a6ff">👤 Fahrlehrer (' + alleFahrlehrer.length + ')</div>' + flListe
+        : '')
+    + (gesamt === 0
+        ? '<div style="padding:40px;text-align:center;color:var(--muted)">Noch niemand angemeldet.</div>'
+        : '');
+}
 
 // ── SUPERADMIN: Einzelne Fahrlehrer anzeigen ─────────────────
 function renderLehrer() {
   const body = document.getElementById('sa-body');
-
-  // 🔍 Diagnose-Box: zeigt was die Datenbank zurückgibt
-  let diagHtml = '';
-  const d = window.__lehrerDiag;
-  if (d) {
-    if (d.fehler) {
-      diagHtml = '<div style="margin:12px 16px;padding:12px;background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.35);border-radius:10px;font-size:0.78rem;line-height:1.5">'
-        + '⚠️ <b>Datenbank-Fehler beim Laden:</b><br>' + d.fehler + '<br><br>'
-        + (d.fehler.includes('permission')
-            ? 'Die Regel zum Lesen aller Nutzer greift nicht. Bitte sicherstellen, dass die firestore.rules in der Firebase Console veröffentlicht sind und du als chriskoo@mail.de eingeloggt bist.'
-            : '')
-        + '</div>';
-    } else {
-      const liste = (d.alle||[]).map(u => '• ' + u.name + ' — typ:' + u.typ + ', rolle:' + u.rolle + ', status:' + u.status).join('<br>');
-      diagHtml = '<div style="margin:12px 16px;padding:12px;background:rgba(88,166,255,0.08);border:1px solid rgba(88,166,255,0.3);border-radius:10px;font-size:0.74rem;line-height:1.6">'
-        + '🔍 <b>Diagnose:</b> ' + d.roh + ' Nutzer in Datenbank, ' + d.gefiltert + ' als Fahrlehrer erkannt.<br>'
-        + (d.roh > 0 ? '<br><b>Alle Nutzer:</b><br>' + liste : '<br>Die users-Sammlung ist leer.')
-        + '</div>';
-    }
-  }
 
   const pend = alleFahrlehrer.filter(l => l.status === 'ausstehend');
   const aktiv = alleFahrlehrer.filter(l => l.status === 'aktiv' || !l.status); // Alt-Konten ohne status = aktiv
@@ -892,7 +932,7 @@ function renderLehrer() {
       + '</div>';
   }
 
-  let html = diagHtml + '<div class="kpi-row">'
+  let html = '<div class="kpi-row">'
     + '<div class="kpi"><div class="kpi-val" style="color:var(--accent)">'+alleFahrlehrer.length+'</div><div class="kpi-lbl">Lehrer gesamt</div></div>'
     + '<div class="kpi"><div class="kpi-val" style="color:var(--accent2)">'+aktiv.length+'</div><div class="kpi-lbl">Aktiv</div></div>'
     + '<div class="kpi"><div class="kpi-val" style="color:'+(pend.length>0?'var(--danger)':'var(--muted)')+'">'+pend.length+'</div><div class="kpi-lbl">Ausstehend</div></div>'
@@ -1224,40 +1264,6 @@ function loadSuperadmin() {
   const q = query(collection(db, 'fahrschulen'), orderBy('createdAt', 'desc'));
   unsubFahrschulen = onSnapshot(q, snap => {
     fahrschulen = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    console.log('✅ Fahrschulen geladen:', fahrschulen.length, fahrschulen);
-
-    // Sichtbare Status-Box — zeigt Fahrschulen UND alle Nutzer (für Diagnose)
-    const diag = document.getElementById('sa-diag');
-    if (diag) {
-      diag.style.cssText = 'margin:12px 16px;padding:12px;background:rgba(88,166,255,0.08);border:1px solid rgba(88,166,255,0.3);border-radius:10px;font-size:0.76rem;line-height:1.6;color:var(--text)';
-      diag.innerHTML = '🔍 <b>' + fahrschulen.length + ' Fahrschule(n)</b> geladen. Prüfe Nutzer…';
-      // Zusätzlich ALLE Nutzer laden und anzeigen
-      getDocs(collection(db, 'users')).then(uSnap => {
-        const users = uSnap.docs.map(d => d.data());
-        // Fahrlehrer rauszählen (gleiche Logik wie Lehrer-Tab)
-        const lehrer = users.filter(u =>
-          u.typ !== 'fahrschule' && u.rolle !== 'superadmin' &&
-          u.email !== 'chriskoo@mail.de' && u.rolle !== 'fahrschul-admin'
-        );
-        let liste = users.length
-          ? users.map(u => '• <b>' + (u.name||'?') + '</b> — typ:' + (u.typ||'(kein)') + ' · rolle:' + (u.rolle||'(keine)') + ' · status:' + (u.status||'(kein)')).join('<br>')
-          : '(keine Nutzer in users-Sammlung)';
-        diag.innerHTML = '🔍 <b>Datenbank-Inhalt:</b><br>'
-          + '🏫 Fahrschulen: ' + fahrschulen.length + '<br>'
-          + '👥 Nutzer (users): ' + users.length + ' · davon <b>' + lehrer.length + ' Fahrlehrer</b><br><br>'
-          + (lehrer.length > 0
-              ? '<div style="background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.4);border-radius:8px;padding:10px;margin-bottom:10px;color:var(--accent2)">✅ <b>' + lehrer.length + ' Fahrlehrer gefunden!</b> Sie stehen im Tab <b>„👨‍🏫 Lehrer"</b> oben. Tippe dort drauf!</div>'
-              : '')
-          + '<b>Alle Nutzer-Konten:</b><br>' + liste;
-      }).catch(err => {
-        diag.style.background = 'rgba(248,81,73,0.1)';
-        diag.style.borderColor = 'rgba(248,81,73,0.35)';
-        diag.innerHTML = '⚠️ <b>Nutzer-Abfrage fehlgeschlagen:</b><br>' + err.code + ': ' + err.message + '<br><br>'
-          + (String(err.code).includes('permission')
-              ? 'Die Regel zum Lesen der users-Sammlung greift nicht. Das erklärt, warum keine Fahrlehrer erscheinen!'
-              : '');
-      });
-    }
 
     // Live-Badge für ausstehende Anfragen
     const pending = fahrschulen.filter(f => f.status === 'ausstehend').length;
@@ -1272,14 +1278,6 @@ function loadSuperadmin() {
   }, err => {
     // Fehler sichtbar machen statt still scheitern
     console.error('❌ Fahrschulen-Listener Fehler:', err.code, err.message);
-    const diag = document.getElementById('sa-diag');
-    if (diag) {
-      diag.style.cssText = 'margin:12px 16px;padding:12px;background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.35);border-radius:10px;font-size:0.78rem;line-height:1.5;color:var(--text)';
-      diag.innerHTML = '⚠️ <b>Datenbank-Fehler:</b> ' + err.code + '<br>'
-        + (err.code === 'permission-denied'
-            ? 'Die Sicherheitsregeln (firestore.rules) sind noch <b>nicht in der Firebase Console veröffentlicht</b>. Das ist der häufigste Grund. Bitte dort unter Firestore → Regeln den Stand einfügen und auf „Veröffentlichen" klicken.'
-            : err.message);
-    }
     const body = document.getElementById('sa-body');
     if (body) {
       let hinweis = '';
@@ -1312,9 +1310,6 @@ function loadSuperadmin() {
   unsubAlleLehrer = onSnapshot(
     collection(db, 'users'),
     snap => {
-      const rohAnzahl = snap.docs.length;
-      window.__lehrerDiag = { roh: rohAnzahl, gefiltert: 0, fehler: null,
-        alle: snap.docs.map(d => { const x=d.data(); return {name:x.name||'?', typ:x.typ||'(kein typ)', rolle:x.rolle||'(keine rolle)', status:x.status||'(kein status)', email:x.email||'?'}; }) };
       // Fahrlehrer = alle, die KEINE Fahrschule und KEIN SuperAdmin sind.
       alleFahrlehrer = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
@@ -1326,19 +1321,16 @@ function loadSuperadmin() {
           return true;
         })
         .sort((a,b) => (b.createdAt||0)-(a.createdAt||0));
-      window.__lehrerDiag.gefiltert = alleFahrlehrer.length;
       const pendL = alleFahrlehrer.filter(l => l.status === 'ausstehend').length;
       const tab = document.getElementById('sa-tab-lehrer');
       if (tab) tab.innerHTML = pendL > 0
         ? `👨‍🏫 Lehrer <span style="background:var(--danger);color:#fff;border-radius:999px;font-size:0.6rem;font-weight:800;padding:1px 6px;margin-left:2px">${pendL}</span>`
         : '👨‍🏫 Lehrer';
-      renderSuperadmin();
+      // Aktuellen Tab aktualisieren (Lehrer- oder Gesamt-Ansicht)
+      if (saAktivTab === 'lehrer') renderLehrer();
+      else if (saAktivTab === 'alle') renderAlleNutzer();
     },
-    err => {
-      console.error('fahrlehrer listener:', err);
-      window.__lehrerDiag = { roh: 0, gefiltert: 0, fehler: err.code + ': ' + err.message };
-      renderSuperadmin();
-    }
+    err => console.error('fahrlehrer listener:', err)
   );
 }
 
