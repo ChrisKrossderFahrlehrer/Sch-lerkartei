@@ -453,6 +453,9 @@ html { overscroll-behavior-y: contain; }
     <button class="tab-btn"        id="sa-tab-einst"     onclick="saTab('einst')">⚙️</button>
   </div>
 
+  <!-- Sichtbare Lade-Diagnose (zeigt Verbindungsstatus zur Datenbank) -->
+  <div id="sa-diag"></div>
+
   <div class="scroll-body" id="sa-body">
     <div style="padding:40px;text-align:center;color:var(--muted)">Lädt…</div>
   </div>
@@ -1132,6 +1135,21 @@ function loadSuperadmin() {
   unsubFahrschulen = onSnapshot(q, snap => {
     fahrschulen = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     console.log('✅ Fahrschulen geladen:', fahrschulen.length, fahrschulen);
+
+    // Sichtbare Status-Box (hilft ohne F12) — verschwindet nach 8s
+    const diag = document.getElementById('sa-diag');
+    if (diag) {
+      if (fahrschulen.length === 0) {
+        diag.style.cssText = 'margin:12px 16px;padding:12px;background:rgba(88,166,255,0.08);border:1px solid rgba(88,166,255,0.3);border-radius:10px;font-size:0.78rem;line-height:1.5;color:var(--text)';
+        diag.innerHTML = 'ℹ️ <b>Verbindung zur Datenbank OK</b> — aber es sind noch <b>0 Fahrschulen</b> registriert. '
+          + 'Sobald sich jemand über die App registriert (oder du es selbst testest), erscheint sie hier automatisch.';
+      } else {
+        diag.style.cssText = 'margin:12px 16px;padding:10px;background:rgba(63,185,80,0.08);border:1px solid rgba(63,185,80,0.3);border-radius:10px;font-size:0.78rem;color:var(--accent2);font-weight:600';
+        diag.innerHTML = '✅ ' + fahrschulen.length + ' Fahrschule(n) geladen';
+        setTimeout(() => { if(diag) diag.style.display='none'; }, 8000);
+      }
+    }
+
     // Live-Badge für ausstehende Anfragen
     const pending = fahrschulen.filter(f => f.status === 'ausstehend').length;
     const tabBtn  = document.getElementById('sa-tab-pending');
@@ -1145,6 +1163,14 @@ function loadSuperadmin() {
   }, err => {
     // Fehler sichtbar machen statt still scheitern
     console.error('❌ Fahrschulen-Listener Fehler:', err.code, err.message);
+    const diag = document.getElementById('sa-diag');
+    if (diag) {
+      diag.style.cssText = 'margin:12px 16px;padding:12px;background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.35);border-radius:10px;font-size:0.78rem;line-height:1.5;color:var(--text)';
+      diag.innerHTML = '⚠️ <b>Datenbank-Fehler:</b> ' + err.code + '<br>'
+        + (err.code === 'permission-denied'
+            ? 'Die Sicherheitsregeln (firestore.rules) sind noch <b>nicht in der Firebase Console veröffentlicht</b>. Das ist der häufigste Grund. Bitte dort unter Firestore → Regeln den Stand einfügen und auf „Veröffentlichen" klicken.'
+            : err.message);
+    }
     const body = document.getElementById('sa-body');
     if (body) {
       let hinweis = '';
