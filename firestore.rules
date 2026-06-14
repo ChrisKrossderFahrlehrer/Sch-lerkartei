@@ -53,7 +53,7 @@ service cloud.firestore {
     // ══════════════════════════════════════════════════════
     match /fahrschulen/{fsId} {
       allow read: if isSuperAdmin() ||
-                     (isAuth() && userFsId() == fsId);
+                     isAuth();  // Auth. Nutzer dürfen lesen (für Fahrschul-Code-Suche bei Registrierung)
 
       allow create: if isAuth() &&
                        (request.resource.data.adminUid == request.auth.uid ||
