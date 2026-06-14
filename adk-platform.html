@@ -830,66 +830,95 @@ window.saTab = (tab) => {
 };
 
 // ── SUPERADMIN: Gesamtübersicht ALLER Nutzer (Fahrschulen + Lehrer) ──
+// Sortier-Zustand für die Gesamtliste
+let alleSortKey = 'name';   // 'name' | 'typ' | 'zuordnung' | 'status' | 'datum'
+let alleSortAsc = true;
+
+window.sortAlle = (key) => {
+  if (alleSortKey === key) alleSortAsc = !alleSortAsc;
+  else { alleSortKey = key; alleSortAsc = true; }
+  renderAlleNutzer();
+};
+
 function renderAlleNutzer() {
   const body = document.getElementById('sa-body');
 
-  // Fahrschulen (Inhaber)
-  const fsListe = fahrschulen.map(f => {
-    const name = (f.name || '?').replace(/</g,'&lt;');
-    const inhaber = (f.inhaber || f.name || '').replace(/</g,'&lt;');
-    const code = f.fahrschulCode ? ' · Code: <b>' + f.fahrschulCode + '</b>' : '';
-    const statusBadge = f.status === 'aktiv'
-      ? '<span class="badge badge-green">✅</span>'
-      : f.status === 'gesperrt' ? '<span class="badge badge-red">🚫</span>'
-      : '<span class="badge badge-yellow">⏳</span>';
-    const datum = f.createdAt ? new Date(f.createdAt).toLocaleDateString('de-DE') : '';
-    return '<div class="list-item">'
-      + '<div class="list-avatar" style="background:#f0b42920;color:#f0b429">🏫</div>'
-      + '<div class="list-info" style="flex:1">'
-      + '<div class="list-name">' + name + '</div>'
-      + '<div class="list-sub">Inhaber: ' + inhaber + code + '</div>'
-      + '<div class="list-sub" style="color:var(--muted)">Seit ' + datum + '</div>'
-      + '</div>' + statusBadge + '</div>';
-  }).join('');
+  // Beide Quellen in EINE einheitliche Zeilen-Struktur bringen
+  const zeilen = [];
+  fahrschulen.forEach(f => zeilen.push({
+    name:      f.name || '?',
+    typ:       'Fahrschule',
+    typIcon:   '🏫',
+    zuordnung: f.fahrschulCode || '–',
+    status:    f.status || 'aktiv',
+    datum:     f.createdAt || 0,
+  }));
+  alleFahrlehrer.forEach(l => zeilen.push({
+    name:      l.name || '?',
+    typ:       'Fahrlehrer',
+    typIcon:   '👤',
+    zuordnung: l.fahrschuleName || 'Eigenständig',
+    status:    l.status || 'aktiv',
+    datum:     l.createdAt || 0,
+  }));
 
-  // Fahrlehrer
-  const flListe = alleFahrlehrer.map(l => {
-    const name = (l.name || '?').replace(/</g,'&lt;');
-    const zuordnung = l.fahrschuleName
-      ? '🏫 ' + (l.fahrschuleName||'').replace(/</g,'&lt;')
-      : '👤 Eigenständig';
-    const statusBadge = (l.status === 'aktiv' || !l.status)
-      ? '<span class="badge badge-green">✅</span>'
-      : l.status === 'gesperrt' ? '<span class="badge badge-red">🚫</span>'
-      : '<span class="badge badge-yellow">⏳</span>';
-    const datum = l.createdAt ? new Date(l.createdAt).toLocaleDateString('de-DE') : '';
-    return '<div class="list-item">'
-      + '<div class="list-avatar" style="background:#58a6ff20;color:#58a6ff">👤</div>'
-      + '<div class="list-info" style="flex:1">'
-      + '<div class="list-name">' + name + '</div>'
-      + '<div class="list-sub">' + zuordnung + '</div>'
-      + '<div class="list-sub" style="color:var(--muted)">Seit ' + datum + '</div>'
-      + '</div>' + statusBadge + '</div>';
-  }).join('');
+  // Sortierung
+  zeilen.sort((a,b) => {
+    let av, bv;
+    if (alleSortKey === 'datum') { av = a.datum; bv = b.datum; }
+    else { av = String(a[alleSortKey]||'').toLowerCase(); bv = String(b[alleSortKey]||'').toLowerCase(); }
+    if (av < bv) return alleSortAsc ? -1 : 1;
+    if (av > bv) return alleSortAsc ? 1 : -1;
+    return 0;
+  });
 
-  const gesamt = fahrschulen.length + alleFahrlehrer.length;
+  const gesamt = zeilen.length;
+  const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const pfeil = key => alleSortKey === key ? (alleSortAsc ? ' ▲' : ' ▼') : '';
+
+  const statusPill = st => {
+    if (st === 'aktiv') return '<span style="display:inline-block;background:rgba(63,185,80,0.15);color:var(--accent2);border-radius:6px;padding:2px 7px;font-size:0.68rem;font-weight:700">Aktiv</span>';
+    if (st === 'gesperrt') return '<span style="display:inline-block;background:rgba(248,81,73,0.15);color:var(--danger);border-radius:6px;padding:2px 7px;font-size:0.68rem;font-weight:700">Gesperrt</span>';
+    if (st === 'ausstehend') return '<span style="display:inline-block;background:rgba(240,180,41,0.15);color:var(--accent);border-radius:6px;padding:2px 7px;font-size:0.68rem;font-weight:700">Wartet</span>';
+    return '<span style="color:var(--muted);font-size:0.68rem">–</span>';
+  };
+
+  const th = (label, key, align) => '<th onclick="sortAlle(\'' + key + '\')" style="text-align:' + (align||'left') + ';padding:10px 8px;font-size:0.7rem;font-weight:800;color:var(--muted);cursor:pointer;white-space:nowrap;border-bottom:2px solid var(--border);user-select:none;position:sticky;top:0;background:var(--bg)">' + label + pfeil(key) + '</th>';
+
+  const rows = zeilen.map((z, i) => {
+    const datumStr = z.datum ? new Date(z.datum).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'}) : '–';
+    const bg = i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)';
+    return '<tr style="background:' + bg + '">'
+      + '<td style="padding:10px 8px;font-size:0.82rem;font-weight:600;border-bottom:1px solid var(--border)">' + z.typIcon + ' ' + esc(z.name) + '</td>'
+      + '<td style="padding:10px 8px;font-size:0.76rem;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap">' + z.typ + '</td>'
+      + '<td style="padding:10px 8px;font-size:0.76rem;border-bottom:1px solid var(--border)">' + (z.typ === 'Fahrschule' && z.zuordnung !== '–' ? '<span style="font-family:monospace;font-weight:700;color:var(--accent)">' + esc(z.zuordnung) + '</span>' : esc(z.zuordnung)) + '</td>'
+      + '<td style="padding:10px 8px;border-bottom:1px solid var(--border);white-space:nowrap">' + statusPill(z.status) + '</td>'
+      + '<td style="padding:10px 8px;font-size:0.74rem;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap">' + datumStr + '</td>'
+      + '</tr>';
+  }).join('');
 
   body.innerHTML =
     '<div class="kpi-row">'
-    + '<div class="kpi"><div class="kpi-val" style="color:var(--accent)">' + gesamt + '</div><div class="kpi-lbl">Angemeldet gesamt</div></div>'
+    + '<div class="kpi"><div class="kpi-val" style="color:var(--accent)">' + gesamt + '</div><div class="kpi-lbl">Gesamt</div></div>'
     + '<div class="kpi"><div class="kpi-val" style="color:#f0b429">' + fahrschulen.length + '</div><div class="kpi-lbl">🏫 Fahrschulen</div></div>'
     + '<div class="kpi"><div class="kpi-val" style="color:#58a6ff">' + alleFahrlehrer.length + '</div><div class="kpi-lbl">👤 Fahrlehrer</div></div>'
     + '</div>'
-    + (fahrschulen.length
-        ? '<div style="margin:16px 16px 8px;font-family:\'Syne\',sans-serif;font-weight:800;font-size:0.82rem;color:#f0b429">🏫 Fahrschulen (' + fahrschulen.length + ')</div>' + fsListe
-        : '')
-    + (alleFahrlehrer.length
-        ? '<div style="margin:16px 16px 8px;font-family:\'Syne\',sans-serif;font-weight:800;font-size:0.82rem;color:#58a6ff">👤 Fahrlehrer (' + alleFahrlehrer.length + ')</div>' + flListe
-        : '')
     + (gesamt === 0
         ? '<div style="padding:40px;text-align:center;color:var(--muted)">Noch niemand angemeldet.</div>'
-        : '');
+        : '<div style="margin:8px 12px 24px;overflow-x:auto;-webkit-overflow-scrolling:touch">'
+          + '<table style="width:100%;border-collapse:collapse;min-width:480px">'
+          + '<thead><tr>'
+          + th('Name', 'name')
+          + th('Typ', 'typ')
+          + th('Code / Zuordnung', 'zuordnung')
+          + th('Status', 'status')
+          + th('Seit', 'datum')
+          + '</tr></thead>'
+          + '<tbody>' + rows + '</tbody>'
+          + '</table></div>'
+          + '<div style="text-align:center;font-size:0.7rem;color:var(--muted);margin:-12px 0 20px">Tipp: Auf die Spaltenüberschriften tippen zum Sortieren</div>');
 }
+
 
 // ── SUPERADMIN: Einzelne Fahrlehrer anzeigen ─────────────────
 function renderLehrer() {
