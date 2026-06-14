@@ -1246,6 +1246,13 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
     <div class="sheet-title">⚙️ Einstellungen</div>
     <div style="font-size:0.8rem;color:var(--muted);margin-bottom:16px;text-align:center" id="settings-username-display"></div>
 
+    <!-- Fahrschul-Code Bereich (dynamisch je nach Rolle befüllt) -->
+    <div id="settings-fscode-section" style="display:none">
+      <div style="height:1px;background:var(--border);margin:0 0 16px"></div>
+      <div style="font-family:'Syne',sans-serif;font-size:0.75rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:12px">🏫 Fahrschule</div>
+      <div id="settings-fscode-body"></div>
+    </div>
+
     <div style="height:1px;background:var(--border);margin:0 0 16px"></div>
     <div style="font-family:'Syne',sans-serif;font-size:0.75rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:12px">🔒 Passwort ändern</div>
 
@@ -4677,7 +4684,7 @@ function downloadBlob(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-window.openSettings = () => {
+window.openSettings = async () => {
   document.getElementById('inp-pw-alt').value = '';
   document.getElementById('inp-pw-neu').value = '';
   document.getElementById('inp-pw-neu2').value = '';
@@ -4686,6 +4693,107 @@ window.openSettings = () => {
   const disp = document.getElementById('settings-username-display');
   if (disp && currentUser) disp.textContent = '👤 Angemeldet als: ' + (currentUser.displayName || '');
   document.getElementById('settings-modal').classList.add('open');
+  // Fahrschul-Bereich befüllen (Code anzeigen ODER Beitritts-Feld)
+  renderFscodeSection();
+};
+
+async function renderFscodeSection() {
+  const section = document.getElementById('settings-fscode-section');
+  const body    = document.getElementById('settings-fscode-body');
+  if (!section || !body || !currentUser) return;
+  try {
+    const fsId = currentUser._fahrschuleId || currentUser.uid;
+    // Eigene Fahrschule? (fsId == eigene uid → ich bin Inhaber)
+    const istInhaber = fsId === currentUser.uid;
+    const fsDoc = await getDoc(doc(db, 'fahrschulen', fsId));
+
+    if (istInhaber && fsDoc.exists() && fsDoc.data().fahrschulCode) {
+      // ── FAHRSCHULE: eigenen Code anzeigen ──
+      const code = fsDoc.data().fahrschulCode;
+      body.innerHTML =
+        '<div style="font-size:0.8rem;color:var(--muted);line-height:1.5;margin-bottom:10px">Gib diesen Code an deine Fahrlehrer weiter, damit sie sich deiner Fahrschule anschließen können:</div>'
+        + '<div style="display:flex;gap:8px;align-items:center">'
+        + '<div style="flex:1;background:var(--surface2);border:2px solid var(--accent);border-radius:10px;padding:12px;text-align:center;font-family:monospace;font-size:1.3rem;font-weight:800;letter-spacing:0.1em;color:var(--accent)">' + code + '</div>'
+        + '<button onclick="copyFscode(\'' + code + '\')" style="background:var(--accent);border:none;border-radius:10px;color:#0d1117;padding:12px 14px;font-weight:700;cursor:pointer;white-space:nowrap">📋</button>'
+        + '</div>';
+      section.style.display = 'block';
+
+    } else if (!istInhaber && fsDoc.exists()) {
+      // ── FAHRLEHRER bereits zugeordnet: Fahrschule anzeigen ──
+      const fsName = (fsDoc.data().name || 'deiner Fahrschule').replace(/</g,'&lt;');
+      body.innerHTML =
+        '<div style="background:rgba(63,185,80,0.08);border:1px solid rgba(63,185,80,0.3);border-radius:10px;padding:12px;font-size:0.85rem">'
+        + '✅ Du gehörst zu <b>' + fsName + '</b>'
+        + '</div>'
+        + '<button onclick="fahrschuleVerlassen()" style="width:100%;margin-top:10px;background:none;border:1px solid var(--border);color:var(--muted);padding:9px;border-radius:8px;font-size:0.78rem;cursor:pointer">Fahrschule verlassen</button>';
+      section.style.display = 'block';
+
+    } else {
+      // ── EIGENSTÄNDIGER FAHRLEHRER: Code-Eingabe zum Beitreten ──
+      body.innerHTML =
+        '<div style="font-size:0.8rem;color:var(--muted);line-height:1.5;margin-bottom:10px">Hast du einen Fahrschul-Code von deinem Chef? Gib ihn hier ein, um dich der Fahrschule anzuschließen:</div>'
+        + '<div style="display:flex;gap:8px">'
+        + '<input id="inp-settings-fscode" type="text" placeholder="z. B. FS-A7K9" autocapitalize="characters" '
+        + 'style="flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;color:var(--text);padding:11px 12px;font-size:0.9rem;font-family:monospace;letter-spacing:0.05em;outline:none;text-transform:uppercase;min-width:0">'
+        + '<button onclick="fahrschuleBeitreten()" style="background:var(--accent);border:none;border-radius:10px;color:#0d1117;padding:11px 16px;font-weight:700;cursor:pointer;white-space:nowrap">Beitreten</button>'
+        + '</div>'
+        + '<div id="settings-fscode-msg" style="font-size:0.76rem;margin-top:8px;min-height:16px"></div>';
+      section.style.display = 'block';
+    }
+  } catch(e) {
+    console.error('renderFscodeSection:', e);
+    section.style.display = 'none';
+  }
+}
+
+window.copyFscode = (code) => {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(code).then(() => toast('📋 Code kopiert: ' + code)).catch(() => toast('Code: ' + code));
+  } else {
+    toast('Code: ' + code);
+  }
+};
+
+window.fahrschuleBeitreten = async () => {
+  const inp = document.getElementById('inp-settings-fscode');
+  const msg = document.getElementById('settings-fscode-msg');
+  const code = (inp?.value || '').trim().toUpperCase();
+  if (!code) { if(msg){msg.style.color='var(--danger)';msg.textContent='Bitte Code eingeben.';} return; }
+  if (msg) { msg.style.color='var(--muted)'; msg.textContent='Suche Fahrschule…'; }
+  try {
+    const fsQ = query(collection(db, 'fahrschulen'), where('fahrschulCode', '==', code));
+    const fsSnap = await getDocs(fsQ);
+    if (fsSnap.empty) {
+      if (msg) { msg.style.color='var(--danger)'; msg.textContent='❌ Code "' + code + '" nicht gefunden. Bitte prüfen.'; }
+      return;
+    }
+    const ziel = { id: fsSnap.docs[0].id, ...fsSnap.docs[0].data() };
+    // User-Dokument aktualisieren: dieser Fahrschule zuordnen
+    await updateDoc(doc(db, 'users', currentUser.uid), {
+      fahrschuleId:   ziel.id,
+      fahrschuleName: ziel.name || null
+    });
+    currentUser._fahrschuleId = ziel.id;
+    if (msg) { msg.style.color='var(--accent2)'; msg.textContent='✅ Erfolgreich ' + (ziel.name || 'der Fahrschule') + ' beigetreten!'; }
+    toast('✅ Du gehörst jetzt zu ' + (ziel.name || 'der Fahrschule'));
+    setTimeout(() => renderFscodeSection(), 1500);
+  } catch(e) {
+    console.error('fahrschuleBeitreten:', e);
+    if (msg) { msg.style.color='var(--danger)'; msg.textContent='Fehler: ' + (e.message || e.code); }
+  }
+};
+
+window.fahrschuleVerlassen = async () => {
+  if (!confirm('Möchtest du die Fahrschule wirklich verlassen?\n\nDu wirst danach wieder als eigenständiger Fahrlehrer geführt. Deine Schüler bleiben erhalten.')) return;
+  try {
+    await updateDoc(doc(db, 'users', currentUser.uid), {
+      fahrschuleId:   currentUser.uid,  // zurück zu eigenständig
+      fahrschuleName: null
+    });
+    currentUser._fahrschuleId = currentUser.uid;
+    toast('Du bist jetzt wieder eigenständig.');
+    renderFscodeSection();
+  } catch(e) { console.error('fahrschuleVerlassen:', e); toast('Fehler: ' + e.message); }
 };
 
 window.changePassword = async () => {
