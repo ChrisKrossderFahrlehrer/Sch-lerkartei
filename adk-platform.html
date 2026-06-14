@@ -1234,12 +1234,20 @@ function loadSuperadmin() {
       // Zusätzlich ALLE Nutzer laden und anzeigen
       getDocs(collection(db, 'users')).then(uSnap => {
         const users = uSnap.docs.map(d => d.data());
+        // Fahrlehrer rauszählen (gleiche Logik wie Lehrer-Tab)
+        const lehrer = users.filter(u =>
+          u.typ !== 'fahrschule' && u.rolle !== 'superadmin' &&
+          u.email !== 'chriskoo@mail.de' && u.rolle !== 'fahrschul-admin'
+        );
         let liste = users.length
           ? users.map(u => '• <b>' + (u.name||'?') + '</b> — typ:' + (u.typ||'(kein)') + ' · rolle:' + (u.rolle||'(keine)') + ' · status:' + (u.status||'(kein)')).join('<br>')
           : '(keine Nutzer in users-Sammlung)';
         diag.innerHTML = '🔍 <b>Datenbank-Inhalt:</b><br>'
           + '🏫 Fahrschulen: ' + fahrschulen.length + '<br>'
-          + '👥 Nutzer (users): ' + users.length + '<br><br>'
+          + '👥 Nutzer (users): ' + users.length + ' · davon <b>' + lehrer.length + ' Fahrlehrer</b><br><br>'
+          + (lehrer.length > 0
+              ? '<div style="background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.4);border-radius:8px;padding:10px;margin-bottom:10px;color:var(--accent2)">✅ <b>' + lehrer.length + ' Fahrlehrer gefunden!</b> Sie stehen im Tab <b>„👨‍🏫 Lehrer"</b> oben. Tippe dort drauf!</div>'
+              : '')
           + '<b>Alle Nutzer-Konten:</b><br>' + liste;
       }).catch(err => {
         diag.style.background = 'rgba(248,81,73,0.1)';
