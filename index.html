@@ -2500,7 +2500,29 @@ onAuthStateChanged(auth, async (user) => {
     // Profil + Fahrschul-Status laden
     try {
       const profDoc = await getDoc(doc(db, 'users', user.uid));
-      if (profDoc.exists()) {
+      if (!profDoc.exists()) {
+        // SELBSTHEILUNG: Konto ohne users-Dokument (z.B. Alt-Konto oder
+        // abgebrochene Registrierung) → jetzt nachträglich anlegen,
+        // damit es im SuperAdmin erscheint.
+        if (user.email !== 'chriskoo@mail.de') {
+          try {
+            const unameGuess = (user.email || '').split('@')[0] || '';
+            await setDoc(doc(db, 'users', user.uid), {
+              uid:          user.uid,
+              username:     unameGuess,
+              email:        user.email || '',
+              name:         user.displayName || unameGuess || 'Fahrlehrer',
+              fahrschuleId: user.uid,       // eigenständig
+              rolle:        'fahrlehrer',
+              typ:          'fahrlehrer',
+              status:       'aktiv',         // Alt-Konten direkt aktiv (waren ja schon in Nutzung)
+              createdAt:    Date.now(),
+              nacherstellt: true             // Markierung: nachträglich angelegt
+            });
+            console.log('✅ Fehlendes users-Dokument für', user.email, 'nachträglich angelegt');
+          } catch(healErr) { console.error('Selbstheilung fehlgeschlagen:', healErr); }
+        }
+      } else {
         const profil = profDoc.data();
         currentUser._fahrschuleId = profil.fahrschuleId || null;
         currentUser._rolle        = profil.rolle || 'fahrlehrer';
