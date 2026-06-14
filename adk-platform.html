@@ -447,6 +447,7 @@ html { overscroll-behavior-y: contain; }
   <div class="tab-row">
     <button class="tab-btn active" id="sa-tab-pending"   onclick="saTab('pending')">⏳ Ausstehend</button>
     <button class="tab-btn"        id="sa-tab-aktiv"     onclick="saTab('aktiv')">✅ Aktiv</button>
+    <button class="tab-btn"        id="sa-tab-lehrer"    onclick="saTab('lehrer')">👨‍🏫 Lehrer</button>
     <button class="tab-btn"        id="sa-tab-abos"      onclick="saTab('abos')">💳 Abos</button>
     <button class="tab-btn"        id="sa-tab-analytics" onclick="saTab('analytics')">📊 Stats</button>
     <button class="tab-btn"        id="sa-tab-alle"      onclick="saTab('alle')">📋 Alle</button>
@@ -635,6 +636,8 @@ const SUPERADMIN_UID = 'DEINE_SUPERADMIN_UID'; // Optional: nach erstem Login mi
 let currentUser   = null;
 let currentProfil = null; // { rolle, fahrschuleId, name, ... }
 let fahrschulen   = [];
+let alleFahrlehrer = [];   // einzelne Fahrlehrer (typ:'fahrlehrer') aus users
+let unsubAlleLehrer = null;
 let passwordResets = [];
 let unsubPwResets  = null;
 let saAktivTab    = 'pending';
@@ -808,6 +811,7 @@ function sendRegistrationNotification({ name, inhaber, email, stadt }) {
 window.doLogout = async () => {
   if (unsubFahrschulen) { unsubFahrschulen(); unsubFahrschulen = null; }
   if (unsubPwResets)    { unsubPwResets();    unsubPwResets = null; }
+  if (unsubAlleLehrer)  { unsubAlleLehrer();  unsubAlleLehrer = null; }
   if (unsubLehrer)      { unsubLehrer();      unsubLehrer = null; }
   currentUser = null; currentProfil = null;
   try { await signOut(auth); } catch(e) { console.error('doLogout:', e); }
@@ -816,14 +820,79 @@ window.doLogout = async () => {
 // ── SUPERADMIN: Tabs ─────────────────────────────────────────
 window.saTab = (tab) => {
   saAktivTab = tab;
-  ['pending','aktiv','abos','analytics','alle','einst'].forEach(t => {
+  ['pending','aktiv','lehrer','abos','analytics','alle','einst'].forEach(t => {
     const el = document.getElementById(`sa-tab-${t}`);
     if (el) el.classList.toggle('active', t===tab);
   });
   if      (tab === 'analytics') renderAnalytics();
   else if (tab === 'abos')      renderAbos();
   else if (tab === 'einst')     renderSuperAdminEinst();
+  else if (tab === 'lehrer')    renderLehrer();
   else renderSuperadmin();
+};
+
+// ── SUPERADMIN: Einzelne Fahrlehrer anzeigen ─────────────────
+function renderLehrer() {
+  const body = document.getElementById('sa-body');
+  const pend = alleFahrlehrer.filter(l => l.status === 'ausstehend');
+  const aktiv = alleFahrlehrer.filter(l => l.status === 'aktiv');
+  const gesperrt = alleFahrlehrer.filter(l => l.status === 'gesperrt');
+
+  function lehrerKarte(l) {
+    const datum = l.createdAt ? new Date(l.createdAt).toLocaleDateString('de-DE') : '';
+    const name = (l.name || '?').replace(/</g,'&lt;');
+    const user = (l.username || '').replace(/</g,'&lt;');
+    const zuordnung = l.fahrschuleName
+      ? '🏫 ' + (l.fahrschuleName||'').replace(/</g,'&lt;')
+      : (l.fahrschuleId === l.uid ? '👤 Eigenständig' : '🏫 zugeordnet');
+    const statusBadge = l.status === 'aktiv'
+      ? '<span class="badge badge-green">✅ Aktiv</span>'
+      : l.status === 'gesperrt'
+      ? '<span class="badge badge-red">🚫 Gesperrt</span>'
+      : '<span class="badge badge-yellow">⏳ Ausstehend</span>';
+    const initial = name[0] ? name[0].toUpperCase() : '?';
+    const aktionen = l.status === 'ausstehend'
+      ? '<div style="display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'
+        + '<button onclick="setLehrerStatus(\''+l.id+'\',\'aktiv\')" style="flex:1;background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.4);color:var(--accent2);border-radius:8px;padding:8px;font-size:0.78rem;font-weight:700;cursor:pointer">✅ Freischalten</button>'
+        + '<button onclick="setLehrerStatus(\''+l.id+'\',\'gesperrt\')" style="flex:1;background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);color:var(--danger);border-radius:8px;padding:8px;font-size:0.78rem;font-weight:700;cursor:pointer">🚫 Ablehnen</button>'
+        + '</div>'
+      : (l.status === 'gesperrt'
+        ? '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"><button onclick="setLehrerStatus(\''+l.id+'\',\'aktiv\')" style="width:100%;background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.4);color:var(--accent2);border-radius:8px;padding:8px;font-size:0.78rem;font-weight:700;cursor:pointer">🔓 Entsperren</button></div>'
+        : '');
+    return '<div class="list-item" style="'+(l.status==='ausstehend'?'border:1px solid rgba(240,180,41,0.3);background:rgba(240,180,41,0.04)':'')+'">'
+      + '<div class="list-avatar" style="background:#58a6ff20;color:#58a6ff">'+initial+'</div>'
+      + '<div class="list-info" style="flex:1">'
+      + '<div class="list-name">'+name+'</div>'
+      + '<div class="list-sub">'+zuordnung+' · @'+user+'</div>'
+      + '<div class="list-sub" style="color:var(--muted)">Registriert: '+datum+'</div>'
+      + aktionen
+      + '</div>'
+      + (l.status!=='ausstehend' ? statusBadge : '')
+      + '</div>';
+  }
+
+  let html = '<div class="kpi-row">'
+    + '<div class="kpi"><div class="kpi-val" style="color:var(--accent)">'+alleFahrlehrer.length+'</div><div class="kpi-lbl">Lehrer gesamt</div></div>'
+    + '<div class="kpi"><div class="kpi-val" style="color:var(--accent2)">'+aktiv.length+'</div><div class="kpi-lbl">Aktiv</div></div>'
+    + '<div class="kpi"><div class="kpi-val" style="color:'+(pend.length>0?'var(--danger)':'var(--muted)')+'">'+pend.length+'</div><div class="kpi-lbl">Ausstehend</div></div>'
+    + '</div>';
+
+  if (alleFahrlehrer.length === 0) {
+    html += '<div style="padding:40px;text-align:center;color:var(--muted)">Noch keine einzelnen Fahrlehrer registriert.<br><span style="font-size:0.8rem">Sie erscheinen hier, sobald sich jemand über die App als „Fahrlehrer" anmeldet.</span></div>';
+  } else {
+    if (pend.length)     html += '<div style="margin:14px 16px 6px;font-weight:800;font-size:0.8rem;color:var(--danger)">⏳ Wartet auf Freischaltung</div>' + pend.map(lehrerKarte).join('');
+    if (aktiv.length)    html += '<div style="margin:14px 16px 6px;font-weight:800;font-size:0.8rem;color:var(--accent2)">✅ Aktive Fahrlehrer</div>' + aktiv.map(lehrerKarte).join('');
+    if (gesperrt.length) html += '<div style="margin:14px 16px 6px;font-weight:800;font-size:0.8rem;color:var(--muted)">🚫 Gesperrt</div>' + gesperrt.map(lehrerKarte).join('');
+  }
+  body.innerHTML = html;
+}
+
+// Fahrlehrer-Status setzen (Freischalten/Sperren)
+window.setLehrerStatus = async (userId, status) => {
+  try {
+    await updateDoc(doc(db, 'users', userId), { status });
+    toast(status === 'aktiv' ? '✅ Fahrlehrer freigeschaltet' : status === 'gesperrt' ? '🚫 Gesperrt' : 'Status geändert');
+  } catch(e) { console.error('setLehrerStatus:', e); toast('❌ Fehler: ' + e.message); }
 };
 
 // ── SUPERADMIN: Analytics Dashboard ──────────────────────────
@@ -1197,6 +1266,24 @@ function loadSuperadmin() {
       .sort((a,b) => (b.createdAt||0)-(a.createdAt||0));
     renderSuperadmin();
   }, err => console.error('passwordResets listener:', err));
+
+  // Einzelne Fahrlehrer live mithören (typ:'fahrlehrer' aus users)
+  if (unsubAlleLehrer) unsubAlleLehrer();
+  unsubAlleLehrer = onSnapshot(
+    query(collection(db, 'users'), where('typ', '==', 'fahrlehrer')),
+    snap => {
+      alleFahrlehrer = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .sort((a,b) => (b.createdAt||0)-(a.createdAt||0));
+      // Badge auf Lehrer-Tab: ausstehende
+      const pendL = alleFahrlehrer.filter(l => l.status === 'ausstehend').length;
+      const tab = document.getElementById('sa-tab-lehrer');
+      if (tab) tab.innerHTML = pendL > 0
+        ? `👨‍🏫 Lehrer <span style="background:var(--danger);color:#fff;border-radius:999px;font-size:0.6rem;font-weight:800;padding:1px 6px;margin-left:2px">${pendL}</span>`
+        : '👨‍🏫 Lehrer';
+      renderSuperadmin();
+    },
+    err => console.error('fahrlehrer listener:', err)
+  );
 }
 
 
