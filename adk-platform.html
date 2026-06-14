@@ -1226,18 +1226,29 @@ function loadSuperadmin() {
     fahrschulen = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     console.log('✅ Fahrschulen geladen:', fahrschulen.length, fahrschulen);
 
-    // Sichtbare Status-Box (hilft ohne F12) — verschwindet nach 8s
+    // Sichtbare Status-Box — zeigt Fahrschulen UND alle Nutzer (für Diagnose)
     const diag = document.getElementById('sa-diag');
     if (diag) {
-      if (fahrschulen.length === 0) {
-        diag.style.cssText = 'margin:12px 16px;padding:12px;background:rgba(88,166,255,0.08);border:1px solid rgba(88,166,255,0.3);border-radius:10px;font-size:0.78rem;line-height:1.5;color:var(--text)';
-        diag.innerHTML = 'ℹ️ <b>Verbindung zur Datenbank OK</b> — aber es sind noch <b>0 Fahrschulen</b> registriert. '
-          + 'Sobald sich jemand über die App registriert (oder du es selbst testest), erscheint sie hier automatisch.';
-      } else {
-        diag.style.cssText = 'margin:12px 16px;padding:10px;background:rgba(63,185,80,0.08);border:1px solid rgba(63,185,80,0.3);border-radius:10px;font-size:0.78rem;color:var(--accent2);font-weight:600';
-        diag.innerHTML = '✅ ' + fahrschulen.length + ' Fahrschule(n) geladen';
-        setTimeout(() => { if(diag) diag.style.display='none'; }, 8000);
-      }
+      diag.style.cssText = 'margin:12px 16px;padding:12px;background:rgba(88,166,255,0.08);border:1px solid rgba(88,166,255,0.3);border-radius:10px;font-size:0.76rem;line-height:1.6;color:var(--text)';
+      diag.innerHTML = '🔍 <b>' + fahrschulen.length + ' Fahrschule(n)</b> geladen. Prüfe Nutzer…';
+      // Zusätzlich ALLE Nutzer laden und anzeigen
+      getDocs(collection(db, 'users')).then(uSnap => {
+        const users = uSnap.docs.map(d => d.data());
+        let liste = users.length
+          ? users.map(u => '• <b>' + (u.name||'?') + '</b> — typ:' + (u.typ||'(kein)') + ' · rolle:' + (u.rolle||'(keine)') + ' · status:' + (u.status||'(kein)')).join('<br>')
+          : '(keine Nutzer in users-Sammlung)';
+        diag.innerHTML = '🔍 <b>Datenbank-Inhalt:</b><br>'
+          + '🏫 Fahrschulen: ' + fahrschulen.length + '<br>'
+          + '👥 Nutzer (users): ' + users.length + '<br><br>'
+          + '<b>Alle Nutzer-Konten:</b><br>' + liste;
+      }).catch(err => {
+        diag.style.background = 'rgba(248,81,73,0.1)';
+        diag.style.borderColor = 'rgba(248,81,73,0.35)';
+        diag.innerHTML = '⚠️ <b>Nutzer-Abfrage fehlgeschlagen:</b><br>' + err.code + ': ' + err.message + '<br><br>'
+          + (String(err.code).includes('permission')
+              ? 'Die Regel zum Lesen der users-Sammlung greift nicht. Das erklärt, warum keine Fahrlehrer erscheinen!'
+              : '');
+      });
     }
 
     // Live-Badge für ausstehende Anfragen
