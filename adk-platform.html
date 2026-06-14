@@ -834,6 +834,27 @@ window.saTab = (tab) => {
 // ── SUPERADMIN: Einzelne Fahrlehrer anzeigen ─────────────────
 function renderLehrer() {
   const body = document.getElementById('sa-body');
+
+  // 🔍 Diagnose-Box: zeigt was die Datenbank zurückgibt
+  let diagHtml = '';
+  const d = window.__lehrerDiag;
+  if (d) {
+    if (d.fehler) {
+      diagHtml = '<div style="margin:12px 16px;padding:12px;background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.35);border-radius:10px;font-size:0.78rem;line-height:1.5">'
+        + '⚠️ <b>Datenbank-Fehler beim Laden:</b><br>' + d.fehler + '<br><br>'
+        + (d.fehler.includes('permission')
+            ? 'Die Regel zum Lesen aller Nutzer greift nicht. Bitte sicherstellen, dass die firestore.rules in der Firebase Console veröffentlicht sind und du als chriskoo@mail.de eingeloggt bist.'
+            : '')
+        + '</div>';
+    } else {
+      const liste = (d.alle||[]).map(u => '• ' + u.name + ' — typ:' + u.typ + ', rolle:' + u.rolle + ', status:' + u.status).join('<br>');
+      diagHtml = '<div style="margin:12px 16px;padding:12px;background:rgba(88,166,255,0.08);border:1px solid rgba(88,166,255,0.3);border-radius:10px;font-size:0.74rem;line-height:1.6">'
+        + '🔍 <b>Diagnose:</b> ' + d.roh + ' Nutzer in Datenbank, ' + d.gefiltert + ' als Fahrlehrer erkannt.<br>'
+        + (d.roh > 0 ? '<br><b>Alle Nutzer:</b><br>' + liste : '<br>Die users-Sammlung ist leer.')
+        + '</div>';
+    }
+  }
+
   const pend = alleFahrlehrer.filter(l => l.status === 'ausstehend');
   const aktiv = alleFahrlehrer.filter(l => l.status === 'aktiv' || !l.status); // Alt-Konten ohne status = aktiv
   const gesperrt = alleFahrlehrer.filter(l => l.status === 'gesperrt');
@@ -871,7 +892,7 @@ function renderLehrer() {
       + '</div>';
   }
 
-  let html = '<div class="kpi-row">'
+  let html = diagHtml + '<div class="kpi-row">'
     + '<div class="kpi"><div class="kpi-val" style="color:var(--accent)">'+alleFahrlehrer.length+'</div><div class="kpi-lbl">Lehrer gesamt</div></div>'
     + '<div class="kpi"><div class="kpi-val" style="color:var(--accent2)">'+aktiv.length+'</div><div class="kpi-lbl">Aktiv</div></div>'
     + '<div class="kpi"><div class="kpi-val" style="color:'+(pend.length>0?'var(--danger)':'var(--muted)')+'">'+pend.length+'</div><div class="kpi-lbl">Ausstehend</div></div>'
@@ -1272,19 +1293,21 @@ function loadSuperadmin() {
   unsubAlleLehrer = onSnapshot(
     collection(db, 'users'),
     snap => {
+      const rohAnzahl = snap.docs.length;
+      window.__lehrerDiag = { roh: rohAnzahl, gefiltert: 0, fehler: null,
+        alle: snap.docs.map(d => { const x=d.data(); return {name:x.name||'?', typ:x.typ||'(kein typ)', rolle:x.rolle||'(keine rolle)', status:x.status||'(kein status)', email:x.email||'?'}; }) };
       // Fahrlehrer = alle, die KEINE Fahrschule und KEIN SuperAdmin sind.
-      // Erfasst auch Legacy-Konten (kein typ-Feld) und explizite typ:'fahrlehrer'.
       alleFahrlehrer = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(u => {
-          if (u.typ === 'fahrschule') return false;            // Inhaber raus
-          if (u.rolle === 'superadmin') return false;          // SuperAdmin raus
-          if (u.email === 'chriskoo@mail.de') return false;    // du selbst raus
-          if (u.rolle === 'fahrschul-admin') return false;     // FS-Admin raus
-          return true; // alles andere = Fahrlehrer (auch ohne typ-Feld)
+          if (u.typ === 'fahrschule') return false;
+          if (u.rolle === 'superadmin') return false;
+          if (u.email === 'chriskoo@mail.de') return false;
+          if (u.rolle === 'fahrschul-admin') return false;
+          return true;
         })
         .sort((a,b) => (b.createdAt||0)-(a.createdAt||0));
-      // Badge auf Lehrer-Tab: ausstehende (Alt-Konten ohne status zählen als aktiv)
+      window.__lehrerDiag.gefiltert = alleFahrlehrer.length;
       const pendL = alleFahrlehrer.filter(l => l.status === 'ausstehend').length;
       const tab = document.getElementById('sa-tab-lehrer');
       if (tab) tab.innerHTML = pendL > 0
@@ -1292,7 +1315,11 @@ function loadSuperadmin() {
         : '👨‍🏫 Lehrer';
       renderSuperadmin();
     },
-    err => console.error('fahrlehrer listener:', err)
+    err => {
+      console.error('fahrlehrer listener:', err);
+      window.__lehrerDiag = { roh: 0, gefiltert: 0, fehler: err.code + ': ' + err.message };
+      renderSuperadmin();
+    }
   );
 }
 
