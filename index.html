@@ -901,6 +901,15 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
     <div class="form-group"><label class="form-label">Nachname</label><input class="form-input" id="inp-nn" placeholder="z. B. Müller" autocomplete="off"></div>
     <div class="form-group"><label class="form-label">Geburtsdatum (optional)</label><input class="form-input" id="inp-geb" type="date"></div>
     <div class="form-group">
+      <label class="form-label">BF17 – Begleitetes Fahren ab 17</label>
+      <select class="form-input" id="inp-bf17">
+        <option value="">Automatisch (nach Alter & Klasse)</option>
+        <option value="ja">Ja – immer als BF17 markieren</option>
+        <option value="nein">Nein – nie als BF17 markieren</option>
+      </select>
+      <div style="font-size:0.72rem;color:var(--muted);margin-top:5px">Automatisch: Klasse B/B197 + Alter 16–17 zeigt das BF17-Badge</div>
+    </div>
+    <div class="form-group">
       <label class="form-label">Führerscheinklasse</label>
       <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap">
         <button class="scope-btn active" id="klasse-b-btn"    onclick="setKlasse('B')">🚗 B</button>
@@ -2766,6 +2775,24 @@ window.setCustomThema = async (themaId, val) => {
   } catch(e) { console.error('setCustomThema:', e); }
 };
 
+window.toggleBF17 = async (studentId) => {
+  const s = getStudent(studentId);
+  if (!s) return;
+  // Zyklus: Automatik ('') → Ja → Nein → Automatik
+  const aktuell = s.bf17Override || '';
+  const naechster = aktuell === '' ? 'ja' : aktuell === 'ja' ? 'nein' : '';
+  try {
+    await saveToFirestore(studentId, { bf17Override: naechster });
+    if (s) s.bf17Override = naechster;
+    const meldung = naechster === 'ja' ? '✓ BF17 aktiviert'
+                  : naechster === 'nein' ? '✓ BF17 deaktiviert'
+                  : '✓ BF17 automatisch';
+    toast(meldung);
+    renderDetail();
+    renderList();
+  } catch(e) { console.error('toggleBF17:', e); }
+};
+
 async function saveToFirestore(studentId, data) {
   try {
     const fsId = currentUser?._fahrschuleId || currentUser?.uid;
@@ -2796,6 +2823,19 @@ function getColor(s) { const i = students.indexOf(s); return COLORS[(i<0?0:i)%CO
 function initials(s) { return ((s.vorname||'?')[0] + (s.nachname||'?')[0]).toUpperCase(); }
 function formatDate(d) { if (!d) return ''; const [y,m,day]=d.split('-'); return `${day}.${m}.${y}`; }
 function age(d) { if (!d) return null; const b=new Date(d),now=new Date(); let a=now.getFullYear()-b.getFullYear(); if(now<new Date(now.getFullYear(),b.getMonth(),b.getDate()))a--; return a; }
+
+// BF17-Erkennung: Begleitetes Fahren ab 17 (Klasse B/B197/B-Auto, Alter 16-17).
+// Auto-Erkennung, aber pro Schüler manuell übersteuerbar via s.bf17Override:
+//   'ja'  → immer BF17, 'nein' → nie BF17, sonst (undefined) → automatisch.
+function isBF17(s) {
+  if (s.bf17Override === 'ja')   return true;
+  if (s.bf17Override === 'nein') return false;
+  // Automatik: Klasse B-Familie + Alter 16 oder 17
+  const klassen = s.klassen && s.klassen.length ? s.klassen : [s.klasse || 'B'];
+  const istBKlasse = klassen.some(k => ['B','B197','B-Auto'].includes(k));
+  const a = age(s.geburt);
+  return istBKlasse && (a === 16 || a === 17);
+}
 function progressColor(p) { return p>=80?'#3fb950':p>=50?'#f0b429':'#58a6ff'; }
 
 // B197: min. 10 Schaltstunden + Testfahrt bestanden
@@ -2954,6 +2994,7 @@ function renderStudentCard(s) {
   const a=age(s.geburt);
   const klasseLabels = {'B':'🚗 Klasse B','B-Auto':'🤖 B-Automatik','B197':'⚙️ B197','BE':'🔗 BE','A':'🏍️ Klasse A'};
   const klasseLabel = klasseLabels[s.klasse] || '🚗 Klasse B';
+  const bf17Tag = isBF17(s) ? '<span style="display:inline-block;background:rgba(88,166,255,0.18);color:#58a6ff;border-radius:5px;padding:1px 6px;font-size:0.72rem;font-weight:700;margin-left:2px" title="Begleitetes Fahren ab 17">BF17</span>' : '';
   const meta=[klasseLabel, a?a+' Jahre':null, (s.fahrstunden||0)+' Std.', s.theorieBestanden?'📋 Theorie ✓':null].filter(Boolean).join(' · ');
   const badge = pct>=90?'<span class="badge badge-green">Prüfungsreif</span>':pct>=60?'<span class="badge badge-amber">Guter Fortschritt</span>':pct>0?'<span class="badge badge-blue">In Ausbildung</span>':'<span class="badge badge-gray">Neu</span>';
 
@@ -2980,7 +3021,7 @@ function renderStudentCard(s) {
 
   return `<div class="student-card" onclick="openDetail('${s.id}')" style="${(unread||expiryAbgelaufen)?'border-color:rgba(248,81,73,0.4)':''}">
     <div class="avatar" style="background:${c}">${initials(s)}</div>
-    <div style="flex:1;min-width:0"><div class="sc-name">${s.vorname} ${s.nachname}</div><div class="sc-meta">${meta}</div>${notifHTML}</div>
+    <div style="flex:1;min-width:0"><div class="sc-name">${s.vorname} ${s.nachname} ${bf17Tag}</div><div class="sc-meta">${meta}</div>${notifHTML}</div>
     <div class="sc-right">
       <div class="progress-ring-wrap">
         <svg class="ring-svg" width="40" height="40" viewBox="0 0 40 40">
@@ -3170,6 +3211,14 @@ function renderDetail() {
   };
   const badge = badgeMap[klasse] || badgeMap['B'];
 
+  // BF17-Badge im Detail (klickbar zum Umschalten der Übersteuerung)
+  const bf17Aktiv = isBF17(s);
+  const bf17DetailTag = bf17Aktiv
+    ? `<span onclick="toggleBF17('${s.id}')" style="background:rgba(88,166,255,0.18);color:#58a6ff;border:1px solid rgba(88,166,255,0.4);border-radius:6px;padding:2px 8px;font-size:0.72rem;font-weight:700;cursor:pointer" title="BF17 aktiv – tippen zum Ändern">BF17</span>`
+    : (age(s.geburt) !== null && age(s.geburt) < 18
+        ? `<span onclick="toggleBF17('${s.id}')" style="background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:0.72rem;font-weight:600;cursor:pointer" title="BF17 inaktiv – tippen zum Aktivieren">BF17?</span>`
+        : '');
+
   document.getElementById('profile-strip').innerHTML=`
     <div class="avatar" style="background:${c};width:50px;height:50px;font-size:1.1rem">${initials(s)}</div>
     <div class="profile-info">
@@ -3177,6 +3226,7 @@ function renderDetail() {
       <div class="profile-meta" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
         <span style="background:${badge.color};color:${badge.text};border:1px solid ${badge.border};border-radius:6px;padding:2px 8px;font-size:0.72rem;font-weight:700">${badge.label}</span>
         ${a?'<span style="font-size:0.72rem;color:var(--muted)">'+a+' Jahre</span>':''}
+        ${bf17DetailTag}
       </div>
     </div>
     <div style="text-align:right">
@@ -4409,6 +4459,8 @@ window.openAddModal = () => {
   ['inp-vn','inp-nn'].forEach(id=>document.getElementById(id).value='');
   const geb = document.getElementById('inp-geb');
   if (geb) geb.value='';
+  const bf17El = document.getElementById('inp-bf17');
+  if (bf17El) bf17El.value='';  // Standard: Automatik
   newStudentKlasse = 'B';
   ['b','bauto','b197','be','a'].forEach(k => {
     const btn = document.getElementById(`klasse-${k}-btn`);
@@ -4456,6 +4508,7 @@ window.addStudent = async () => {
       fahrschuleId: currentUser._fahrschuleId || currentUser.uid,
       vorname:vn, nachname:nn,
       geburt:document.getElementById('inp-geb').value,
+      bf17Override:document.getElementById('inp-bf17')?.value || '',
       klasse: newStudentKlasse,
       klassen: [newStudentKlasse],
       zielStunden: ziel,
