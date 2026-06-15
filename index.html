@@ -779,12 +779,22 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
       <button class="filter-chip"        data-filter="reif"    onclick="setFilter('reif')">🏆 Prüfungsreif</button>
       <button class="filter-chip"        data-filter="theorie" onclick="setFilter('theorie')">📋 Theorie offen</button>
       <button class="filter-chip"        data-filter="sonder"  onclick="setFilter('sonder')">⚠️ Pflichtf. offen</button>
-      <button class="filter-chip"        data-filter="sortDesc" onclick="setFilter('sortDesc')">📉 Fortschritt ↓</button>
-      <button class="filter-chip"        data-filter="sortAsc" onclick="setFilter('sortAsc')">📈 Fortschritt ↑</button>
       <button class="filter-chip"        data-filter="archiv"  onclick="setFilter('archiv')">🎓 Archiv</button>
     </div>
   </div>
   <div class="stats-row" id="stats-row"></div>
+  <!-- Sortier-Leiste -->
+  <div style="display:flex;align-items:center;gap:8px;padding:0 16px 4px">
+    <span style="font-size:0.74rem;color:var(--muted);white-space:nowrap">Sortieren:</span>
+    <select id="sort-select" onchange="setSortMode(this.value)" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:7px 10px;font-size:0.8rem;outline:none;cursor:pointer">
+      <option value="nameAsc">Name (A → Z)</option>
+      <option value="nameDesc">Name (Z → A)</option>
+      <option value="dateDesc">Neueste zuerst</option>
+      <option value="dateAsc">Älteste zuerst</option>
+      <option value="progDesc">Fortschritt (hoch → niedrig)</option>
+      <option value="progAsc">Fortschritt (niedrig → hoch)</option>
+    </select>
+  </div>
   <div id="abc-bar" class="abc-bar" style="display:none"></div>
   <div class="student-scroll" id="student-list">
     <div class="empty-state"><div class="ei">🚗</div><p>Noch keine Schüler angelegt.</p></div>
@@ -2803,6 +2813,28 @@ window.setFilter = (f) => {
   renderList();
 };
 
+// Sortier-Modus (unabhängig vom Filter)
+let sortMode = 'nameAsc';
+window.setSortMode = (mode) => {
+  sortMode = mode;
+  renderList();
+};
+
+// Wendet den gewählten Sortier-Modus auf eine Liste an
+function applySingleSort(arr) {
+  const byName = (a,b) => (a.nachname||'').localeCompare(b.nachname||'', 'de')
+                       || (a.vorname||'').localeCompare(b.vorname||'', 'de');
+  switch(sortMode) {
+    case 'nameDesc': return [...arr].sort((a,b) => byName(b,a));
+    case 'dateDesc': return [...arr].sort((a,b) => (b.createdAt||0)-(a.createdAt||0));
+    case 'dateAsc':  return [...arr].sort((a,b) => (a.createdAt||0)-(b.createdAt||0));
+    case 'progDesc': return [...arr].sort((a,b) => overallProgress(b)-overallProgress(a));
+    case 'progAsc':  return [...arr].sort((a,b) => overallProgress(a)-overallProgress(b));
+    case 'nameAsc':
+    default:         return [...arr].sort(byName);
+  }
+}
+
 window.renderList = () => {
   const inp = document.getElementById('search')||{value:''};
   const q = inp.value.toLowerCase();
@@ -2828,8 +2860,6 @@ window.renderList = () => {
     }); break;
     case 'reif':     filtered = filtered.filter(s => overallProgress(s) >= 90); break;
     case 'archiv':   break; // already handled above
-    case 'sortAsc':  filtered = [...filtered].sort((a,b) => overallProgress(a)-overallProgress(b)); break;
-    case 'sortDesc': filtered = [...filtered].sort((a,b) => overallProgress(b)-overallProgress(a)); break;
   }
 
   // stats
@@ -2850,13 +2880,15 @@ window.renderList = () => {
     list.innerHTML=`<div class="empty-state"><div class="ei">${activeFilter==='archiv'?'🎓':'🔍'}</div><p>${msg}</p></div>`; return;
   }
 
-  // Sortiere nach Nachname für ABC-Gruppierung (nur wenn kein Fortschritt-Sort aktiv)
-  const isProgressSort = activeFilter === 'sortAsc' || activeFilter === 'sortDesc';
+  // Sortierung anwenden (nach gewähltem Modus)
+  filtered = applySingleSort(filtered);
+
+  // ABC-Gruppierung nur bei Namens-Sortierung und ohne aktive Suche
+  const isNameSort = sortMode === 'nameAsc' || sortMode === 'nameDesc';
   const isSearchActive = q.length > 0;
 
-  if (!isProgressSort && !isSearchActive) {
-    // ABC-Gruppierung nach Nachname
-    filtered.sort((a,b) => a.nachname.localeCompare(b.nachname, 'de'));
+  if (isNameSort && !isSearchActive) {
+    // ABC-Gruppierung nach Nachname (Reihenfolge der Buchstaben je nach Richtung)
     const groups = {};
     filtered.forEach(s => {
       const letter = (s.nachname||'?')[0].toUpperCase();
@@ -2865,6 +2897,7 @@ window.renderList = () => {
     });
 
     const letters = Object.keys(groups).sort();
+    if (sortMode === 'nameDesc') letters.reverse();
     list.innerHTML = letters.map(letter => {
       const cards = groups[letter].map(s => renderStudentCard(s)).join('');
       return `<div class="abc-group">
@@ -2876,8 +2909,8 @@ window.renderList = () => {
     list.innerHTML = filtered.map(s => renderStudentCard(s)).join('');
   }
 
-  // ABC Schnellsprung-Leiste aktualisieren
-  renderAbcBar(filtered);
+  // ABC Schnellsprung-Leiste aktualisieren (nur sinnvoll bei Namens-Sortierung)
+  renderAbcBar(isNameSort && !isSearchActive ? filtered : []);
 };
 
 function renderStudentCard(s) {
