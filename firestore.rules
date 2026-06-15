@@ -199,6 +199,18 @@ service cloud.firestore {
     }
 
     // ══════════════════════════════════════════════════════
+    // USERNAMES (Benutzername → E-Mail Zuordnung für Login)
+    // Öffentlich lesbar, damit Login per Benutzername funktioniert.
+    // Enthält KEINE sensiblen Daten (nur username, email, uid).
+    // ══════════════════════════════════════════════════════
+    match /usernames/{uname} {
+      allow read:   if true;
+      allow create: if isAuth() && request.resource.data.uid == request.auth.uid;
+      allow update: if isAuth() && resource.data.uid == request.auth.uid;
+      allow delete: if isAuth() && resource.data.uid == request.auth.uid;
+    }
+
+    // ══════════════════════════════════════════════════════
     // ALLES ANDERE: VERBOTEN
     // ══════════════════════════════════════════════════════
     match /{document=**} {
