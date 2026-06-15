@@ -736,9 +736,9 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
     </div>
     <div id="login-form">
       <div class="form-group">
-        <label class="form-label">Benutzername</label>
-        <input class="form-input" id="login-username" type="text" placeholder="z. B. max.mustermann" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false">
-        <div style="font-size:0.7rem;color:var(--muted);margin-top:4px">⚠️ Genau so schreiben wie beim Registrieren</div>
+        <label class="form-label">Benutzername oder E-Mail</label>
+        <input class="form-input" id="login-username" type="text" placeholder="Benutzername oder E-Mail" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false">
+        <div style="font-size:0.7rem;color:var(--muted);margin-top:4px">Du kannst dich mit deinem Benutzernamen oder deiner E-Mail anmelden</div>
       </div>
       <div class="form-group">
         <label class="form-label">Passwort</label>
@@ -778,9 +778,14 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
         <input class="form-input" id="reg-name" type="text" placeholder="z. B. Fahrschule Mustermann">
       </div>
       <div class="form-group">
+        <label class="form-label">E-Mail-Adresse</label>
+        <input class="form-input" id="reg-email" type="email" placeholder="z. B. info@fahrschule.de" autocapitalize="none" autocomplete="email">
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:5px">Deine echte E-Mail. Zum Anmelden und für Passwort-Zurücksetzen.</div>
+      </div>
+      <div class="form-group">
         <label class="form-label">Benutzername</label>
         <input class="form-input" id="reg-username" type="text" placeholder="z. B. fahrschule.mustermann" autocapitalize="none">
-        <div style="font-size:0.72rem;color:var(--muted);margin-top:5px">Nur Buchstaben, Zahlen und Punkte. Wird zum Anmelden verwendet.</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:5px">Nur Buchstaben, Zahlen und Punkte. Damit ODER mit E-Mail anmelden.</div>
       </div>
       <div class="form-group">
         <label class="form-label">Passwort (min. 6 Zeichen)</label>
@@ -1970,23 +1975,48 @@ function validateUsername(u) {
 }
 
 window.doLogin = async () => {
-  const username = document.getElementById('login-username').value.trim();
+  const eingabe = document.getElementById('login-username').value.trim();
   const pw = document.getElementById('login-pw').value;
   const btn = document.getElementById('btn-login');
-  if (!username || !pw) { setAuthError('Bitte Benutzername und Passwort eingeben.'); return; }
-  // Zeige dem Nutzer welche E-Mail intern verwendet wird (für Debugging)
-  const internalEmail = usernameToEmail(username);
+  if (!eingabe || !pw) { setAuthError('Bitte Benutzername/E-Mail und Passwort eingeben.'); return; }
   btn.disabled = true; btn.textContent = '…';
-  try {
-    await signInWithEmailAndPassword(auth, internalEmail, pw);
-  } catch(e) {
-    btn.disabled = false; btn.textContent = 'Anmelden';
-    // Klarer Hinweis bei falschem Login
-    if (e.code === 'auth/invalid-credential' || e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found') {
-      setAuthError('Benutzername oder Passwort falsch. Bitte prüfe die Schreibweise.');
-    } else {
-      setAuthError(friendlyError(e.code));
+
+  // Mögliche E-Mail-Adressen sammeln, die wir nacheinander probieren
+  const versuche = [];
+  if (eingabe.includes('@')) {
+    // Sieht aus wie eine echte E-Mail → direkt damit anmelden
+    versuche.push(eingabe.toLowerCase());
+  } else {
+    // Benutzername: erst neue echte E-Mail aus usernames-Sammlung holen…
+    try {
+      const unameLower = eingabe.toLowerCase().trim();
+      const unameDoc = await getDoc(doc(db, 'usernames', unameLower));
+      if (unameDoc.exists() && unameDoc.data().email) {
+        versuche.push(unameDoc.data().email.toLowerCase());
+      }
+    } catch(e) { /* usernames-Sammlung evtl. nicht lesbar – weiter */ }
+    // …und als Fallback die alte interne Fake-E-Mail (für Bestandskonten)
+    versuche.push(usernameToEmail(eingabe));
+  }
+
+  // Alle Kandidaten nacheinander durchprobieren
+  let letzterFehler = null;
+  for (const mail of versuche) {
+    try {
+      await signInWithEmailAndPassword(auth, mail, pw);
+      return; // Erfolg → onAuthStateChanged übernimmt
+    } catch(e) {
+      letzterFehler = e;
     }
+  }
+
+  // Keiner der Versuche hat geklappt
+  btn.disabled = false; btn.textContent = 'Anmelden';
+  const c = letzterFehler ? letzterFehler.code : '';
+  if (c === 'auth/invalid-credential' || c === 'auth/wrong-password' || c === 'auth/user-not-found') {
+    setAuthError('Benutzername/E-Mail oder Passwort falsch. Bitte prüfe die Schreibweise.');
+  } else {
+    setAuthError(friendlyError(c));
   }
 };
 
@@ -2020,18 +2050,39 @@ function generateFahrschulCode() {
 
 window.doRegister = async () => {
   const name = document.getElementById('reg-name').value.trim();
+  const email = (document.getElementById('reg-email')?.value || '').trim().toLowerCase();
   const username = document.getElementById('reg-username').value.trim();
   const pw = document.getElementById('reg-pw').value;
   const fsCode = (document.getElementById('reg-fscode')?.value || '').trim().toUpperCase();
   const btn = document.getElementById('btn-register');
-  if (!name || !username || !pw) { setAuthError('Bitte alle Felder ausfüllen.'); return; }
+  if (!name || !email || !username || !pw) { setAuthError('Bitte alle Felder ausfüllen.'); return; }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { setAuthError('Bitte eine gültige E-Mail-Adresse eingeben.'); return; }
   if (!validateUsername(username)) { setAuthError('Benutzername: nur Buchstaben, Zahlen, Punkte und Bindestriche (min. 3 Zeichen).'); return; }
   if (pw.length < 6) { setAuthError('Passwort muss mindestens 6 Zeichen haben.'); return; }
   btn.disabled = true; btn.textContent = '…';
   try {
-    const email = usernameToEmail(username);
+    // Benutzername-Eindeutigkeit prüfen (vor Konto-Erstellung)
+    const unameLower = username.toLowerCase().trim();
+    try {
+      const dupQ = query(collection(db, 'usernames'), where('username', '==', unameLower));
+      const dupSnap = await getDocs(dupQ);
+      if (!dupSnap.empty) {
+        btn.disabled = false; btn.textContent = 'Konto erstellen';
+        setAuthError('Benutzername "' + username + '" ist bereits vergeben. Bitte einen anderen wählen.');
+        return;
+      }
+    } catch(dupErr) { /* usernames-Sammlung evtl. noch leer – weiter */ }
+
+    // Konto mit ECHTER E-Mail anlegen
     const cred = await createUserWithEmailAndPassword(auth, email, pw);
     await updateProfile(cred.user, { displayName: name });
+
+    // Benutzername → E-Mail-Zuordnung speichern (für Login per Benutzername)
+    try {
+      await setDoc(doc(db, 'usernames', unameLower), {
+        username: unameLower, email, uid: cred.user.uid, createdAt: Date.now()
+      });
+    } catch(unErr) { console.warn('username-mapping:', unErr); }
 
     // Falls Fahrlehrer einen Code eingegeben hat: Fahrschule suchen (jetzt authentifiziert)
     let zielFahrschule = null;
@@ -2054,16 +2105,16 @@ window.doRegister = async () => {
       const code = generateFahrschulCode();
       await setDoc(doc(db, 'fahrschulen', cred.user.uid), {
         name, inhaber: name, stadt: '', email,
-        username:      username.toLowerCase().trim(),
+        username:      unameLower,
         adminUid:      cred.user.uid,
-        fahrschulCode: code,         // ← eigener Code zum Lehrer-Aufnehmen
+        fahrschulCode: code,
         typ:           'fahrschule',
         status:        'ausstehend',
         abo:           'free',
         createdAt:     Date.now()
       });
       await setDoc(doc(db, 'users', cred.user.uid), {
-        uid: cred.user.uid, username: username.toLowerCase().trim(), email, name,
+        uid: cred.user.uid, username: unameLower, email, name,
         fahrschuleId: cred.user.uid,
         rolle:        'fahrschul-admin',
         typ:          'fahrschule',
@@ -2075,8 +2126,7 @@ window.doRegister = async () => {
     } else {
       // ── FAHRLEHRER (einzeln) ──
       await setDoc(doc(db, 'users', cred.user.uid), {
-        uid: cred.user.uid, username: username.toLowerCase().trim(), email, name,
-        // Wenn Code passte: direkt zuordnen. Sonst eigenständig (eigene uid als fahrschuleId).
+        uid: cred.user.uid, username: unameLower, email, name,
         fahrschuleId:    zielFahrschule ? zielFahrschule.id : cred.user.uid,
         fahrschuleName:  zielFahrschule ? zielFahrschule.name : null,
         rolle:           'fahrlehrer',
