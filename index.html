@@ -13,9 +13,13 @@
 <meta name="application-name" content="ADK – Digitale Kartei">
 <meta name="description" content="Digitale Fahrschul-Verwaltung für Fahrlehrer">
 <link rel="manifest" href="./manifest.json">
-<link rel="apple-touch-icon" href="./icon-192.png?v=2">
-<link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png?v=2">
-<link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png?v=2">
+<!-- iOS: quadratisches Icon, iOS rundet selbst -->
+<link rel="apple-touch-icon" href="./apple-touch-icon.png?v=3">
+<link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png?v=3">
+<!-- Browser-Favicon (rund) -->
+<link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png?v=3">
+<link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png?v=3">
+<link rel="shortcut icon" href="./icon-192.png?v=3">
 <title>ADK – Digitale Kartei</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Manrope:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -656,7 +660,7 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
 <div class="screen" id="screen-login">
   <div class="login-box">
     <div style="display:flex;justify-content:center;margin-bottom:6px">
-      <img src="./icon-512.png?v=2" alt="Ausbildungsdiagrammkarte" style="height:130px;width:130px;border-radius:50%;display:block" onerror="this.style.display='none'">
+      <img src="./icon-512.png?v=3" alt="Ausbildungsdiagrammkarte" style="height:130px;width:130px;border-radius:50%;display:block" onerror="this.style.display='none'">
     </div>
     <div class="tabs">
       <button class="tab-btn active" id="tab-login" onclick="switchTab('login')">Anmelden</button>
@@ -752,7 +756,7 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
   <div class="list-header">
     <div class="list-top">
       <div style="flex:1;min-width:0">
-        <img src="./icon-192.png?v=2" alt="ADK" style="height:48px;width:48px;border-radius:50%;display:block" onerror="this.style.display='none'">
+        <img src="./icon-192.png?v=3" alt="ADK" style="height:48px;width:48px;border-radius:50%;display:block" onerror="this.style.display='none'">
         <div id="user-greeting" style="font-size:0.72rem;color:var(--muted);margin-top:2px"></div>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
@@ -5957,7 +5961,7 @@ window.openImpressum = async () => {
 
   const logoHTML = fsLogo
     ? `<img src="${fsLogo}" style="width:72px;height:72px;border-radius:18px;object-fit:contain;border:1px solid var(--border)" onerror="this.style.display='none'">`
-    : `<img src="./icon-192.png?v=2" style="width:72px;height:72px;border-radius:18px" onerror="this.style.display='none'">`;
+    : `<img src="./icon-192.png?v=3" style="width:72px;height:72px;border-radius:18px" onerror="this.style.display='none'">`;
 
   body.innerHTML = `
     <div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:24px 0 8px">
@@ -6204,7 +6208,7 @@ window.exportPDF = () => {
 
   <div class="header-box">
     <div style="display:flex;align-items:center;gap:14px">
-      <img src="https://chriskrossderfahrlehrer.github.io/Sch-lerkartei/icon-192.png?v=2" alt="ADK" style="width:56px;height:56px;border-radius:50%;flex-shrink:0" onerror="this.style.display='none'">
+      <img src="https://chriskrossderfahrlehrer.github.io/Sch-lerkartei/icon-192.png?v=3" alt="ADK" style="width:56px;height:56px;border-radius:50%;flex-shrink:0" onerror="this.style.display='none'">
       <div>
         <div style="font-size:10px;color:#f0b429;text-transform:uppercase;letter-spacing:1px">Ausbildungsnachweis</div>
         <div style="font-size:18px;font-weight:bold;margin:4px 0">${s.vorname} ${s.nachname}</div>
