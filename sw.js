@@ -2,13 +2,16 @@
 // HTML kommt IMMER frisch vom Server → kein Cache-Löschen mehr nötig!
 // Cache dient nur als Offline-Fallback.
 
-const CACHE_NAME = 'adk-v5';
+const CACHE_NAME = 'adk-v6';
 
 // Nur statische Assets die sich nie ändern → Cache-First erlaubt
 const STATIC_ASSETS = [
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png',
+  '/apple-touch-icon.png',
+  '/icon-maskable-192.png',
+  '/icon-maskable-512.png',
 ];
 
 // ── Installation ────────────────────────────────────────────
