@@ -1262,6 +1262,22 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
     </div>
 
     <div style="height:1px;background:var(--border);margin:0 0 16px"></div>
+    <div style="font-family:'Syne',sans-serif;font-size:0.75rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:12px">📧 E-Mail-Adresse ändern</div>
+
+    <div style="font-size:0.78rem;color:var(--muted);line-height:1.5;margin-bottom:12px" id="email-current-display"></div>
+    <div class="form-group">
+      <label class="form-label">Neue E-Mail-Adresse</label>
+      <input class="form-input" id="inp-email-neu" type="email" placeholder="neue@email.de" autocapitalize="none" autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Aktuelles Passwort (zur Bestätigung)</label>
+      <input class="form-input" id="inp-email-pw" type="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <div id="email-error" style="color:var(--danger);font-size:0.8rem;min-height:18px;text-align:center;margin-bottom:8px"></div>
+    <div id="email-success" style="color:var(--accent2);font-size:0.8rem;min-height:18px;text-align:center;margin-bottom:8px;line-height:1.5"></div>
+    <button class="btn-main" onclick="changeEmail()" style="margin-bottom:12px">E-Mail ändern ✓</button>
+
+    <div style="height:1px;background:var(--border);margin:0 0 16px"></div>
     <div style="font-family:'Syne',sans-serif;font-size:0.75rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:12px">🔒 Passwort ändern</div>
 
     <div class="form-group">
@@ -1638,7 +1654,7 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider, verifyBeforeUpdateEmail } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, enableIndexedDbPersistence, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, getDocs, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -4782,6 +4798,17 @@ window.openSettings = async () => {
   document.getElementById('inp-pw-neu2').value = '';
   document.getElementById('settings-error').textContent = '';
   document.getElementById('settings-success').textContent = '';
+  // E-Mail-Bereich zurücksetzen + aktuelle E-Mail anzeigen
+  const emailNeu = document.getElementById('inp-email-neu');
+  const emailPw  = document.getElementById('inp-email-pw');
+  if (emailNeu) emailNeu.value = '';
+  if (emailPw)  emailPw.value = '';
+  const emErr = document.getElementById('email-error');
+  const emOk  = document.getElementById('email-success');
+  if (emErr) emErr.textContent = '';
+  if (emOk)  emOk.textContent = '';
+  const emDisp = document.getElementById('email-current-display');
+  if (emDisp && currentUser) emDisp.innerHTML = 'Aktuelle E-Mail: <b>' + (currentUser.email || '–') + '</b>';
   const disp = document.getElementById('settings-username-display');
   if (disp && currentUser) disp.textContent = '👤 Angemeldet als: ' + (currentUser.displayName || '');
   document.getElementById('settings-modal').classList.add('open');
@@ -4922,9 +4949,59 @@ window.changePassword = async () => {
   }
 };
 
-// ─────────────────────────────────────────
-// TRANSFER STUDENT
-// ─────────────────────────────────────────
+window.changeEmail = async () => {
+  const neueEmail = (document.getElementById('inp-email-neu').value || '').trim().toLowerCase();
+  const pw = document.getElementById('inp-email-pw').value;
+  const errEl = document.getElementById('email-error');
+  const okEl = document.getElementById('email-success');
+  errEl.textContent = ''; okEl.textContent = '';
+
+  if (!neueEmail || !pw) { errEl.textContent = 'Bitte neue E-Mail und aktuelles Passwort eingeben.'; return; }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(neueEmail)) { errEl.textContent = 'Bitte eine gültige E-Mail-Adresse eingeben.'; return; }
+  if (neueEmail === (currentUser.email||'').toLowerCase()) { errEl.textContent = 'Das ist bereits deine aktuelle E-Mail.'; return; }
+
+  try {
+    // Re-authentifizieren mit aktuellem Passwort
+    const credential = EmailAuthProvider.credential(currentUser.email, pw);
+    await reauthenticateWithCredential(currentUser, credential);
+
+    // Bestätigungs-Mail an die NEUE Adresse senden (sichere Methode)
+    await verifyBeforeUpdateEmail(currentUser, neueEmail);
+
+    // Die neue E-Mail schon mal in Firestore vormerken (wird nach Bestätigung aktiv)
+    try {
+      await updateDoc(doc(db, 'users', currentUser.uid), {
+        emailPending: neueEmail,
+        emailPendingSince: Date.now()
+      });
+      // usernames-Zuordnung aktualisieren, falls vorhanden
+      const profDoc = await getDoc(doc(db, 'users', currentUser.uid));
+      const uname = profDoc.exists() ? profDoc.data().username : null;
+      if (uname) {
+        await setDoc(doc(db, 'usernames', uname), {
+          username: uname, email: neueEmail, uid: currentUser.uid, updatedAt: Date.now()
+        }, { merge: true });
+      }
+    } catch(dbErr) { console.warn('emailPending speichern:', dbErr); }
+
+    okEl.innerHTML = '✓ Bestätigungs-Mail an <b>' + neueEmail + '</b> gesendet!<br>'
+      + 'Bitte öffne die Mail und klicke auf den Link. Danach meldest du dich mit der neuen E-Mail an.';
+    document.getElementById('inp-email-neu').value = '';
+    document.getElementById('inp-email-pw').value = '';
+  } catch(e) {
+    if (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
+      errEl.textContent = 'Aktuelles Passwort ist falsch.';
+    } else if (e.code === 'auth/email-already-in-use') {
+      errEl.textContent = 'Diese E-Mail wird bereits von einem anderen Konto verwendet.';
+    } else if (e.code === 'auth/too-many-requests') {
+      errEl.textContent = 'Zu viele Versuche. Bitte kurz warten.';
+    } else if (e.code === 'auth/operation-not-allowed') {
+      errEl.textContent = 'E-Mail-Änderung ist in Firebase noch nicht aktiviert (Console-Einstellung).';
+    } else {
+      errEl.textContent = 'Fehler: ' + e.code;
+    }
+  }
+};
 window.openTransferModal = () => {
   document.getElementById('inp-transfer-username').value = '';
   document.getElementById('transfer-error').textContent = '';
