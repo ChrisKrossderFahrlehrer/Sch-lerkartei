@@ -632,6 +632,10 @@ const SUPERADMIN_UID = 'DEINE_SUPERADMIN_UID'; // Optional: nach erstem Login mi
 // ── STATE ────────────────────────────────────────────────────
 let currentUser   = null;
 let currentProfil = null; // { rolle, fahrschuleId, name, ... }
+
+// Bezahlfunktion an/aus – muss mit index.html übereinstimmen!
+// Zahlungs-Sperre-Buttons erscheinen nur wenn true.
+const ABO_ENABLED = false;
 let fahrschulen   = [];
 let alleFahrlehrer = [];   // einzelne Fahrlehrer (typ:'fahrlehrer') aus users
 let unsubAlleLehrer = null;
@@ -886,6 +890,7 @@ function renderAlleNutzer() {
   const statusPill = st => {
     if (st === 'aktiv') return '<span style="display:inline-block;background:rgba(63,185,80,0.15);color:var(--accent2);border-radius:6px;padding:2px 7px;font-size:0.68rem;font-weight:700">Aktiv</span>';
     if (st === 'gesperrt') return '<span style="display:inline-block;background:rgba(248,81,73,0.15);color:var(--danger);border-radius:6px;padding:2px 7px;font-size:0.68rem;font-weight:700">Gesperrt</span>';
+    if (st === 'zahlung_offen') return '<span style="display:inline-block;background:rgba(240,180,41,0.15);color:var(--accent);border-radius:6px;padding:2px 7px;font-size:0.68rem;font-weight:700">💳 Zahlung offen</span>';
     if (st === 'ausstehend') return '<span style="display:inline-block;background:rgba(240,180,41,0.15);color:var(--accent);border-radius:6px;padding:2px 7px;font-size:0.68rem;font-weight:700">Wartet</span>';
     return '<span style="color:var(--muted);font-size:0.68rem">–</span>';
   };
@@ -1208,6 +1213,16 @@ async function renderAbos() {
             </div>
           </div>
           ${abo !== 'free' ? `<div style="font-size:0.7rem;color:var(--muted);margin-top:6px">Läuft bis: ${expiry}</div>` : ''}
+          ${ABO_ENABLED ? `
+            <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+              ${fs.status === 'zahlung_offen'
+                ? `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                     <span style="background:rgba(248,81,73,0.15);color:var(--danger);border-radius:6px;padding:3px 9px;font-size:0.7rem;font-weight:700">💳 Zahlung offen${fs.autoLocked?' (auto)':''}</span>
+                     <button onclick="setZahlungStatus('${fs.id}','aktiv')" style="flex:1;background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.4);color:var(--accent2);border-radius:8px;padding:7px;font-size:0.74rem;font-weight:700;cursor:pointer">✅ Zahlung erhalten – entsperren</button>
+                   </div>`
+                : `<button onclick="setZahlungStatus('${fs.id}','zahlung_offen')" style="width:100%;background:rgba(240,180,41,0.1);border:1px solid rgba(240,180,41,0.4);color:var(--accent);border-radius:8px;padding:7px;font-size:0.74rem;font-weight:700;cursor:pointer">💳 Wegen Zahlung sperren</button>`
+              }
+            </div>` : ''}
         </div>`;
     }).join('');
 
@@ -1247,8 +1262,22 @@ window.setFsAbo = async (fsId, abo) => {
   }
 };
 
-
-// ── AUTH STATE CHANGED ────────────────────────────────────────
+// ── ZAHLUNGS-STATUS: wegen Zahlung sperren / entsperren ──
+window.setZahlungStatus = async (fsId, status) => {
+  try {
+    const update = { status, statusUpdatedAt: Date.now() };
+    // Beim manuellen Entsperren die Auto-Sperre-Markierung entfernen
+    if (status === 'aktiv') update.autoLocked = false;
+    await updateDoc(doc(db, 'fahrschulen', fsId), update);
+    toast(status === 'zahlung_offen'
+      ? '💳 Wegen Zahlung gesperrt'
+      : '✅ Entsperrt – Zahlung erhalten');
+    renderAbos(); // Tabelle neu zeichnen
+  } catch(e) {
+    console.error('setZahlungStatus:', e);
+    toast('❌ Fehler: ' + e.message);
+  }
+};
 onAuthStateChanged(auth, async (user) => {
   document.getElementById('loading').style.display = 'none';
 
