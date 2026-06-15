@@ -969,7 +969,11 @@ function renderLehrer() {
         + '</div>'
       : (l.status === 'gesperrt'
         ? '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"><button onclick="setLehrerStatus(\''+l.id+'\',\'aktiv\')" style="width:100%;background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.4);color:var(--accent2);border-radius:8px;padding:8px;font-size:0.78rem;font-weight:700;cursor:pointer">🔓 Entsperren</button></div>'
-        : '');
+        : '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"><button onclick="setLehrerStatus(\''+l.id+'\',\'gesperrt\')" style="width:100%;background:rgba(248,81,73,0.08);border:1px solid rgba(248,81,73,0.25);color:var(--danger);border-radius:8px;padding:8px;font-size:0.78rem;font-weight:700;cursor:pointer">🚫 Sperren</button></div>');
+    // Lösch-Button für ALLE Fahrlehrer (egal welcher Status)
+    const loeschBtn = '<div style="margin-top:8px">'
+      + '<button id="btn-del-lehrer-'+l.id+'" data-armed="0" onclick="deleteLehrerComplete(\''+l.id+'\',\''+(name||'Fahrlehrer').replace(/'/g,'')+'\')" style="width:100%;background:transparent;border:1px solid var(--danger);color:var(--danger);border-radius:8px;padding:7px;font-size:0.74rem;font-weight:700;cursor:pointer">🗑️ Löschen</button>'
+      + '</div>';
     return '<div class="list-item" style="'+(l.status==='ausstehend'?'border:1px solid rgba(240,180,41,0.3);background:rgba(240,180,41,0.04)':'')+'">'
       + '<div class="list-avatar" style="background:#58a6ff20;color:#58a6ff">'+initial+'</div>'
       + '<div class="list-info" style="flex:1">'
@@ -977,6 +981,7 @@ function renderLehrer() {
       + '<div class="list-sub">'+zuordnung+' · @'+user+'</div>'
       + '<div class="list-sub" style="color:var(--muted)">Registriert: '+datum+'</div>'
       + aktionen
+      + loeschBtn
       + '</div>'
       + (l.status!=='ausstehend' ? statusBadge : '')
       + '</div>';
@@ -1582,6 +1587,10 @@ window.openFsDetail = (fsId) => {
       ${fs.status === 'aktiv'    ? `<button class="btn-secondary" onclick="setFsStatus('${fs.id}','gesperrt')" style="border-color:var(--danger);color:var(--danger)">🚫 Fahrschule sperren</button>` : ''}
       ${fs.status === 'gesperrt' ? `<button class="btn-main" onclick="setFsStatus('${fs.id}','aktiv')">🔓 Entsperren</button>` : ''}
       <button class="btn-secondary" onclick="document.getElementById('modal-fs-detail').classList.remove('open')">Schließen</button>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--danger)">
+        <div style="font-size:0.7rem;color:var(--danger);text-align:center;margin-bottom:8px">⚠️ Unwiderruflich – löscht Fahrschule + alle Schüler &amp; Daten</div>
+        <button id="btn-del-fs-${fs.id}" data-armed="0" onclick="deleteFahrschuleComplete('${fs.id}','${(fs.name||'Fahrschule').replace(/'/g,'')}')" style="width:100%;background:transparent;border:1px solid var(--danger);color:var(--danger);border-radius:10px;padding:10px;font-size:0.82rem;font-weight:700;cursor:pointer">🗑️ Fahrschule löschen</button>
+      </div>
     </div>
   `;
   document.getElementById('modal-fs-detail').classList.add('open');
@@ -1602,6 +1611,87 @@ window.setFsStatus = async (fsId, status) => {
     if (modalEl) modalEl.classList.remove('open');
     toast(status === 'aktiv' ? '✅ Fahrschule freigeschaltet!' : status === 'gesperrt' ? '🚫 Fahrschule gesperrt.' : '✓ Status aktualisiert');
   } catch(e) { console.error('setFsStatus:', e); toast('❌ Fehler: ' + e.message); }
+};
+
+// ── VOLL-LÖSCHUNG: Fahrschule + ALLE zugehörigen Daten ──
+window.deleteFahrschuleComplete = async (fsId, fsName) => {
+  // Schnelle Sicherheitsabfrage (Inline-Bestätigung)
+  const btn = document.getElementById('btn-del-fs-' + fsId);
+  if (btn && btn.dataset.armed !== '1') {
+    btn.dataset.armed = '1';
+    btn.textContent = '⚠️ Wirklich? Nochmal tippen';
+    btn.style.background = 'var(--danger)';
+    btn.style.color = '#fff';
+    setTimeout(() => { if (btn) { btn.dataset.armed='0'; btn.textContent='🗑️ Fahrschule löschen'; btn.style.background=''; btn.style.color='var(--danger)'; } }, 4000);
+    return;
+  }
+  try {
+    toast('⏳ Lösche Fahrschule und alle Daten…');
+    let geloescht = { students:0, protokoll:0, lehrer:0, sonstige:0 };
+
+    // 1. Alle Schüler dieser Fahrschule
+    const studentsSnap = await getDocs(query(collection(db,'students'), where('fahrschuleId','==',fsId)));
+    for (const d of studentsSnap.docs) { await deleteDoc(d.ref); geloescht.students++; }
+
+    // 2. Alle Protokoll-Einträge
+    const protSnap = await getDocs(query(collection(db,'protokoll'), where('fahrschuleId','==',fsId)));
+    for (const d of protSnap.docs) { await deleteDoc(d.ref); geloescht.protokoll++; }
+
+    // 3. Zugeordnete Fahrlehrer (users mit dieser fahrschuleId, außer dem Inhaber selbst)
+    const lehrerSnap = await getDocs(query(collection(db,'users'), where('fahrschuleId','==',fsId)));
+    for (const d of lehrerSnap.docs) { await deleteDoc(d.ref); geloescht.lehrer++; }
+
+    // 4. Weitere zugehörige Daten (best effort, einzeln abgesichert)
+    for (const coll of ['customFields','customThemen','customGruppen','chat','accessCodes']) {
+      try {
+        const snap = await getDocs(query(collection(db,coll), where('fahrschuleId','==',fsId)));
+        for (const d of snap.docs) { await deleteDoc(d.ref); geloescht.sonstige++; }
+      } catch(subErr) { /* Collection evtl. ohne fahrschuleId-Feld – überspringen */ }
+    }
+
+    // 5. Die Fahrschule selbst
+    await deleteDoc(doc(db, 'fahrschulen', fsId));
+
+    const modalEl = document.getElementById('modal-fs-detail');
+    if (modalEl) modalEl.classList.remove('open');
+    toast(`✅ "${fsName}" gelöscht (${geloescht.students} Schüler, ${geloescht.lehrer} Lehrer, ${geloescht.protokoll} Protokolle)`);
+  } catch(e) {
+    console.error('deleteFahrschuleComplete:', e);
+    toast('❌ Fehler beim Löschen: ' + e.message);
+  }
+};
+
+// ── VOLL-LÖSCHUNG: Fahrlehrer + seine Schüler ──
+window.deleteLehrerComplete = async (userId, lehrerName) => {
+  const btn = document.getElementById('btn-del-lehrer-' + userId);
+  if (btn && btn.dataset.armed !== '1') {
+    btn.dataset.armed = '1';
+    btn.textContent = '⚠️ Wirklich? Nochmal tippen';
+    btn.style.background = 'var(--danger)';
+    btn.style.color = '#fff';
+    setTimeout(() => { if (btn) { btn.dataset.armed='0'; btn.textContent='🗑️ Löschen'; btn.style.background=''; btn.style.color='var(--danger)'; } }, 4000);
+    return;
+  }
+  try {
+    toast('⏳ Lösche Fahrlehrer und Daten…');
+    let geloescht = { students:0, protokoll:0 };
+
+    // Schüler dieses Fahrlehrers (eigenständig: fahrschuleId == seine uid)
+    const studentsSnap = await getDocs(query(collection(db,'students'), where('fahrschuleId','==',userId)));
+    for (const d of studentsSnap.docs) { await deleteDoc(d.ref); geloescht.students++; }
+
+    // Protokolle
+    const protSnap = await getDocs(query(collection(db,'protokoll'), where('fahrschuleId','==',userId)));
+    for (const d of protSnap.docs) { await deleteDoc(d.ref); geloescht.protokoll++; }
+
+    // Das Konto selbst
+    await deleteDoc(doc(db, 'users', userId));
+
+    toast(`✅ "${lehrerName}" gelöscht (${geloescht.students} Schüler, ${geloescht.protokoll} Protokolle)`);
+  } catch(e) {
+    console.error('deleteLehrerComplete:', e);
+    toast('❌ Fehler beim Löschen: ' + e.message);
+  }
 };
 
 // ── FAHRSCHUL-ADMIN ──────────────────────────────────────────
