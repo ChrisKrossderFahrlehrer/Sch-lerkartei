@@ -94,58 +94,59 @@ service cloud.firestore {
     // SCHÜLER
     // ══════════════════════════════════════════════════════
     match /students/{studentId} {
-      allow read:   if isAuth() && docBelongsToUser(resource.data);
+      // SuperAdmin darf lesen (nötig zum Auffinden beim Voll-Löschen)
+      allow read:   if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
       allow create: if isAuth() &&
                        request.resource.data.uid == request.auth.uid;
       allow update: if isAuth() && (
                        docBelongsToUser(resource.data) ||
                        request.resource.data.uid == request.auth.uid
                      );
-      allow delete: if isAuth() && docBelongsToUser(resource.data);
+      allow delete: if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
     }
 
     // ══════════════════════════════════════════════════════
     // PROTOKOLL
     // ══════════════════════════════════════════════════════
     match /protokoll/{eintragId} {
-      allow read:   if isAuth() && docBelongsToUser(resource.data);
+      allow read:   if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
       allow create: if isAuth() &&
                        request.resource.data.uid == request.auth.uid;
       allow update: if isAuth() && docBelongsToUser(resource.data);
-      allow delete: if isAuth() && docBelongsToUser(resource.data);
+      allow delete: if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
     }
 
     // ══════════════════════════════════════════════════════
     // CUSTOM FIELDS
     // ══════════════════════════════════════════════════════
     match /customFields/{docId} {
-      allow read:   if isAuth() && docBelongsToUser(resource.data);
+      allow read:   if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
       allow create: if isAuth() &&
                        request.resource.data.uid == request.auth.uid;
       allow update: if isAuth() && docBelongsToUser(resource.data);
-      allow delete: if isAuth() && docBelongsToUser(resource.data);
+      allow delete: if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
     }
 
     // ══════════════════════════════════════════════════════
     // CUSTOM THEMEN
     // ══════════════════════════════════════════════════════
     match /customThemen/{docId} {
-      allow read:   if isAuth() && docBelongsToUser(resource.data);
+      allow read:   if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
       allow create: if isAuth() &&
                        request.resource.data.uid == request.auth.uid;
       allow update: if isAuth() && docBelongsToUser(resource.data);
-      allow delete: if isAuth() && docBelongsToUser(resource.data);
+      allow delete: if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
     }
 
     // ══════════════════════════════════════════════════════
     // CUSTOM GRUPPEN (eigene Überschriften im Eigene-Tab)
     // ══════════════════════════════════════════════════════
     match /customGruppen/{docId} {
-      allow read:   if isAuth() && docBelongsToUser(resource.data);
+      allow read:   if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
       allow create: if isAuth() &&
                        request.resource.data.uid == request.auth.uid;
       allow update: if isAuth() && docBelongsToUser(resource.data);
-      allow delete: if isAuth() && docBelongsToUser(resource.data);
+      allow delete: if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
     }
 
     // ══════════════════════════════════════════════════════
