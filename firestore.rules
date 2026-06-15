@@ -211,6 +211,70 @@ service cloud.firestore {
     }
 
     // ══════════════════════════════════════════════════════
+    // FAHRSCHULKALENDER (separates App, gemeinsames Projekt)
+    // Eigene Collections, eigenes Rollensystem (role/approved/schoolId).
+    // kalenderUsers ist getrennt von ADKs users, damit keine Kollision.
+    // ══════════════════════════════════════════════════════
+    function kalAuth() { return request.auth != null; }
+    function kalIsSuperAdmin() {
+      return kalAuth() && request.auth.token.email == 'chriskoo@mail.de';
+    }
+
+    // Kalender-Nutzerprofile (Lehrer/Admins des Kalenders)
+    match /kalenderUsers/{uid} {
+      allow read:   if kalAuth();
+      allow create: if kalAuth() && (request.auth.uid == uid || kalIsSuperAdmin());
+      allow update: if kalAuth() && (request.auth.uid == uid || kalIsSuperAdmin());
+      allow delete: if kalIsSuperAdmin() ||
+                       (kalAuth() && request.auth.uid == uid);
+    }
+
+    // Fahrschulen im Kalender
+    match /schools/{schoolId} {
+      allow read:   if kalAuth();
+      allow create: if kalAuth();
+      allow update: if kalAuth();
+      allow delete: if kalAuth();
+    }
+
+    // Alle weiteren Kalender-Collections: authentifizierte Nutzer
+    // dürfen lesen/schreiben (Verfeinerung später bei Bedarf).
+    match /schueler/{docId} {
+      allow read, write: if kalAuth();
+    }
+    match /slots/{docId} {
+      allow read, write: if kalAuth();
+    }
+    match /autos/{docId} {
+      allow read, write: if kalAuth();
+    }
+    match /blocked/{docId} {
+      allow read, write: if kalAuth();
+    }
+    match /globalBlocked/{docId} {
+      allow read, write: if kalAuth();
+    }
+    match /urlaub/{docId} {
+      allow read, write: if kalAuth();
+    }
+    match /notizen/{docId} {
+      allow read, write: if kalAuth();
+    }
+    match /warteliste/{docId} {
+      allow read, write: if kalAuth();
+    }
+    match /pruefungen/{docId} {
+      allow read, write: if kalAuth();
+    }
+    match /mailQueue/{docId} {
+      allow read, write: if kalAuth();
+    }
+    match /settings/{docId} {
+      allow read:  if kalAuth();
+      allow write: if kalIsSuperAdmin();
+    }
+
+    // ══════════════════════════════════════════════════════
     // ALLES ANDERE: VERBOTEN
     // ══════════════════════════════════════════════════════
     match /{document=**} {
