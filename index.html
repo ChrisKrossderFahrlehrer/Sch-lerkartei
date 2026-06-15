@@ -2477,19 +2477,41 @@ onAuthStateChanged(auth, async (user) => {
 
         // Status kommt von der Fahrschule (falls zugeordnet) ODER vom User selbst (eigenständiger Lehrer)
         let effektiverStatus = profil.status || null;
+        let aboData = null; // für Ablauf-Prüfung
         const fsId = profil.fahrschuleId;
         if (fsId && fsId !== user.uid) {
           // Fahrlehrer gehört zu fremder Fahrschule → deren Status zählt zusätzlich
           try {
             const fsDoc = await getDoc(doc(db, 'fahrschulen', fsId));
-            if (fsDoc.exists() && fsDoc.data().status) effektiverStatus = fsDoc.data().status;
+            if (fsDoc.exists()) {
+              if (fsDoc.data().status) effektiverStatus = fsDoc.data().status;
+              aboData = fsDoc.data();
+            }
           } catch(e) {}
         } else if (fsId === user.uid) {
           // Fahrschule (Inhaber): eigener fahrschulen-Doc-Status
           try {
             const fsDoc = await getDoc(doc(db, 'fahrschulen', fsId));
-            if (fsDoc.exists() && fsDoc.data().status) effektiverStatus = fsDoc.data().status;
+            if (fsDoc.exists()) {
+              if (fsDoc.data().status) effektiverStatus = fsDoc.data().status;
+              aboData = fsDoc.data();
+            }
           } catch(e) {}
+        }
+
+        // AUTOMATISCHE ZAHLUNGS-SPERRE: nur wenn Bezahlfunktion aktiv ist.
+        // Wenn ein bezahltes Abo abgelaufen ist → automatisch auf 'zahlung_offen' setzen.
+        if (!istSuperadmin && ABO_ENABLED && aboData) {
+          const hatBezahltesAbo = aboData.abo && aboData.abo !== 'free';
+          const abgelaufen = aboData.aboExpiry && Date.now() > aboData.aboExpiry;
+          if (hatBezahltesAbo && abgelaufen && effektiverStatus === 'aktiv') {
+            effektiverStatus = 'zahlung_offen';
+            // Im Hintergrund den Status persistieren (best effort)
+            try {
+              const targetId = (fsId === user.uid) ? user.uid : fsId;
+              await updateDoc(doc(db,'fahrschulen',targetId), { status:'zahlung_offen', statusUpdatedAt:Date.now(), autoLocked:true });
+            } catch(e) {}
+          }
         }
 
         if (!istSuperadmin && effektiverStatus === 'ausstehend') {
@@ -2497,6 +2519,14 @@ onAuthStateChanged(auth, async (user) => {
           document.getElementById('screen-warte').classList.add('active');
           document.getElementById('warte-name').textContent =
             '👤 ' + (profil.fahrschuleName || profil.name || user.email);
+          return;
+        }
+        if (!istSuperadmin && effektiverStatus === 'zahlung_offen') {
+          document.querySelectorAll('.screen').forEach(s => { s.classList.remove('active'); s.style.display=''; });
+          document.getElementById('screen-login').classList.add('active');
+          document.getElementById('auth-error').innerHTML =
+            '💳 Deine Zahlung steht noch aus. Bitte begleiche die offene Rechnung, um die App weiter zu nutzen.<br><span style="font-size:0.8rem;color:var(--muted)">Bei Fragen wende dich an den Support.</span>';
+          await signOut(auth);
           return;
         }
         if (!istSuperadmin && effektiverStatus === 'gesperrt') {
