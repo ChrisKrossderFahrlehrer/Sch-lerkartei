@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <!-- EmailJS: Benachrichtigung bei neuer Registrierung -->
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#f0b429">
 <meta name="mobile-web-app-capable" content="yes">
@@ -1406,6 +1407,10 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
       <div style="font-size:0.72rem;color:var(--muted);margin-bottom:6px">🔗 Schüler-Portal Link</div>
       <div id="code-portal-url" style="font-size:0.75rem;color:var(--blue);word-break:break-all;line-height:1.4"></div>
       <button onclick="copyPortalLink()" style="margin-top:8px;width:100%;background:rgba(74,158,255,0.15);border:1px solid rgba(74,158,255,0.4);color:var(--blue);padding:8px;border-radius:8px;cursor:pointer;font-size:0.78rem;font-weight:600">📋 Link kopieren</button>
+      <div style="text-align:center;margin-top:12px;padding-top:12px;border-top:1px solid rgba(74,158,255,0.2)">
+        <div style="font-size:0.72rem;color:var(--muted);margin-bottom:8px">📱 QR-Code – vom Schüler scannen lassen</div>
+        <div id="code-qr" style="display:inline-block;background:#fff;padding:10px;border-radius:10px"></div>
+      </div>
     </div>
     <!-- Chat & Planer Buttons -->
     <div style="display:flex;gap:8px;margin-bottom:10px">
@@ -4408,6 +4413,30 @@ window.copyPortalLink = () => {
   navigator.clipboard.writeText(url).then(() => toast('✓ Link kopiert!'));
 };
 
+// QR-Code für den Portal-Link erzeugen (in #code-qr)
+function zeigeQRCode(url) {
+  const el = document.getElementById('code-qr');
+  if (!el) return;
+  el.innerHTML = ''; // alten QR entfernen
+  try {
+    if (typeof QRCode === 'undefined') {
+      el.innerHTML = '<span style="font-size:0.7rem;color:#999">QR-Code lädt…</span>';
+      return;
+    }
+    new QRCode(el, {
+      text: url,
+      width: 160,
+      height: 160,
+      colorDark: '#0d1117',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  } catch(e) {
+    console.error('QR-Code Fehler:', e);
+    el.innerHTML = '<span style="font-size:0.7rem;color:#999">QR-Code nicht verfügbar</span>';
+  }
+}
+
 // ─────────────────────────────────────────
 // 🏆 GAMIFICATION – Abzeichen & Meilensteine
 // ─────────────────────────────────────────
@@ -5132,6 +5161,7 @@ window.openCodeModal = async () => {
       const portalUrl = `${base}/schueler-portal.html?code=${data.code}`;
       document.getElementById('code-portal-url').textContent = portalUrl;
       document.getElementById('code-portal-link').style.display = 'block';
+      zeigeQRCode(portalUrl);
     } else {
       document.getElementById('code-display').textContent = '––––––';
       document.getElementById('code-valid-until').textContent = 'Noch kein Code generiert';
@@ -5201,6 +5231,12 @@ window.generateCode = async () => {
     const exp = new Date(expiresAt);
     document.getElementById('code-valid-until').textContent =
       `Gültig bis: ${exp.toLocaleDateString('de-DE')}`;
+    // Portal-Link + QR-Code anzeigen
+    const base = window.location.href.replace('index.html','').replace(/\/$/, '');
+    const portalUrl = `${base}/schueler-portal.html?code=${code}`;
+    document.getElementById('code-portal-url').textContent = portalUrl;
+    document.getElementById('code-portal-link').style.display = 'block';
+    zeigeQRCode(portalUrl);
     toast('✓ Code generiert – gib ihn dem Schüler');
   } catch(e) {
     console.error('generateCode Fehler:', e);
