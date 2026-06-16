@@ -1657,33 +1657,36 @@ window.deleteFahrschuleComplete = async (fsId, fsName) => {
   try {
     toast('⏳ Lösche Fahrschule und alle Daten…');
     let geloescht = { students:0, protokoll:0, lehrer:0, sonstige:0 };
+    const backup = []; // {coll, id, data} für Undo
 
     // 1. Alle Schüler dieser Fahrschule
     const studentsSnap = await getDocs(query(collection(db,'students'), where('fahrschuleId','==',fsId)));
-    for (const d of studentsSnap.docs) { await deleteDoc(d.ref); geloescht.students++; }
+    for (const d of studentsSnap.docs) { backup.push({coll:'students', id:d.id, data:d.data()}); await deleteDoc(d.ref); geloescht.students++; }
 
     // 2. Alle Protokoll-Einträge
     const protSnap = await getDocs(query(collection(db,'protokoll'), where('fahrschuleId','==',fsId)));
-    for (const d of protSnap.docs) { await deleteDoc(d.ref); geloescht.protokoll++; }
+    for (const d of protSnap.docs) { backup.push({coll:'protokoll', id:d.id, data:d.data()}); await deleteDoc(d.ref); geloescht.protokoll++; }
 
-    // 3. Zugeordnete Fahrlehrer (users mit dieser fahrschuleId, außer dem Inhaber selbst)
+    // 3. Zugeordnete Fahrlehrer
     const lehrerSnap = await getDocs(query(collection(db,'users'), where('fahrschuleId','==',fsId)));
-    for (const d of lehrerSnap.docs) { await deleteDoc(d.ref); geloescht.lehrer++; }
+    for (const d of lehrerSnap.docs) { backup.push({coll:'users', id:d.id, data:d.data()}); await deleteDoc(d.ref); geloescht.lehrer++; }
 
-    // 4. Weitere zugehörige Daten (best effort, einzeln abgesichert)
+    // 4. Weitere zugehörige Daten
     for (const coll of ['customFields','customThemen','customGruppen','chat','accessCodes']) {
       try {
         const snap = await getDocs(query(collection(db,coll), where('fahrschuleId','==',fsId)));
-        for (const d of snap.docs) { await deleteDoc(d.ref); geloescht.sonstige++; }
-      } catch(subErr) { /* Collection evtl. ohne fahrschuleId-Feld – überspringen */ }
+        for (const d of snap.docs) { backup.push({coll, id:d.id, data:d.data()}); await deleteDoc(d.ref); geloescht.sonstige++; }
+      } catch(subErr) {}
     }
 
     // 5. Die Fahrschule selbst
+    const fsSnap = await getDoc(doc(db,'fahrschulen',fsId));
+    if (fsSnap.exists()) backup.push({coll:'fahrschulen', id:fsId, data:fsSnap.data()});
     await deleteDoc(doc(db, 'fahrschulen', fsId));
 
     const modalEl = document.getElementById('modal-fs-detail');
     if (modalEl) modalEl.classList.remove('open');
-    toast(`✅ "${fsName}" gelöscht (${geloescht.students} Schüler, ${geloescht.lehrer} Lehrer, ${geloescht.protokoll} Protokolle)`);
+    zeigeUndoBalken(`🗑️ "${fsName}" gelöscht (${geloescht.students} Schüler, ${geloescht.lehrer} Lehrer)`, backup);
   } catch(e) {
     console.error('deleteFahrschuleComplete:', e);
     toast('❌ Fehler beim Löschen: ' + e.message);
@@ -1704,24 +1707,65 @@ window.deleteLehrerComplete = async (userId, lehrerName) => {
   try {
     toast('⏳ Lösche Fahrlehrer und Daten…');
     let geloescht = { students:0, protokoll:0 };
+    const backup = [];
 
     // Schüler dieses Fahrlehrers (eigenständig: fahrschuleId == seine uid)
     const studentsSnap = await getDocs(query(collection(db,'students'), where('fahrschuleId','==',userId)));
-    for (const d of studentsSnap.docs) { await deleteDoc(d.ref); geloescht.students++; }
+    for (const d of studentsSnap.docs) { backup.push({coll:'students', id:d.id, data:d.data()}); await deleteDoc(d.ref); geloescht.students++; }
 
     // Protokolle
     const protSnap = await getDocs(query(collection(db,'protokoll'), where('fahrschuleId','==',userId)));
-    for (const d of protSnap.docs) { await deleteDoc(d.ref); geloescht.protokoll++; }
+    for (const d of protSnap.docs) { backup.push({coll:'protokoll', id:d.id, data:d.data()}); await deleteDoc(d.ref); geloescht.protokoll++; }
 
     // Das Konto selbst
+    const uSnap = await getDoc(doc(db,'users',userId));
+    if (uSnap.exists()) backup.push({coll:'users', id:userId, data:uSnap.data()});
     await deleteDoc(doc(db, 'users', userId));
 
-    toast(`✅ "${lehrerName}" gelöscht (${geloescht.students} Schüler, ${geloescht.protokoll} Protokolle)`);
+    zeigeUndoBalken(`🗑️ "${lehrerName}" gelöscht (${geloescht.students} Schüler)`, backup);
   } catch(e) {
     console.error('deleteLehrerComplete:', e);
     toast('❌ Fehler beim Löschen: ' + e.message);
   }
 };
+
+// ── UNDO-BALKEN für SuperAdmin (stellt alle gesicherten Dokumente wieder her) ──
+let saUndoTimer = null;
+function zeigeUndoBalken(text, backup) {
+  const alt = document.getElementById('undo-bar');
+  if (alt) alt.remove();
+  if (saUndoTimer) clearTimeout(saUndoTimer);
+
+  const bar = document.createElement('div');
+  bar.id = 'undo-bar';
+  bar.style.cssText = 'position:fixed;left:50%;bottom:24px;z-index:99999;'
+    + 'background:#1c2128;border:1px solid var(--border);border-radius:12px;padding:12px 16px;'
+    + 'display:flex;align-items:center;gap:14px;box-shadow:0 8px 28px rgba(0,0,0,0.5);max-width:90vw';
+  bar.innerHTML = `<span style="font-size:0.85rem;color:var(--text)">${text}</span>`
+    + `<button id="undo-btn" style="background:var(--accent);color:#0d1117;border:none;border-radius:8px;padding:7px 14px;font-size:0.82rem;font-weight:700;cursor:pointer;white-space:nowrap">↩️ Rückgängig</button>`;
+  document.body.appendChild(bar);
+
+  document.getElementById('undo-btn').onclick = async () => {
+    if (saUndoTimer) clearTimeout(saUndoTimer);
+    bar.remove();
+    toast('⏳ Stelle wieder her…');
+    let ok = 0, fail = 0;
+    // In umgekehrter Reihenfolge wiederherstellen (Konto zuletzt gelöscht → zuerst zurück)
+    for (const item of backup.reverse()) {
+      try { await setDoc(doc(db, item.coll, item.id), item.data); ok++; }
+      catch(e) { console.error('undo restore:', item.coll, e); fail++; }
+    }
+    toast(fail === 0 ? `✓ Wiederhergestellt (${ok} Einträge)` : `⚠️ ${ok} wiederhergestellt, ${fail} fehlgeschlagen`);
+    // Listen neu laden
+    if (typeof renderAlleNutzer === 'function') renderAlleNutzer();
+    if (typeof renderLehrer === 'function') renderLehrer();
+  };
+
+  saUndoTimer = setTimeout(() => {
+    const b = document.getElementById('undo-bar');
+    if (b) b.remove();
+  }, 8000); // SuperAdmin: 8 Sekunden (mehr Daten = mehr Bedenkzeit)
+}
 
 // ── FAHRSCHUL-ADMIN ──────────────────────────────────────────
 window.fsaTab = (tab) => {
