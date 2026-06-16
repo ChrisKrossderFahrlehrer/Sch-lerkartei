@@ -1421,7 +1421,29 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
   </div>
 </div>
 
-<!-- ══ CHAT MODAL (Fahrlehrer) ══ -->
+<!-- ══ ABSCHLUSS-UNTERSCHRIFT MODAL ══ -->
+<div class="modal-overlay" id="abschluss-sig-modal" onclick="closeModal(event)">
+  <div class="modal-sheet">
+    <div class="sheet-title">✍️ Abschluss-Unterschrift</div>
+    <div style="font-size:0.8rem;color:var(--muted);margin:8px 0 16px">Der Schüler unterschreibt hier den Ausbildungsnachweis. Die Unterschrift erscheint im PDF.</div>
+    <div id="abschluss-sig-current" style="display:none;text-align:center;margin-bottom:14px">
+      <div style="font-size:0.72rem;color:var(--muted);margin-bottom:6px">Gespeicherte Unterschrift:</div>
+      <img id="abschluss-sig-img" style="max-width:100%;background:#fff;border:1px solid var(--border);border-radius:10px;padding:6px" />
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <label class="form-label" style="margin:0">Neu unterschreiben</label>
+      <button onclick="clearAbschlussSig()" style="background:none;border:1px solid var(--border);color:var(--muted);font-size:0.72rem;padding:3px 8px;border-radius:6px;cursor:pointer">Löschen</button>
+    </div>
+    <canvas id="abschluss-sig-canvas" width="400" height="150"
+      style="width:100%;height:150px;background:#fff;border:1.5px solid var(--border);border-radius:10px;touch-action:none;display:block;cursor:crosshair"></canvas>
+    <div style="font-size:0.68rem;color:var(--muted);margin-top:4px">Mit Finger oder Stift unterschreiben</div>
+    <div class="sheet-actions" style="margin-top:16px">
+      <button class="btn-sheet-cancel" onclick="document.getElementById('abschluss-sig-modal').classList.remove('open')">Abbrechen</button>
+      <button class="btn-sheet-ok" onclick="saveAbschlussSig()">Speichern ✓</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="teacher-chat-modal" onclick="closeModal(event)">
   <div class="modal-sheet" style="height:80vh;display:flex;flex-direction:column;padding:0">
     <div style="padding:16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
@@ -3297,6 +3319,7 @@ function renderDetail() {
             ${isBAuto? `<div style="font-size:0.7rem;color:var(--muted);margin-top:4px">Nur Automatikgetriebe · keine Schaltberechtigung</div>` : ''}
           </div>
           <div style="display:flex;gap:8px;white-space:nowrap">
+            <button onclick="openAbschlussSig()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:10px;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:'Manrope',sans-serif">✍️</button>
             <button onclick="exportPDF()" style="background:var(--accent);border:1px solid var(--accent);color:#0d1117;padding:8px 14px;border-radius:10px;font-size:0.78rem;font-weight:700;cursor:pointer;font-family:'Manrope',sans-serif">📄 PDF</button>
             <button onclick="openOptionsMenu()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:10px;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:'Manrope',sans-serif">⚙️ Optionen</button>
           </div>
@@ -3756,6 +3779,86 @@ function isSignatureEmpty() {
 window.clearSignature = () => {
   if (!sigCtx || !sigCanvas) return;
   sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height);
+};
+
+// ── ABSCHLUSS-UNTERSCHRIFT (für den gesamten Ausbildungsnachweis) ──
+let aSigCanvas = null, aSigCtx = null, aSigDrawing = false;
+
+window.openAbschlussSig = () => {
+  const s = getStudent(activeId);
+  if (!s) return;
+  document.getElementById('abschluss-sig-modal').classList.add('open');
+  // Bereits gespeicherte Unterschrift anzeigen
+  const cur = document.getElementById('abschluss-sig-current');
+  const img = document.getElementById('abschluss-sig-img');
+  if (s.abschlussUnterschrift) {
+    img.src = s.abschlussUnterschrift;
+    cur.style.display = 'block';
+  } else {
+    cur.style.display = 'none';
+  }
+  // Canvas initialisieren (nach kurzer Verzögerung, damit Layout steht)
+  setTimeout(() => initAbschlussSigPad(), 100);
+};
+
+function initAbschlussSigPad() {
+  aSigCanvas = document.getElementById('abschluss-sig-canvas');
+  if (!aSigCanvas) return;
+  aSigCtx = aSigCanvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = aSigCanvas.getBoundingClientRect();
+  aSigCanvas.width  = rect.width  * dpr;
+  aSigCanvas.height = rect.height * dpr;
+  aSigCtx.scale(dpr, dpr);
+  aSigCtx.strokeStyle = '#0d1117'; // dunkle Schrift auf weißem Grund (für PDF)
+  aSigCtx.lineWidth = 2.5;
+  aSigCtx.lineCap = 'round';
+  aSigCtx.lineJoin = 'round';
+
+  const getPos = (e) => {
+    const r = aSigCanvas.getBoundingClientRect();
+    const src = e.touches ? e.touches[0] : e;
+    return { x: src.clientX - r.left, y: src.clientY - r.top };
+  };
+  aSigCanvas.addEventListener('pointerdown', e => {
+    aSigDrawing = true;
+    const p = getPos(e);
+    aSigCtx.beginPath();
+    aSigCtx.moveTo(p.x, p.y);
+    e.preventDefault();
+  }, { passive: false });
+  aSigCanvas.addEventListener('pointermove', e => {
+    if (!aSigDrawing) return;
+    const p = getPos(e);
+    aSigCtx.lineTo(p.x, p.y);
+    aSigCtx.stroke();
+    e.preventDefault();
+  }, { passive: false });
+  aSigCanvas.addEventListener('pointerup',  () => { aSigDrawing = false; });
+  aSigCanvas.addEventListener('pointerout', () => { aSigDrawing = false; });
+}
+
+window.clearAbschlussSig = () => {
+  if (!aSigCtx || !aSigCanvas) return;
+  aSigCtx.clearRect(0, 0, aSigCanvas.width, aSigCanvas.height);
+};
+
+function isAbschlussSigEmpty() {
+  if (!aSigCanvas) return true;
+  const data = aSigCtx.getImageData(0, 0, aSigCanvas.width, aSigCanvas.height).data;
+  return !data.some((v, i) => i % 4 === 3 && v > 10);
+}
+
+window.saveAbschlussSig = async () => {
+  if (isAbschlussSigEmpty()) { toast('Bitte erst unterschreiben'); return; }
+  const dataUrl = aSigCanvas.toDataURL('image/png');
+  try {
+    await saveToFirestore(activeId, { abschlussUnterschrift: dataUrl, abschlussUnterschriftDatum: Date.now() });
+    const s = getStudent(activeId);
+    if (s) { s.abschlussUnterschrift = dataUrl; s.abschlussUnterschriftDatum = Date.now(); }
+    document.getElementById('abschluss-sig-modal').classList.remove('open');
+    toast('✓ Unterschrift gespeichert');
+  } catch(e) { console.error('saveAbschlussSig:', e); toast('Fehler: ' + e.message); }
 };
 
 function renderLernkurve() {
@@ -6463,8 +6566,11 @@ window.exportPDF = () => {
       <div style="border-top:1px solid #333;width:160px;padding-top:4px;font-size:9px;color:#888">Datum, Unterschrift</div>
     </div>
     <div>
-      <div style="font-size:10px;color:#888;margin-bottom:20px">Unterschrift Fahrschüler</div>
-      <div style="border-top:1px solid #333;width:160px;padding-top:4px;font-size:9px;color:#888">Datum, Unterschrift</div>
+      <div style="font-size:10px;color:#888;margin-bottom:6px">Unterschrift Fahrschüler</div>
+      ${s.abschlussUnterschrift
+        ? `<img src="${s.abschlussUnterschrift}" style="height:50px;max-width:160px;object-fit:contain;display:block;margin-bottom:2px" /><div style="border-top:1px solid #333;width:160px;padding-top:4px;font-size:9px;color:#888">${s.abschlussUnterschriftDatum ? new Date(s.abschlussUnterschriftDatum).toLocaleDateString('de-DE') : ''} ✍️ digital signiert</div>`
+        : `<div style="margin-top:14px;border-top:1px solid #333;width:160px;padding-top:4px;font-size:9px;color:#888">Datum, Unterschrift</div>`
+      }
     </div>
   </div>
 
