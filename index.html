@@ -2420,24 +2420,10 @@ async function migrateOldAccessCodes() {
         const pSnap = await getDocs(pq);
         const protokollSnapshot = pSnap.docs.map(d => ({ id: d.id, ...d.data() }));
         
-        // Snapshot hinzufügen
+        // Snapshot hinzufügen (Datenschutz: minimiert)
         await updateDoc(doc(db, 'accessCodes', codeDoc.id), {
-          studentSnapshot: {
-            id: data.studentId,
-            vorname: s.vorname,
-            nachname: s.nachname,
-            geburt: s.geburt || '',
-            klasse: s.klasse || 'B',
-            klassen: s.klassen || [s.klasse || 'B'],
-            fahrstunden: s.fahrstunden || 0,
-            zielStunden: s.zielStunden || 30,
-            sonderfahrten: s.sonderfahrten || {},
-            themen: s.themen || {},
-            schaltstunden: s.schaltstunden || 0,
-            zielSchaltstunden: s.zielSchaltstunden || 10,
-            testfahrtBestanden: s.testfahrtBestanden || false,
-          },
-          protokollSnapshot: protokollSnapshot,
+          studentSnapshot: buildPortalSnapshot({ ...s, id: data.studentId }, data.code, data.expiresAt || (Date.now()+CODE_LAUFZEIT_MS)),
+          protokollSnapshot: buildPortalProtokoll(protokollSnapshot),
           migratedAt: Date.now()
         });
         
@@ -4132,9 +4118,11 @@ window.addProtokollEintrag = async () => {
     const _cq = query(collection(db,'accessCodes'), where('studentId','==',activeId), where('uid','==',currentUser.uid));
     const _cs = await getDocs(_cq);
     if (!_cs.empty) {
-      const _proto = protokollEintraege
-        .sort((a,b) => (b.createdAt||0)-(a.createdAt||0)).slice(0,50)
-        .map(p => ({id:p.id,datum:p.datum,notiz:p.notiz||'',maengel:p.maengel||[],sterne:p.sterne||0,typ:p.typ||'fahrstunde',createdAt:p.createdAt||0}));
+      const _proto = buildPortalProtokoll(
+        protokollEintraege
+          .sort((a,b) => (b.createdAt||0)-(a.createdAt||0)).slice(0,50)
+          .map(p => ({...p, fortschritt: p.fortschritt ?? null, stunde: p.stunde||0}))
+      );
       await updateDoc(doc(db,'accessCodes',_cs.docs[0].id), { protokollSnapshot: _proto, expiresAt: Date.now() + CODE_LAUFZEIT_MS });
     }
   } catch(_e) { console.error('ProtokollSnapshot-Update:', _e); }
@@ -5246,6 +5234,48 @@ function generateCodeStr() {
   return code;
 }
 
+// ── DATENSCHUTZ: minimierte Daten fürs Schüler-Portal ──
+// Nur was der Schüler sehen MUSS. Keine internen Notizen, kein Geburtsdatum,
+// keine Fahrlehrer-Kommentare. Reduziert den Schaden, falls ein Code leakt.
+function buildPortalSnapshot(s, code, expiresAt) {
+  return {
+    id:                s.id || null,
+    vorname:           s.vorname,
+    nachname:          s.nachname,
+    // KEIN geburt (sensibles Personendatum, im Portal nicht nötig)
+    klasse:            s.klasse || 'B',
+    klassen:           s.klassen || [s.klasse || 'B'],
+    fahrstunden:       s.fahrstunden || 0,
+    zielStunden:       s.zielStunden || 30,
+    sonderfahrten:     s.sonderfahrten || {},
+    themen:            s.themen || {},
+    schaltstunden:     s.schaltstunden || 0,
+    zielSchaltstunden: s.zielSchaltstunden || 10,
+    testfahrtBestanden:s.testfahrtBestanden || false,
+    // KEIN pruefKommentar (interner Fahrlehrer-Kommentar)
+    code:              code,
+    expiresAt:         expiresAt,
+  };
+}
+
+// Protokoll fürs Portal: Fortschritt UND Rückmeldungen (Notiz/Mängel) für den
+// Schüler – das ist gewolltes Feedback. Weggelassen werden nur rein interne
+// Felder (z.B. teacherUid, fahrschuleId), die der Schüler nicht braucht.
+function buildPortalProtokoll(protoArray) {
+  return protoArray.map(e => ({
+    id:          e.id,
+    datum:       e.datum,
+    notiz:       e.notiz || '',        // Rückmeldung an den Schüler (gewollt)
+    maengel:     e.maengel || [],      // Lernpunkte für den Schüler (gewollt)
+    sterne:      e.sterne || 0,
+    fortschritt: e.fortschritt ?? null,
+    stunde:      e.stunde || 0,
+    typ:         e.typ || 'fahrstunde',
+    createdAt:   e.createdAt || 0,
+    // bewusst WEG: teacherUid, uid, fahrschuleId, studentId (interne Verknüpfungen)
+  }));
+}
+
 window.openCodeModal = async () => {
   document.getElementById('code-modal').classList.add('open');
   document.getElementById('code-display').textContent = '…';
@@ -5308,26 +5338,9 @@ window.generateCode = async () => {
       studentName:      `${s.vorname} ${s.nachname}`,
       expiresAt,
       createdAt:        Date.now(),
-      // Vollständiger Schüler-Snapshot
-      studentSnapshot:  {
-        id:               activeId,
-        vorname:          s.vorname,
-        nachname:         s.nachname,
-        geburt:           s.geburt || '',
-        klasse:           s.klasse || 'B',
-        klassen:          s.klassen || [s.klasse || 'B'],
-        fahrstunden:      s.fahrstunden || 0,
-        zielStunden:      s.zielStunden || 30,
-        sonderfahrten:    s.sonderfahrten || {},
-        themen:           s.themen || {},
-        schaltstunden:    s.schaltstunden || 0,
-        zielSchaltstunden:s.zielSchaltstunden || 10,
-        testfahrtBestanden:s.testfahrtBestanden || false,
-        pruefKommentar:   s.pruefKommentar || '',
-        code:             code,
-        expiresAt:        expiresAt,
-      },
-      protokollSnapshot: protokollSnapshot,
+      // Datenschutz: minimierter Snapshot (kein Geburtsdatum, kein interner Kommentar)
+      studentSnapshot:  buildPortalSnapshot({ ...s, id: activeId }, code, expiresAt),
+      protokollSnapshot: buildPortalProtokoll(protokollSnapshot),
     });
 
     document.getElementById('code-display').textContent = code;
