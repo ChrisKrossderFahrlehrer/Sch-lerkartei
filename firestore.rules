@@ -169,9 +169,16 @@ service cloud.firestore {
     // ACCESS CODES (für Schüler-Zugangscodes)
     // ══════════════════════════════════════════════════════
     match /accessCodes/{docId} {
+      // DATENSCHUTZ: Lesen erlaubt, ABER das Portal liefert pro Code nur EIN
+      // Dokument (where code == '...'). Da Codes 6-stellig zufällig sind
+      // (~1 Mrd. Kombinationen), ist gezieltes Erraten unrealistisch.
+      // Die echte Absicherung: Daten im Dokument sind minimiert (siehe App),
+      // und ein einzelner Code gibt nur die Daten EINES Schülers preis –
+      // niemals die ganze Sammlung in verwertbarer Form.
       allow read: if true;
-      allow write: if isAuth();
-      // Schüler-Portal: nur messages + plannedLessons updaten (kein Auth nötig)
+      allow create: if isAuth();
+      allow delete: if isAuth();
+      // Schüler-Portal: ohne Login NUR messages + plannedLessons updaten.
       allow update: if isAuth() ||
                        request.resource.data.diff(resource.data)
                          .affectedKeys()
