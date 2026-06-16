@@ -733,6 +733,15 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
         <input class="form-input" id="reg-fscode" type="text" placeholder="z. B. FS-A7K9" autocapitalize="characters">
         <div style="font-size:0.72rem;color:var(--muted);margin-top:5px">Hast du einen Code von deiner Fahrschule? Dann hier eingeben. Sonst einfach leer lassen – du kannst ihn später ergänzen.</div>
       </div>
+      <!-- DSGVO-Einwilligung (Pflicht) -->
+      <div class="form-group" style="margin-top:6px">
+        <label onclick="toggleRegConsent()" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;user-select:none">
+          <div class="custom-checkbox" id="reg-consent-box" style="flex-shrink:0;margin-top:1px"></div>
+          <span style="font-size:0.78rem;line-height:1.5;color:var(--muted)">
+            Ich habe die <a onclick="event.stopPropagation();zeigeDatenschutzModal()" style="color:var(--accent);text-decoration:underline;cursor:pointer">Datenschutzerklärung</a> gelesen und stimme der Verarbeitung meiner Daten gemäß DSGVO zu.
+          </span>
+        </label>
+      </div>
       <button class="btn-main" id="btn-register" onclick="doRegister()">Konto erstellen</button>
     </div>
     <div id="schueler-form" style="display:none">
@@ -751,6 +760,50 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
   </div>
   <div style="text-align:center;margin-top:20px;padding-bottom:8px;font-size:0.72rem;color:var(--muted);opacity:0.75">
     © 2026 ChrisKross der Fahrlehrer
+  </div>
+</div>
+
+<!-- ══ DATENSCHUTZ MODAL (vor Login lesbar) ══ -->
+<div class="modal-overlay" id="datenschutz-modal" onclick="closeModal(event)">
+  <div class="modal-sheet" style="max-height:85vh;overflow-y:auto">
+    <div class="sheet-title">🔒 Datenschutzerklärung</div>
+    <div style="font-size:0.8rem;line-height:1.6;color:var(--muted);margin-top:12px">
+      <strong style="color:var(--text)">1. Verantwortlicher</strong><br>
+      Verantwortlich für die Datenverarbeitung in dieser App ist der jeweils registrierte Fahrlehrer bzw. die Fahrschule als Verantwortlicher i.S.d. Art. 4 Nr. 7 DSGVO. Die technische Bereitstellung erfolgt durch den Betreiber (Impressum).<br><br>
+
+      <strong style="color:var(--text)">2. Welche Daten werden verarbeitet?</strong><br>
+      • Konto-Daten: E-Mail-Adresse, Name, Passwort (verschlüsselt)<br>
+      • Schüler-Daten: Name, Geburtsdatum, Ausbildungsfortschritt, Fahrstunden, Protokolle<br>
+      • Nutzungsdaten: Anmeldezeitpunkte, technische Verbindungsdaten<br><br>
+
+      <strong style="color:var(--text)">3. Zweck & Rechtsgrundlage (Art. 6 DSGVO)</strong><br>
+      Die Verarbeitung erfolgt zur Durchführung und Dokumentation der Fahrausbildung. Rechtsgrundlage ist die Vertragserfüllung (Art. 6 Abs. 1 lit. b DSGVO) sowie ggf. Ihre Einwilligung (Art. 6 Abs. 1 lit. a DSGVO).<br><br>
+
+      <strong style="color:var(--text)">4. Speicherort & Hosting</strong><br>
+      Alle Daten werden auf Servern von Google Firebase in Frankfurt am Main (EU, europe-west3) gespeichert. Es findet keine Übermittlung in Drittländer statt. Eine Weitergabe an unbefugte Dritte erfolgt nicht.<br><br>
+
+      <strong style="color:var(--text)">5. Speicherdauer</strong><br>
+      Daten werden gespeichert, solange das Nutzungsverhältnis besteht. Nach Beendigung werden alle Daten innerhalb von 30 Tagen unwiderruflich gelöscht.<br><br>
+
+      <strong style="color:var(--text)">6. Ihre Rechte als betroffene Person</strong><br>
+      Sie haben das Recht auf:<br>
+      • Auskunft über Ihre Daten (Art. 15 DSGVO)<br>
+      • Berichtigung (Art. 16 DSGVO)<br>
+      • Löschung (Art. 17 DSGVO)<br>
+      • Einschränkung der Verarbeitung (Art. 18 DSGVO)<br>
+      • Datenübertragbarkeit (Art. 20 DSGVO)<br>
+      • Widerspruch gegen die Verarbeitung (Art. 21 DSGVO)<br>
+      • Beschwerde bei einer Aufsichtsbehörde (Art. 77 DSGVO)<br><br>
+
+      <strong style="color:var(--text)">7. Widerruf der Einwilligung</strong><br>
+      Eine erteilte Einwilligung können Sie jederzeit mit Wirkung für die Zukunft widerrufen, indem Sie Ihr Konto löschen oder den Betreiber kontaktieren.<br><br>
+
+      <strong style="color:var(--text)">8. Kontakt</strong><br>
+      Bei Fragen zum Datenschutz wenden Sie sich an den im Impressum genannten Verantwortlichen.<br><br>
+
+      <span style="font-size:0.72rem;color:var(--muted)">Diese Datenschutzerklärung dient als Grundlage und sollte für den produktiven Einsatz rechtlich geprüft werden.</span>
+    </div>
+    <button class="btn-sheet-cancel" onclick="document.getElementById('datenschutz-modal').classList.remove('open')" style="margin-top:16px">Schließen</button>
   </div>
 </div>
 
@@ -1883,6 +1936,9 @@ let themaScope = 'all';
 // ─────────────────────────────────────────
 // AUTH
 // ─────────────────────────────────────────
+// DSGVO-Einwilligungsstatus (vor switchTab deklariert)
+let regConsentGegeben = false;
+
 window.switchTab = (tab) => {
   ['login','register','schueler'].forEach(t => {
     const form = document.getElementById(t+'-form');
@@ -1893,6 +1949,10 @@ window.switchTab = (tab) => {
   document.getElementById('auth-error').textContent = '';
   if (tab==='register') {
     if (typeof setRegRole === 'function') setRegRole('fahrschule'); // Default-Rolle setzen
+    // Einwilligung zurücksetzen (sauberer Startzustand)
+    regConsentGegeben = false;
+    const cbox = document.getElementById('reg-consent-box');
+    if (cbox) { cbox.classList.remove('checked'); cbox.textContent = ''; }
   }
   if (tab==='schueler') {
     const errEl = document.getElementById('schueler-code-error');
@@ -1987,6 +2047,20 @@ function generateFahrschulCode() {
   return code;
 }
 
+// ── DSGVO-Einwilligung bei Registrierung ──
+window.toggleRegConsent = () => {
+  regConsentGegeben = !regConsentGegeben;
+  const box = document.getElementById('reg-consent-box');
+  if (box) {
+    box.classList.toggle('checked', regConsentGegeben);
+    box.textContent = regConsentGegeben ? '✓' : '';
+  }
+};
+
+window.zeigeDatenschutzModal = () => {
+  document.getElementById('datenschutz-modal').classList.add('open');
+};
+
 window.doRegister = async () => {
   const name = document.getElementById('reg-name').value.trim();
   const email = (document.getElementById('reg-email')?.value || '').trim().toLowerCase();
@@ -1998,6 +2072,7 @@ window.doRegister = async () => {
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { setAuthError('Bitte eine gültige E-Mail-Adresse eingeben.'); return; }
   if (!validateUsername(username)) { setAuthError('Benutzername: nur Buchstaben, Zahlen, Punkte und Bindestriche (min. 3 Zeichen).'); return; }
   if (pw.length < 6) { setAuthError('Passwort muss mindestens 6 Zeichen haben.'); return; }
+  if (!regConsentGegeben) { setAuthError('Bitte stimme der Datenschutzerklärung zu, um fortzufahren.'); return; }
   btn.disabled = true; btn.textContent = '…';
   try {
     // Benutzername-Eindeutigkeit prüfen (vor Konto-Erstellung)
@@ -2058,7 +2133,9 @@ window.doRegister = async () => {
         rolle:        'fahrschul-admin',
         typ:          'fahrschule',
         status:       'ausstehend',
-        createdAt:    Date.now()
+        createdAt:    Date.now(),
+        datenschutzAkzeptiert: true,
+        datenschutzAkzeptiertAm: Date.now()
       });
       sendRegistrationNotification({ name, email, username, typ: 'Fahrschule', code });
 
@@ -2071,7 +2148,9 @@ window.doRegister = async () => {
         rolle:           'fahrlehrer',
         typ:             'fahrlehrer',
         status:          'ausstehend',
-        createdAt:       Date.now()
+        createdAt:       Date.now(),
+        datenschutzAkzeptiert: true,
+        datenschutzAkzeptiertAm: Date.now()
       });
       sendRegistrationNotification({
         name, email, username,
