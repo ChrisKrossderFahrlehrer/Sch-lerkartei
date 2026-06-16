@@ -4496,7 +4496,7 @@ function zeigeUndoBalken(text, undoCallback) {
   undoTimer = setTimeout(() => {
     const b = document.getElementById('undo-bar');
     if (b) { b.style.animation = 'undoOut 0.3s ease forwards'; setTimeout(()=>b.remove(), 300); }
-  }, 6000);
+  }, 60000);
 }
 
 // ─────────────────────────────────────────
