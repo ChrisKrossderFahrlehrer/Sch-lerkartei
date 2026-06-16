@@ -1764,7 +1764,7 @@ function zeigeUndoBalken(text, backup) {
   saUndoTimer = setTimeout(() => {
     const b = document.getElementById('undo-bar');
     if (b) b.remove();
-  }, 8000); // SuperAdmin: 8 Sekunden (mehr Daten = mehr Bedenkzeit)
+  }, 60000); // SuperAdmin: 1 Minute Bedenkzeit zum Wiederherstellen
 }
 
 // ── FAHRSCHUL-ADMIN ──────────────────────────────────────────
