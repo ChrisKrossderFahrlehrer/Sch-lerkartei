@@ -557,8 +557,41 @@ function renderDashboard() {
         ${renderSonderfahrtenMini(s)}
       </div>
 
+      ${renderLernzieleCard()}
+
     </div>`;
 }
+
+// Lernziele-Karte fürs Portal (Schüler sieht + hakt ab)
+function renderLernzieleCard() {
+  const ziele = codeData.lernziele || [];
+  if (ziele.length === 0) return '';
+  const erledigt = ziele.filter(z => z.erledigt).length;
+  return `
+    <div class="card">
+      <div class="card-title">🎯 Deine Lernziele <span style="font-size:0.75rem;color:var(--muted);font-weight:400">(${erledigt}/${ziele.length})</span></div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+        ${ziele.map((z, i) => `
+          <div onclick="toggleLernziel(${i})" style="display:flex;align-items:center;gap:10px;background:var(--surface);border-radius:10px;padding:11px 12px;cursor:pointer">
+            <span style="font-size:1.2rem">${z.erledigt ? '✅' : '⭕'}</span>
+            <span style="flex:1;font-size:0.86rem;${z.erledigt ? 'text-decoration:line-through;color:var(--muted)' : ''}">${escHtml(z.text)}</span>
+          </div>
+        `).join('')}
+      </div>
+      <div style="font-size:0.7rem;color:var(--muted);text-align:center;margin-top:10px">Tippe ein Ziel an, um es als erledigt zu markieren</div>
+    </div>`;
+}
+
+window.toggleLernziel = async (index) => {
+  const ziele = [...(codeData.lernziele || [])];
+  if (!ziele[index]) return;
+  ziele[index] = { ...ziele[index], erledigt: !ziele[index].erledigt };
+  try {
+    await updateDoc(doc(db,'accessCodes',codeDocId), { lernziele: ziele });
+    codeData.lernziele = ziele;
+    renderDashboard();
+  } catch(e) { console.error('toggleLernziel:', e); }
+};
 
 // ── Chat ───────────────────────────────────────────────────────
 function renderChat() {
