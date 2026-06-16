@@ -1421,7 +1421,21 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
   </div>
 </div>
 
-<!-- ══ ABSCHLUSS-UNTERSCHRIFT MODAL ══ -->
+<!-- ══ LERNZIELE MODAL ══ -->
+<div class="modal-overlay" id="lernziele-modal" onclick="closeModal(event)">
+  <div class="modal-sheet">
+    <div class="sheet-title">🎯 Lernziele & Aufgaben</div>
+    <div style="font-size:0.8rem;color:var(--muted);margin:8px 0 16px">Gib dem Schüler Aufgaben mit. Er sieht sie in seinem Portal und kann sie abhaken.</div>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <input class="form-input" id="inp-lernziel" type="text" placeholder="z. B. Einparken üben" style="flex:1" onkeydown="if(event.key==='Enter')addLernziel()">
+      <button onclick="addLernziel()" style="background:var(--accent);border:none;color:#0d1117;border-radius:10px;padding:0 16px;font-size:1.2rem;font-weight:700;cursor:pointer">+</button>
+    </div>
+    <div id="lernziele-liste" style="display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow-y:auto"></div>
+    <div id="lernziele-leer" style="text-align:center;color:var(--muted);font-size:0.82rem;padding:20px 0">Noch keine Lernziele. Füge oben das erste hinzu!</div>
+    <button class="btn-sheet-cancel" onclick="document.getElementById('lernziele-modal').classList.remove('open')" style="margin-top:16px">Schließen</button>
+  </div>
+</div>
+
 <div class="modal-overlay" id="abschluss-sig-modal" onclick="closeModal(event)">
   <div class="modal-sheet">
     <div class="sheet-title">✍️ Abschluss-Unterschrift</div>
@@ -3305,9 +3319,10 @@ function renderDetail() {
             ${isBAuto? `<div style="font-size:0.7rem;color:var(--muted);margin-top:4px">Nur Automatikgetriebe · keine Schaltberechtigung</div>` : ''}
           </div>
           <div style="display:flex;gap:8px;white-space:nowrap">
+            <button onclick="openLernziele()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:10px;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:'Manrope',sans-serif">🎯</button>
             <button onclick="openAbschlussSig()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:10px;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:'Manrope',sans-serif">✍️</button>
             <button onclick="exportPDF()" style="background:var(--accent);border:1px solid var(--accent);color:#0d1117;padding:8px 14px;border-radius:10px;font-size:0.78rem;font-weight:700;cursor:pointer;font-family:'Manrope',sans-serif">📄 PDF</button>
-            <button onclick="openOptionsMenu()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:10px;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:'Manrope',sans-serif">⚙️ Optionen</button>
+            <button onclick="openOptionsMenu()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:10px;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:'Manrope',sans-serif">⚙️</button>
           </div>
         </div>
       </div>
@@ -3766,6 +3781,75 @@ window.clearSignature = () => {
   if (!sigCtx || !sigCanvas) return;
   sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height);
 };
+
+// ── LERNZIELE (Fahrlehrer erstellt, Schüler hakt im Portal ab) ──
+window.openLernziele = () => {
+  const s = getStudent(activeId);
+  if (!s) return;
+  document.getElementById('lernziele-modal').classList.add('open');
+  renderLernziele();
+};
+
+function renderLernziele() {
+  const s = getStudent(activeId);
+  if (!s) return;
+  const ziele = s.lernziele || [];
+  const liste = document.getElementById('lernziele-liste');
+  const leer = document.getElementById('lernziele-leer');
+  if (ziele.length === 0) {
+    liste.innerHTML = '';
+    leer.style.display = 'block';
+    return;
+  }
+  leer.style.display = 'none';
+  liste.innerHTML = ziele.map((z, i) => `
+    <div style="display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px">
+      <span style="font-size:1.1rem">${z.erledigt ? '✅' : '⭕'}</span>
+      <span style="flex:1;font-size:0.85rem;${z.erledigt ? 'text-decoration:line-through;color:var(--muted)' : ''}">${escHtml(z.text)}</span>
+      <button onclick="removeLernziel(${i})" style="background:none;border:none;color:var(--danger);font-size:1rem;cursor:pointer;padding:2px 6px" title="Löschen">🗑️</button>
+    </div>
+  `).join('');
+}
+
+window.addLernziel = async () => {
+  const inp = document.getElementById('inp-lernziel');
+  const text = inp.value.trim();
+  if (!text) return;
+  const s = getStudent(activeId);
+  if (!s) return;
+  const ziele = [...(s.lernziele || []), { text, erledigt: false, erstelltAm: Date.now() }];
+  try {
+    await saveToFirestore(activeId, { lernziele: ziele });
+    if (s) s.lernziele = ziele;
+    inp.value = '';
+    renderLernziele();
+    syncLernzieleToPortal(ziele);
+  } catch(e) { console.error('addLernziel:', e); toast('Fehler: ' + e.message); }
+};
+
+window.removeLernziel = async (index) => {
+  const s = getStudent(activeId);
+  if (!s) return;
+  const ziele = [...(s.lernziele || [])];
+  ziele.splice(index, 1);
+  try {
+    await saveToFirestore(activeId, { lernziele: ziele });
+    if (s) s.lernziele = ziele;
+    renderLernziele();
+    syncLernzieleToPortal(ziele);
+  } catch(e) { console.error('removeLernziel:', e); }
+};
+
+// Lernziele ins accessCode-Dokument synchronisieren (damit Portal sie sieht)
+async function syncLernzieleToPortal(ziele) {
+  try {
+    const cq = query(collection(db,'accessCodes'), where('studentId','==',activeId));
+    const cs = await getDocs(cq);
+    for (const d of cs.docs) {
+      await updateDoc(doc(db,'accessCodes',d.id), { lernziele: ziele });
+    }
+  } catch(e) { console.error('syncLernziele:', e); }
+}
 
 // ── ABSCHLUSS-UNTERSCHRIFT (für den gesamten Ausbildungsnachweis) ──
 let aSigCanvas = null, aSigCtx = null, aSigDrawing = false;
