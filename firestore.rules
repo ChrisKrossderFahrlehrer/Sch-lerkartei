@@ -182,7 +182,7 @@ service cloud.firestore {
       allow update: if isAuth() ||
                        request.resource.data.diff(resource.data)
                          .affectedKeys()
-                         .hasOnly(['messages', 'plannedLessons']);
+                         .hasOnly(['messages', 'plannedLessons', 'lernziele']);
     }
 
     // ══════════════════════════════════════════════════════
