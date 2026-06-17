@@ -872,6 +872,7 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
       <button class="filter-chip"        data-filter="archiv"  onclick="setFilter('archiv')">🎓 Archiv</button>
     </div>
   </div>
+  <div id="broadcast-banner" style="display:none"></div>
   <div class="stats-row" id="stats-row"></div>
   <!-- Sortier-Leiste -->
   <div style="display:flex;align-items:center;gap:8px;padding:0 16px 4px">
@@ -2780,6 +2781,7 @@ function listenStudents() {
     students.sort((a,b) => (a.nachname||'').localeCompare(b.nachname||''));
     renderList();
     if (activeId) renderDetail();
+    ladeBroadcast(); // Nachricht vom SuperAdmin prüfen/anzeigen
 
     // Datenschutzfreundlich: nur die ANZAHL (nicht die Daten) ins eigene users-Doc
     // schreiben, damit der SuperAdmin sie sehen kann, ohne Schülerzugriff.
@@ -3165,6 +3167,48 @@ function applySingleSort(arr) {
     default:         return [...arr].sort(byName);
   }
 }
+
+// ── BROADCAST-BANNER: Nachricht vom SuperAdmin an alle anzeigen ──
+async function ladeBroadcast() {
+  const banner = document.getElementById('broadcast-banner');
+  if (!banner) return;
+  try {
+    const bcDoc = await getDoc(doc(db, 'platform', 'broadcast'));
+    if (!bcDoc.exists()) { banner.style.display = 'none'; return; }
+    const bc = bcDoc.data();
+    // Nur zeigen wenn aktiv und Inhalt vorhanden
+    if (!bc.aktiv || (!bc.titel && !bc.text)) { banner.style.display = 'none'; return; }
+    // Wurde diese Nachricht (per Zeitstempel) schon weggeklickt?
+    const gesehen = localStorage.getItem('bc_dismissed');
+    if (gesehen && Number(gesehen) === bc.gesendetAm) { banner.style.display = 'none'; return; }
+
+    const farben = {
+      info:    { bg:'rgba(88,166,255,0.12)', border:'rgba(88,166,255,0.4)', icon:'ℹ️' },
+      neu:     { bg:'rgba(63,185,80,0.12)',  border:'rgba(63,185,80,0.4)',  icon:'🎉' },
+      warnung: { bg:'rgba(240,180,41,0.12)', border:'rgba(240,180,41,0.4)', icon:'⚠️' },
+    };
+    const f = farben[bc.typ] || farben.info;
+    banner.innerHTML = `
+      <div style="margin:0 16px 10px;background:${f.bg};border:1px solid ${f.border};border-radius:12px;padding:12px 14px;display:flex;gap:10px;align-items:flex-start">
+        <span style="font-size:1.2rem;flex-shrink:0">${f.icon}</span>
+        <div style="flex:1;min-width:0">
+          ${bc.titel ? `<div style="font-weight:700;font-size:0.88rem;margin-bottom:2px">${escHtml(bc.titel)}</div>` : ''}
+          ${bc.text ? `<div style="font-size:0.82rem;color:var(--text);line-height:1.45">${escHtml(bc.text)}</div>` : ''}
+        </div>
+        <button onclick="dismissBroadcast(${bc.gesendetAm})" style="background:none;border:none;color:var(--muted);font-size:1.1rem;cursor:pointer;padding:0 2px;flex-shrink:0" title="Ausblenden">✕</button>
+      </div>`;
+    banner.style.display = 'block';
+  } catch(e) {
+    console.error('ladeBroadcast:', e);
+    banner.style.display = 'none';
+  }
+}
+
+window.dismissBroadcast = (zeitstempel) => {
+  localStorage.setItem('bc_dismissed', String(zeitstempel));
+  const banner = document.getElementById('broadcast-banner');
+  if (banner) banner.style.display = 'none';
+};
 
 window.renderList = () => {
   const inp = document.getElementById('search')||{value:''};
