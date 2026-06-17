@@ -1459,6 +1459,15 @@ async function renderSuperAdminEinst() {
     console.log('platform/impressum noch nicht vorhanden – wird beim Speichern angelegt');
   }
 
+  // Bestehende Broadcast-Nachricht laden
+  let bc = {};
+  try {
+    const bcDoc = await getDoc(doc(db, 'platform', 'broadcast'));
+    if (bcDoc.exists()) bc = bcDoc.data();
+  } catch(e) {
+    console.log('platform/broadcast noch nicht vorhanden');
+  }
+
   body.innerHTML = `
     <div class="section-hd">📄 Impressum bearbeiten</div>
     <div class="card" style="margin-bottom:8px">
@@ -1493,6 +1502,38 @@ async function renderSuperAdminEinst() {
       <button class="btn-main" onclick="savePlatformImpressum()">💾 Impressum speichern</button>
     </div>
 
+    <div class="section-hd" style="margin-top:8px">📢 Nachricht an alle Fahrschulen</div>
+    <div class="card" style="margin-bottom:8px">
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:14px;line-height:1.5">
+        Diese Nachricht erscheint als Banner bei allen Fahrlehrern in der App – z.B. für neue Funktionen oder Wartungshinweise.
+      </div>
+      <div class="form-group">
+        <label class="form-label">Titel</label>
+        <input class="form-input" id="sa-bc-titel" value="${(bc.titel||'').replace(/"/g,'&quot;')}" placeholder="z.B. 🎉 Neue Funktion verfügbar!">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nachricht</label>
+        <textarea class="form-input" id="sa-bc-text" rows="3" placeholder="z.B. Die Prüfungsampel zeigt euch jetzt, welche Schüler prüfungsbereit sind.">${(bc.text||'').replace(/</g,'&lt;')}</textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Farbe / Typ</label>
+        <select class="form-input" id="sa-bc-typ">
+          <option value="info"${bc.typ==='info'?' selected':''}>ℹ️ Info (blau)</option>
+          <option value="neu"${bc.typ==='neu'?' selected':''}>🎉 Neue Funktion (grün)</option>
+          <option value="warnung"${bc.typ==='warnung'?' selected':''}>⚠️ Wichtig / Wartung (gelb)</option>
+        </select>
+      </div>
+      <label onclick="toggleBcAktiv()" style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:14px;user-select:none">
+        <div id="sa-bc-aktiv-box" style="width:46px;height:26px;border-radius:13px;background:${bc.aktiv?'var(--accent2)':'var(--border)'};position:relative;transition:0.2s;flex-shrink:0">
+          <div style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:3px;left:${bc.aktiv?'23px':'3px'};transition:0.2s"></div>
+        </div>
+        <span style="font-size:0.85rem">Nachricht aktiv (wird angezeigt)</span>
+      </label>
+      <div id="sa-bc-status" style="font-size:0.82rem;min-height:20px;margin-bottom:8px;text-align:center;padding:8px;border-radius:8px"></div>
+      <button class="btn-main" onclick="savePlatformBroadcast()">📢 Nachricht senden</button>
+      <button class="btn-secondary" style="margin-top:8px" onclick="clearPlatformBroadcast()">🗑️ Nachricht entfernen</button>
+    </div>
+
     <div class="section-hd" style="margin-top:8px">⚙️ Mein Account</div>
     <div class="card">
       <div style="font-size:0.88rem;color:var(--muted);margin-bottom:4px">${currentUser?.email}</div>
@@ -1500,7 +1541,63 @@ async function renderSuperAdminEinst() {
       <button class="btn-secondary" onclick="doLogout()">⏻ Abmelden</button>
     </div>
   `;
+  // Aktiv-Status im Speicher halten für den Toggle
+  _bcAktiv = !!bc.aktiv;
 }
+
+let _bcAktiv = false;
+window.toggleBcAktiv = () => {
+  _bcAktiv = !_bcAktiv;
+  const box = document.getElementById('sa-bc-aktiv-box');
+  if (box) {
+    box.style.background = _bcAktiv ? 'var(--accent2)' : 'var(--border)';
+    box.firstElementChild.style.left = _bcAktiv ? '23px' : '3px';
+  }
+};
+
+window.savePlatformBroadcast = async () => {
+  const statusEl = document.getElementById('sa-bc-status');
+  statusEl.textContent = '⏳ Wird gesendet…';
+  statusEl.style.color = 'var(--muted)';
+  statusEl.style.background = 'transparent';
+  try {
+    const data = {
+      titel:  document.getElementById('sa-bc-titel').value.trim(),
+      text:   document.getElementById('sa-bc-text').value.trim(),
+      typ:    document.getElementById('sa-bc-typ').value,
+      aktiv:  _bcAktiv,
+      gesendetAm: Date.now(),
+    };
+    if (!data.titel && !data.text) {
+      statusEl.textContent = '⚠️ Bitte Titel oder Text eingeben';
+      statusEl.style.color = 'var(--danger)';
+      return;
+    }
+    await setDoc(doc(db, 'platform', 'broadcast'), data, { merge: true });
+    statusEl.textContent = _bcAktiv ? '✅ Nachricht ist live!' : '✅ Gespeichert (inaktiv)';
+    statusEl.style.color = 'var(--accent2)';
+    statusEl.style.background = 'rgba(63,185,80,0.1)';
+    toast('✓ Nachricht gespeichert');
+  } catch(e) {
+    console.error('Broadcast Fehler:', e);
+    if (e.code === 'permission-denied') {
+      statusEl.innerHTML = '⚠️ Keine Berechtigung.<br><span style="font-size:0.7rem">Firestore Rules aktualisieren!</span>';
+    } else {
+      statusEl.textContent = '⚠️ Fehler: ' + e.message;
+    }
+    statusEl.style.color = 'var(--danger)';
+    statusEl.style.background = 'rgba(248,81,73,0.1)';
+  }
+};
+
+window.clearPlatformBroadcast = async () => {
+  try {
+    await setDoc(doc(db, 'platform', 'broadcast'), { aktiv: false, titel: '', text: '', gesendetAm: Date.now() }, { merge: true });
+    _bcAktiv = false;
+    toast('✓ Nachricht entfernt');
+    renderSuperAdminEinst();
+  } catch(e) { console.error('clearBroadcast:', e); toast('Fehler: ' + e.message); }
+};
 
 window.savePlatformImpressum = async () => {
   const statusEl = document.getElementById('sa-imp-status');
