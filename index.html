@@ -2916,6 +2916,20 @@ window.togglePin = async (studentId) => {
   } catch(e) { console.error('togglePin:', e); }
 };
 
+window.zeigeAmpelDetail = (studentId) => {
+  const s = getStudent(studentId);
+  if (!s) return;
+  const ampel = pruefungsAmpel(s);
+  const icon = ampel.farbe === 'gruen' ? '🟢' : ampel.farbe === 'gelb' ? '🟡' : '🔴';
+  let msg;
+  if (ampel.offen.length === 0) {
+    msg = `${icon} ${ampel.text}!\n\nAlle Pflicht-Voraussetzungen erfüllt. Der Schüler kann zur praktischen Prüfung angemeldet werden.`;
+  } else {
+    msg = `${icon} ${ampel.text}\n\nNoch offen:\n• ${ampel.offen.join('\n• ')}`;
+  }
+  alert(msg);
+};
+
 window.toggleBF17 = async (studentId) => {
   const s = getStudent(studentId);
   if (!s) return;
@@ -2985,6 +2999,54 @@ const SONDER_B197 = [
   { key:'autobahn', icon:'🛣️', label:'Autobahn',  min:4 },
   { key:'nacht',    icon:'🌙', label:'Nacht',      min:3 },
 ];
+
+// ── PRÜFUNGSAMPEL: ist der Schüler bereit für die praktische Prüfung? ──
+// Prüft Pflichtfahrten, Fahrstunden-Ziel und ADK-Themen-Stand.
+// Gibt {farbe, text, offen[]} zurück. farbe: 'gruen' | 'gelb' | 'rot'
+function pruefungsAmpel(s) {
+  const klasse = s.klasse || 'B';
+  const isA    = klasse === 'A';
+  const isB197 = klasse === 'B197';
+  const isBE   = klasse === 'BE';
+  const SONDER = isA
+    ? [{ key:'ueber', name:'Überland', min:5 }, { key:'autobahn', name:'Autobahn', min:4 }, { key:'nacht', name:'Nacht/Dämmerung', min:3 }]
+    : isBE ? SONDERFAHRTEN_BE : (isB197 ? SONDER_B197 : SONDERFAHRTEN);
+
+  const offen = [];
+
+  // 1. Pflichtfahrten (Sonderfahrten) vollständig?
+  const sonderFehlt = SONDER.filter(f => (s.sonderfahrten||{})[f.key] < f.min);
+  sonderFehlt.forEach(f => {
+    const ist = (s.sonderfahrten||{})[f.key] || 0;
+    offen.push(`${f.name}: ${ist}/${f.min} Fahrten`);
+  });
+
+  // 2. Fahrstunden-Ziel erreicht?
+  const fs = s.fahrstunden || 0, ziel = s.zielStunden || 30;
+  if (fs < ziel) offen.push(`Fahrstunden: ${fs}/${ziel}`);
+
+  // 3. B197: Schaltstunden + Testfahrt
+  if (isB197) {
+    const sch = s.schaltstunden || 0, zielSch = s.zielSchaltstunden || 10;
+    if (sch < zielSch) offen.push(`Schaltstunden: ${sch}/${zielSch}`);
+    if (!s.testfahrtBestanden) offen.push('Testfahrt (B197) noch offen');
+  }
+
+  // 4. ADK-Themen-Stand (mind. 80% im Schnitt für "bereit")
+  const pct = Math.min(overallProgress(s), 100);
+
+  // Ampel-Logik
+  const pflichtOk = sonderFehlt.length === 0 && fs >= ziel;
+  let farbe, text;
+  if (pflichtOk && pct >= 90) {
+    farbe = 'gruen'; text = 'Prüfungsbereit';
+  } else if (pct >= 70 || (sonderFehlt.length <= 1 && fs >= ziel * 0.8)) {
+    farbe = 'gelb'; text = 'Fast bereit';
+  } else {
+    farbe = 'rot'; text = 'Noch nicht bereit';
+  }
+  return { farbe, text, offen, pct };
+}
 
 function overallProgress(s) {
   const fs=s.fahrstunden||0, ziel=s.zielStunden||30;
@@ -3148,6 +3210,9 @@ function renderStudentCard(s) {
   const klasseLabels = {'B':'🚗 Klasse B','B-Auto':'🤖 B-Automatik','B197':'⚙️ B197','BE':'🔗 BE','A':'🏍️ Klasse A'};
   const klasseLabel = klasseLabels[s.klasse] || '🚗 Klasse B';
   const bf17Tag = isBF17(s) ? '<span style="display:inline-block;background:rgba(88,166,255,0.18);color:#58a6ff;border-radius:5px;padding:1px 6px;font-size:0.72rem;font-weight:700;margin-left:2px" title="Begleitetes Fahren ab 17">BF17</span>' : '';
+  const ampelKarte = pruefungsAmpel(s);
+  const ampelPunkt = ampelKarte.farbe === 'gruen' ? '🟢' : ampelKarte.farbe === 'gelb' ? '🟡' : '🔴';
+  const ampelDot = `<span title="${ampelKarte.text}" style="font-size:0.7rem;margin-right:3px">${ampelPunkt}</span>`;
   const meta=[klasseLabel, a?a+' Jahre':null, (s.fahrstunden||0)+' Std.', s.theorieBestanden?'📋 Theorie ✓':null].filter(Boolean).join(' · ');
   const badge = pct>=90?'<span class="badge badge-green">Prüfungsreif</span>':pct>=60?'<span class="badge badge-amber">Guter Fortschritt</span>':pct>0?'<span class="badge badge-blue">In Ausbildung</span>':'<span class="badge badge-gray">Neu</span>';
 
@@ -3174,7 +3239,7 @@ function renderStudentCard(s) {
 
   return `<div class="student-card" onclick="openDetail('${s.id}')" style="${(unread||expiryAbgelaufen)?'border-color:rgba(248,81,73,0.4)':''}">
     <div class="avatar" style="background:${c}">${initials(s)}</div>
-    <div style="flex:1;min-width:0"><div class="sc-name">${s.pinned?'📌 ':''}${s.vorname} ${s.nachname} ${bf17Tag}</div><div class="sc-meta">${meta}</div>${notifHTML}</div>
+    <div style="flex:1;min-width:0"><div class="sc-name">${ampelDot}${s.pinned?'📌 ':''}${s.vorname} ${s.nachname} ${bf17Tag}</div><div class="sc-meta">${meta}</div>${notifHTML}</div>
     <div class="sc-right">
       <button onclick="event.stopPropagation();togglePin('${s.id}')" title="${s.pinned?'Lösen':'Anpinnen'}" style="background:none;border:none;cursor:pointer;font-size:1rem;padding:4px;opacity:${s.pinned?'1':'0.35'};line-height:1">📌</button>
       <div class="progress-ring-wrap">
@@ -3373,6 +3438,16 @@ function renderDetail() {
         ? `<span onclick="toggleBF17('${s.id}')" style="background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:0.72rem;font-weight:600;cursor:pointer" title="BF17 inaktiv – tippen zum Aktivieren">BF17?</span>`
         : '');
 
+  // Prüfungsampel-Badge
+  const ampel = pruefungsAmpel(s);
+  const ampelFarben = {
+    gruen: { bg:'rgba(63,185,80,0.18)', color:'#3fb950', border:'rgba(63,185,80,0.4)', icon:'🟢' },
+    gelb:  { bg:'rgba(240,180,41,0.18)', color:'#f0b429', border:'rgba(240,180,41,0.4)', icon:'🟡' },
+    rot:   { bg:'rgba(248,81,73,0.15)', color:'#f85149', border:'rgba(248,81,73,0.35)', icon:'🔴' },
+  };
+  const af = ampelFarben[ampel.farbe];
+  const ampelTag = `<span onclick="zeigeAmpelDetail('${s.id}')" style="background:${af.bg};color:${af.color};border:1px solid ${af.border};border-radius:6px;padding:2px 8px;font-size:0.72rem;font-weight:700;cursor:pointer" title="Prüfungsreife – tippen für Details">${af.icon} ${ampel.text}</span>`;
+
   document.getElementById('profile-strip').innerHTML=`
     <div class="avatar" style="background:${c};width:50px;height:50px;font-size:1.1rem">${initials(s)}</div>
     <div class="profile-info">
@@ -3381,6 +3456,7 @@ function renderDetail() {
         <span style="background:${badge.color};color:${badge.text};border:1px solid ${badge.border};border-radius:6px;padding:2px 8px;font-size:0.72rem;font-weight:700">${badge.label}</span>
         ${a?'<span style="font-size:0.72rem;color:var(--muted)">'+a+' Jahre</span>':''}
         ${bf17DetailTag}
+        ${ampelTag}
       </div>
     </div>
     <div style="text-align:right">
