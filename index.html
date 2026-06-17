@@ -341,10 +341,10 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
 .bar-fill { height:100%; border-radius:6px; transition:width 0.4s ease; }
 
 .sonder-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
-.sonder-item { background:var(--surface2); border:1.5px solid var(--border); border-radius:10px; padding:12px 8px; text-align:center; cursor:pointer; transition:all 0.2s; -webkit-user-select:none; }
+.sonder-item { background:var(--surface2); border:1.5px solid var(--border); border-radius:10px; padding:12px 6px; text-align:center; cursor:pointer; transition:all 0.2s; -webkit-user-select:none; min-width:0; overflow:hidden; }
 .sonder-item.done { background:rgba(63,185,80,0.1); border-color:var(--accent2); }
 .sonder-icon { font-size:1.5rem; margin-bottom:5px; }
-.sonder-name { font-size:0.7rem; font-weight:600; color:var(--muted); }
+.sonder-name { font-size:0.68rem; font-weight:600; color:var(--muted); line-height:1.2; word-break:break-word; hyphens:auto; min-height:1.7em; display:flex; align-items:center; justify-content:center; }
 .sonder-item.done .sonder-name { color:var(--accent2); }
 .sonder-stepper { display:flex; align-items:center; justify-content:center; gap:8px; margin-top:6px; }
 .s-btn { background:var(--surface); border:1px solid var(--border); color:var(--text); width:26px; height:26px; border-radius:6px; font-size:1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; font-weight:700; }
