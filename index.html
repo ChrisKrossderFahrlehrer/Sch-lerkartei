@@ -2643,6 +2643,20 @@ onAuthStateChanged(auth, async (user) => {
         // SuperAdmin nie sperren
         const istSuperadmin = profil.rolle === 'superadmin' || user.email === 'chriskoo@mail.de';
 
+        // ── AUTO-WEITERLEITUNG für SuperAdmin ──
+        // Loggt sich der SuperAdmin auf der normalen Seite ein, wird er
+        // automatisch zur Admin-Seite weitergeleitet (eine URL für alles).
+        // Notausgang: ?normal=1 in der URL überspringt die Weiterleitung,
+        // falls der SuperAdmin doch mal die normale Fahrlehrer-Ansicht braucht.
+        if (istSuperadmin) {
+          const params = new URLSearchParams(window.location.search);
+          const willNormalAnsicht = params.get('normal') === '1';
+          if (!willNormalAnsicht) {
+            window.location.replace('adk-platform.html');
+            return;
+          }
+        }
+
         // Status kommt von der Fahrschule (falls zugeordnet) ODER vom User selbst (eigenständiger Lehrer)
         let effektiverStatus = profil.status || null;
         let aboData = null; // für Ablauf-Prüfung
