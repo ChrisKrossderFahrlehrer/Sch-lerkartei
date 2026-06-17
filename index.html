@@ -897,6 +897,10 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
         <div style="font-weight:700">📋 Ausbildungsnachweis als PDF</div>
         <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">ADK-Stand, Pflichtfahrten & Protokoll exportieren</div>
       </button>
+      <button onclick="document.getElementById('options-modal').classList.remove('open');openDatenexport()" class="klasse-choice-btn">
+        <div style="font-weight:700">📤 Daten exportieren (DSGVO)</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">Datenauskunft Art. 15 – als PDF oder Datei</div>
+      </button>
       <button onclick="document.getElementById('options-modal').classList.remove('open');openChat()" class="klasse-choice-btn">
         <div style="font-weight:700">💬 Chat mit Schüler</div>
         <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">Nachrichten an Schüler senden</div>
@@ -1486,6 +1490,23 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
     <div id="lernziele-liste" style="display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow-y:auto"></div>
     <div id="lernziele-leer" style="text-align:center;color:var(--muted);font-size:0.82rem;padding:20px 0">Noch keine Lernziele. Füge oben das erste hinzu!</div>
     <button class="btn-sheet-cancel" onclick="document.getElementById('lernziele-modal').classList.remove('open')" style="margin-top:16px">Schließen</button>
+  </div>
+</div>
+
+<!-- ══ DATENEXPORT MODAL (DSGVO Auskunft) ══ -->
+<div class="modal-overlay" id="datenexport-modal" onclick="closeModal(event)">
+  <div class="modal-sheet">
+    <div class="sheet-title">📤 Daten exportieren</div>
+    <div style="font-size:0.8rem;color:var(--muted);margin:8px 0 18px">Alle gespeicherten Daten dieses Schülers – für die Datenauskunft nach Art. 15 DSGVO oder zur Mitnahme (Art. 20).</div>
+    <button onclick="exportiereDatenPDF()" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;text-align:left;font-family:'Manrope',sans-serif">
+      <div style="font-weight:700;font-size:0.92rem">📄 Als PDF (zum Ausdrucken)</div>
+      <div style="font-size:0.75rem;color:var(--muted);margin-top:3px">Lesbare Auskunft zum Aushändigen an den Schüler</div>
+    </button>
+    <button onclick="exportiereJSON()" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:14px;margin-bottom:14px;cursor:pointer;text-align:left;font-family:'Manrope',sans-serif">
+      <div style="font-weight:700;font-size:0.92rem">📦 Als Datei (JSON)</div>
+      <div style="font-size:0.75rem;color:var(--muted);margin-top:3px">Maschinenlesbar – für Datenübertragbarkeit</div>
+    </button>
+    <button class="btn-sheet-cancel" onclick="document.getElementById('datenexport-modal').classList.remove('open')">Schließen</button>
   </div>
 </div>
 
@@ -6573,6 +6594,151 @@ window.closeImpressum = () => {
 // ─────────────────────────────────────────
 // 📋 PDF EXPORT – Ausbildungsnachweis
 // ─────────────────────────────────────────
+// ─────────────────────────────────────────
+// 📤 DATENEXPORT (DSGVO Art. 15 Auskunft / Art. 20 Datenübertragbarkeit)
+// ─────────────────────────────────────────
+window.openDatenexport = () => {
+  const s = getStudent(activeId);
+  if (!s) return;
+  document.getElementById('datenexport-modal').classList.add('open');
+};
+
+// Alle Daten eines Schülers sammeln (Stammdaten + Protokolle)
+async function sammleSchuelerDaten() {
+  const s = getStudent(activeId);
+  if (!s) return null;
+  // Protokoll-Einträge dieses Schülers laden
+  let protokolle = [];
+  try {
+    const pq = query(collection(db,'protokoll'), where('studentId','==',activeId));
+    const ps = await getDocs(pq);
+    protokolle = ps.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch(e) { console.error('Protokoll-Export:', e); }
+  return {
+    exportInfo: {
+      erstelltAm: new Date().toISOString(),
+      hinweis: 'Datenauskunft gemäß Art. 15 DSGVO',
+      app: 'ADK – Digitale Kartei',
+    },
+    stammdaten: {
+      vorname: s.vorname || '',
+      nachname: s.nachname || '',
+      geburtsdatum: s.geburt || '–',
+      führerscheinklasse: s.klasse || 'B',
+      weitereKlassen: s.klassen || [],
+      angelegtAm: s.createdAt ? new Date(s.createdAt).toLocaleString('de-DE') : '–',
+    },
+    ausbildungsstand: {
+      fahrstunden: s.fahrstunden || 0,
+      zielStunden: s.zielStunden || 30,
+      schaltstunden: s.schaltstunden || 0,
+      zielSchaltstunden: s.zielSchaltstunden || 0,
+      sonderfahrten: s.sonderfahrten || {},
+      themenFortschritt: s.themen || {},
+      testfahrtBestanden: s.testfahrtBestanden || false,
+      gesamtfortschrittProzent: Math.min(overallProgress(s), 100),
+    },
+    lernziele: s.lernziele || [],
+    notizen: s.notes || '',
+    protokolle: protokolle.map(p => ({
+      datum: p.datum || '',
+      fahrstunde: p.stunde || 0,
+      bewertungSterne: p.sterne || 0,
+      notiz: p.notiz || '',
+      maengel: p.maengel || [],
+    })),
+  };
+}
+
+// Variante 1: JSON-Datei (maschinenlesbar, Art. 20 Datenübertragbarkeit)
+window.exportiereJSON = async () => {
+  const daten = await sammleSchuelerDaten();
+  if (!daten) return;
+  const s = getStudent(activeId);
+  const blob = new Blob([JSON.stringify(daten, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Datenauskunft_${s.vorname}_${s.nachname}.json`.replace(/\s+/g,'_');
+  a.click();
+  URL.revokeObjectURL(url);
+  document.getElementById('datenexport-modal').classList.remove('open');
+  toast('✓ JSON-Datei exportiert');
+};
+
+// Variante 2: Lesbare PDF-Auskunft (zum Ausdrucken/Aushändigen)
+window.exportiereDatenPDF = async () => {
+  const daten = await sammleSchuelerDaten();
+  if (!daten) return;
+  const s = getStudent(activeId);
+  const sf = daten.ausbildungsstand.sonderfahrten;
+  const sfHTML = Object.keys(sf).length
+    ? Object.entries(sf).map(([k,v]) => `${k}: ${v}`).join(', ')
+    : 'keine erfasst';
+  const lzHTML = daten.lernziele.length
+    ? daten.lernziele.map(z => `<li>${z.erledigt ? '✅' : '⭕'} ${escHtml(z.text)}</li>`).join('')
+    : '<li>keine</li>';
+  const protoHTML = daten.protokolle.length
+    ? daten.protokolle.map(p => `
+        <tr>
+          <td style="padding:5px 8px;border:1px solid #ddd">${p.datum}</td>
+          <td style="padding:5px 8px;border:1px solid #ddd;text-align:center">${p.fahrstunde}</td>
+          <td style="padding:5px 8px;border:1px solid #ddd;text-align:center">${'★'.repeat(p.bewertungSterne)}</td>
+          <td style="padding:5px 8px;border:1px solid #ddd">${escHtml(p.notiz || '')}${(p.maengel||[]).length ? '<br><span style="color:#a00">Mängel: '+p.maengel.map(escHtml).join(', ')+'</span>' : ''}</td>
+        </tr>`).join('')
+    : '<tr><td colspan="4" style="padding:8px;text-align:center;color:#888">Keine Protokolle</td></tr>';
+
+  const html = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
+    <title>Datenauskunft – ${s.vorname} ${s.nachname}</title>
+    <style>
+      body{font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:30px;color:#222;line-height:1.5}
+      h1{font-size:20px;border-bottom:2px solid #f0b429;padding-bottom:8px}
+      h2{font-size:15px;color:#333;margin-top:24px;background:#f7f7f7;padding:6px 10px;border-radius:5px}
+      .row{display:flex;padding:4px 0;border-bottom:1px solid #eee}
+      .label{width:200px;color:#666;font-weight:bold}
+      table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+      th{background:#f0b429;color:#222;padding:6px 8px;text-align:left;font-size:12px}
+      .foot{margin-top:30px;font-size:11px;color:#888;border-top:1px solid #ddd;padding-top:12px}
+    </style></head><body>
+    <h1>📋 Datenauskunft gemäß Art. 15 DSGVO</h1>
+    <p style="font-size:12px;color:#666">Erstellt am ${new Date().toLocaleString('de-DE')} · ADK – Digitale Kartei</p>
+
+    <h2>Stammdaten</h2>
+    <div class="row"><div class="label">Vorname</div><div>${escHtml(daten.stammdaten.vorname)}</div></div>
+    <div class="row"><div class="label">Nachname</div><div>${escHtml(daten.stammdaten.nachname)}</div></div>
+    <div class="row"><div class="label">Geburtsdatum</div><div>${daten.stammdaten.geburtsdatum}</div></div>
+    <div class="row"><div class="label">Führerscheinklasse</div><div>${daten.stammdaten.führerscheinklasse}</div></div>
+    <div class="row"><div class="label">Angelegt am</div><div>${daten.stammdaten.angelegtAm}</div></div>
+
+    <h2>Ausbildungsstand</h2>
+    <div class="row"><div class="label">Fahrstunden</div><div>${daten.ausbildungsstand.fahrstunden} / ${daten.ausbildungsstand.zielStunden}</div></div>
+    <div class="row"><div class="label">Schaltstunden</div><div>${daten.ausbildungsstand.schaltstunden}</div></div>
+    <div class="row"><div class="label">Sonderfahrten</div><div>${sfHTML}</div></div>
+    <div class="row"><div class="label">Testfahrt bestanden</div><div>${daten.ausbildungsstand.testfahrtBestanden ? 'Ja' : 'Nein'}</div></div>
+    <div class="row"><div class="label">Gesamtfortschritt</div><div>${daten.ausbildungsstand.gesamtfortschrittProzent}%</div></div>
+
+    <h2>Lernziele</h2>
+    <ul style="font-size:13px">${lzHTML}</ul>
+
+    <h2>Protokoll der Fahrstunden</h2>
+    <table>
+      <tr><th>Datum</th><th>Std.</th><th>Bewertung</th><th>Notiz / Mängel</th></tr>
+      ${protoHTML}
+    </table>
+
+    <div class="foot">
+      Diese Auskunft enthält alle zur Person gespeicherten Daten gemäß Art. 15 DSGVO.
+      Bei Fragen wenden Sie sich an den verantwortlichen Fahrlehrer / die Fahrschule.
+    </div>
+    <script>window.onload=()=>window.print()<\/script>
+    </body></html>`;
+
+  const w = window.open('', '_blank');
+  if (w) { w.document.write(html); w.document.close(); }
+  document.getElementById('datenexport-modal').classList.remove('open');
+  toast('✓ PDF-Auskunft geöffnet');
+};
+
 window.exportPDF = () => {
   const s = getStudent(activeId);
   if (!s) return;
