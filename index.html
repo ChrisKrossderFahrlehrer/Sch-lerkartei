@@ -2974,6 +2974,16 @@ async function saveToFirestore(studentId, data) {
 // HELPERS
 // ─────────────────────────────────────────
 function getStudent(id) { return students.find(s => s.id === id); }
+
+// Schüler-Nummer ermitteln. Hat der Schüler ein gespeichertes schuelerNr-Feld,
+// wird das genutzt. Sonst (Alt-Schüler) wird die Position nach Anlegedatum berechnet.
+function getSchuelerNr(s) {
+  if (s.schuelerNr) return s.schuelerNr;
+  // Fallback: Position in nach createdAt sortierter Liste
+  const sorted = [...students].sort((a,b) => (a.createdAt||0) - (b.createdAt||0));
+  const idx = sorted.findIndex(st => st.id === s.id);
+  return idx >= 0 ? idx + 1 : '–';
+}
 function getColor(s) { const i = students.indexOf(s); return COLORS[(i<0?0:i)%COLORS.length]; }
 function initials(s) { return ((s.vorname||'?')[0] + (s.nachname||'?')[0]).toUpperCase(); }
 function formatDate(d) { if (!d) return ''; const [y,m,day]=d.split('-'); return `${day}.${m}.${y}`; }
@@ -3213,7 +3223,7 @@ function renderStudentCard(s) {
   const ampelKarte = pruefungsAmpel(s);
   const ampelPunkt = ampelKarte.farbe === 'gruen' ? '🟢' : ampelKarte.farbe === 'gelb' ? '🟡' : '🔴';
   const ampelDot = `<span title="${ampelKarte.text}" style="font-size:0.7rem;margin-right:3px">${ampelPunkt}</span>`;
-  const meta=[klasseLabel, a?a+' Jahre':null, (s.fahrstunden||0)+' Std.', s.theorieBestanden?'📋 Theorie ✓':null].filter(Boolean).join(' · ');
+  const meta=['#'+getSchuelerNr(s), klasseLabel, a?a+' Jahre':null, (s.fahrstunden||0)+' Std.', s.theorieBestanden?'📋 Theorie ✓':null].filter(Boolean).join(' · ');
   const badge = pct>=90?'<span class="badge badge-green">Prüfungsreif</span>':pct>=60?'<span class="badge badge-amber">Guter Fortschritt</span>':pct>0?'<span class="badge badge-blue">In Ausbildung</span>':'<span class="badge badge-gray">Neu</span>';
 
   // 🔔 Ungelesene Nachrichten + Termin-Reaktionen
@@ -3453,6 +3463,7 @@ function renderDetail() {
     <div class="profile-info">
       <div class="profile-name">${s.vorname} ${s.nachname}</div>
       <div class="profile-meta" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <span style="font-size:0.72rem;color:var(--muted);font-weight:600">#${getSchuelerNr(s)}</span>
         <span style="background:${badge.color};color:${badge.text};border:1px solid ${badge.border};border-radius:6px;padding:2px 8px;font-size:0.72rem;font-weight:700">${badge.label}</span>
         ${a?'<span style="font-size:0.72rem;color:var(--muted)">'+a+' Jahre</span>':''}
         ${bf17DetailTag}
@@ -4955,9 +4966,13 @@ window.addStudent = async () => {
     ? Math.max(10, parseInt(document.getElementById('inp-schalt-ziel').value)||10)
     : 10;
   try {
+    // Nächste fortlaufende Schüler-Nummer ermitteln (höchste vorhandene + 1)
+    const maxNr = students.reduce((max, st) => Math.max(max, st.schuelerNr || 0), 0);
+    const neueNr = maxNr + 1;
     await addDoc(collection(db,'students'),{
       uid: currentUser.uid,
       fahrschuleId: currentUser._fahrschuleId || currentUser.uid,
+      schuelerNr: neueNr,
       vorname:vn, nachname:nn,
       geburt:document.getElementById('inp-geb').value,
       bf17Override:document.getElementById('inp-bf17')?.value || '',
