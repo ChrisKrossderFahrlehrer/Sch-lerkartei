@@ -1331,6 +1331,13 @@ onAuthStateChanged(auth, async (user) => {
 
   currentProfil = profDoc.data();
 
+  // ── KEIN SuperAdmin? → zurück zur normalen Seite ──
+  // Normale Fahrlehrer/Fahrschul-Admins gehören auf die Hauptseite (index.html).
+  // So bleibt alles unter einer URL: jeder landet automatisch dort, wo er hingehört.
+  window.location.replace('index.html?normal=1');
+  return;
+
+  // (Alt-Code unten wird dadurch nicht mehr erreicht, bleibt als Fallback erhalten.)
   if (currentProfil.rolle === 'fs_admin') {
     // Fahrschule Status prüfen
     const fsDoc = await getDoc(doc(db, 'fahrschulen', currentProfil.fahrschuleId));
