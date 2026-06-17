@@ -1,3 +1,20 @@
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║   ADK – DIGITALE KARTEI · Firestore-Sicherheitsregeln              ║
+// ║   © 2026 ChrisKross der Fahrlehrer (Chriskoo)                      ║
+// ║   fahrschülerkartei.de · Kontakt: chriskoo@mail.de                 ║
+// ║                                                                    ║
+// ║   ─────────────── ALLE RECHTE VORBEHALTEN ───────────────         ║
+// ║                                                                    ║
+// ║   Diese Sicherheitsregeln und der gesamte zugehörige Quellcode     ║
+// ║   sind urheberrechtlich geschützt (§ 69a ff. UrhG). Das Urheber-   ║
+// ║   recht liegt ausschließlich beim Entwickler.                      ║
+// ║                                                                    ║
+// ║   Das Kopieren, Nachbauen, Verbreiten oder Wiederverwenden –       ║
+// ║   auch in Teilen – ist streng verboten und wird zivil- und         ║
+// ║   strafrechtlich verfolgt (§ 106 UrhG: Freiheitsstrafe bis zu      ║
+// ║   3 Jahren oder Geldstrafe; §§ 97 ff. UrhG: Schadensersatz).       ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
