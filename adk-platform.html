@@ -1174,6 +1174,7 @@ async function renderAbos() {
     const proJahr  = alle.filter(f => f.abo === 'pro_jahr');
     const gesamt   = alle.length;
     const mrr      = proMonat.length * 9.99 + proJahr.length * (79/12);
+    const kalenderAktiv = alle.filter(f => f.kalenderAktiv).length;
 
     // KPI-Kacheln
     const kpiHTML = `
@@ -1193,6 +1194,10 @@ async function renderAbos() {
         <div style="background:rgba(240,180,41,0.1);border:1px solid rgba(240,180,41,0.3);border-radius:12px;padding:14px;text-align:center">
           <div style="font-size:1.8rem;font-weight:800;font-family:'Syne',sans-serif;color:var(--accent)">${mrr.toFixed(2)} €</div>
           <div style="font-size:0.7rem;color:var(--muted)">MRR (geschätzt)</div>
+        </div>
+        <div style="background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.3);border-radius:12px;padding:14px;text-align:center;grid-column:span 2">
+          <div style="font-size:1.8rem;font-weight:800;font-family:'Syne',sans-serif;color:#58a6ff">📅 ${kalenderAktiv}</div>
+          <div style="font-size:0.7rem;color:var(--muted)">Kalender-Modul gebucht</div>
         </div>
       </div>`;
 
@@ -1226,6 +1231,18 @@ async function renderAbos() {
             </div>
           </div>
           ${abo !== 'free' ? `<div style="font-size:0.7rem;color:var(--muted);margin-top:6px">Läuft bis: ${expiry}</div>` : ''}
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <div style="display:flex;align-items:center;gap:7px;min-width:0">
+              <span style="font-size:1rem">📅</span>
+              <div style="min-width:0">
+                <div style="font-size:0.78rem;font-weight:600">Kalender-Modul</div>
+                <div style="font-size:0.66rem;color:var(--muted)">${fs.kalenderAktiv ? 'Extra freigeschaltet' : 'Nicht gebucht'}</div>
+              </div>
+            </div>
+            <div onclick="toggleKalender('${fs.id}', ${fs.kalenderAktiv ? 'false' : 'true'})" style="width:46px;height:26px;border-radius:13px;background:${fs.kalenderAktiv ? 'var(--accent2)' : 'var(--border)'};position:relative;cursor:pointer;flex-shrink:0;transition:0.2s" title="Kalender-Modul an/aus">
+              <div style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:3px;left:${fs.kalenderAktiv ? '23px' : '3px'};transition:0.2s"></div>
+            </div>
+          </div>
           ${ABO_ENABLED ? `
             <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
               ${fs.status === 'zahlung_offen'
@@ -1272,6 +1289,21 @@ window.setFsAbo = async (fsId, abo) => {
     toast(`✅ Abo auf "${abo}" gesetzt`);
   } catch(e) {
     toast('Fehler: ' + e.message);
+  }
+};
+
+// ── KALENDER-MODUL: Extra-Abo pro Fahrschule an/aus schalten ──
+window.toggleKalender = async (fsId, aktivieren) => {
+  try {
+    await updateDoc(doc(db,'fahrschulen',fsId), {
+      kalenderAktiv: aktivieren,
+      kalenderUpdatedAt: Date.now()
+    });
+    toast(aktivieren ? '📅 Kalender-Modul freigeschaltet' : '📅 Kalender-Modul deaktiviert');
+    renderAbos(); // Tabelle neu zeichnen, Schalter aktualisieren
+  } catch(e) {
+    console.error('toggleKalender:', e);
+    toast('❌ Fehler: ' + e.message);
   }
 };
 
