@@ -98,10 +98,17 @@ service cloud.firestore {
                       isFsAdmin()
                     );
 
+      // Update: eigenes Doc, SuperAdmin oder FS-Admin.
+      // ABER: das Feld 'kalenderAktiv' (Freischaltung = bezahltes Extra) darf
+      // ein normaler Nutzer NICHT bei sich selbst verändern – nur der SuperAdmin.
+      // Sonst könnte sich jeder kostenlos selbst freischalten.
       allow update: if isAuth() && (
-                      request.auth.uid == uid ||
                       isSuperAdmin() ||
-                      isFsAdmin()
+                      (
+                        (request.auth.uid == uid || isFsAdmin()) &&
+                        request.resource.data.get('kalenderAktiv', false)
+                          == resource.data.get('kalenderAktiv', false)
+                      )
                     );
 
       allow delete: if isSuperAdmin() || isFsAdmin();
