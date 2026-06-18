@@ -244,56 +244,101 @@ service cloud.firestore {
     function kalIsSuperAdmin() {
       return kalAuth() && request.auth.token.email == 'chriskoo@mail.de';
     }
+    // Existiert mein Kalender-Profil? (Schutz vor get() auf nicht-existentes Doc)
+    function kalUserExists() {
+      return kalAuth() && exists(/databases/$(database)/documents/kalenderUsers/$(request.auth.uid));
+    }
+    // Meine eigene Schul-ID (aus meinem kalenderUsers-Profil)
+    function kalMySchool() {
+      return get(/databases/$(database)/documents/kalenderUsers/$(request.auth.uid)).data.schoolId;
+    }
+    // Gehört ein Dokument mit dieser schoolId zu MEINER Schule? (oder bin ich SuperAdmin)
+    function kalOwnsSchool(sid) {
+      return kalIsSuperAdmin() || (kalUserExists() && kalMySchool() == sid);
+    }
+    // Gehört ein Lehrer (per UID) zu meiner Schule? (für Collections ohne schoolId, z.B. blocked)
+    function kalLehrerInMySchool(luid) {
+      return kalIsSuperAdmin() ||
+             (luid == request.auth.uid) ||
+             (kalUserExists() &&
+              exists(/databases/$(database)/documents/kalenderUsers/$(luid)) &&
+              get(/databases/$(database)/documents/kalenderUsers/$(luid)).data.schoolId == kalMySchool());
+    }
 
-    // Kalender-Nutzerprofile (Lehrer/Admins des Kalenders)
+    // Kalender-Nutzerprofile: eigenes Doc immer; fremde nur in eigener Schule
     match /kalenderUsers/{uid} {
-      allow read:   if kalAuth();
+      allow read:   if kalIsSuperAdmin() ||
+                       (kalAuth() && request.auth.uid == uid) ||
+                       (kalUserExists() && resource.data.schoolId == kalMySchool());
       allow create: if kalAuth() && (request.auth.uid == uid || kalIsSuperAdmin());
-      allow update: if kalAuth() && (request.auth.uid == uid || kalIsSuperAdmin());
+      allow update: if kalIsSuperAdmin() ||
+                       (kalAuth() && request.auth.uid == uid) ||
+                       (kalUserExists() && resource.data.schoolId == kalMySchool() &&
+                        request.resource.data.schoolId == kalMySchool());
       allow delete: if kalIsSuperAdmin() ||
                        (kalAuth() && request.auth.uid == uid);
     }
 
-    // Fahrschulen im Kalender
+    // Fahrschulen im Kalender: nur die eigene
     match /schools/{schoolId} {
-      allow read:   if kalAuth();
-      allow create: if kalAuth();
-      allow update: if kalAuth();
-      allow delete: if kalAuth();
+      allow read:   if kalIsSuperAdmin() ||
+                       (kalUserExists() && kalMySchool() == schoolId);
+      allow create: if kalAuth() && request.resource.data.adminUid == request.auth.uid;
+      allow update: if kalIsSuperAdmin() ||
+                       (kalUserExists() && kalMySchool() == schoolId);
+      allow delete: if kalIsSuperAdmin();
     }
 
-    // Alle weiteren Kalender-Collections: authentifizierte Nutzer
-    // dürfen lesen/schreiben (Verfeinerung später bei Bedarf).
+    // ── Daten-Collections mit schoolId: streng pro Fahrschule getrennt ──
+    // read/update/delete prüfen die schoolId des BESTEHENDEN Dokuments,
+    // create prüft die schoolId des NEUEN Dokuments. So kann niemand Daten
+    // einer fremden Fahrschule lesen, ändern oder unterschieben.
     match /schueler/{docId} {
-      allow read, write: if kalAuth();
+      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId);
+      allow create:               if kalOwnsSchool(request.resource.data.schoolId);
     }
     match /slots/{docId} {
-      allow read, write: if kalAuth();
+      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId);
+      allow create:               if kalOwnsSchool(request.resource.data.schoolId);
     }
     match /autos/{docId} {
-      allow read, write: if kalAuth();
-    }
-    match /blocked/{docId} {
-      allow read, write: if kalAuth();
+      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId);
+      allow create:               if kalOwnsSchool(request.resource.data.schoolId);
     }
     match /globalBlocked/{docId} {
-      allow read, write: if kalAuth();
+      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId);
+      allow create:               if kalOwnsSchool(request.resource.data.schoolId);
     }
     match /urlaub/{docId} {
-      allow read, write: if kalAuth();
+      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId);
+      allow create:               if kalOwnsSchool(request.resource.data.schoolId);
     }
     match /notizen/{docId} {
-      allow read, write: if kalAuth();
+      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId);
+      allow create:               if kalOwnsSchool(request.resource.data.schoolId);
     }
     match /warteliste/{docId} {
-      allow read, write: if kalAuth();
+      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId);
+      allow create:               if kalOwnsSchool(request.resource.data.schoolId);
     }
     match /pruefungen/{docId} {
-      allow read, write: if kalAuth();
+      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId);
+      allow create:               if kalOwnsSchool(request.resource.data.schoolId);
     }
+    // blocked hat kein schoolId, nur lehrerUid → über den Lehrer absichern
+    match /blocked/{docId} {
+      allow read, update, delete: if kalLehrerInMySchool(resource.data.lehrerUid);
+      allow create:               if kalLehrerInMySchool(request.resource.data.lehrerUid);
+    }
+    // mailQueue: enthält E-Mail-Inhalte (personenbezogen). Jeder eingeloggte
+    // Nutzer darf eine Mail EINREIHEN (create), aber nur SuperAdmin/System
+    // darf den Inhalt LESEN. Kein Lesen durch normale Nutzer.
     match /mailQueue/{docId} {
-      allow read, write: if kalAuth();
+      allow create: if kalAuth();
+      allow read:   if kalIsSuperAdmin();
+      allow update, delete: if kalIsSuperAdmin();
     }
+    // App-Einstellungen: lesen alle Eingeloggten, schreiben nur SuperAdmin
     match /settings/{docId} {
       allow read:  if kalAuth();
       allow write: if kalIsSuperAdmin();
