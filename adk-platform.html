@@ -1256,12 +1256,46 @@ async function renderAbos() {
         </div>`;
     }).join('');
 
+    // ── Eigenständige Fahrlehrer (ohne Fahrschule) als eigene Karten ──
+    // Diese haben keinen fahrschulen-Eintrag, daher wird kalenderAktiv auf
+    // ihrem users-Doc gesetzt. So kannst du auch Einzel-Fahrlehrer freischalten.
+    const einzelLehrer = (alleFahrlehrer || []).filter(l => !l.fahrschuleName);
+    const lehrerKarten = einzelLehrer.map(l => {
+      const esc2 = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      return `
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px">
+            <div style="font-weight:700;font-size:0.92rem;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">👤 ${esc2(l.name||'Fahrlehrer')}</div>
+            <span style="background:rgba(88,166,255,0.12);color:#58a6ff;border-radius:6px;padding:2px 8px;font-size:0.66rem;font-weight:700;flex-shrink:0">Eigenständig</span>
+          </div>
+          <div style="font-size:0.74rem;color:var(--muted);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc2(l.email||'–')}</div>
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <div style="display:flex;align-items:center;gap:7px;min-width:0">
+              <span style="font-size:1rem">📅</span>
+              <div style="min-width:0">
+                <div style="font-size:0.78rem;font-weight:600">Kalender-Modul</div>
+                <div style="font-size:0.66rem;color:var(--muted)">${l.kalenderAktiv ? 'Extra freigeschaltet' : 'Nicht gebucht'}</div>
+              </div>
+            </div>
+            <div onclick="toggleKalender('${l.id}', ${l.kalenderAktiv ? 'false' : 'true'}, 'users')" style="width:46px;height:26px;border-radius:13px;background:${l.kalenderAktiv ? 'var(--accent2)' : 'var(--border)'};position:relative;cursor:pointer;flex-shrink:0;transition:0.2s" title="Kalender-Modul an/aus">
+              <div style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:3px;left:${l.kalenderAktiv ? '23px' : '3px'};transition:0.2s"></div>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
     body.innerHTML = kpiHTML +
       `<div style="padding:0 16px">
         <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">
-          Alle Nutzer (${alle.length})
+          Fahrschulen (${alle.length})
         </div>
-        ${rowsHTML || '<div style="text-align:center;padding:32px;color:var(--muted)">Keine Nutzer</div>'}
+        ${rowsHTML || '<div style="text-align:center;padding:32px;color:var(--muted)">Keine Fahrschulen</div>'}
+        ${einzelLehrer.length ? `
+          <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin:20px 0 10px">
+            Einzelne Fahrlehrer (${einzelLehrer.length})
+          </div>
+          ${lehrerKarten}
+        ` : ''}
         <div style="padding:20px 0;font-size:0.7rem;color:var(--muted);text-align:center">
           Pro Monat: 9,99 € · Pro Jahr: 79 € (6,58 €/Monat)
         </div>
@@ -1292,10 +1326,12 @@ window.setFsAbo = async (fsId, abo) => {
   }
 };
 
-// ── KALENDER-MODUL: Extra-Abo pro Fahrschule an/aus schalten ──
-window.toggleKalender = async (fsId, aktivieren) => {
+// ── KALENDER-MODUL: Extra-Abo freischalten (Fahrschule ODER einzelner Fahrlehrer) ──
+window.toggleKalender = async (id, aktivieren, collectionName) => {
+  // collectionName: 'fahrschulen' (Standard) oder 'users' (einzelner Fahrlehrer)
+  const coll = collectionName || 'fahrschulen';
   try {
-    await updateDoc(doc(db,'fahrschulen',fsId), {
+    await updateDoc(doc(db, coll, id), {
       kalenderAktiv: aktivieren,
       kalenderUpdatedAt: Date.now()
     });
