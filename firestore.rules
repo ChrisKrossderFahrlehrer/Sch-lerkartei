@@ -76,8 +76,12 @@ service cloud.firestore {
                        (request.resource.data.adminUid == request.auth.uid ||
                         fsId == request.auth.uid);
 
+      // UPDATE: Ein FS-Admin darf seine eigene Fahrschule bearbeiten, ABER
+      // 'kalenderAktiv' (bezahltes Extra) darf nur der SuperAdmin setzen.
       allow update: if isSuperAdmin() ||
-                       (isFsAdmin() && userFsId() == fsId);
+                       (isFsAdmin() && userFsId() == fsId &&
+                        request.resource.data.get('kalenderAktiv', false)
+                          == resource.data.get('kalenderAktiv', false));
 
       allow delete: if isSuperAdmin();
     }
@@ -92,22 +96,39 @@ service cloud.firestore {
                     isFsAdmin()
                   );
 
+      // CREATE: Beim Anlegen des EIGENEN Kontos dürfen sicherheitsrelevante
+      // Felder NICHT frei gewählt werden. rolle muss 'fahrlehrer' oder
+      // 'fahrschul-admin' sein (NIE superadmin/fs_admin), status muss
+      // 'ausstehend' sein, und kalenderAktiv darf nicht aktiv sein.
+      // Nur der SuperAdmin darf beliebige Werte setzen.
       allow create: if isAuth() && (
-                      request.auth.uid == uid ||
                       isSuperAdmin() ||
-                      isFsAdmin()
+                      (
+                        request.auth.uid == uid &&
+                        request.resource.data.rolle in ['fahrlehrer', 'fahrschul-admin'] &&
+                        request.resource.data.get('status', 'ausstehend') == 'ausstehend' &&
+                        request.resource.data.get('kalenderAktiv', false) == false
+                      )
                     );
 
-      // Update: eigenes Doc, SuperAdmin oder FS-Admin.
-      // ABER: das Feld 'kalenderAktiv' (Freischaltung = bezahltes Extra) darf
-      // ein normaler Nutzer NICHT bei sich selbst verändern – nur der SuperAdmin.
-      // Sonst könnte sich jeder kostenlos selbst freischalten.
+      // UPDATE: Ein Nutzer darf sein eigenes Doc bearbeiten, aber die
+      // sicherheitsrelevanten Felder rolle, status und kalenderAktiv müssen
+      // dabei UNVERÄNDERT bleiben. Nur SuperAdmin (bzw. FsAdmin für status)
+      // darf diese ändern. Das verhindert Selbst-Hochstufung, Umgehung der
+      // Zahlungssperre und kostenlose Kalender-Freischaltung.
       allow update: if isAuth() && (
                       isSuperAdmin() ||
                       (
                         (request.auth.uid == uid || isFsAdmin()) &&
+                        request.resource.data.rolle == resource.data.rolle &&
                         request.resource.data.get('kalenderAktiv', false)
-                          == resource.data.get('kalenderAktiv', false)
+                          == resource.data.get('kalenderAktiv', false) &&
+                        (
+                          // status darf nur ein FsAdmin ändern, nicht man selbst
+                          isFsAdmin() ||
+                          request.resource.data.get('status', '')
+                            == resource.data.get('status', '')
+                        )
                       )
                     );
 
@@ -272,16 +293,29 @@ service cloud.firestore {
               get(/databases/$(database)/documents/kalenderUsers/$(luid)).data.schoolId == kalMySchool());
     }
 
-    // Kalender-Nutzerprofile: eigenes Doc immer; fremde nur in eigener Schule
+    // Die ADK-fahrschuleId des Nutzers (autoritativ, da users.rolle jetzt
+    // geschützt ist). Wird genutzt, um die Kalender-schoolId fest an die
+    // echte Identität zu binden – so kann niemand eine fremde schoolId wählen.
+    function kalAdkFahrschuleId() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.fahrschuleId
+        : null;
+    }
+
+    // Kalender-Nutzerprofile: eigenes Doc immer; fremde nur in eigener Schule.
+    // WICHTIG: Beim Anlegen/Ändern des eigenen Profils muss die schoolId mit
+    // der ADK-fahrschuleId übereinstimmen (oder SuperAdmin) – verhindert, dass
+    // sich jemand einer fremden Fahrschule zuordnet (Cross-Tenant-Schutz).
     match /kalenderUsers/{uid} {
       allow read:   if kalIsSuperAdmin() ||
                        (kalAuth() && request.auth.uid == uid) ||
                        (kalUserExists() && resource.data.schoolId == kalMySchool());
-      allow create: if kalAuth() && (request.auth.uid == uid || kalIsSuperAdmin());
+      allow create: if kalIsSuperAdmin() ||
+                       (kalAuth() && request.auth.uid == uid &&
+                        request.resource.data.schoolId == kalAdkFahrschuleId());
       allow update: if kalIsSuperAdmin() ||
-                       (kalAuth() && request.auth.uid == uid) ||
-                       (kalUserExists() && resource.data.schoolId == kalMySchool() &&
-                        request.resource.data.schoolId == kalMySchool());
+                       (kalAuth() && request.auth.uid == uid &&
+                        request.resource.data.schoolId == kalAdkFahrschuleId());
       allow delete: if kalIsSuperAdmin() ||
                        (kalAuth() && request.auth.uid == uid);
     }
