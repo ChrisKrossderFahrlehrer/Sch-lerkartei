@@ -57,6 +57,16 @@ service cloud.firestore {
              resData.uid == request.auth.uid;
     }
 
+    // Helper: Stimmt der beim Beitritt mitgesendete Code mit dem Code der
+    // Ziel-Fahrschule überein? Verhindert, dass jemand seine fahrschuleId
+    // einfach auf eine fremde Schule setzt (Cross-Tenant), ohne den geheimen
+    // Fahrschul-Code zu kennen. Beitreten ist nur MIT korrektem Code möglich.
+    function fahrschulCodeStimmt() {
+      return exists(/databases/$(database)/documents/fahrschulen/$(request.resource.data.fahrschuleId)) &&
+             request.resource.data.get('beitrittCode', '__kein_code__') ==
+               get(/databases/$(database)/documents/fahrschulen/$(request.resource.data.fahrschuleId)).data.get('fahrschulCode', '__keine_uebereinstimmung__');
+    }
+
     // ══════════════════════════════════════════════════════
     // SUPERADMINS
     // ══════════════════════════════════════════════════════
@@ -90,10 +100,13 @@ service cloud.firestore {
     // USERS (Fahrlehrer, Admins, SuperAdmin)
     // ══════════════════════════════════════════════════════
     match /users/{uid} {
+      // READ: eigenes Doc, SuperAdmin, oder FsAdmin NUR für Mitglieder der
+      // EIGENEN Schule (nicht mehr global – sonst könnte ein FsAdmin fremde
+      // Nutzerprofile lesen).
       allow read: if isAuth() && (
                     request.auth.uid == uid ||
                     isSuperAdmin() ||
-                    isFsAdmin()
+                    (isFsAdmin() && resource.data.fahrschuleId == userFsId())
                   );
 
       // CREATE: Beim Anlegen des EIGENEN Kontos dürfen sicherheitsrelevante
@@ -112,22 +125,31 @@ service cloud.firestore {
                     );
 
       // UPDATE: Ein Nutzer darf sein eigenes Doc bearbeiten, aber die
-      // sicherheitsrelevanten Felder rolle, status und kalenderAktiv müssen
-      // dabei UNVERÄNDERT bleiben. Nur SuperAdmin (bzw. FsAdmin für status)
-      // darf diese ändern. Das verhindert Selbst-Hochstufung, Umgehung der
-      // Zahlungssperre und kostenlose Kalender-Freischaltung.
+      // sicherheitsrelevanten Felder müssen geschützt sein:
+      //  • rolle/kalenderAktiv: NIE durch den Nutzer selbst änderbar
+      //  • status: nur FsAdmin/SuperAdmin
+      //  • fahrschuleId: nur auf die eigene uid (Schule verlassen) ODER auf
+      //    eine Schule, deren Code korrekt mitgesendet wird (Beitritt). Das
+      //    verhindert Cross-Tenant-Zugriff durch fahrschuleId-Manipulation.
+      // FsAdmin darf nur Mitglieder der eigenen Schule bearbeiten.
       allow update: if isAuth() && (
                       isSuperAdmin() ||
                       (
-                        (request.auth.uid == uid || isFsAdmin()) &&
+                        (request.auth.uid == uid ||
+                         (isFsAdmin() && resource.data.fahrschuleId == userFsId())) &&
                         request.resource.data.rolle == resource.data.rolle &&
                         request.resource.data.get('kalenderAktiv', false)
                           == resource.data.get('kalenderAktiv', false) &&
                         (
-                          // status darf nur ein FsAdmin ändern, nicht man selbst
                           isFsAdmin() ||
                           request.resource.data.get('status', '')
                             == resource.data.get('status', '')
+                        ) &&
+                        (
+                          isFsAdmin() ||
+                          request.resource.data.fahrschuleId == resource.data.fahrschuleId ||
+                          request.resource.data.fahrschuleId == request.auth.uid ||
+                          fahrschulCodeStimmt()
                         )
                       )
                     );
