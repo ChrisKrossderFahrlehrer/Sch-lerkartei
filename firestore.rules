@@ -76,11 +76,34 @@ service cloud.firestore {
     }
 
     // ══════════════════════════════════════════════════════
+    // SCHOOLCODES — Nachschlage-Tabelle Code → Fahrschule
+    // Zweck: Beim Beitreten findet man die Schule per get(schoolCodes/{code}).
+    // Man muss den Code KENNEN, um ihn nachzuschlagen (get). Das massenhafte
+    // Auflisten (list) ist gesperrt → kein Abgreifen aller Codes/Schulen.
+    // Dadurch kann 'fahrschulen' streng (nur Mitglieder) gelesen werden.
+    // ══════════════════════════════════════════════════════
+    match /schoolCodes/{code} {
+      allow get:    if isAuth();
+      allow list:   if isSuperAdmin();
+      // Nur der Inhaber selbst (schoolId == eigene uid) oder SuperAdmin darf
+      // einen Code-Eintrag anlegen/ändern. Verhindert das Fälschen von Einträgen.
+      allow create, update: if isSuperAdmin() ||
+                               (isAuth() && request.resource.data.schoolId == request.auth.uid);
+      allow delete: if isSuperAdmin() ||
+                       (isAuth() && resource.data.schoolId == request.auth.uid);
+    }
+
+    // ══════════════════════════════════════════════════════
     // FAHRSCHULEN
     // ══════════════════════════════════════════════════════
     match /fahrschulen/{fsId} {
-      allow read: if isSuperAdmin() ||
-                     isAuth();  // Auth. Nutzer dürfen lesen (für Fahrschul-Code-Suche bei Registrierung)
+      // READ verschärft: nur SuperAdmin oder MITGLIEDER dieser Fahrschule.
+      // Der Beitritts-Code wird NICHT mehr hier gesucht (das läuft über die
+      // schoolCodes-Tabelle), daher muss read nicht mehr für alle offen sein.
+      // get: eigene Schule (Mitglied) oder SuperAdmin. list: nur SuperAdmin.
+      allow get:  if isSuperAdmin() ||
+                     (isAuth() && fsId == userFsId());
+      allow list: if isSuperAdmin();
 
       allow create: if isAuth() &&
                        (request.resource.data.adminUid == request.auth.uid ||
@@ -120,7 +143,13 @@ service cloud.firestore {
                         request.auth.uid == uid &&
                         request.resource.data.rolle in ['fahrlehrer', 'fahrschul-admin'] &&
                         request.resource.data.get('status', 'ausstehend') == 'ausstehend' &&
-                        request.resource.data.get('kalenderAktiv', false) == false
+                        request.resource.data.get('kalenderAktiv', false) == false &&
+                        (
+                          // fahrschuleId beim Anlegen nur die eigene uid
+                          // (eigenständig/Inhaber) ODER eine Schule mit gültigem Code
+                          request.resource.data.fahrschuleId == request.auth.uid ||
+                          fahrschulCodeStimmt()
+                        )
                       )
                     );
 
