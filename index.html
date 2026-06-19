@@ -852,6 +852,7 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
                  white-space:nowrap">⭐ Pro</button>
         <button class="btn-icon-sm" onclick="toggleTheme()" id="theme-btn" title="Design wechseln">☀️</button>
         <button class="btn-icon-sm" onclick="openDashboard()" title="Übersicht" id="btn-dashboard">📊</button>
+        <button class="btn-icon-sm" onclick="openKalender()" title="Kalender" id="btn-kalender" style="display:none">📅</button>
         <button class="btn-icon-sm" onclick="openSettings()" title="Einstellungen" id="btn-settings-header">⚙️</button>
         <button class="btn-icon-sm" onclick="doLogout()" id="user-btn" title="Abmelden">⏻</button>
       </div>
@@ -2641,6 +2642,22 @@ onAuthStateChanged(auth, async (user) => {
         currentUser._rolle        = profil.rolle || 'fahrlehrer';
         currentUser._fsName       = profil.fahrschuleName || '';
 
+        // ── KALENDER-MODUL: Ist der Kalender für diesen Nutzer freigeschaltet? ──
+        // Entweder die FAHRSCHULE ist freigeschaltet (fahrschulen.kalenderAktiv)
+        // oder der Fahrlehrer EINZELN (users.kalenderAktiv). Steuert nur die
+        // Sichtbarkeit des Buttons – die echte Zugangskontrolle macht der Kalender.
+        currentUser._kalenderAktiv = false;
+        try {
+          if (profil.kalenderAktiv === true) {
+            currentUser._kalenderAktiv = true;
+          } else if (profil.fahrschuleId) {
+            const fsSnap = await getDoc(doc(db, 'fahrschulen', profil.fahrschuleId));
+            if (fsSnap.exists() && fsSnap.data().kalenderAktiv === true) {
+              currentUser._kalenderAktiv = true;
+            }
+          }
+        } catch(e) { console.warn('Kalender-Status nicht ladbar:', e); }
+
         // ── STATUS-CHECK ──
         // SuperAdmin nie sperren
         const istSuperadmin = profil.rolle === 'superadmin' || user.email === 'chriskoo@mail.de';
@@ -2732,6 +2749,9 @@ onAuthStateChanged(auth, async (user) => {
     if (userBtn) userBtn.textContent = '⏻';
     const greeting = document.getElementById('user-greeting');
     if (greeting) greeting.textContent = 'Hallo, ' + (user.displayName || 'Fahrlehrer') + ' 👋';
+    // Kalender-Button nur zeigen, wenn das Modul freigeschaltet ist
+    const kalBtn = document.getElementById('btn-kalender');
+    if (kalBtn) kalBtn.style.display = currentUser._kalenderAktiv ? '' : 'none';
     listenStudents();
     listenFields();
     listenCustomThemen();
@@ -5097,6 +5117,16 @@ window.toggleTheme = () => {
   localStorage.setItem('fs_theme', isLight ? 'light' : 'dark');
   const btn = document.getElementById('theme-btn');
   if (btn) btn.textContent = isLight ? '🌙' : '☀️';
+};
+
+// ─────────────────────────────────────────
+// KALENDER (Extra-Modul) – öffnet die separate Kalender-App.
+// Der Button ist nur sichtbar, wenn die Fahrschule/der Fahrlehrer
+// freigeschaltet ist (currentUser._kalenderAktiv). Die echte
+// Zugangskontrolle macht der Kalender selbst beim Login.
+// ─────────────────────────────────────────
+window.openKalender = () => {
+  window.open('https://chriskrossderfahrlehrer.github.io/Kalender/', '_blank');
 };
 
 // ─────────────────────────────────────────
