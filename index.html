@@ -5454,9 +5454,12 @@ window.fahrschuleBeitreten = async () => {
     }
     const ziel = { id: fsSnap.docs[0].id, ...fsSnap.docs[0].data() };
     // User-Dokument aktualisieren: dieser Fahrschule zuordnen
+    // beitrittCode wird mitgesendet, damit die Firestore-Regel prüfen kann,
+    // dass der Code wirklich zu dieser Schule gehört (Cross-Tenant-Schutz).
     await updateDoc(doc(db, 'users', currentUser.uid), {
       fahrschuleId:   ziel.id,
-      fahrschuleName: ziel.name || null
+      fahrschuleName: ziel.name || null,
+      beitrittCode:   code
     });
     currentUser._fahrschuleId = ziel.id;
     if (msg) { msg.style.color='var(--accent2)'; msg.textContent='✅ Erfolgreich ' + (ziel.name || 'der Fahrschule') + ' beigetreten!'; }
