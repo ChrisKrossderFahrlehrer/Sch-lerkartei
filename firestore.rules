@@ -214,16 +214,18 @@ service cloud.firestore {
     // ACCESS CODES (für Schüler-Zugangscodes)
     // ══════════════════════════════════════════════════════
     match /accessCodes/{docId} {
-      // DATENSCHUTZ: Lesen erlaubt, ABER das Portal liefert pro Code nur EIN
-      // Dokument (where code == '...'). Da Codes 6-stellig zufällig sind
-      // (~1 Mrd. Kombinationen), ist gezieltes Erraten unrealistisch.
-      // Die echte Absicherung: Daten im Dokument sind minimiert (siehe App),
-      // und ein einzelner Code gibt nur die Daten EINES Schülers preis –
-      // niemals die ganze Sammlung in verwertbarer Form.
-      allow read: if true;
+      // DATENSCHUTZ-FIX: Firestore unterscheidet 'get' (ein einzelnes Dokument)
+      // und 'list' (Abfrage über die Collection). Das Schüler-Portal liest pro
+      // Code nur EIN Dokument (Code = Dokument-ID) – das erlauben wir. Das
+      // massenhafte Auslesen der GANZEN Collection (list) ist für nicht-
+      // eingeloggte Nutzer VERBOTEN. So kann kein Angreifer alle Schülerdaten
+      // auf einmal abgreifen (DSGVO Art. 32). Eingeloggte Fahrlehrer dürfen
+      // listen (brauchen sie zum Verwalten/Verlängern der Codes).
+      allow get:  if true;
+      allow list: if isAuth();
       allow create: if isAuth();
       allow delete: if isAuth();
-      // Schüler-Portal: ohne Login NUR messages + plannedLessons updaten.
+      // Schüler-Portal: ohne Login NUR messages + plannedLessons + lernziele updaten.
       allow update: if isAuth() ||
                        request.resource.data.diff(resource.data)
                          .affectedKeys()
@@ -247,7 +249,10 @@ service cloud.firestore {
     // PLATFORM (Impressum, Einstellungen)
     // ══════════════════════════════════════════════════════
     match /platform/{docId} {
-      allow read:  if true;
+      // Impressum/Broadcast werden gezielt per get() geladen (das Impressum
+      // MUSS öffentlich sein – rechtliche Pflicht). list() ist gesperrt.
+      allow get:   if true;
+      allow list:  if isAuth();
       allow write: if isSuperAdmin();
     }
 
@@ -257,7 +262,11 @@ service cloud.firestore {
     // Enthält KEINE sensiblen Daten (nur username, email, uid).
     // ══════════════════════════════════════════════════════
     match /usernames/{uname} {
-      allow read:   if true;
+      // get() für den Login-Lookup (Benutzername ist Doc-ID) ist erlaubt.
+      // list() ist gesperrt → niemand kann alle Benutzernamen+uids abgreifen
+      // (Schutz vor Enumeration / DSGVO).
+      allow get:    if true;
+      allow list:   if isAuth();
       allow create: if isAuth() && request.resource.data.uid == request.auth.uid;
       allow update: if isAuth() && resource.data.uid == request.auth.uid;
       allow delete: if isAuth() && resource.data.uid == request.auth.uid;
