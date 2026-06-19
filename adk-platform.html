@@ -651,6 +651,9 @@ let currentProfil = null; // { rolle, fahrschuleId, name, ... }
 const ABO_ENABLED = false;
 let fahrschulen   = [];
 let alleFahrlehrer = [];   // einzelne Fahrlehrer (typ:'fahrlehrer') aus users
+// XSS-Schutz: Nutzereingaben (Namen, E-Mails) escapen, bevor sie via innerHTML
+// ins DOM kommen. Verhindert, dass z.B. ein Name mit <script> Code ausführt.
+function escHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 let unsubAlleLehrer = null;
 let passwordResets = [];
 let unsubPwResets  = null;
@@ -1138,7 +1141,7 @@ async function renderAnalytics() {
         ${fsStats.map(fs => `
           <div style="display:grid;grid-template-columns:1fr auto auto auto auto;gap:0;padding:10px 12px;border-bottom:1px solid var(--border);font-size:0.82rem;align-items:center">
             <div>
-              <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px">${fs.name}</div>
+              <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px">${escHtml(fs.name)}</div>
               <div style="font-size:0.68rem;color:var(--muted)">${fs.stadt}</div>
             </div>
             <span style="text-align:center;color:var(--blue);font-weight:700">${fs.anzahlLehrer}</span>
@@ -1790,7 +1793,7 @@ window.openFsDetail = (fsId) => {
     <div style="margin-bottom:16px">
       <div style="display:flex;flex-direction:column;gap:8px;font-size:0.88rem">
         <div><span style="color:var(--muted)">Inhaber:</span> <strong>${fs.inhaber}</strong></div>
-        <div><span style="color:var(--muted)">E-Mail:</span> ${fs.email}</div>
+        <div><span style="color:var(--muted)">E-Mail:</span> ${escHtml(fs.email)}</div>
         <div><span style="color:var(--muted)">Stadt:</span> ${fs.stadt}</div>
         <div><span style="color:var(--muted)">Registriert:</span> ${new Date(fs.createdAt).toLocaleDateString('de-DE')}</div>
         <div><span style="color:var(--muted)">Status:</span> <strong style="color:${fs.status==='aktiv'?'var(--accent2)':fs.status==='gesperrt'?'var(--danger)':'var(--accent)'}">${fs.status}</strong></div>
@@ -2045,7 +2048,7 @@ async function renderFsAdmin() {
       <div class="section-hd" style="margin-top:8px">Fahrschul-Daten</div>
       <div class="card">
         <div style="display:flex;flex-direction:column;gap:10px;font-size:0.88rem">
-          <div><span style="color:var(--muted)">Name:</span> <strong>${fs.name}</strong></div>
+          <div><span style="color:var(--muted)">Name:</span> <strong>${escHtml(fs.name)}</strong></div>
           <div><span style="color:var(--muted)">Inhaber:</span> ${fs.inhaber}</div>
           <div><span style="color:var(--muted)">Stadt:</span> ${fs.stadt}</div>
           <div><span style="color:var(--muted)">Status:</span> <span class="badge badge-green">✅ Aktiv</span></div>
