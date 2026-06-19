@@ -419,7 +419,7 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
 /* MODAL */
 .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.7); backdrop-filter:blur(6px); z-index:200; display:none; align-items:flex-end; justify-content:center; }
 .modal-overlay.open { display:flex; }
-.modal-sheet { background:var(--surface); border-radius:20px 20px 0 0; padding:24px 20px calc(var(--safe-bottom) + 28px); width:100%; max-width:480px; max-height:90vh; overflow-y:auto; -webkit-overflow-scrolling:touch; animation:slideUp 0.25s ease; }
+.modal-sheet { background:var(--surface); border-radius:20px 20px 0 0; padding:24px 20px calc(var(--safe-bottom) + 28px); width:100%; max-width:480px; max-height:85vh; max-height:calc(100dvh - env(safe-area-inset-top, 0px) - 24px); overflow-y:auto; -webkit-overflow-scrolling:touch; animation:slideUp 0.25s ease; }
 @keyframes slideUp { from{transform:translateY(40px);opacity:0} to{transform:translateY(0);opacity:1} }
 .sheet-title { font-family:'Syne',sans-serif; font-size:1.1rem; font-weight:700; margin-bottom:20px; text-align:center; }
 .sheet-actions { display:flex; gap:10px; margin-top:20px; }
