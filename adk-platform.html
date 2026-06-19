@@ -1446,6 +1446,25 @@ function loadSuperadmin() {
   unsubFahrschulen = onSnapshot(q, snap => {
     fahrschulen = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
+    // ── EINMALIGE MIGRATION: schoolCodes-Einträge für bestehende Schulen ──
+    // Stellt sicher, dass jede Fahrschule mit Code einen Nachschlage-Eintrag
+    // hat, damit Fahrlehrer beitreten können (ohne dass alle Schulen lesbar
+    // sein müssen). Läuft automatisch, sobald der SuperAdmin die Liste lädt.
+    (async () => {
+      for (const fs of fahrschulen) {
+        if (!fs.fahrschulCode) continue;
+        try {
+          const scSnap = await getDoc(doc(db, 'schoolCodes', fs.fahrschulCode));
+          if (!scSnap.exists()) {
+            await setDoc(doc(db, 'schoolCodes', fs.fahrschulCode), {
+              schoolId: fs.id, schoolName: fs.name || '', createdAt: Date.now(), migriert: true
+            });
+            console.log('schoolCode migriert:', fs.fahrschulCode, '→', fs.name);
+          }
+        } catch(scErr) { console.warn('Migration schoolCode', fs.fahrschulCode, scErr); }
+      }
+    })();
+
     // Live-Badge für ausstehende Anfragen
     const pending = fahrschulen.filter(f => f.status === 'ausstehend').length;
     const tabBtn  = document.getElementById('sa-tab-pending');
