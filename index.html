@@ -5126,7 +5126,10 @@ window.toggleTheme = () => {
 // Zugangskontrolle macht der Kalender selbst beim Login.
 // ─────────────────────────────────────────
 window.openKalender = () => {
-  window.open('https://chriskrossderfahrlehrer.github.io/Kalender/', '_blank');
+  // Relativer Pfad → öffnet den Kalender auf DERSELBEN Domain wie die ADK-App.
+  // Dadurch teilt sich die Firebase-Login-Sitzung automatisch (Single Sign-On):
+  // wer in der ADK eingeloggt ist, ist auch im Kalender sofort eingeloggt.
+  window.open('kalender.html', '_blank');
 };
 
 // ─────────────────────────────────────────
