@@ -1,0 +1,1959 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1a1a1a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Fahrschule Kalender</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0f0f0f; --surface:#1a1a1a; --surface2:#242424; --border:#2e2e2e;
+  --accent:#d4a843; --accent2:#e8c878; --text:#f0ede8; --text-muted:#888;
+  --danger:#e05555; --success:#5bba7a; --radius:10px;
+  --font-display:'DM Serif Display',serif; --font-body:'DM Sans',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-height:100vh;font-size:15px;}
+
+/* ── Auth ── */
+#auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 60% 20%,#1e1608 0%,#0f0f0f 60%);}
+.auth-box{width:400px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:36px;}
+.auth-logo{font-family:var(--font-display);font-size:26px;color:var(--accent);margin-bottom:4px;}
+.auth-sub{color:var(--text-muted);font-size:13px;margin-bottom:28px;}
+.auth-tabs{display:flex;gap:4px;background:var(--surface2);border-radius:8px;padding:4px;margin-bottom:22px;}
+.auth-tab{flex:1;padding:7px;border:none;background:transparent;color:var(--text-muted);border-radius:6px;cursor:pointer;font-family:var(--font-body);font-size:13px;font-weight:500;transition:all .2s;}
+.auth-tab.active{background:var(--accent);color:#0f0f0f;}
+
+/* ── Forms ── */
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:11px;color:var(--text-muted);margin-bottom:5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;}
+.field input,.field select,.field textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-family:var(--font-body);font-size:14px;outline:none;transition:border .2s;}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);}
+.field select option{background:#1a1a1a;}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:9px 18px;border:none;border-radius:8px;font-family:var(--font-body);font-size:14px;font-weight:500;cursor:pointer;transition:all .2s;text-decoration:none;}
+.btn-primary{background:var(--accent);color:#0f0f0f;} .btn-primary:hover{background:var(--accent2);}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);} .btn-secondary:hover{border-color:var(--accent);color:var(--accent);}
+.btn-danger{background:transparent;color:var(--danger);border:1px solid var(--danger);} .btn-danger:hover{background:var(--danger);color:#fff;}
+.btn-success{background:var(--success);color:#0f0f0f;}
+.btn-full{width:100%;justify-content:center;} .btn-sm{padding:5px 11px;font-size:12px;}
+
+/* ── App Layout ── */
+#app{display:none;min-height:100vh;flex-direction:column;}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:56px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
+.topbar-brand{font-family:var(--font-display);font-size:19px;color:var(--accent);}
+.topbar-role{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);background:var(--surface2);padding:3px 9px;border-radius:20px;}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+.topbar-user{font-size:12px;color:var(--text-muted);}
+.layout{display:flex;flex:1;}
+.sidebar{width:210px;min-height:calc(100vh - 56px);background:var(--surface);border-right:1px solid var(--border);padding:16px 10px;flex-shrink:0;}
+.nav-item{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:8px;color:var(--text-muted);font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;margin-bottom:2px;border:none;background:none;width:100%;text-align:left;}
+.nav-item:hover,.nav-item.active{background:var(--surface2);color:var(--text);}
+.nav-item.active{color:var(--accent);}
+.nav-icon{font-size:15px;width:18px;text-align:center;}
+.nav-section{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);padding:12px 12px 4px;margin-top:4px;}
+.main{flex:1;padding:28px;overflow-y:auto;}
+.page-title{font-family:var(--font-display);font-size:26px;color:var(--text);margin-bottom:20px;}
+
+/* ── Cards ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:22px;margin-bottom:16px;}
+.card-title{font-size:13px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:14px;}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+
+/* ── Stat Cards ── */
+.stat-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px 20px;}
+.stat-label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:6px;}
+.stat-val{font-family:var(--font-display);font-size:30px;}
+
+/* ── Table ── */
+table{width:100%;border-collapse:collapse;}
+th{text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);padding:7px 11px;border-bottom:1px solid var(--border);}
+td{padding:11px;border-bottom:1px solid rgba(46,46,46,.5);font-size:13px;vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+
+/* ── Kalender ── */
+.cal-header{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+.cal-month{font-family:var(--font-display);font-size:20px;flex:1;}
+.cal-view-toggle{display:flex;gap:3px;background:var(--surface2);border-radius:7px;padding:3px;}
+.cal-view-btn{padding:5px 12px;border:none;background:transparent;color:var(--text-muted);border-radius:5px;cursor:pointer;font-family:var(--font-body);font-size:12px;font-weight:500;transition:all .2s;}
+.cal-view-btn.active{background:var(--accent);color:#0f0f0f;}
+.cal-day-label{text-align:center;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);padding:6px 0;}
+.cal-day{min-height:76px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:6px;cursor:pointer;transition:border .2s;position:relative;}
+.cal-day:hover{border-color:var(--accent);}
+.cal-day.other-month{opacity:.3;}
+.cal-day.today{border-color:var(--accent);}
+.cal-day.blocked{background:rgba(224,85,85,.07);border-color:rgba(224,85,85,.3);}
+.cal-day.urlaub-day{background:rgba(91,186,122,.06);border-color:rgba(91,186,122,.3);}
+.cal-day.feiertag-day{background:rgba(212,168,67,.06);border-color:rgba(212,168,67,.3);}
+.cal-day-num{font-size:11px;font-weight:600;margin-bottom:3px;color:var(--text-muted);}
+.cal-day.today .cal-day-num{color:var(--accent);}
+.cal-slot{font-size:9px;border-radius:3px;padding:2px 4px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;}
+.slot-booked{opacity:.6;}
+.cal-day.urlaub-day,.cal-day.feiertag-day{pointer-events:all;}
+
+/* ── Week View ── */
+.week-cell{border-right:1px solid rgba(46,46,46,.3);border-bottom:1px solid rgba(46,46,46,.3);height:44px;position:relative;cursor:pointer;transition:background .15s;}
+.week-cell:hover{background:rgba(212,168,67,.04);}
+.week-time-label{font-size:9px;color:var(--text-muted);text-align:right;padding-right:6px;border-right:1px solid var(--border);border-bottom:1px solid rgba(46,46,46,.4);height:44px;display:flex;align-items:flex-start;justify-content:flex-end;padding-top:2px;}
+.week-slot-chip{position:absolute;left:2px;right:2px;border-radius:3px;padding:2px 4px;font-size:9px;font-weight:600;overflow:hidden;z-index:2;}
+.week-col-header{text-align:center;padding:8px 3px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:11px;font-weight:600;}
+.week-col-header.today-col{color:var(--accent);}
+
+/* ── Modal ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;width:440px;max-height:90vh;overflow-y:auto;position:relative;}
+.modal-title{font-family:var(--font-display);font-size:20px;margin-bottom:18px;}
+.modal-close{position:absolute;top:14px;right:14px;background:var(--surface2);border:none;color:var(--text-muted);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;}
+
+/* ── Badges ── */
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
+.badge-booked{background:rgba(91,186,122,.15);color:var(--success);}
+.badge-free{background:rgba(212,168,67,.12);color:var(--accent);}
+.badge-bestanden{background:rgba(91,186,122,.18);color:#5bba7a;}
+.badge-nicht-bestanden{background:rgba(224,85,85,.18);color:#e05555;}
+.badge-ausstehend{background:rgba(212,168,67,.15);color:var(--accent);}
+
+/* ── Slot Row ── */
+.slot-row{display:flex;align-items:center;gap:10px;padding:10px;background:var(--surface2);border-radius:8px;margin-bottom:7px;flex-wrap:wrap;}
+.slot-time{font-weight:600;font-size:14px;min-width:90px;}
+.slot-info{flex:1;}
+.slot-student{font-size:12px;color:var(--text-muted);margin-top:2px;}
+
+/* ── Auto Card ── */
+.auto-card{display:flex;align-items:center;gap:12px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:12px 14px;margin-bottom:7px;flex-wrap:wrap;}
+.auto-icon{font-size:22px;}
+.auto-info{flex:1;}
+.auto-name{font-weight:600;font-size:13px;}
+.auto-detail{font-size:11px;color:var(--text-muted);margin-top:2px;}
+.auto-kennzeichen{font-family:monospace;font-size:12px;font-weight:700;background:#f0ede8;color:#0f0f0f;padding:2px 7px;border-radius:4px;border:1.5px solid #555;letter-spacing:.05em;}
+
+/* ── Prüfung ── */
+.pruefung-card{display:flex;align-items:center;gap:12px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:12px 14px;margin-bottom:7px;flex-wrap:wrap;}
+.pruefung-status{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.pruefung-info{flex:1;min-width:140px;}
+.pruefung-title{font-weight:600;font-size:13px;}
+.pruefung-meta{font-size:11px;color:var(--text-muted);margin-top:2px;}
+
+/* ── Notizen ── */
+.notiz-block{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:13px;margin-bottom:8px;}
+.notiz-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.notiz-author{font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.04em;}
+.notiz-date{font-size:10px;color:var(--text-muted);}
+.notiz-text{font-size:13px;line-height:1.6;white-space:pre-wrap;}
+.notiz-compose{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:13px;}
+.notiz-compose textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:var(--font-body);font-size:13px;padding:9px 12px;resize:vertical;min-height:72px;outline:none;transition:border .2s;}
+.notiz-compose textarea:focus{border-color:var(--accent);}
+
+/* ── Warteliste ── */
+.warteliste-row{display:flex;align-items:center;gap:10px;padding:10px 13px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;flex-wrap:wrap;}
+.warteliste-name{flex:1;font-weight:500;font-size:13px;}
+.warteliste-meta{font-size:11px;color:var(--text-muted);}
+
+/* ── Typ Rows ── */
+.type-row{display:flex;align-items:center;gap:10px;padding:10px 13px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:7px;flex-wrap:wrap;}
+.type-row-name{flex:1;font-weight:500;font-size:13px;}
+.type-row-id{font-size:10px;color:var(--text-muted);font-family:monospace;}
+.preset-colors{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px;}
+.preset-color{width:26px;height:26px;border-radius:5px;cursor:pointer;border:2px solid transparent;transition:border .15s;}
+.preset-color:hover{border-color:var(--text);}
+
+/* ── Auslastung ── */
+.auslastung-bar-wrap{display:flex;align-items:center;gap:10px;margin-bottom:9px;}
+.auslastung-label{min-width:130px;font-size:13px;font-weight:500;}
+.auslastung-bar-bg{flex:1;height:9px;background:var(--surface2);border-radius:20px;overflow:hidden;}
+.auslastung-bar-fill{height:100%;border-radius:20px;transition:width .4s;}
+.auslastung-val{min-width:55px;text-align:right;font-size:11px;color:var(--text-muted);}
+
+/* ── Email Banner ── */
+.email-banner{background:linear-gradient(135deg,rgba(212,168,67,.12),rgba(212,168,67,.04));border:1px solid rgba(212,168,67,.3);border-radius:11px;padding:18px 22px;margin-bottom:14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.email-banner-icon{font-size:26px;flex-shrink:0;}
+.email-banner-text{flex:1;min-width:180px;}
+.email-banner-title{font-weight:600;font-size:13px;margin-bottom:3px;}
+.email-banner-sub{font-size:11px;color:var(--text-muted);}
+.email-banner-input{display:flex;gap:7px;align-items:center;flex-shrink:0;}
+.email-banner-input input{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:7px 12px;color:var(--text);font-family:var(--font-body);font-size:12px;outline:none;transition:border .2s;width:200px;}
+.email-banner-input input:focus{border-color:var(--accent);}
+.email-saved{color:var(--success);font-size:12px;font-weight:500;}
+
+/* ── Booking Screen ── */
+#booking-screen{min-height:100vh;background:radial-gradient(ellipse at 30% 70%,#0d1520 0%,#0f0f0f 60%);display:none;flex-direction:column;align-items:center;padding:36px 16px 80px;}
+.booking-header{text-align:center;margin-bottom:32px;}
+.booking-logo{font-family:var(--font-display);font-size:28px;color:var(--accent);}
+.booking-sub{color:var(--text-muted);margin-top:6px;font-size:14px;}
+.booking-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;width:100%;max-width:680px;padding:24px;margin-bottom:16px;}
+.booking-card-title{font-family:var(--font-display);font-size:17px;margin-bottom:14px;}
+
+/* ── Toast ── */
+#toast{position:fixed;bottom:22px;right:22px;z-index:10000;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:12px 18px;max-width:300px;transform:translateY(80px);opacity:0;transition:all .3s;font-size:13px;}
+#toast.show{transform:translateY(0);opacity:1;}
+#toast.error{border-color:var(--danger);color:var(--danger);}
+#toast.success{border-color:var(--success);color:var(--success);}
+
+/* ── Utils ── */
+.divider{border:none;border-top:1px solid var(--border);margin:16px 0;}
+.text-muted{color:var(--text-muted);font-size:12px;}
+.text-center{text-align:center;}
+.copy-btn{flex-shrink:0;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:3px 9px;cursor:pointer;font-size:10px;font-family:var(--font-body);}
+.copy-btn:hover{border-color:var(--accent);color:var(--accent);}
+.spinner{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.invite-code{font-family:monospace;font-size:22px;font-weight:700;letter-spacing:.12em;color:var(--accent);}
+.school-badge{display:inline-flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--text-muted);}
+
+/* ── Footer ── */
+.app-footer {
+  text-align: center; padding: 16px 20px;
+  border-top: 1px solid var(--border);
+  font-size: 11px; color: var(--text-muted);
+  background: var(--surface);
+  display: flex; align-items: center; justify-content: center;
+  gap: 16px; flex-wrap: wrap;
+}
+.app-footer a {
+  color: var(--text-muted); text-decoration: none;
+  cursor: pointer; transition: color .2s;
+}
+.app-footer a:hover { color: var(--accent); }
+.legal-section { margin-bottom: 22px; }
+.legal-section h3 { font-family: var(--font-display); font-size: 16px; margin-bottom: 8px; color: var(--text); }
+.legal-section p { font-size: 13px; line-height: 1.7; color: var(--text-muted); margin-bottom: 8px; }
+.legal-section ul { padding-left: 18px; font-size: 13px; line-height: 1.8; color: var(--text-muted); }
+.sa-school-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:10px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.sa-school-name{font-weight:600;font-size:15px;flex:1;}
+.sa-school-meta{font-size:12px;color:var(--text-muted);margin-top:3px;}
+
+/* ── Mobile ── */
+@media(max-width:768px){
+  #toast{bottom:80px;right:10px;left:10px;max-width:100%;text-align:center;}
+  #auth-screen{padding:16px;align-items:flex-start;padding-top:32px;min-height:100dvh;overflow-y:auto;}
+  .auth-box{width:100%;padding:24px 16px;}
+  .topbar{padding:0 14px;height:50px;}
+  .topbar-user{display:none;}
+  .layout{flex-direction:column;}
+  .sidebar{width:100%;min-height:unset;border-right:none;border-top:1px solid var(--border);padding:6px 6px env(safe-area-inset-bottom);position:fixed;bottom:0;left:0;right:0;z-index:99;display:flex;flex-direction:row;overflow-x:auto;gap:2px;}
+  .nav-section{display:none;}
+  .nav-item{flex-direction:column;gap:2px;padding:5px 8px;min-width:55px;font-size:9px;text-align:center;border-radius:7px;white-space:nowrap;flex:1;}
+  .nav-icon{font-size:17px;width:auto;}
+  .main{padding:14px 10px;padding-bottom:85px;}
+  .page-title{font-size:20px;margin-bottom:14px;}
+  .card{padding:14px;margin-bottom:10px;}
+  .grid-2,.grid-3{grid-template-columns:1fr;}
+  table,thead,tbody,th,td,tr{display:block;}
+  thead{display:none;}
+  td{padding:5px 10px;border-bottom:none;display:flex;align-items:center;gap:7px;}
+  td:before{content:attr(data-label);font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;min-width:80px;flex-shrink:0;}
+  tr{background:var(--surface2);border:1px solid var(--border);border-radius:9px;margin-bottom:8px;padding:7px 0;}
+  .cal-day{min-height:50px;padding:4px;}
+  .cal-slot{font-size:8px;}
+  .cal-day-label{font-size:9px;}
+  .modal{width:100%;max-width:100%;margin:0;border-radius:18px 18px 0 0;position:fixed;bottom:0;left:0;right:0;max-height:88vh;padding:22px 18px;}
+  .modal-overlay{align-items:flex-end;}
+  .slot-row{gap:7px;}
+  .slot-time{min-width:unset;font-size:12px;}
+  .email-banner{flex-direction:column;align-items:flex-start;}
+  .email-banner-input{width:100%;}
+  .email-banner-input input{width:100%;}
+  #booking-screen{padding:16px 10px 90px;}
+  .booking-card{padding:16px 12px;}
+}
+@media(max-width:380px){.nav-item{min-width:46px;font-size:8px;padding:4px 5px;}.nav-icon{font-size:15px;}}
+</style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="auth-screen">
+  <div class="auth-box">
+    <div class="auth-logo">🚗 Fahrschule</div>
+    <div class="auth-sub">Kalender & Buchungssystem</div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchAuthTab('login')">Anmelden</button>
+      <button class="auth-tab" onclick="switchAuthTab('register')">Neue Fahrschule</button>
+    </div>
+    <div id="login-form">
+      <div class="field"><label>E-Mail</label><input id="login-email" type="email" placeholder="admin@fahrschule.de"></div>
+      <div class="field"><label>Passwort</label><input id="login-pw" type="password" placeholder="••••••••"></div>
+      <button class="btn btn-primary btn-full" onclick="doLogin()">Anmelden</button>
+    </div>
+    <div id="register-form" style="display:none">
+      <div class="field"><label>Name der Fahrschule</label><input id="reg-school" type="text" placeholder="Fahrschule Mustermann"></div>
+      <div class="field"><label>Bundesland</label>
+        <select id="reg-bl"><option value="">— Bitte wählen —</option></select>
+      </div>      <hr class="divider">
+      <div class="field"><label>Ihr Vorname</label><input id="reg-fname" type="text" placeholder="Max"></div>
+      <div class="field"><label>Ihr Nachname</label><input id="reg-lname" type="text" placeholder="Mustermann"></div>
+      <div class="field"><label>E-Mail</label><input id="reg-email" type="email" placeholder="admin@fahrschule.de"></div>
+      <div class="field"><label>Passwort</label><input id="reg-pw" type="password" placeholder="Mindestens 6 Zeichen"></div>
+      <button class="btn btn-primary btn-full" onclick="doRegisterAdmin()">Fahrschule registrieren</button>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="topbar-brand">🚗 Fahrschule</div>
+      <span id="topbar-school" class="school-badge" style="display:none">🏫 <span id="topbar-school-name"></span></span>
+    </div>
+    <div class="topbar-right">
+      <span class="topbar-role" id="topbar-role">—</span>
+      <span class="topbar-user" id="topbar-user"></span>
+      <button class="btn btn-secondary btn-sm" onclick="doLogout()">Abmelden</button>
+    </div>
+  </div>
+  <div class="layout">
+    <div class="sidebar" id="sidebar"></div>
+    <div class="main" id="main-content"></div>
+  </div>
+  <footer class="app-footer">
+    <span>© 2025 ChrisKrossderFahrlehrer – Alle Rechte vorbehalten</span>
+    <span>·</span>
+    <a onclick="showLegal('impressum')">Impressum</a>
+    <span>·</span>
+    <a onclick="showLegal('datenschutz')">Datenschutz</a>
+    <span>·</span>
+    <a onclick="showLegal('agb')">AGB & Nutzungsbedingungen</a>
+  </footer>
+</div>
+
+<!-- BOOKING -->
+<div id="booking-screen">
+  <div class="booking-header">
+    <div class="booking-logo">🚗 Fahrschule</div>
+    <div class="booking-sub" id="booking-subtitle">Terminbuchung</div>
+  </div>
+  <div id="booking-content" style="width:100%;max-width:680px;"></div>
+  <footer style="margin-top:32px;text-align:center;font-size:11px;color:var(--text-muted);display:flex;gap:14px;flex-wrap:wrap;justify-content:center;">
+    <span>© 2025 ChrisKrossderFahrlehrer</span>
+    <a onclick="showLegal('impressum')" style="color:var(--text-muted);cursor:pointer;text-decoration:none">Impressum</a>
+    <a onclick="showLegal('datenschutz')" style="color:var(--text-muted);cursor:pointer;text-decoration:none">Datenschutz</a>
+    <a onclick="showLegal('agb')" style="color:var(--text-muted);cursor:pointer;text-decoration:none">AGB</a>
+  </footer>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModalOutside(event)">
+  <div class="modal" id="modal-box">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div id="modal-inner"></div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, collection, query, where, orderBy, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+// ── FIREBASE CONFIG ──
+const firebaseConfig = {
+  apiKey: "AIzaSyD490kLzTOq3h3VdQ9ZqWZd_aXcDRfxBOs",
+  authDomain: "fahrschule-ebc65.firebaseapp.com",
+  projectId: "fahrschule-ebc65",
+  storageBucket: "fahrschule-ebc65.firebasestorage.app",
+  messagingSenderId: "194338111405",
+  appId: "1:194338111405:web:73e2f31d69cde3ac9beb24"
+};
+const SUPER_ADMIN_EMAIL = "chriskoo@mail.de"; // ← Deine Super-Admin E-Mail
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// ── STATE ──
+let currentUser = null;
+let currentRole = null; // 'superadmin' | 'admin' | 'lehrer'
+let currentProfile = null;
+let currentSchoolId = null;
+let currentSchool = null;
+let calDate = new Date();
+let calView = 'month';
+let weekStart = null;
+let fahrstundenarten = [];
+
+// ── BUNDESLÄNDER & FEIERTAGE ──
+const BUNDESLAENDER = {
+  'BW':'Baden-Württemberg','BY':'Bayern','BE':'Berlin','BB':'Brandenburg',
+  'HB':'Bremen','HH':'Hamburg','HE':'Hessen','MV':'Mecklenburg-Vorpommern',
+  'NI':'Niedersachsen','NW':'Nordrhein-Westfalen','RP':'Rheinland-Pfalz',
+  'SL':'Saarland','SN':'Sachsen','ST':'Sachsen-Anhalt','SH':'Schleswig-Holstein','TH':'Thüringen'
+};
+
+function easterSunday(y){const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31)-1,da=((h+l-7*m+114)%31)+1;return new Date(y,mo,da);}
+function addDays(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r;}
+
+const _ftCache = {};
+function getFeiertage(year, bl) {
+  const k=`${year}-${bl}`;
+  if (_ftCache[k]) return _ftCache[k];
+  const e=easterSunday(year);
+  const all=[
+    {d:new Date(year,0,1),n:'Neujahr'},{d:addDays(e,-2),n:'Karfreitag'},
+    {d:addDays(e,1),n:'Ostermontag'},{d:new Date(year,4,1),n:'Tag der Arbeit'},
+    {d:addDays(e,39),n:'Christi Himmelfahrt'},{d:addDays(e,50),n:'Pfingstmontag'},
+    {d:new Date(year,9,3),n:'Tag der Deutschen Einheit'},
+    {d:new Date(year,11,25),n:'1. Weihnachtstag'},{d:new Date(year,11,26),n:'2. Weihnachtstag'},
+    ...({BW:[{d:new Date(year,0,6),n:'Heilige Drei Könige'},{d:addDays(e,60),n:'Fronleichnam'},{d:new Date(year,7,15),n:'Mariä Himmelfahrt'},{d:new Date(year,10,1),n:'Allerheiligen'}],
+      BY:[{d:new Date(year,0,6),n:'Heilige Drei Könige'},{d:addDays(e,60),n:'Fronleichnam'},{d:new Date(year,7,15),n:'Mariä Himmelfahrt'},{d:new Date(year,10,1),n:'Allerheiligen'}],
+      BE:[{d:new Date(year,4,8),n:'Tag der Befreiung'}],BB:[{d:new Date(year,9,31),n:'Reformationstag'}],
+      HB:[{d:new Date(year,9,31),n:'Reformationstag'}],HH:[{d:new Date(year,9,31),n:'Reformationstag'}],
+      HE:[{d:addDays(e,60),n:'Fronleichnam'}],MV:[{d:new Date(year,9,31),n:'Reformationstag'}],
+      NI:[{d:new Date(year,9,31),n:'Reformationstag'}],
+      NW:[{d:addDays(e,60),n:'Fronleichnam'},{d:new Date(year,10,1),n:'Allerheiligen'}],
+      RP:[{d:addDays(e,60),n:'Fronleichnam'},{d:new Date(year,10,1),n:'Allerheiligen'}],
+      SL:[{d:addDays(e,60),n:'Fronleichnam'},{d:new Date(year,7,15),n:'Mariä Himmelfahrt'},{d:new Date(year,10,1),n:'Allerheiligen'}],
+      SN:[{d:new Date(year,9,31),n:'Reformationstag'},{d:new Date(year,10,17),n:'Buß- und Bettag'}],
+      ST:[{d:new Date(year,0,6),n:'Heilige Drei Könige'},{d:new Date(year,9,31),n:'Reformationstag'}],
+      SH:[{d:new Date(year,9,31),n:'Reformationstag'}],
+      TH:[{d:new Date(year,9,31),n:'Reformationstag'},{d:new Date(year,8,20),n:'Weltkindertag'}],
+    }[bl]||[])
+  ];
+  const map={};
+  all.forEach(f=>{map[`${f.d.getFullYear()}-${f.d.getMonth()}-${f.d.getDate()}`]=f.n;});
+  _ftCache[k]=map; return map;
+}
+function getFeiertageName(date, bl) {
+  if (!bl) return null;
+  const m=getFeiertage(date.getFullYear(),bl);
+  return m[`${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`]||null;
+}
+
+// ── DEFAULT FAHRSTUNDENARTEN ──
+const DEFAULT_ARTEN = [
+  {id:'normal',label:'Normal',color:'#4a90d9'},
+  {id:'ueberlandfahrt',label:'Überlandfahrt',color:'#e07b30'},
+  {id:'autobahnfahrt',label:'Autobahnfahrt',color:'#9b59b6'},
+  {id:'nachtfahrt',label:'Nachtfahrt',color:'#2d6a8a'},
+];
+
+async function loadTypes() {
+  try {
+    const snap = await getDoc(doc(db,'settings','fahrstundenarten'));
+    fahrstundenarten = (snap.exists()&&snap.data().arten?.length) ? snap.data().arten : DEFAULT_ARTEN;
+  } catch(e) { fahrstundenarten = DEFAULT_ARTEN; }
+  injectTypeBadgeStyles();
+}
+function injectTypeBadgeStyles() {
+  let old=document.getElementById('dts'); if(old)old.remove();
+  const s=document.createElement('style'); s.id='dts';
+  s.textContent=fahrstundenarten.map(t=>{const h=t.color,r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);
+    return `.slot-${t.id}{background:rgba(${r},${g},${b},0.22);color:${h};filter:brightness(1.4);}.badge-${t.id}{background:rgba(${r},${g},${b},0.18);color:${h};filter:brightness(1.4);}`;
+  }).join('');
+  document.head.appendChild(s);
+}
+function typeLabel(id){const t=fahrstundenarten.find(a=>a.id===id);return t?t.label:id;}
+function typeColor(id){const t=fahrstundenarten.find(a=>a.id===id);return t?t.color:'#888';}
+function typeBadgeHtml(id){const l=typeLabel(id),c=typeColor(id),r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16);
+  return `<span class="badge" style="background:rgba(${r},${g},${b},0.18);color:${c};filter:brightness(1.4)">${l}</span>`;}
+
+// ── UTILS ──
+function toast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className='show '+type;setTimeout(()=>t.className='',3000);}
+function openModal(html){document.getElementById('modal-inner').innerHTML=html;document.getElementById('modal-overlay').classList.add('open');}
+function closeModal(){document.getElementById('modal-overlay').classList.remove('open');}
+function closeModalOutside(e){if(e.target===document.getElementById('modal-overlay'))closeModal();}
+window.closeModal=closeModal; window.closeModalOutside=closeModalOutside;
+function fmt(ts){if(!ts)return'—';const d=ts.toDate?ts.toDate():new Date(ts);return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});}
+function fmtTime(ts){if(!ts)return'—';const d=ts.toDate?ts.toDate():new Date(ts);return d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});}
+function fmtDatetime(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});}
+function escHtml(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function generateCode(){return Math.random().toString(36).substring(2,8).toUpperCase();}
+function show(screen){
+  document.getElementById('auth-screen').style.display=screen==='auth'?'flex':'none';
+  document.getElementById('app').style.display=screen==='app'?'flex':'none';
+  document.getElementById('booking-screen').style.display=screen==='booking'?'flex':'none';
+}
+
+// ── POPULATE BUNDESLAND SELECT ON PAGE LOAD ──
+document.addEventListener('DOMContentLoaded',()=>{
+  const sel=document.getElementById('reg-bl');
+  if(sel)Object.entries(BUNDESLAENDER).forEach(([k,v])=>{const o=document.createElement('option');o.value=k;o.textContent=v;sel.appendChild(o);});
+});
+
+// ── AUTH ──
+window.switchAuthTab=function(tab){
+  document.querySelectorAll('.auth-tab').forEach((b,i)=>b.classList.toggle('active',['login','register'][i]===tab));
+  document.getElementById('login-form').style.display=tab==='login'?'':'none';
+  document.getElementById('register-form').style.display=tab==='register'?'':'none';
+};
+window.doLogin=async function(){
+  const email=document.getElementById('login-email').value.trim();
+  const pw=document.getElementById('login-pw').value;
+  try{await signInWithEmailAndPassword(auth,email,pw);}
+  catch(e){toast('Anmeldung fehlgeschlagen: '+e.message,'error');}
+};
+window.doRegisterAdmin=async function(){
+  const schoolName=document.getElementById('reg-school').value.trim();
+  const bl=document.getElementById('reg-bl').value;
+  const fname=document.getElementById('reg-fname').value.trim();
+  const lname=document.getElementById('reg-lname').value.trim();
+  const email=document.getElementById('reg-email').value.trim();
+  const pw=document.getElementById('reg-pw').value;
+  if(!schoolName||!bl||!fname||!lname||!email||!pw)return toast('Bitte alle Felder ausfüllen.','error');
+  try{
+    const cred=await createUserWithEmailAndPassword(auth,email,pw);
+    const schoolRef=await addDoc(collection(db,'schools'),{name:schoolName,bundesland:bl,adminUid:cred.user.uid,createdAt:serverTimestamp()});
+    await setDoc(doc(db,'kalenderUsers',cred.user.uid),{uid:cred.user.uid,email,fname,lname,role:'admin',approved:true,schoolId:schoolRef.id,createdAt:serverTimestamp()});
+    toast('Fahrschule registriert!','success');
+  }catch(e){toast('Fehler: '+e.message,'error');}
+};
+window.doLogout=async function(){
+  currentUser=null;currentRole=null;currentProfile=null;currentSchoolId=null;currentSchool=null;
+  calDate=new Date();calView='month';weekStart=null;
+  await signOut(auth);
+};
+
+// ── AUTH STATE ──
+onAuthStateChanged(auth,async user=>{
+  const params=new URLSearchParams(window.location.search);
+  if(params.get('schueler')&&params.get('lehrer')){showBookingPage(params.get('schueler'),params.get('lehrer'));return;}
+  if(!user){show('auth');return;}
+  currentUser=user;
+  await loadTypes();
+  const snap=await getDoc(doc(db,'kalenderUsers',user.uid));
+  if(user.email===SUPER_ADMIN_EMAIL){
+    if(!snap.exists()){
+      await setDoc(doc(db,'kalenderUsers',user.uid),{uid:user.uid,email:user.email,fname:'Super',lname:'Admin',role:'superadmin',approved:true,createdAt:serverTimestamp()});
+      currentProfile={fname:'Super',lname:'Admin',role:'superadmin'};
+    }else{currentProfile=snap.data();}
+    currentRole='superadmin';
+  }else{
+    // ── ZUGANGSSPERRE (Schritt 3): Freigeschaltete Fahrschulen/Fahrlehrer dürfen rein. ──
+    // Geprüft wird über die ADK-Daten: Wer ist der Nutzer (users-Doc) und hat seine
+    // Fahrschule das Kalender-Modul gebucht (fahrschulen.kalenderAktiv === true)?
+    let adkUser = null;
+    try {
+      const adkSnap = await getDoc(doc(db,'users',user.uid));
+      if (adkSnap.exists()) adkUser = adkSnap.data();
+    } catch(e) { console.error('ADK-User laden:', e); }
+
+    if (!adkUser) {
+      toast('🔒 Kein Zugriff – kein Konto gefunden.','error');
+      await signOut(auth); return;
+    }
+
+    // Welche Fahrschule? Bei Inhaber = eigene uid, bei Fahrlehrer = fahrschuleId
+    const fahrschuleId = adkUser.fahrschuleId || user.uid;
+    let fahrschule = null;
+    try {
+      const fsSnap = await getDoc(doc(db,'fahrschulen',fahrschuleId));
+      if (fsSnap.exists()) fahrschule = fsSnap.data();
+    } catch(e) { console.error('Fahrschule laden:', e); }
+
+    // Ist das Kalender-Modul freigeschaltet? Zwei Wege:
+    //   (A) Die FAHRSCHULE ist freigeschaltet → alle ihre Fahrlehrer dürfen rein
+    //   (B) Der Fahrlehrer wurde EINZELN freigeschaltet (users.kalenderAktiv)
+    //       → für eigenständige Fahrlehrer ohne Fahrschule
+    const fahrschuleFrei = fahrschule && fahrschule.kalenderAktiv === true;
+    const einzelFrei     = adkUser.kalenderAktiv === true;
+    if (!fahrschuleFrei && !einzelFrei) {
+      toast('🔒 Kein Zugriff – das Kalender-Modul ist für dich nicht freigeschaltet.','error');
+      await signOut(auth); return;
+    }
+
+    // Freigeschaltet! ADK-Rolle → Kalender-Rolle zuordnen
+    const istInhaber = adkUser.rolle === 'fahrschul-admin' || adkUser.rolle === 'fs_admin';
+    currentRole = istInhaber ? 'admin' : 'lehrer';
+    currentSchoolId = fahrschuleId;
+
+    // Namen aus ADK übernehmen (fname/lname für die Kalender-Oberfläche)
+    const namensteile = (adkUser.name || user.email).split(' ');
+    const fname = namensteile[0] || 'Fahrlehrer';
+    const lname = namensteile.slice(1).join(' ') || '';
+
+    // kalenderUsers-Doc anlegen/aktualisieren (damit der Kalender intern damit arbeiten kann)
+    if (!snap.exists()) {
+      await setDoc(doc(db,'kalenderUsers',user.uid),{
+        uid:user.uid, email:user.email, fname, lname,
+        role:currentRole, approved:true, schoolId:fahrschuleId,
+        createdAt:serverTimestamp()
+      });
+      currentProfile={fname, lname, role:currentRole, schoolId:fahrschuleId};
+    } else {
+      currentProfile=snap.data();
+      // Rolle/Schule aktuell halten, falls sich im Admin was geändert hat
+      currentProfile.role = currentRole;
+      currentProfile.schoolId = fahrschuleId;
+    }
+
+    // Kalender-eigenes School-Objekt laden (für Topbar-Anzeige), falls vorhanden
+    try {
+      const ss=await getDoc(doc(db,'schools',fahrschuleId));
+      currentSchool=ss.exists()?{id:ss.id,...ss.data()}:{id:fahrschuleId,name:fahrschule.name||'Meine Fahrschule'};
+    } catch(e) { currentSchool={id:fahrschuleId,name:fahrschule.name||'Meine Fahrschule'}; }
+  }
+  const roleLabels={'superadmin':'Super-Admin','admin':'Admin','lehrer':'Fahrlehrer'};
+  document.getElementById('topbar-role').textContent=roleLabels[currentRole]||currentRole;
+  document.getElementById('topbar-user').textContent=currentProfile.fname+' '+currentProfile.lname;
+  if(currentSchool){
+    document.getElementById('topbar-school').style.display='';
+    document.getElementById('topbar-school-name').textContent=currentSchool.name;
+  }
+  show('app');buildSidebar();
+  navigate(currentRole==='superadmin'?'sa-dashboard':currentRole==='admin'?'admin-dashboard':'lehrer-kalender');
+});
+
+// ── NAVIGATION ──
+function buildSidebar(){
+  const nav=document.getElementById('sidebar');
+  const saNav=[
+    {id:'sa-dashboard',icon:'📊',label:'Übersicht'},
+    {id:'sa-fahrschulen',icon:'🏫',label:'Fahrschulen'},
+  ];
+  const adminNav=[
+    {id:'admin-dashboard',icon:'📊',label:'Übersicht'},
+    {id:'admin-auslastung',icon:'📈',label:'Auslastung'},
+    {id:'admin-lehrer',icon:'👨‍🏫',label:'Fahrlehrer'},
+    {id:'admin-schueler',icon:'🧑‍🎓',label:'Fahrschüler'},
+    {id:'admin-pruefungen',icon:'🎓',label:'Prüfungen'},
+    {id:'admin-fuhrpark',icon:'🚗',label:'Fuhrpark'},
+    {id:'admin-urlaub',icon:'🏖️',label:'Urlaub'},
+    {id:'admin-sperrtage',icon:'🚫',label:'Sperrtage'},
+    {id:'admin-schule',icon:'🏫',label:'Fahrschule'},
+    {id:'admin-einstellungen',icon:'⚙️',label:'Einstellungen'},
+  ];
+  const lehrerNav=[
+    {id:'lehrer-kalender',icon:'📅',label:'Kalender'},
+    {id:'lehrer-slots',icon:'⏱️',label:'Zeitslots'},
+    {id:'lehrer-buchungen',icon:'📋',label:'Buchungen'},
+    {id:'lehrer-schueler',icon:'🧑‍🎓',label:'Meine Schüler'},
+    {id:'lehrer-pruefungen',icon:'🎓',label:'Prüfungen'},
+    {id:'lehrer-urlaub',icon:'🏖️',label:'Urlaub'},
+    {id:'lehrer-warteliste',icon:'⏳',label:'Warteliste'},
+    {id:'lehrer-profil',icon:'⚙️',label:'Einstellungen'},
+  ];
+  const items=currentRole==='superadmin'?saNav:currentRole==='admin'?adminNav:lehrerNav;
+  nav.innerHTML=items.map(i=>`<button class="nav-item" id="nav-${i.id}" onclick="navigate('${i.id}')"><span class="nav-icon">${i.icon}</span>${i.label}</button>`).join('');
+}
+window.navigate=function(page){
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const btn=document.getElementById('nav-'+page);if(btn)btn.classList.add('active');
+  const main=document.getElementById('main-content');
+  if(pages[page])pages[page](main);else main.innerHTML='';
+  setTimeout(injectTableLabels,300);
+};
+const pages={};
+
+// ════════════════════════════════
+// SUPER ADMIN PAGES
+// ════════════════════════════════
+pages['sa-dashboard']=async function(el){
+  el.innerHTML=`<div class="page active"><h1 class="page-title">Super-Admin Übersicht</h1>
+  <div id="sa-stats" class="grid-3" style="margin-bottom:20px"></div>
+  <div class="card"><div class="card-title">Alle Fahrschulen</div><div id="sa-list"><div class="spinner"></div></div></div></div>`;
+  const [schoolsSnap,usersSnap]=await Promise.all([getDocs(collection(db,'schools')),getDocs(collection(db,'kalenderUsers'))]);
+  const adminCount=usersSnap.docs.filter(d=>d.data().role==='admin').length;
+  const lehrerCount=usersSnap.docs.filter(d=>d.data().role==='lehrer').length;
+  document.getElementById('sa-stats').innerHTML=[
+    {label:'Fahrschulen',val:schoolsSnap.size,color:'var(--accent)'},
+    {label:'Admins',val:adminCount,color:'var(--text)'},
+    {label:'Fahrlehrer',val:lehrerCount,color:'var(--success)'},
+  ].map(s=>`<div class="stat-card"><div class="stat-label">${s.label}</div><div class="stat-val" style="color:${s.color}">${s.val}</div></div>`).join('');
+  const sl=document.getElementById('sa-list');
+  if(schoolsSnap.empty){sl.innerHTML='<p class="text-muted">Noch keine Fahrschulen.</p>';return;}
+  sl.innerHTML=schoolsSnap.docs.map(d=>{
+    const s=d.data();
+    const lehrerInSchool=usersSnap.docs.filter(u=>u.data().schoolId===d.id&&u.data().role==='lehrer').length;
+    return `<div class="sa-school-card">
+      <div style="font-size:28px">🏫</div>
+      <div style="flex:1">
+        <div class="sa-school-name">${s.name}</div>
+        <div class="sa-school-meta">${BUNDESLAENDER[s.bundesland]||s.bundesland} · ${lehrerInSchool} Fahrlehrer</div>
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="deleteSchool('${d.id}','${s.name}')">Löschen</button>
+    </div>`;
+  }).join('');
+};
+pages['sa-fahrschulen']=async function(el){
+  el.innerHTML=`<div class="page active"><h1 class="page-title">Fahrschulen</h1>
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">Neue Fahrschule anlegen</div>
+    <div class="grid-2">
+      <div class="field"><label>Name</label><input id="sa-school-name" type="text" placeholder="Fahrschule Mustermann"></div>
+      <div class="field"><label>Bundesland</label><select id="sa-school-bl"><option value="">— Wählen —</option>${Object.entries(BUNDESLAENDER).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></div>
+    </div>
+    <div class="grid-2">
+      <div class="field"><label>Admin Vorname</label><input id="sa-admin-fname" type="text"></div>
+      <div class="field"><label>Admin Nachname</label><input id="sa-admin-lname" type="text"></div>
+    </div>
+    <div class="grid-2">
+      <div class="field"><label>Admin E-Mail</label><input id="sa-admin-email" type="email"></div>
+      <div class="field"><label>Admin Passwort</label><input id="sa-admin-pw" type="password" placeholder="Mindestens 6 Zeichen"></div>
+    </div>
+    <button class="btn btn-primary" onclick="saCreateSchool()">+ Fahrschule anlegen</button>
+  </div>
+  <div class="card"><div class="card-title">Alle Fahrschulen</div><div id="sa-school-list"><div class="spinner"></div></div></div></div>`;
+  await renderSASchoolList();
+};
+async function renderSASchoolList(){
+  const el=document.getElementById('sa-school-list');if(!el)return;
+  const [schoolsSnap,usersSnap]=await Promise.all([getDocs(query(collection(db,'schools'),orderBy('createdAt'))),getDocs(collection(db,'kalenderUsers'))]);
+  if(schoolsSnap.empty){el.innerHTML='<p class="text-muted">Noch keine Fahrschulen.</p>';return;}
+  el.innerHTML='<table><thead><tr><th>Fahrschule</th><th>Bundesland</th><th>Lehrer</th><th>Admin E-Mail</th><th></th></tr></thead><tbody>'+
+    schoolsSnap.docs.map(d=>{
+      const s=d.data();
+      const admin=usersSnap.docs.find(u=>u.data().uid===s.adminUid);
+      const lehrerCount=usersSnap.docs.filter(u=>u.data().schoolId===d.id&&u.data().role==='lehrer').length;
+      return `<tr>
+        <td>${s.name}</td><td>${BUNDESLAENDER[s.bundesland]||s.bundesland}</td>
+        <td>${lehrerCount}</td><td>${admin?.data().email||'—'}</td>
+        <td><button class="btn btn-danger btn-sm" onclick="deleteSchool('${d.id}','${s.name}')">Löschen</button></td>
+      </tr>`;
+    }).join('')+'</tbody></table>';
+}
+window.saCreateSchool=async function(){
+  const name=document.getElementById('sa-school-name').value.trim();
+  const bl=document.getElementById('sa-school-bl').value;
+  const fname=document.getElementById('sa-admin-fname').value.trim();
+  const lname=document.getElementById('sa-admin-lname').value.trim();
+  const email=document.getElementById('sa-admin-email').value.trim();
+  const pw=document.getElementById('sa-admin-pw').value;
+  if(!name||!bl||!fname||!lname||!email||!pw)return toast('Bitte alle Felder ausfüllen.','error');
+  try{
+    // Speichere Super-Admin Credentials vor dem Wechsel
+    const saEmail=currentUser.email;
+    const cred=await createUserWithEmailAndPassword(auth,email,pw);
+    const schoolRef=await addDoc(collection(db,'schools'),{name,bundesland:bl,adminUid:cred.user.uid,createdAt:serverTimestamp()});
+    await setDoc(doc(db,'kalenderUsers',cred.user.uid),{uid:cred.user.uid,email,fname,lname,role:'admin',approved:true,schoolId:schoolRef.id,createdAt:serverTimestamp()});
+    // Zeige Passwort-Modal für Re-Login
+    openModal(`<h2 class="modal-title">Super-Admin bestätigen</h2>
+      <p class="text-muted" style="margin-bottom:14px">Bitte Super-Admin Passwort eingeben um fortzufahren.</p>
+      <div class="field"><label>Passwort</label><input id="sa-relogin-pw" type="password" placeholder="Dein Passwort"></div>
+      <button class="btn btn-primary btn-full" onclick="saReLogin('${saEmail}')">Bestätigen</button>`);
+    setTimeout(()=>document.getElementById('sa-relogin-pw')?.focus(),100);
+  }catch(e){toast('Fehler: '+e.message,'error');}
+};
+window.saReLogin=async function(saEmail){
+  const pw=document.getElementById('sa-relogin-pw')?.value;
+  if(!pw)return toast('Passwort eingeben.','error');
+  try{
+    await signInWithEmailAndPassword(auth,saEmail,pw);
+    closeModal();
+    toast('Fahrschule angelegt!','success');
+    await renderSASchoolList();
+  }catch(e){toast('Falsches Passwort.','error');}
+};
+window.deleteSchool=async function(schoolId,name){
+  if(!confirm(`Fahrschule "${name}" wirklich löschen?\n\nALLE Daten (Lehrer, Schüler, Slots, Buchungen) werden unwiderruflich gelöscht!`))return;
+  toast('Wird gelöscht…','');
+  // Alle schoolId-gebundenen Daten löschen
+  const collections=['kalenderUsers','schueler','slots','autos','blocked','globalBlocked','urlaub','notizen','warteliste','pruefungen','mailQueue'];
+  for(const col of collections){
+    try{
+      const snap=await getDocs(query(collection(db,col),where('schoolId','==',schoolId)));
+      for(const d of snap.docs)await deleteDoc(doc(db,col,d.id));
+    }catch(e){ /* Collection may not have schoolId index yet */ }
+  }
+  // Users haben schoolId
+  try{
+    const uSnap=await getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',schoolId)));
+    for(const d of uSnap.docs)await deleteDoc(doc(db,'kalenderUsers',d.id));
+  }catch(e){}
+  await deleteDoc(doc(db,'schools',schoolId));
+  toast('Fahrschule gelöscht.','success');
+  navigate('sa-fahrschulen');
+};
+
+// ════════════════════════════════
+// ADMIN – DASHBOARD
+// ════════════════════════════════
+pages['admin-dashboard']=async function(el){
+  el.innerHTML=`<div class="page active"><h1 class="page-title">Übersicht</h1>
+  <div class="grid-2" style="margin-bottom:16px">
+    <div class="stat-card"><div class="stat-label">Fahrlehrer</div><div class="stat-val" id="stat-lehrer"><div class="spinner"></div></div></div>
+    <div class="stat-card"><div class="stat-label">Fahrschüler</div><div class="stat-val" id="stat-schueler"><div class="spinner"></div></div></div>
+  </div>
+  <div class="card"><div class="card-title">Ausstehende Freischaltungen</div><div id="pending-list"></div></div></div>`;
+  const [lSnap,sSnap,pSnap]=await Promise.all([
+    getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId),where('role','==','lehrer'),where('approved','==',true))),
+    getDocs(query(collection(db,'schueler'),where('schoolId','==',currentSchoolId))),
+    getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId),where('role','==','lehrer'),where('approved','==',false))),
+  ]);
+  document.getElementById('stat-lehrer').textContent=lSnap.size;
+  document.getElementById('stat-schueler').textContent=sSnap.size;
+  const pl=document.getElementById('pending-list');
+  if(pSnap.empty){pl.innerHTML='<p class="text-muted">Keine ausstehenden Anfragen.</p>';return;}
+  pl.innerHTML='<table><thead><tr><th>Name</th><th>E-Mail</th><th></th></tr></thead><tbody>'+
+    pSnap.docs.map(d=>{const u=d.data();return`<tr><td>${u.fname} ${u.lname}</td><td>${u.email}</td><td><button class="btn btn-success btn-sm" onclick="approveLehrer('${d.id}')">Freischalten</button></td></tr>`;}).join('')+'</tbody></table>';
+};
+window.approveLehrer=async function(uid){
+  await updateDoc(doc(db,'kalenderUsers',uid),{approved:true});
+  toast('Freigeschaltet!','success');
+  pages['admin-dashboard'](document.getElementById('main-content'));
+};
+
+// ════════════════════════════════
+// ADMIN – LEHRER
+// ════════════════════════════════
+pages['admin-lehrer']=async function(el){
+  el.innerHTML=`<div class="page active"><h1 class="page-title">Fahrlehrer</h1>
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">Neuen Fahrlehrer anlegen</div>
+    <div class="grid-2">
+      <div class="field"><label>Vorname</label><input id="nl-fname" type="text"></div>
+      <div class="field"><label>Nachname</label><input id="nl-lname" type="text"></div>
+    </div>
+    <div class="grid-2">
+      <div class="field"><label>E-Mail</label><input id="nl-email" type="email"></div>
+      <div class="field"><label>Passwort</label><input id="nl-pw" type="password" placeholder="Mindestens 6 Zeichen"></div>
+    </div>
+    <button class="btn btn-primary" onclick="createLehrer()">+ Fahrlehrer anlegen</button>
+  </div>
+  <div class="card"><div class="card-title">Alle Fahrlehrer</div><div id="lehrer-list"><div class="spinner"></div></div></div></div>`;
+  await renderLehrerList();
+};
+async function renderLehrerList(){
+  const el=document.getElementById('lehrer-list');if(!el)return;
+  const snap=await getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId),where('role','==','lehrer'),where('approved','==',true)));
+  if(snap.empty){el.innerHTML='<p class="text-muted">Noch keine Fahrlehrer.</p>';return;}
+  el.innerHTML='<table><thead><tr><th>Name</th><th>E-Mail</th><th>Blockdauer</th><th>Kalender</th><th>Schüler</th><th></th></tr></thead><tbody>'+
+    snap.docs.map(d=>{const u=d.data();const bd=u.blockDauer||60;
+      return`<tr><td>${u.fname} ${u.lname}</td><td>${u.email}</td>
+        <td><select onchange="setLehrerBlockDauer('${d.id}',this.value)" style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:3px 7px;font-size:12px">
+          ${[45,50,60,75,80,90,100,120].map(m=>`<option value="${m}" ${bd===m?'selected':''}>${m} Min</option>`).join('')}
+        </select></td>
+        <td><button class="btn btn-primary btn-sm" onclick="viewLehrerKalender('${d.id}','${u.fname} ${u.lname}')">📅</button></td>
+        <td><button class="btn btn-secondary btn-sm" onclick="viewLehrerSchueler('${d.id}','${u.fname} ${u.lname}')">Schüler</button></td>
+        <td><button class="btn btn-danger btn-sm" onclick="deleteLehrer('${d.id}','${u.fname} ${u.lname}')">Löschen</button></td>
+      </tr>`;}).join('')+'</tbody></table>';
+}
+window.createLehrer=async function(){
+  const fname=document.getElementById('nl-fname').value.trim();
+  const lname=document.getElementById('nl-lname').value.trim();
+  const email=document.getElementById('nl-email').value.trim();
+  const pw=document.getElementById('nl-pw').value;
+  if(!fname||!lname||!email||!pw)return toast('Bitte alle Felder ausfüllen.','error');
+  try{
+    const adminEmail=currentUser.email;
+    const cred=await createUserWithEmailAndPassword(auth,email,pw);
+    await setDoc(doc(db,'kalenderUsers',cred.user.uid),{uid:cred.user.uid,email,fname,lname,role:'lehrer',approved:true,schoolId:currentSchoolId,createdAt:serverTimestamp()});
+    // Modal für Re-Login
+    openModal(`<h2 class="modal-title">Admin bestätigen</h2>
+      <p class="text-muted" style="margin-bottom:14px">Bitte Admin-Passwort eingeben um fortzufahren.</p>
+      <div class="field"><label>Passwort</label><input id="admin-relogin-pw" type="password" placeholder="Dein Passwort"></div>
+      <button class="btn btn-primary btn-full" onclick="adminReLogin('${adminEmail}')">Bestätigen</button>`);
+    setTimeout(()=>document.getElementById('admin-relogin-pw')?.focus(),100);
+  }catch(e){toast('Fehler: '+e.message,'error');}
+};
+window.adminReLogin=async function(adminEmail){
+  const pw=document.getElementById('admin-relogin-pw')?.value;
+  if(!pw)return toast('Passwort eingeben.','error');
+  try{
+    await signInWithEmailAndPassword(auth,adminEmail,pw);
+    closeModal();
+    toast('Fahrlehrer angelegt!','success');
+    await renderLehrerList();
+  }catch(e){toast('Falsches Passwort.','error');}
+};
+window.deleteLehrer=async function(uid,name){
+  if(!confirm(`Fahrlehrer "${name}" wirklich löschen?`))return;
+  await updateDoc(doc(db,'kalenderUsers',uid),{approved:false});
+  toast('Fahrlehrer deaktiviert.','success');
+  await renderLehrerList();
+};
+window.setLehrerBlockDauer=async function(uid,min){
+  await updateDoc(doc(db,'kalenderUsers',uid),{blockDauer:parseInt(min)});
+  toast(`Blockdauer: ${min} Min gesetzt.`,'success');
+};
+window.viewLehrerSchueler=async function(lehrerUid,lehrerName){
+  const snap=await getDocs(query(collection(db,'schueler'),where('lehrerUid','==',lehrerUid),where('schoolId','==',currentSchoolId)));
+  const rows=snap.docs.map(d=>{const s=d.data();return`<tr><td>${s.fname} ${s.lname}</td><td>${s.email||'—'}</td><td><button class="btn btn-danger btn-sm" onclick="unassignSchueler('${d.id}')">Entfernen</button></td></tr>`;}).join('');
+  openModal(`<h2 class="modal-title">Schüler: ${lehrerName}</h2>${rows?`<table><thead><tr><th>Name</th><th>E-Mail</th><th></th></tr></thead><tbody>${rows}</tbody></table>`:'<p class="text-muted">Keine Schüler.</p>'}`);
+};
+window.unassignSchueler=async function(id){await updateDoc(doc(db,'schueler',id),{lehrerUid:null});toast('Entfernt.','success');closeModal();};
+
+// ════════════════════════════════
+// ADMIN – SCHÜLER
+// ════════════════════════════════
+pages['admin-schueler']=async function(el){
+  el.innerHTML=`<div class="page active"><h1 class="page-title">Fahrschüler</h1>
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title">Neuen Schüler anlegen</div>
+    <div class="grid-2"><div class="field"><label>Vorname</label><input id="ns-fname" type="text"></div><div class="field"><label>Nachname</label><input id="ns-lname" type="text"></div></div>
+    <div class="grid-2"><div class="field"><label>E-Mail (optional)</label><input id="ns-email" type="email"></div><div class="field"><label>Telefon (optional)</label><input id="ns-tel" type="text"></div></div>
+    <div class="grid-2">
+      <div class="field"><label>Fahrlehrer</label><select id="ns-lehrer"><option value="">— Keiner —</option></select></div>
+      <div class="field"><label>Max. Fahrstunden (0=∞)</label><input id="ns-max" type="number" min="0" value="0"></div>
+    </div>
+    <div class="field"><label>Max. gleichzeitig gebuchte Termine (0=∞)</label><input id="ns-maxaktiv" type="number" min="0" value="0"></div>
+    <button class="btn btn-primary" onclick="createSchueler()">+ Schüler anlegen</button>
+  </div>
+  <div class="card"><div class="card-title">Alle Schüler</div><div id="schueler-list"><div class="spinner"></div></div></div></div>`;
+  const lSnap=await getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId),where('role','==','lehrer'),where('approved','==',true)));
+  const sel=document.getElementById('ns-lehrer');
+  lSnap.docs.forEach(d=>{const u=d.data();sel.innerHTML+=`<option value="${d.id}">${u.fname} ${u.lname}</option>`;});
+  await loadSchuelerList(lSnap.docs);
+};
+async function loadSchuelerList(lehrerDocs){
+  const el=document.getElementById('schueler-list');if(!el)return;
+  const [snap,autosSnap]=await Promise.all([getDocs(query(collection(db,'schueler'),where('schoolId','==',currentSchoolId))),getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId)))]);
+  if(snap.empty){el.innerHTML='<p class="text-muted">Noch keine Schüler.</p>';return;}
+  const lm={};(lehrerDocs||[]).forEach(d=>{const u=d.data();lm[d.id]=u.fname+' '+u.lname;});
+  const am={};autosSnap.docs.forEach(d=>{const a=d.data();am[d.id]=a;});
+  el.innerHTML='<table><thead><tr><th>Name</th><th>Fahrlehrer</th><th>Kontingent</th><th>Auto</th><th>Link</th><th></th></tr></thead><tbody>'+
+    snap.docs.map(d=>{
+      const s=d.data();
+      const link=`${location.origin}${location.pathname}?schueler=${d.id}&lehrer=${s.lehrerUid||''}`;
+      const k=s.maxFahrstunden>0?`${s.bookedCount||0}/${s.maxFahrstunden}`:`${s.bookedCount||0}/∞`;
+      const w=s.maxFahrstunden>0&&(s.bookedCount||0)>=s.maxFahrstunden;
+      const autoStr=s.autoId&&am[s.autoId]?`<span class="auto-kennzeichen" style="font-size:10px">${am[s.autoId].kennzeichen}</span>`:'—';
+      return`<tr><td>${s.fname} ${s.lname}</td><td>${s.lehrerUid?(lm[s.lehrerUid]||'?'):'—'}</td>
+        <td style="color:${w?'var(--danger)':'inherit'}">${k}${w?' ⚠️':''}</td>
+        <td>${autoStr}</td>
+        <td>${s.lehrerUid?`<button class="copy-btn" onclick="copyLink('${link}')">🔗</button>`:'—'}</td>
+        <td><button class="btn btn-secondary btn-sm" onclick="editSchueler('${d.id}')">Bearb.</button> <button class="btn btn-danger btn-sm" onclick="deleteSchueler('${d.id}')">Löschen</button></td>
+      </tr>`;}).join('')+'</tbody></table>';
+}
+window.copyLink=function(link){navigator.clipboard.writeText(link);toast('Link kopiert!','success');};
+window.createSchueler=async function(){
+  const fname=document.getElementById('ns-fname').value.trim(),lname=document.getElementById('ns-lname').value.trim();
+  const email=document.getElementById('ns-email').value.trim(),tel=document.getElementById('ns-tel').value.trim();
+  const lehrerUid=document.getElementById('ns-lehrer').value;
+  const maxFahrstunden=parseInt(document.getElementById('ns-max').value)||0;
+  const maxAktiveTermine=parseInt(document.getElementById('ns-maxaktiv').value)||0;
+  if(!fname||!lname)return toast('Vor- und Nachname erforderlich.','error');
+  await addDoc(collection(db,'schueler'),{fname,lname,email,tel,lehrerUid:lehrerUid||null,maxFahrstunden,maxAktiveTermine,bookedCount:0,schoolId:currentSchoolId,createdAt:serverTimestamp()});
+  toast('Schüler angelegt!','success');
+  pages['admin-schueler'](document.getElementById('main-content'));
+};
+window.deleteSchueler=async function(id){if(!confirm('Schüler löschen?'))return;await deleteDoc(doc(db,'schueler',id));toast('Gelöscht.','success');pages['admin-schueler'](document.getElementById('main-content'));};
+window.editSchueler=async function(id){
+  const snap=await getDoc(doc(db,'schueler',id));const s=snap.data();
+  const lSnap=await getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId),where('role','==','lehrer'),where('approved','==',true)));
+  const opts=lSnap.docs.map(d=>{const u=d.data();return`<option value="${d.id}" ${s.lehrerUid===d.id?'selected':''}>${u.fname} ${u.lname}</option>`;}).join('');
+  openModal(`<h2 class="modal-title">Schüler bearbeiten</h2>
+    <div class="field"><label>Vorname</label><input id="es-fname" value="${s.fname}"></div>
+    <div class="field"><label>Nachname</label><input id="es-lname" value="${s.lname}"></div>
+    <div class="field"><label>E-Mail</label><input id="es-email" value="${s.email||''}"></div>
+    <div class="field"><label>Telefon</label><input id="es-tel" value="${s.tel||''}"></div>
+    <div class="field"><label>Fahrlehrer</label><select id="es-lehrer"><option value="">— Keiner —</option>${opts}</select></div>
+    <div class="grid-2">
+      <div class="field"><label>Max. Fahrstunden</label><input id="es-max" type="number" min="0" value="${s.maxFahrstunden||0}"></div>
+      <div class="field"><label>Max. akt. Termine</label><input id="es-maxaktiv" type="number" min="0" value="${s.maxAktiveTermine||0}"></div>
+    </div>
+    <p class="text-muted" style="margin-bottom:12px">Bereits gebucht: <strong>${s.bookedCount||0}</strong></p>
+    <button class="btn btn-primary" onclick="saveSchueler('${id}')">Speichern</button>`);
+};
+window.saveSchueler=async function(id){
+  await updateDoc(doc(db,'schueler',id),{
+    fname:document.getElementById('es-fname').value.trim(),lname:document.getElementById('es-lname').value.trim(),
+    email:document.getElementById('es-email').value.trim(),tel:document.getElementById('es-tel').value.trim(),
+    lehrerUid:document.getElementById('es-lehrer').value||null,
+    maxFahrstunden:parseInt(document.getElementById('es-max').value)||0,
+    maxAktiveTermine:parseInt(document.getElementById('es-maxaktiv').value)||0,
+  });
+  toast('Gespeichert!','success');closeModal();pages['admin-schueler'](document.getElementById('main-content'));
+};
+
+// ════════════════════════════════
+// ADMIN – SCHULE EINSTELLUNGEN
+// ════════════════════════════════
+pages['admin-schule']=async function(el){
+  const school=currentSchool||{};
+  el.innerHTML=`<div class="page active"><h1 class="page-title">Fahrschule</h1>
+  <div class="card">
+    <div class="card-title">Stammdaten</div>
+    <div class="field"><label>Name</label><input id="sc-name" value="${school.name||''}"></div>
+    <div class="field"><label>Bundesland</label>
+      <select id="sc-bl">${Object.entries(BUNDESLAENDER).map(([k,v])=>`<option value="${k}" ${school.bundesland===k?'selected':''}>${v}</option>`).join('')}</select>
+    </div>
+    <button class="btn btn-primary" onclick="saveSchule()">Speichern</button>
+  </div></div>`;
+};
+window.saveSchule=async function(){
+  const name=document.getElementById('sc-name').value.trim();
+  const bl=document.getElementById('sc-bl').value;
+  if(!name||!bl)return toast('Bitte alle Felder ausfüllen.','error');
+  await updateDoc(doc(db,'schools',currentSchoolId),{name,bundesland:bl});
+  currentSchool={...currentSchool,name,bundesland:bl};
+  Object.keys(_ftCache).forEach(k=>delete _ftCache[k]);
+  document.getElementById('topbar-school-name').textContent=name;
+  toast('Gespeichert!','success');
+};
+
+// ════════════════════════════════
+// ADMIN – AUSLASTUNG
+// ════════════════════════════════
+pages['admin-auslastung']=async function(el){
+  el.innerHTML=`<div class="page active"><h1 class="page-title">Auslastung</h1>
+  <div class="card" style="margin-bottom:14px">
+    <div class="grid-2">
+      <div class="field"><label>Von</label><input type="date" id="aus-von"></div>
+      <div class="field"><label>Bis</label><input type="date" id="aus-bis"></div>
+    </div>
+    <button class="btn btn-primary" onclick="loadAuslastung()">Auswerten</button>
+  </div><div id="auslastung-content"></div></div>`;
+  const now=new Date();
+  document.getElementById('aus-von').value=new Date(now.getFullYear(),now.getMonth(),1).toISOString().slice(0,10);
+  document.getElementById('aus-bis').value=new Date(now.getFullYear(),now.getMonth()+1,0).toISOString().slice(0,10);
+  await loadAuslastung();
+};
+window.loadAuslastung=async function(){
+  const von=document.getElementById('aus-von').value,bis=document.getElementById('aus-bis').value;
+  if(!von||!bis)return;
+  const el=document.getElementById('auslastung-content');el.innerHTML='<div class="spinner"></div>';
+  const [lSnap,slotsSnap]=await Promise.all([
+    getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId),where('role','==','lehrer'),where('approved','==',true))),
+    getDocs(query(collection(db,'slots'),where('schoolId','==',currentSchoolId),where('startTime','>=',Timestamp.fromDate(new Date(von+'T00:00:00'))),where('startTime','<=',Timestamp.fromDate(new Date(bis+'T23:59:59'))),orderBy('startTime'))),
+  ]);
+  const stats={};
+  lSnap.docs.forEach(d=>{stats[d.id]={name:d.data().fname+' '+d.data().lname,total:0,booked:0,types:{}};});
+  slotsSnap.docs.forEach(d=>{const s=d.data();if(!stats[s.lehrerUid])return;stats[s.lehrerUid].total++;if(s.bookedBy)stats[s.lehrerUid].booked++;stats[s.lehrerUid].types[s.type]=(stats[s.lehrerUid].types[s.type]||0)+1;});
+  const totalS=Object.values(stats).reduce((a,b)=>a+b.total,0);
+  const totalB=Object.values(stats).reduce((a,b)=>a+b.booked,0);
+  let html=`<div class="grid-2" style="margin-bottom:16px">
+    <div class="stat-card"><div class="stat-label">Slots gesamt</div><div class="stat-val">${totalS}</div></div>
+    <div class="stat-card"><div class="stat-label">Gebucht</div><div class="stat-val" style="color:var(--success)">${totalB} <span style="font-size:14px">(${totalS?Math.round(totalB/totalS*100):0}%)</span></div></div>
+  </div><div class="card">`;
+  Object.entries(stats).sort((a,b)=>b[1].booked-a[1].booked).forEach(([uid,s])=>{
+    const pct=s.total?Math.round(s.booked/s.total*100):0;
+    const bc=pct>=80?'var(--success)':pct>=50?'var(--accent)':'var(--danger)';
+    html+=`<div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-weight:500">${s.name}</span><span style="font-size:12px;color:var(--text-muted)">${s.booked}/${s.total} · ${pct}%</span></div>
+    <div class="auslastung-bar-bg"><div class="auslastung-bar-fill" style="width:${pct}%;background:${bc}"></div></div></div>`;
+  });
+  html+='</div>';
+  el.innerHTML=html;
+};
+
+// ════════════════════════════════
+// ADMIN – FUHRPARK
+// ════════════════════════════════
+pages['admin-fuhrpark']=async function(el){
+  el.innerHTML=`<div class="page active"><h1 class="page-title">Fuhrpark</h1>
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title">+ Auto hinzufügen</div>
+    <div class="grid-2"><div class="field"><label>Marke/Modell</label><input id="ac-modell" placeholder="VW Golf"></div><div class="field"><label>Kennzeichen</label><input id="ac-kennzeichen" placeholder="AB-CD 123"></div></div>
+    <div class="grid-2"><div class="field"><label>Farbe</label><input id="ac-farbe" placeholder="Schwarz"></div><div class="field"><label>Notiz</label><input id="ac-notiz" placeholder="Schaltgetriebe…"></div></div>
+    <button class="btn btn-primary" onclick="addAuto()">+ Auto hinzufügen</button>
+  </div>
+  <div class="card"><div class="card-title">Alle Fahrzeuge</div><div id="auto-list"><div class="spinner"></div></div></div></div>`;
+  await renderAutoList();
+};
+async function renderAutoList(){
+  const el=document.getElementById('auto-list');if(!el)return;
+  const snap=await getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId),orderBy('createdAt')));
+  if(snap.empty){el.innerHTML='<p class="text-muted">Noch keine Fahrzeuge.</p>';return;}
+  el.innerHTML=snap.docs.map(d=>{const a=d.data();return`<div class="auto-card">
+    <div class="auto-icon">🚗</div><div class="auto-info"><div class="auto-name">${a.modell}</div><div class="auto-detail">${a.farbe?a.farbe+' · ':''}${a.notiz||''}</div></div>
+    <span class="auto-kennzeichen">${a.kennzeichen}</span>
+    <button class="btn btn-secondary btn-sm" onclick="editAuto('${d.id}')">Bearb.</button>
+    <button class="btn btn-danger btn-sm" onclick="deleteAuto('${d.id}')">Löschen</button>
+  </div>`;}).join('');
+}
+window.addAuto=async function(){
+  const modell=document.getElementById('ac-modell').value.trim();
+  const kennzeichen=document.getElementById('ac-kennzeichen').value.trim().toUpperCase();
+  if(!modell||!kennzeichen)return toast('Modell und Kennzeichen erforderlich.','error');
+  await addDoc(collection(db,'autos'),{modell,kennzeichen,farbe:document.getElementById('ac-farbe').value.trim(),notiz:document.getElementById('ac-notiz').value.trim(),schoolId:currentSchoolId,createdAt:serverTimestamp()});
+  toast('Auto hinzugefügt!','success');
+  ['ac-modell','ac-kennzeichen','ac-farbe','ac-notiz'].forEach(id=>document.getElementById(id).value='');
+  await renderAutoList();
+};
+window.editAuto=async function(id){
+  const snap=await getDoc(doc(db,'autos',id));const a=snap.data();
+  openModal(`<h2 class="modal-title">Auto bearbeiten</h2>
+    <div class="field"><label>Modell</label><input id="ea-m" value="${a.modell}"></div>
+    <div class="field"><label>Kennzeichen</label><input id="ea-k" value="${a.kennzeichen}"></div>
+    <div class="field"><label>Farbe</label><input id="ea-f" value="${a.farbe||''}"></div>
+    <div class="field"><label>Notiz</label><input id="ea-n" value="${a.notiz||''}"></div>
+    <button class="btn btn-primary" onclick="saveAuto('${id}')">Speichern</button>`);
+};
+window.saveAuto=async function(id){
+  await updateDoc(doc(db,'autos',id),{modell:document.getElementById('ea-m').value.trim(),kennzeichen:document.getElementById('ea-k').value.trim().toUpperCase(),farbe:document.getElementById('ea-f').value.trim(),notiz:document.getElementById('ea-n').value.trim()});
+  toast('Gespeichert!','success');closeModal();await renderAutoList();
+};
+window.deleteAuto=async function(id){if(!confirm('Auto löschen?'))return;await deleteDoc(doc(db,'autos',id));toast('Gelöscht.','success');await renderAutoList();};
+
+// ════════════════════════════════
+// ADMIN – URLAUB
+// ════════════════════════════════
+pages['admin-urlaub']=async function(el){
+  el.innerHTML=`<div class="page active"><h1 class="page-title">Urlaub</h1>
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title">Urlaub eintragen</div>
+    <div class="grid-2"><div class="field"><label>Fahrlehrer</label><select id="urlaub-lehrer"><option value="">— Wählen —</option></select></div><div class="field"><label>Bezeichnung</label><input id="urlaub-label" placeholder="Sommerurlaub"></div></div>
+    <div class="grid-2"><div class="field"><label>Von</label><input id="urlaub-von" type="date"></div><div class="field"><label>Bis</label><input id="urlaub-bis" type="date"></div></div>
+    <button class="btn btn-primary" onclick="addUrlaub()">+ Urlaub eintragen</button>
+  </div>
+  <div class="card"><div class="card-title">Alle Urlaube</div><div id="urlaub-list"><div class="spinner"></div></div></div></div>`;
+  const lSnap=await getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId),where('role','==','lehrer'),where('approved','==',true)));
+  const sel=document.getElementById('urlaub-lehrer');
+  lSnap.docs.forEach(d=>{const u=d.data();sel.innerHTML+=`<option value="${d.id}">${u.fname} ${u.lname}</option>`;});
+  await renderUrlaubList();
+};
+pages['lehrer-urlaub']=async function(el){
+  el.innerHTML=`<div class="page active"><h1 class="page-title">Mein Urlaub</h1>
+  <div class="card" style="margin-bottom:14px">
+    <div class="field"><label>Bezeichnung</label><input id="urlaub-label" placeholder="Sommerurlaub"></div>
+    <div class="grid-2"><div class="field"><label>Von</label><input id="urlaub-von" type="date"></div><div class="field"><label>Bis</label><input id="urlaub-bis" type="date"></div></div>
+    <button class="btn btn-primary" onclick="addUrlaubLehrer()">+ Urlaub eintragen</button>
+  </div>
+  <div class="card"><div class="card-title">Meine Urlaube</div><div id="urlaub-list"><div class="spinner"></div></div></div></div>`;
+  await renderUrlaubList(currentUser.uid);
+};
+async function renderUrlaubList(filterUid){
+  const el=document.getElementById('urlaub-list');if(!el)return;
+  const q=filterUid?query(collection(db,'urlaub'),where('lehrerUid','==',filterUid),orderBy('von')):query(collection(db,'urlaub'),where('schoolId','==',currentSchoolId),orderBy('von'));
+  const snap=await getDocs(q);
+  if(snap.empty){el.innerHTML='<p class="text-muted">Noch keine Urlaube.</p>';return;}
+  const lSnap=await getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId),where('role','==','lehrer')));
+  const lm={};lSnap.docs.forEach(d=>{const u=d.data();lm[d.id]=u.fname+' '+u.lname;});
+  el.innerHTML=snap.docs.map(d=>{const u=d.data();
+    const von=new Date(u.von+'T12:00:00'),bis=new Date(u.bis+'T12:00:00');
+    const tage=Math.round((bis-von)/(86400000))+1;
+    return`<div class="auto-card">
+      <div class="auto-icon">🏖️</div>
+      <div class="auto-info">
+        <div class="auto-name">${u.label||'Urlaub'}${!filterUid?' – '+(lm[u.lehrerUid]||'?'):''}</div>
+        <div class="auto-detail">${von.toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'})} – ${bis.toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'})} (${tage} Tage)</div>
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="deleteUrlaub('${d.id}')">Löschen</button>
+    </div>`;}).join('');
+}
+window.addUrlaub=async function(){
+  const lUid=document.getElementById('urlaub-lehrer').value;
+  const label=document.getElementById('urlaub-label').value.trim();
+  const von=document.getElementById('urlaub-von').value,bis=document.getElementById('urlaub-bis').value;
+  if(!lUid||!von||!bis)return toast('Bitte Fahrlehrer und Zeitraum angeben.','error');
+  if(von>bis)return toast('Von muss vor Bis liegen.','error');
+  await addDoc(collection(db,'urlaub'),{lehrerUid:lUid,label:label||'Urlaub',von,bis,schoolId:currentSchoolId,createdAt:serverTimestamp()});
+  toast('Urlaub eingetragen!','success');await renderUrlaubList();
+};
+window.addUrlaubLehrer=async function(){
+  const label=document.getElementById('urlaub-label').value.trim();
+  const von=document.getElementById('urlaub-von').value,bis=document.getElementById('urlaub-bis').value;
+  if(!von||!bis)return toast('Bitte Zeitraum angeben.','error');
+  if(von>bis)return toast('Von muss vor Bis liegen.','error');
+  await addDoc(collection(db,'urlaub'),{lehrerUid:currentUser.uid,label:label||'Urlaub',von,bis,schoolId:currentSchoolId,createdAt:serverTimestamp()});
+  toast('Urlaub eingetragen!','success');await renderUrlaubList(currentUser.uid);
+};
+window.deleteUrlaub=async function(id){
+  if(!confirm('Urlaub löschen?'))return;
+  await deleteDoc(doc(db,'urlaub',id));toast('Urlaub gelöscht.','success');
+  const fu=currentRole==='lehrer'?currentUser.uid:null;
+  await renderUrlaubList(fu);
+};
+function urlaubCoversDate(list,date){
+  for(const u of list){const v=new Date(u.von+'T00:00:00'),b=new Date(u.bis+'T23:59:59');if(date>=v&&date<=b)return u;}return null;
+}
+
+// ════════════════════════════════
+// ADMIN – SPERRTAGE
+// ════════════════════════════════
+pages['admin-sperrtage']=async function(el){
+  el.innerHTML=`<div class="page active"><h1 class="page-title">Globale Sperrtage</h1>
+  <div class="card" style="margin-bottom:14px">
+    <p class="text-muted" style="margin-bottom:14px">Globale Sperrtage gelten für alle Fahrlehrer dieser Fahrschule.</p>
+    <div class="grid-2"><div class="field"><label>Datum</label><input type="date" id="gs-date"></div><div class="field"><label>Beschreibung</label><input type="text" id="gs-label" placeholder="z.B. Betriebsferien"></div></div>
+    <button class="btn btn-primary" onclick="addGlobalSperrtag()">+ Sperrtag hinzufügen</button>
+  </div>
+  <div class="card"><div class="card-title">Aktuelle Sperrtage</div><div id="sperrtage-list"><div class="spinner"></div></div></div></div>`;
+  await renderSperrtageList();
+};
+async function renderSperrtageList(){
+  const el=document.getElementById('sperrtage-list');if(!el)return;
+  const snap=await getDocs(query(collection(db,'globalBlocked'),where('schoolId','==',currentSchoolId),orderBy('year'),orderBy('month'),orderBy('day')));
+  if(snap.empty){el.innerHTML='<p class="text-muted">Keine globalen Sperrtage.</p>';return;}
+  el.innerHTML='<table><thead><tr><th>Datum</th><th>Beschreibung</th><th></th></tr></thead><tbody>'+
+    snap.docs.map(d=>{const b=d.data();const date=new Date(b.year,b.month,b.day);
+      return`<tr><td>${date.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'})}</td><td>${b.label||'—'}</td><td><button class="btn btn-danger btn-sm" onclick="deleteGlobalSperrtag('${d.id}')">Löschen</button></td></tr>`;}).join('')+'</tbody></table>';
+}
+window.addGlobalSperrtag=async function(){
+  const dateVal=document.getElementById('gs-date').value,label=document.getElementById('gs-label').value.trim();
+  if(!dateVal)return toast('Bitte Datum wählen.','error');
+  const d=new Date(dateVal+'T12:00:00');
+  await addDoc(collection(db,'globalBlocked'),{year:d.getFullYear(),month:d.getMonth(),day:d.getDate(),label,schoolId:currentSchoolId});
+  toast('Sperrtag hinzugefügt!','success');document.getElementById('gs-date').value='';document.getElementById('gs-label').value='';
+  await renderSperrtageList();
+};
+window.deleteGlobalSperrtag=async function(id){await deleteDoc(doc(db,'globalBlocked',id));toast('Entfernt.','success');await renderSperrtageList();};
+
+// ════════════════════════════════
+// ADMIN – EINSTELLUNGEN (Fahrstundenarten)
+// ════════════════════════════════
+pages['admin-einstellungen']=async function(el){
+  el.innerHTML=`<div class="page active"><h1 class="page-title">Einstellungen</h1>
+  <div class="card">
+    <div class="card-title">Fahrstundenarten</div>
+    <div id="arten-list"></div>
+    <hr class="divider">
+    <div class="card-title">Neue Art</div>
+    <div class="grid-2"><div class="field"><label>Name</label><input id="na-label" placeholder="z.B. Prüfungsfahrt"></div><div class="field"><label>ID (keine Leerzeichen)</label><input id="na-id" placeholder="z.B. pruefungsfahrt"></div></div>
+    <div class="field"><label>Farbe</label>
+      <div style="display:flex;align-items:center;gap:10px">
+        <input type="color" id="na-color" value="#5bba7a" style="width:44px;height:36px;border-radius:7px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;padding:2px;">
+        <div class="preset-colors" id="preset-colors"></div>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="addFahrstundenart()">Art hinzufügen</button>
+  </div>
+  <div class="card"><button class="btn btn-danger" onclick="resetFahrstundenarten()">Auf Standard zurücksetzen</button></div></div>`;
+  const presets=['#4a90d9','#e07b30','#9b59b6','#2d6a8a','#5bba7a','#e05555','#d4a843','#e8748a','#50c8a8','#f0c040','#8b5cf6','#06b6d4'];
+  document.getElementById('preset-colors').innerHTML=presets.map(c=>`<div class="preset-color" style="background:${c}" onclick="document.getElementById('na-color').value='${c}'"></div>`).join('');
+  renderArtenList();
+};
+function renderArtenList(){
+  const el=document.getElementById('arten-list');if(!el)return;
+  if(!fahrstundenarten.length){el.innerHTML='<p class="text-muted">Keine Arten.</p>';return;}
+  el.innerHTML=fahrstundenarten.map((t,i)=>{const r=parseInt(t.color.slice(1,3),16),g=parseInt(t.color.slice(3,5),16),b=parseInt(t.color.slice(5,7),16);
+    return`<div class="type-row">
+      <div style="background:${t.color};width:18px;height:18px;border-radius:4px;flex-shrink:0"></div>
+      <div class="type-row-name">${t.label}</div><div class="type-row-id">${t.id}</div>
+      <span class="badge" style="background:rgba(${r},${g},${b},0.18);color:${t.color};filter:brightness(1.4)">${t.label}</span>
+      <input type="color" value="${t.color}" style="width:32px;height:28px;border-radius:5px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;padding:2px;" onchange="changeArtColor(${i},this.value)">
+      <button class="btn btn-danger btn-sm" onclick="deleteFahrstundenart(${i})">×</button>
+    </div>`;}).join('');
+}
+window.addFahrstundenart=async function(){
+  const label=document.getElementById('na-label').value.trim();
+  const id=document.getElementById('na-id').value.trim().toLowerCase().replace(/\s+/g,'_');
+  const color=document.getElementById('na-color').value;
+  if(!label||!id)return toast('Name und ID erforderlich.','error');
+  if(fahrstundenarten.find(a=>a.id===id))return toast('ID existiert bereits.','error');
+  fahrstundenarten.push({id,label,color});await saveArten();renderArtenList();injectTypeBadgeStyles();
+  document.getElementById('na-label').value='';document.getElementById('na-id').value='';
+  toast('Hinzugefügt!','success');
+};
+window.deleteFahrstundenart=async function(i){if(fahrstundenarten.length<=1)return toast('Mindestens eine Art.','error');fahrstundenarten.splice(i,1);await saveArten();renderArtenList();injectTypeBadgeStyles();};
+window.changeArtColor=async function(i,c){fahrstundenarten[i].color=c;await saveArten();renderArtenList();injectTypeBadgeStyles();};
+window.resetFahrstundenarten=async function(){if(!confirm('Zurücksetzen?'))return;fahrstundenarten=[...DEFAULT_ARTEN];await saveArten();renderArtenList();injectTypeBadgeStyles();toast('Zurückgesetzt.','success');};
+async function saveArten(){await setDoc(doc(db,'settings','fahrstundenarten'),{arten:fahrstundenarten});}
+
+// ════════════════════════════════
+// LEHRER – KALENDER
+// ════════════════════════════════
+pages['lehrer-kalender']=function(el){
+  if(!weekStart){const now=new Date();const dow=now.getDay()===0?6:now.getDay()-1;weekStart=new Date(now.getFullYear(),now.getMonth(),now.getDate()-dow);}
+  el.innerHTML=`<div class="page active"><h1 class="page-title">Kalender</h1>
+  <div class="card">
+    <div class="cal-header">
+      <button class="btn btn-secondary btn-sm" onclick="calPrev()">◀</button>
+      <span class="cal-month" id="cal-month-label"></span>
+      <button class="btn btn-secondary btn-sm" onclick="calNext()">▶</button>
+      <div class="cal-view-toggle">
+        <button class="cal-view-btn ${calView==='month'?'active':''}" onclick="setCalView('month')">Monat</button>
+        <button class="cal-view-btn ${calView==='week'?'active':''}" onclick="setCalView('week')">Woche</button>
+      </div>
+    </div>
+    <div id="cal-grid"></div>
+  </div></div>`;
+  renderCal();
+};
+window.setCalView=function(v){calView=v;document.querySelectorAll('.cal-view-btn').forEach(b=>b.classList.toggle('active',b.textContent.trim()===(v==='month'?'Monat':'Woche')));renderCal();};
+window.calPrev=function(){if(calView==='month')calDate.setMonth(calDate.getMonth()-1);else weekStart=new Date(weekStart.getFullYear(),weekStart.getMonth(),weekStart.getDate()-7);renderCal();};
+window.calNext=function(){if(calView==='month')calDate.setMonth(calDate.getMonth()+1);else weekStart=new Date(weekStart.getFullYear(),weekStart.getMonth(),weekStart.getDate()+7);renderCal();};
+
+async function renderCal(){
+  const label=document.getElementById('cal-month-label'),grid=document.getElementById('cal-grid');
+  if(!label||!grid)return;
+  if(calView==='month')await renderMonthCal(label,grid);
+  else await renderWeekCal(label,grid);
+}
+
+async function renderMonthCal(label,grid){
+  const year=calDate.getFullYear(),month=calDate.getMonth();
+  label.textContent=new Date(year,month,1).toLocaleDateString('de-DE',{month:'long',year:'numeric'});
+  const days=['Mo','Di','Mi','Do','Fr','Sa','So'];
+  let html=days.map(d=>`<div class="cal-day-label">${d}</div>`).join('');
+  const first=new Date(year,month,1);
+  let startDow=first.getDay()-1;if(startDow<0)startDow=6;
+  const dim=new Date(year,month+1,0).getDate(),prevDays=new Date(year,month,0).getDate();
+  const [sSnap,bSnap,gbSnap,uSnap]=await Promise.all([
+    getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid))),
+    getDocs(query(collection(db,'blocked'),where('lehrerUid','==',currentUser.uid))),
+    getDocs(query(collection(db,'globalBlocked'),where('schoolId','==',currentSchoolId))),
+    getDocs(query(collection(db,'urlaub'),where('lehrerUid','==',currentUser.uid))),
+  ]);
+  const slotsByDay={};
+  sSnap.docs.forEach(d=>{const s=d.data();const dt=s.startTime.toDate();if(dt.getFullYear()===year&&dt.getMonth()===month){const day=dt.getDate();if(!slotsByDay[day])slotsByDay[day]=[];slotsByDay[day].push({id:d.id,...s});}});
+  const blockedSet=new Set();
+  bSnap.docs.forEach(d=>{const b=d.data();if(b.year===year&&b.month===month)blockedSet.add(b.day);});
+  gbSnap.docs.forEach(d=>{const b=d.data();if(b.year===year&&b.month===month)blockedSet.add('g'+b.day);});
+  const urlaubList=uSnap.docs.map(d=>({id:d.id,...d.data()}));
+  const today=new Date();
+  for(let i=0;i<startDow;i++)html+=`<div class="cal-day other-month"><div class="cal-day-num">${prevDays-startDow+i+1}</div></div>`;
+  for(let d=1;d<=dim;d++){
+    const thisDate=new Date(year,month,d);
+    const isToday=d===today.getDate()&&month===today.getMonth()&&year===today.getFullYear();
+    const isBlocked=blockedSet.has(d);const isGlobal=blockedSet.has('g'+d);
+    const ft=getFeiertageName(thisDate,currentSchool?.bundesland);
+    const urlaubEntry=urlaubCoversDate(urlaubList,thisDate);
+    const slots=slotsByDay[d]||[];
+    let dc='';
+    if(ft)dc+=`<div class="cal-slot" style="background:rgba(212,168,67,.2);color:var(--accent2);font-size:8px">🎉 ${ft}</div>`;
+    if(urlaubEntry)dc+=`<div class="cal-slot" style="background:rgba(91,186,122,.2);color:#5bba7a;font-size:8px">🏖️ ${urlaubEntry.label||'Urlaub'}</div>`;
+    else if(isGlobal)dc+=`<div class="cal-slot" style="background:rgba(212,168,67,.15);color:var(--accent);font-size:8px">🏫 Gesperrt</div>`;
+    else if(isBlocked)dc+=`<div class="cal-slot" style="background:rgba(224,85,85,.15);color:#e05555;font-size:9px">Gesperrt</div>`;
+    else dc+=slots.slice(0,3).map(s=>s.bookedBy?`<div class="cal-slot slot-${s.type} slot-booked">${fmtTime(s.startTime)} ${typeLabel(s.type)}</div>`:`<div class="cal-slot" style="background:rgba(91,186,122,.25);color:#5bba7a;font-weight:600">${fmtTime(s.startTime)} Frei</div>`).join('');
+    html+=`<div class="cal-day${isToday?' today':''}${isBlocked&&!urlaubEntry?' blocked':''}${urlaubEntry?' urlaub-day':''}${ft&&!urlaubEntry?' feiertag-day':''}" onclick="openDayModal(${year},${month},${d})" style="display:flex;flex-direction:column">
+      <div class="cal-day-num">${d}</div>${dc}
+      ${slots.length>3?`<div style="font-size:8px;color:var(--text-muted)">+${slots.length-3}</div>`:''}
+    </div>`;
+  }
+  const total=startDow+dim;const rem=total%7===0?0:7-(total%7);
+  for(let i=1;i<=rem;i++)html+=`<div class="cal-day other-month"><div class="cal-day-num">${i}</div></div>`;
+  grid.style.cssText='display:grid;grid-template-columns:repeat(7,1fr);gap:5px';
+  grid.innerHTML=html;
+}
+
+async function renderWeekCal(label,grid){
+  const weekDays=[];for(let i=0;i<7;i++)weekDays.push(new Date(weekStart.getFullYear(),weekStart.getMonth(),weekStart.getDate()+i));
+  label.textContent=`${weekDays[0].toLocaleDateString('de-DE',{day:'2-digit',month:'short'})} – ${weekDays[6].toLocaleDateString('de-DE',{day:'2-digit',month:'short',year:'numeric'})}`;
+  const startTs=Timestamp.fromDate(weekDays[0]),endTs=Timestamp.fromDate(new Date(weekDays[6].getFullYear(),weekDays[6].getMonth(),weekDays[6].getDate()+1));
+  const [sSnap,bSnap,scSnap]=await Promise.all([
+    getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid),where('startTime','>=',startTs),where('startTime','<',endTs),orderBy('startTime'))),
+    getDocs(query(collection(db,'blocked'),where('lehrerUid','==',currentUser.uid))),
+    getDocs(query(collection(db,'schueler'),where('lehrerUid','==',currentUser.uid))),
+  ]);
+  const scm={};scSnap.docs.forEach(d=>{const s=d.data();scm[d.id]=s.fname+' '+s.lname;});
+  const bSet=new Set();bSnap.docs.forEach(d=>{const b=d.data();bSet.add(`${b.year}-${b.month}-${b.day}`);});
+  const slotsByDay={};sSnap.docs.forEach(d=>{const s=d.data();const dt=s.startTime.toDate();const k=dt.toDateString();if(!slotsByDay[k])slotsByDay[k]=[];slotsByDay[k].push({id:d.id,...s,_dt:dt});});
+  const today=new Date();const HOURS=Array.from({length:14},(_,i)=>i+7);const dn=['Mo','Di','Mi','Do','Fr','Sa','So'];
+  let html=`<div style="display:grid;grid-template-columns:48px repeat(7,1fr);border:1px solid var(--border);border-radius:9px;overflow:hidden">`;
+  html+=`<div class="week-col-header" style="background:var(--surface2);border-bottom:1px solid var(--border)"></div>`;
+  weekDays.forEach((d,i)=>{const isT=d.toDateString()===today.toDateString();html+=`<div class="week-col-header${isT?' today-col':''}" style="background:var(--surface2);border-bottom:1px solid var(--border);border-left:1px solid var(--border)"><div style="font-weight:700">${dn[i]}</div><div style="font-size:10px;color:${isT?'var(--accent)':'var(--text-muted)'}">${d.getDate()}.${d.getMonth()+1}.</div></div>`;});
+  HOURS.forEach(hour=>{
+    html+=`<div class="week-time-label">${hour}:00</div>`;
+    weekDays.forEach(day=>{
+      const dk=day.toDateString();const blocked=bSet.has(`${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`);
+      const daySlots=(slotsByDay[dk]||[]).filter(s=>s._dt.getHours()===hour);
+      let cc='';daySlots.forEach(s=>{const c=typeColor(s.type);const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16);
+        const endH=s.endTime.toDate().getHours(),endM=s.endTime.toDate().getMinutes(),startM=s._dt.getMinutes();
+        const hp=Math.max(20,Math.round(((endH*60+endM)-(hour*60+startM))/60*44));
+        const name=s.bookedBy?(scm[s.bookedBy]||'?'):'Frei';
+        cc+=`<div class="week-slot-chip" style="background:rgba(${r},${g},${b},0.25);color:${c};filter:brightness(1.4);height:${hp}px;top:${Math.round(startM/60*44)}px" onclick="event.stopPropagation();openDayModal(${day.getFullYear()},${day.getMonth()},${day.getDate()})">${fmtTime(s.startTime)} ${name}</div>`;});
+      html+=`<div class="week-cell${blocked?' blocked-cell':''}" style="border-left:1px solid rgba(46,46,46,.3)" onclick="openDayModal(${day.getFullYear()},${day.getMonth()},${day.getDate()})">${cc}</div>`;
+    });
+  });
+  html+=`</div>`;
+  grid.style.cssText='display:block';grid.innerHTML=html;
+}
+
+window.openDayModal=async function(year,month,day){
+  const date=new Date(year,month,day);
+  const dateStr=date.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  const ft=getFeiertageName(date,currentSchool?.bundesland);
+  const [sSnap,bSnap,gbSnap,profSnap,uSnap]=await Promise.all([
+    getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid))),
+    getDocs(query(collection(db,'blocked'),where('lehrerUid','==',currentUser.uid),where('year','==',year),where('month','==',month),where('day','==',day))),
+    getDocs(query(collection(db,'globalBlocked'),where('schoolId','==',currentSchoolId),where('year','==',year),where('month','==',month),where('day','==',day))),
+    getDoc(doc(db,'kalenderUsers',currentUser.uid)),
+    getDocs(query(collection(db,'urlaub'),where('lehrerUid','==',currentUser.uid))),
+  ]);
+  const blockDauer=profSnap.exists()?(profSnap.data().blockDauer||60):60;
+  const urlaubEntry=urlaubCoversDate(uSnap.docs.map(d=>({id:d.id,...d.data()})),date);
+  const daySlots=sSnap.docs.filter(d=>{const dt=d.data().startTime.toDate();return dt.getFullYear()===year&&dt.getMonth()===month&&dt.getDate()===day;});
+  const isBlocked=!bSnap.empty,isGlobal=!gbSnap.empty;
+  const blockedId=isBlocked?bSnap.docs[0].id:null;
+  const scSnap=await getDocs(query(collection(db,'schueler'),where('lehrerUid','==',currentUser.uid)));
+  const scm={};scSnap.docs.forEach(d=>{const s=d.data();scm[d.id]=s.fname+' '+s.lname;});
+  const slotsHtml=daySlots.length?daySlots.map(d=>{const s=d.data();const sn=s.bookedBy?(scm[s.bookedBy]||'?'):null;
+    return`<div class="slot-row"><div class="slot-time">${fmtTime(s.startTime)} – ${fmtTime(s.endTime)}</div>
+    <div class="slot-info">${typeBadgeHtml(s.type)}${sn?`<div class="slot-student">👤 ${sn}</div>`:'<div class="slot-student" style="color:var(--success)">Frei</div>'}</div>
+    ${!s.bookedBy?`<button class="btn btn-danger btn-sm" onclick="deleteSlot('${d.id}')">Löschen</button>`:''}</div>`;}).join(''):'<p class="text-muted">Keine Slots.</p>';
+  openModal(`<h2 class="modal-title">${dateStr}</h2>
+    ${ft?`<div style="background:rgba(212,168,67,.1);border:1px solid rgba(212,168,67,.3);border-radius:7px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:var(--accent)">🎉 Feiertag: ${ft}</div>`:''}
+    ${urlaubEntry?`<div style="background:rgba(91,186,122,.1);border:1px solid rgba(91,186,122,.3);border-radius:7px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:#5bba7a">🏖️ Urlaub: ${urlaubEntry.label||'Urlaub'}</div>`:''}
+    ${isGlobal?`<div style="background:rgba(212,168,67,.1);border:1px solid var(--accent);border-radius:7px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:var(--accent)">🏫 Globaler Sperrtag</div>`:''}
+    <div style="margin-bottom:12px">
+      ${isBlocked?`<button class="btn btn-secondary btn-sm" onclick="unblockDay('${blockedId}',${year},${month},${day})">🔓 Entsperren</button>`:
+      `<button class="btn btn-danger btn-sm" onclick="blockDay(${year},${month},${day})">🔒 Tag sperren</button>`}
+    </div>
+    <hr class="divider">
+    <div class="card-title">Slots</div>${slotsHtml}
+    <hr class="divider">
+    <div class="card-title">Neuer Slot</div>
+    <p class="text-muted" style="margin-bottom:10px">Blockdauer: <strong>${blockDauer} Min</strong></p>
+    <div class="field"><label>Startzeit</label><input id="ns-from" type="time" value="08:00" oninput="updateEndTime(${blockDauer})"></div>
+    <div class="field"><label>Endzeit (auto)</label><input id="ns-to" type="time" value="09:00" style="opacity:.6" readonly></div>
+    <div class="field"><label>Typ</label><select id="ns-type">${fahrstundenarten.map(t=>`<option value="${t.id}">${t.label}</option>`).join('')}</select></div>
+    <button class="btn btn-primary" onclick="addSlot(${year},${month},${day})">Slot hinzufügen</button>`);
+  setTimeout(()=>updateEndTime(blockDauer),50);
+};
+window.updateEndTime=function(bd){const f=document.getElementById('ns-from'),t=document.getElementById('ns-to');if(!f||!t||!f.value)return;const[h,m]=f.value.split(':').map(Number);const tot=h*60+m+bd;t.value=`${String(Math.floor(tot/60)%24).padStart(2,'0')}:${String(tot%60).padStart(2,'0')}`;};
+window.addSlot=async function(year,month,day){
+  const from=document.getElementById('ns-from').value,type=document.getElementById('ns-type').value;
+  if(!from)return toast('Bitte Startzeit angeben.','error');
+  const pSnap=await getDoc(doc(db,'kalenderUsers',currentUser.uid));
+  const bd=pSnap.exists()?(pSnap.data().blockDauer||60):60;
+  const[fh,fm]=from.split(':').map(Number);const tot=fh*60+fm+bd;
+  const st=Timestamp.fromDate(new Date(year,month,day,fh,fm));
+  const et=Timestamp.fromDate(new Date(year,month,day,Math.floor(tot/60)%24,tot%60));
+  await addDoc(collection(db,'slots'),{lehrerUid:currentUser.uid,type,startTime:st,endTime:et,bookedBy:null,schoolId:currentSchoolId,createdAt:serverTimestamp()});
+  toast('Slot hinzugefügt!','success');closeModal();renderCal();
+};
+window.deleteSlot=async function(id){await deleteDoc(doc(db,'slots',id));toast('Gelöscht.','success');closeModal();renderCal();};
+window.blockDay=async function(year,month,day){await addDoc(collection(db,'blocked'),{lehrerUid:currentUser.uid,year,month,day});toast('Gesperrt.','success');closeModal();renderCal();};
+window.unblockDay=async function(id){await deleteDoc(doc(db,'blocked',id));toast('Entsperrt.','success');closeModal();renderCal();};
+
+// ════════════════════════════════
+// LEHRER – SLOTS LISTE
+// ════════════════════════════════
+pages['lehrer-slots']=async function(el){
+  el.innerHTML=`<div class="page active"><h1 class="page-title">Zeitslots</h1><div class="card"><div id="slots-list"><div class="spinner"></div></div></div></div>`;
+  const[snap,scSnap]=await Promise.all([getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid),orderBy('startTime'))),getDocs(query(collection(db,'schueler'),where('lehrerUid','==',currentUser.uid)))]);
+  const scm={};scSnap.docs.forEach(d=>{const s=d.data();scm[d.id]=s.fname+' '+s.lname;});
+  const sl=document.getElementById('slots-list');
+  if(snap.empty){sl.innerHTML='<p class="text-muted">Noch keine Slots.</p>';return;}
+  sl.innerHTML='<table><thead><tr><th>Datum</th><th>Zeit</th><th>Typ</th><th>Status</th><th></th></tr></thead><tbody>'+
+    snap.docs.map(d=>{const s=d.data();return`<tr><td>${fmt(s.startTime)}</td><td>${fmtTime(s.startTime)}–${fmtTime(s.endTime)}</td><td>${typeBadgeHtml(s.type)}</td>
+      <td>${s.bookedBy?`<span class="badge badge-booked">${scm[s.bookedBy]||'?'}</span>`:'<span class="badge badge-free">Frei</span>'}</td>
+      <td>${!s.bookedBy?`<button class="btn btn-danger btn-sm" onclick="deleteSlotFromList('${d.id}')">Löschen</button>`:''}</td></tr>`;}).join('')+'</tbody></table>';
+};
+window.deleteSlotFromList=async function(id){await deleteDoc(doc(db,'slots',id));toast('Gelöscht.','success');pages['lehrer-slots'](document.getElementById('main-content'));};
+
+// ════════════════════════════════
+// LEHRER – BUCHUNGEN
+// ════════════════════════════════
+pages['lehrer-buchungen']=async function(el){
+  el.innerHTML=`<div class="page active"><h1 class="page-title">Buchungen</h1><div class="card"><div id="buchungen-list"><div class="spinner"></div></div></div></div>`;
+  const[snap,scSnap,autosSnap]=await Promise.all([
+    getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid),where('bookedBy','!=',null),orderBy('bookedBy'),orderBy('startTime'))),
+    getDocs(query(collection(db,'schueler'),where('lehrerUid','==',currentUser.uid))),
+    getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId))),
+  ]);
+  const scm={},scAutoM={};scSnap.docs.forEach(d=>{const s=d.data();scm[d.id]=s.fname+' '+s.lname;scAutoM[d.id]=s.autoId||null;});
+  const am={};autosSnap.docs.forEach(d=>{const a=d.data();am[d.id]=a;});
+  const bl=document.getElementById('buchungen-list');
+  if(snap.empty){bl.innerHTML='<p class="text-muted">Noch keine Buchungen.</p>';return;}
+  bl.innerHTML='<table><thead><tr><th>Schüler</th><th>Datum</th><th>Zeit</th><th>Typ</th><th>Auto</th><th></th></tr></thead><tbody>'+
+    snap.docs.map(d=>{const s=d.data();const aid=scAutoM[s.bookedBy];const aStr=aid&&am[aid]?`<span class="auto-kennzeichen" style="font-size:10px">${am[aid].kennzeichen}</span>`:'—';
+      return`<tr><td>${scm[s.bookedBy]||'?'}</td><td>${fmt(s.startTime)}</td><td>${fmtTime(s.startTime)}–${fmtTime(s.endTime)}</td><td>${typeBadgeHtml(s.type)}</td><td>${aStr}</td>
+        <td><button class="btn btn-danger btn-sm" onclick="cancelBookingLehrer('${d.id}')">Stornieren</button></td></tr>`;}).join('')+'</tbody></table>';
+};
+window.cancelBookingLehrer=async function(id){
+  const[sSnap,lSnap]=await Promise.all([getDoc(doc(db,'slots',id)),getDoc(doc(db,'kalenderUsers',currentUser.uid))]);
+  const slot=sSnap.data();await updateDoc(doc(db,'slots',id),{bookedBy:null,bookedAt:null});
+  if(slot.bookedBy){const scSnap=await getDoc(doc(db,'schueler',slot.bookedBy));if(scSnap.exists())await updateDoc(doc(db,'schueler',slot.bookedBy),{bookedCount:Math.max(0,(scSnap.data().bookedCount||1)-1)});}
+  await triggerEmail('stornierung_freigeworden',{datum:slot.startTime.toDate().toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}),von:fmtTime(slot.startTime),bis:fmtTime(slot.endTime),typ:typeLabel(slot.type),lehrerName:lSnap.data().fname+' '+lSnap.data().lname,lehrerUid:currentUser.uid,slotId:id});
+  toast('Storniert.','success');pages['lehrer-buchungen'](document.getElementById('main-content'));
+};
+
+// ════════════════════════════════
+// LEHRER – MEINE SCHÜLER
+// ════════════════════════════════
+pages['lehrer-schueler']=async function(el){
+  el.innerHTML=`<div class="page active"><h1 class="page-title">Meine Schüler</h1><div id="ls-content"><div class="spinner"></div></div></div>`;
+  const[snap,autosSnap]=await Promise.all([getDocs(query(collection(db,'schueler'),where('lehrerUid','==',currentUser.uid))),getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId),orderBy('createdAt')))]);
+  const lsContent=document.getElementById('ls-content');
+  if(snap.empty){lsContent.innerHTML='<p class="text-muted">Noch keine Schüler zugewiesen.</p>';return;}
+  let html='';
+  for(const d of snap.docs){
+    const s=d.data();
+    const link=`${location.origin}${location.pathname}?schueler=${d.id}&lehrer=${currentUser.uid}`;
+    const max=s.maxFahrstunden||0,count=s.bookedCount||0,warn=max>0&&count>=max;
+    const kontingent=max>0?`${count}/${max}`:`${count}/∞`;
+    let autoHtml='';
+    if(s.autoId){const ca=autosSnap.docs.find(x=>x.id===s.autoId);if(ca){const a=ca.data();autoHtml=`<span class="auto-kennzeichen" style="font-size:10px">${a.kennzeichen}</span> <span style="font-size:11px;color:var(--text-muted)">${a.modell}</span>`;}}
+    const autoOptsS=`<option value="">— Kein Auto —</option>`+autosSnap.docs.map(x=>{const a=x.data();return`<option value="${x.id}" ${s.autoId===x.id?'selected':''}>${a.modell} · ${a.kennzeichen}</option>`;}).join('');
+    const notizenHtml=await loadNotizenHtml(d.id,'lehrer');
+    const pruefungen=await loadPruefungenForSchueler(d.id);
+    const letzteStatus=pruefungen.length?pruefungen[0].status:null;
+    html+=`<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+        <div>
+          <div style="font-family:var(--font-display);font-size:18px">${s.fname} ${s.lname}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:3px">${s.email||''} ${s.tel?'· '+s.tel:''}</div>
+          <div style="margin-top:5px;display:flex;gap:7px;align-items:center;flex-wrap:wrap">
+            <span style="color:${warn?'var(--danger)':'var(--text-muted)'};font-size:12px">🎓 ${kontingent}${warn?' ⚠️':''}</span>
+            ${autoHtml?`<span>${autoHtml}</span>`:''}
+            ${letzteStatus?pruefungStatusBadge(letzteStatus):''}
+          </div>
+        </div>
+        <button class="copy-btn" onclick="copyLink('${link}')">🔗 Buchungslink</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
+        <div>
+          <div class="card-title" style="margin-bottom:10px">🚗 Auto</div>
+          <div class="field" style="margin-bottom:7px"><select id="auto-sel-${d.id}">${autoOptsS}</select></div>
+          <button class="btn btn-secondary btn-sm" onclick="saveSchuelerAuto('${d.id}')">Speichern</button>
+        </div>
+        <div>
+          <div class="card-title" style="margin-bottom:10px">📝 Notizen</div>
+          <div id="notizen-container-${d.id}">${notizenHtml}</div>
+          <div class="notiz-compose" style="margin-top:7px">
+            <textarea id="notiz-text-${d.id}" placeholder="Notiz für ${s.fname}…"></textarea>
+            <div style="display:flex;justify-content:flex-end;margin-top:7px"><button class="btn btn-primary btn-sm" onclick="addNotizLehrer('${d.id}')">Senden</button></div>
+          </div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <div class="card-title" style="margin-bottom:0">🎓 Prüfungen</div>
+            <button class="btn btn-primary btn-sm" onclick="openAddPruefung('${d.id}')">+ Neu</button>
+          </div>
+          <div id="pruefungen-container-${d.id}">${renderPruefungenList(pruefungen,true,d.id)}</div>
+        </div>
+      </div>
+    </div>`;
+  }
+  lsContent.innerHTML=html;
+};
+window.saveSchuelerAuto=async function(sid){await updateDoc(doc(db,'schueler',sid),{autoId:document.getElementById('auto-sel-'+sid).value||null});toast('Auto gespeichert!','success');};
+
+// ════════════════════════════════
+// ADMIN – LEHRER KALENDER VIEW
+// ════════════════════════════════
+window.viewLehrerKalender=async function(lehrerUid,lehrerName){
+  const main=document.getElementById('main-content');
+  main.innerHTML=`<div class="page active">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
+      <button class="btn btn-secondary btn-sm" onclick="navigate('admin-lehrer')">← Zurück</button>
+      <h1 class="page-title" style="margin-bottom:0">📅 ${lehrerName}</h1>
+    </div>
+    <div class="card">
+      <div class="cal-header">
+        <button class="btn btn-secondary btn-sm" onclick="adminCalPrev()">◀</button>
+        <span class="cal-month" id="admin-cal-label"></span>
+        <button class="btn btn-secondary btn-sm" onclick="adminCalNext()">▶</button>
+      </div>
+      <div id="admin-cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px"></div>
+    </div>
+  </div>`;
+  window._adminCalDate=new Date();window._adminCalLehrerUid=lehrerUid;window._adminCalLehrerName=lehrerName;
+  await renderAdminCal();
+};
+window.adminCalPrev=function(){window._adminCalDate.setMonth(window._adminCalDate.getMonth()-1);renderAdminCal();};
+window.adminCalNext=function(){window._adminCalDate.setMonth(window._adminCalDate.getMonth()+1);renderAdminCal();};
+async function renderAdminCal(){
+  const label=document.getElementById('admin-cal-label'),grid=document.getElementById('admin-cal-grid');if(!label||!grid)return;
+  const year=window._adminCalDate.getFullYear(),month=window._adminCalDate.getMonth(),lehrerUid=window._adminCalLehrerUid;
+  label.textContent=new Date(year,month,1).toLocaleDateString('de-DE',{month:'long',year:'numeric'});
+  const days=['Mo','Di','Mi','Do','Fr','Sa','So'];
+  let html=days.map(d=>`<div class="cal-day-label">${d}</div>`).join('');
+  const first=new Date(year,month,1);let startDow=first.getDay()-1;if(startDow<0)startDow=6;
+  const dim=new Date(year,month+1,0).getDate(),prevDays=new Date(year,month,0).getDate();
+  const[sSnap,bSnap,scSnap]=await Promise.all([getDocs(query(collection(db,'slots'),where('lehrerUid','==',lehrerUid))),getDocs(query(collection(db,'blocked'),where('lehrerUid','==',lehrerUid))),getDocs(query(collection(db,'schueler'),where('lehrerUid','==',lehrerUid)))]);
+  const scm={};scSnap.docs.forEach(d=>{const s=d.data();scm[d.id]=s.fname+' '+s.lname;});
+  const slotsByDay={};sSnap.docs.forEach(d=>{const s=d.data();const dt=s.startTime.toDate();if(dt.getFullYear()===year&&dt.getMonth()===month){const day=dt.getDate();if(!slotsByDay[day])slotsByDay[day]=[];slotsByDay[day].push({id:d.id,...s});}});
+  const bSet=new Set();bSnap.docs.forEach(d=>{const b=d.data();if(b.year===year&&b.month===month)bSet.add(b.day);});
+  const today=new Date();
+  for(let i=0;i<startDow;i++)html+=`<div class="cal-day other-month"><div class="cal-day-num">${prevDays-startDow+i+1}</div></div>`;
+  for(let d=1;d<=dim;d++){
+    const isT=d===today.getDate()&&month===today.getMonth()&&year===today.getFullYear();
+    const isB=bSet.has(d);const slots=slotsByDay[d]||[];
+    const slotHtml=slots.slice(0,2).map(s=>{const sn=s.bookedBy?(scm[s.bookedBy]||'?'):'';return s.bookedBy?`<div class="cal-slot slot-${s.type} slot-booked" title="${sn}">${fmtTime(s.startTime)} ${sn}</div>`:`<div class="cal-slot" style="background:rgba(91,186,122,.25);color:#5bba7a">${fmtTime(s.startTime)} Frei</div>`;}).join('');
+    html+=`<div class="cal-day${isT?' today':''}${isB?' blocked':''}" onclick="adminOpenDayDetail(${year},${month},${d})" style="display:flex;flex-direction:column">
+      <div class="cal-day-num">${d}</div>${isB?'<div class="cal-slot" style="background:rgba(224,85,85,.15);color:#e05555;font-size:8px">Gesperrt</div>':slotHtml}
+      ${slots.length>2?`<div style="font-size:8px;color:var(--text-muted)">+${slots.length-2}</div>`:''}
+    </div>`;
+  }
+  const total=startDow+dim,rem=total%7===0?0:7-(total%7);
+  for(let i=1;i<=rem;i++)html+=`<div class="cal-day other-month"><div class="cal-day-num">${i}</div></div>`;
+  grid.innerHTML=html;
+}
+window.adminOpenDayDetail=async function(year,month,day){
+  const lUid=window._adminCalLehrerUid;
+  const date=new Date(year,month,day);const dateStr=date.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  const[sSnap,scSnap]=await Promise.all([getDocs(query(collection(db,'slots'),where('lehrerUid','==',lUid))),getDocs(query(collection(db,'schueler'),where('lehrerUid','==',lUid)))]);
+  const scm={};scSnap.docs.forEach(d=>{const s=d.data();scm[d.id]=s.fname+' '+s.lname;});
+  const daySlots=sSnap.docs.filter(d=>{const dt=d.data().startTime.toDate();return dt.getFullYear()===year&&dt.getMonth()===month&&dt.getDate()===day;});
+  const sHtml=daySlots.length?daySlots.map(d=>{const s=d.data();const sn=s.bookedBy?(scm[s.bookedBy]||'?'):null;
+    return`<div class="slot-row"><div class="slot-time">${fmtTime(s.startTime)}–${fmtTime(s.endTime)}</div>
+    <div class="slot-info">${typeBadgeHtml(s.type)}${sn?`<div class="slot-student">👤 ${sn}</div>`:'<div class="slot-student" style="color:var(--success)">Frei</div>'}</div></div>`;}).join(''):'<p class="text-muted">Keine Slots.</p>';
+  openModal(`<h2 class="modal-title">${dateStr}</h2><div class="card-title">Slots – ${window._adminCalLehrerName}</div>${sHtml}`);
+};
+
+// ════════════════════════════════
+// PRÜFUNGSVERWALTUNG
+// ════════════════════════════════
+function pruefungStatusBadge(status){const map={bestanden:'Bestanden',nicht_bestanden:'Nicht bestanden',ausstehend:'Ausstehend'};const cls=status==='nicht_bestanden'?'nicht-bestanden':status;return`<span class="badge badge-${cls}">${map[status]||status}</span>`;}
+function pruefungStatusDot(s){return{bestanden:'#5bba7a',nicht_bestanden:'#e05555',ausstehend:'#d4a843'}[s]||'#888';}
+async function loadPruefungenForSchueler(sid){const snap=await getDocs(query(collection(db,'pruefungen'),where('schuelerId','==',sid),orderBy('datum','desc')));return snap.docs.map(d=>({id:d.id,...d.data()}));}
+function renderPruefungenList(list,canEdit,sid){
+  if(!list.length)return'<p class="text-muted">Noch keine Prüfungen.</p>';
+  return list.map(p=>{const ds=p.datum?new Date(p.datum+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'}):'—';
+    return`<div class="pruefung-card"><div class="pruefung-status" style="background:${pruefungStatusDot(p.status)}"></div>
+    <div class="pruefung-info"><div class="pruefung-title">Versuch ${p.versuch||1}</div><div class="pruefung-meta">📅 ${ds}${p.ort?' · 📍'+p.ort:''}${p.notiz?' · '+p.notiz:''}</div></div>
+    ${pruefungStatusBadge(p.status)}
+    ${canEdit?`<button class="btn btn-secondary btn-sm" onclick="editPruefung('${p.id}','${sid}')">Bearb.</button><button class="btn btn-danger btn-sm" onclick="deletePruefung('${p.id}','${sid}')">×</button>`:''}
+    </div>`;}).join('');}
+function pruefungFormHtml(sid,p=null){
+  const isEdit=!!p;
+  const opts=[{v:'ausstehend',l:'Ausstehend'},{v:'bestanden',l:'Bestanden'},{v:'nicht_bestanden',l:'Nicht bestanden'}].map(o=>`<option value="${o.v}" ${(p?.status||'ausstehend')===o.v?'selected':''}>${o.l}</option>`).join('');
+  return`<h2 class="modal-title">${isEdit?'Prüfung bearbeiten':'Prüfung eintragen'}</h2>
+    <div class="grid-2"><div class="field"><label>Datum</label><input id="pf-d" type="date" value="${p?.datum||''}"></div><div class="field"><label>Versuch</label><input id="pf-v" type="number" min="1" value="${p?.versuch||1}"></div></div>
+    <div class="field"><label>Prüfungsort</label><input id="pf-o" placeholder="TÜV München" value="${escHtml(p?.ort||'')}"></div>
+    <div class="field"><label>Status</label><select id="pf-s">${opts}</select></div>
+    <div class="field"><label>Notiz</label><input id="pf-n" placeholder="Rückwärtsfahren…" value="${escHtml(p?.notiz||'')}"></div>
+    <button class="btn btn-primary" onclick="${isEdit?`savePruefungEdit('${p.id}','${sid}')`:`savePruefungNew('${sid}')`}">${isEdit?'Speichern':'Eintragen'}</button>`;}
+window.openAddPruefung=function(sid){openModal(pruefungFormHtml(sid));};
+window.savePruefungNew=async function(sid){
+  const datum=document.getElementById('pf-d').value;if(!datum)return toast('Datum angeben.','error');
+  await addDoc(collection(db,'pruefungen'),{schuelerId:sid,datum,versuch:parseInt(document.getElementById('pf-v').value)||1,ort:document.getElementById('pf-o').value.trim(),status:document.getElementById('pf-s').value,notiz:document.getElementById('pf-n').value.trim(),schoolId:currentSchoolId,eingetragenVon:currentUser.uid,createdAt:serverTimestamp()});
+  toast('Prüfung eingetragen!','success');closeModal();
+  const c=document.getElementById('pruefungen-container-'+sid);if(c){const l=await loadPruefungenForSchueler(sid);c.innerHTML=renderPruefungenList(l,true,sid);}
+};
+window.editPruefung=async function(pid,sid){const snap=await getDoc(doc(db,'pruefungen',pid));openModal(pruefungFormHtml(sid,{id:pid,...snap.data()}));};
+window.savePruefungEdit=async function(pid,sid){
+  const datum=document.getElementById('pf-d').value;if(!datum)return toast('Datum angeben.','error');
+  await updateDoc(doc(db,'pruefungen',pid),{datum,versuch:parseInt(document.getElementById('pf-v').value)||1,ort:document.getElementById('pf-o').value.trim(),status:document.getElementById('pf-s').value,notiz:document.getElementById('pf-n').value.trim()});
+  toast('Aktualisiert!','success');closeModal();
+  const c=document.getElementById('pruefungen-container-'+sid);if(c){const l=await loadPruefungenForSchueler(sid);c.innerHTML=renderPruefungenList(l,true,sid);}
+};
+window.deletePruefung=async function(pid,sid){
+  if(!confirm('Prüfung löschen?'))return;await deleteDoc(doc(db,'pruefungen',pid));toast('Gelöscht.','success');
+  const c=document.getElementById('pruefungen-container-'+sid);if(c){const l=await loadPruefungenForSchueler(sid);c.innerHTML=renderPruefungenList(l,true,sid);}
+};
+pages['lehrer-pruefungen']=async function(el){
+  el.innerHTML=`<div class="page active"><h1 class="page-title">Prüfungen</h1><div id="lp-content"><div class="spinner"></div></div></div>`;
+  const snap=await getDocs(query(collection(db,'schueler'),where('lehrerUid','==',currentUser.uid)));
+  const lp=document.getElementById('lp-content');if(snap.empty){lp.innerHTML='<p class="text-muted">Keine Schüler.</p>';return;}
+  let html='';
+  for(const d of snap.docs){const s=d.data();const ps=await loadPruefungenForSchueler(d.id);const ls=ps.length?ps[0].status:null;
+    html+=`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px"><div><div style="font-family:var(--font-display);font-size:17px">${s.fname} ${s.lname}</div><div style="margin-top:3px">${ls?pruefungStatusBadge(ls):'<span class="badge badge-ausstehend">Keine Prüfung</span>'}</div></div><button class="btn btn-primary btn-sm" onclick="openAddPruefung('${d.id}')">+ Eintragen</button></div>
+    <div id="pruefungen-container-${d.id}">${renderPruefungenList(ps,true,d.id)}</div></div>`;
+  }
+  lp.innerHTML=html;
+};
+pages['admin-pruefungen']=async function(el){
+  el.innerHTML=`<div class="page active"><h1 class="page-title">Prüfungen</h1>
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title">Filter</div>
+    <div class="field" style="max-width:220px"><label>Status</label><select id="ap-filter" onchange="filterAdminPruefungen()"><option value="">Alle</option><option value="ausstehend">Ausstehend</option><option value="bestanden">Bestanden</option><option value="nicht_bestanden">Nicht bestanden</option></select></div>
+  </div>
+  <div id="ap-stats" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px"></div>
+  <div class="card"><div id="ap-list"><div class="spinner"></div></div></div></div>`;
+  await loadAdminPruefungen();
+};
+let _apCache=[];
+async function loadAdminPruefungen(){
+  const[scSnap,pSnap,lSnap]=await Promise.all([getDocs(query(collection(db,'schueler'),where('schoolId','==',currentSchoolId))),getDocs(query(collection(db,'pruefungen'),where('schoolId','==',currentSchoolId),orderBy('datum','desc'))),getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId),where('role','==','lehrer')))]);
+  const lm={};lSnap.docs.forEach(d=>{const u=d.data();lm[d.id]=u.fname+' '+u.lname;});
+  const pbS={};pSnap.docs.forEach(d=>{const p={id:d.id,...d.data()};if(!pbS[p.schuelerId])pbS[p.schuelerId]=[];pbS[p.schuelerId].push(p);});
+  _apCache=scSnap.docs.map(d=>({id:d.id,...d.data(),pruefungen:pbS[d.id]||[]}));
+  const bestanden=_apCache.filter(s=>s.pruefungen.some(p=>p.status==='bestanden')).length;
+  const stats=document.getElementById('ap-stats');
+  if(stats)stats.innerHTML=[{l:'Gesamt',v:_apCache.length,c:'var(--text)'},{l:'Bestanden',v:bestanden,c:'var(--success)'},{l:'Ausstehend',v:_apCache.length-bestanden,c:'var(--accent)'}].map(s=>`<div class="stat-card" style="min-width:100px"><div class="stat-label">${s.l}</div><div class="stat-val" style="color:${s.c}">${s.v}</div></div>`).join('');
+  renderAdminPruefungenList(lm);
+}
+function renderAdminPruefungenList(lm){
+  const filter=document.getElementById('ap-filter')?.value||'',el=document.getElementById('ap-list');if(!el)return;
+  let list=_apCache;
+  if(filter==='bestanden')list=list.filter(s=>s.pruefungen.some(p=>p.status==='bestanden'));
+  else if(filter==='nicht_bestanden')list=list.filter(s=>s.pruefungen.some(p=>p.status==='nicht_bestanden'));
+  else if(filter==='ausstehend')list=list.filter(s=>!s.pruefungen.some(p=>p.status==='bestanden'));
+  if(!list.length){el.innerHTML='<p class="text-muted">Keine Einträge.</p>';return;}
+  el.innerHTML=list.map(s=>{const ls=s.pruefungen.length?s.pruefungen[0].status:null;return`<div class="pruefung-card">
+    <div class="pruefung-status" style="background:${ls?pruefungStatusDot(ls):'#444'}"></div>
+    <div class="pruefung-info"><div class="pruefung-title">${s.fname} ${s.lname}</div><div class="pruefung-meta">${s.lehrerUid?(lm?.[s.lehrerUid]||'?'):'—'} · ${s.pruefungen.length} Versuch(e)</div></div>
+    ${ls?pruefungStatusBadge(ls):'<span class="badge badge-ausstehend">Keine</span>'}
+    <button class="btn btn-primary btn-sm" onclick="openAddPruefung('${s.id}')">+ Eintragen</button>
+    <button class="btn btn-secondary btn-sm" onclick="togglePruefungDetail('${s.id}')">Details</button>
+  </div><div id="pd-${s.id}" style="display:none;padding:0 0 8px 22px">${renderPruefungenList(s.pruefungen,true,s.id)}</div>`;}).join('');
+}
+window.filterAdminPruefungen=function(){renderAdminPruefungenList(null);};
+window.togglePruefungDetail=function(sid){const el=document.getElementById('pd-'+sid);if(el)el.style.display=el.style.display==='none'?'block':'none';};
+
+// ════════════════════════════════
+// WARTELISTE
+// ════════════════════════════════
+pages['lehrer-warteliste']=async function(el){
+  el.innerHTML=`<div class="page active"><h1 class="page-title">Warteliste</h1><div class="card"><div id="wl-list"><div class="spinner"></div></div></div></div>`;
+  const snap=await getDocs(query(collection(db,'warteliste'),where('lehrerUid','==',currentUser.uid),where('abgearbeitet','==',false),orderBy('createdAt')));
+  const wl=document.getElementById('wl-list');
+  if(snap.empty){wl.innerHTML='<p class="text-muted">Keine Einträge auf der Warteliste.</p>';return;}
+  const scIds=[...new Set(snap.docs.map(d=>d.data().schuelerId))];const scm={};
+  for(const id of scIds){const s=await getDoc(doc(db,'schueler',id));if(s.exists())scm[id]=s.data();}
+  wl.innerHTML=snap.docs.map(d=>{const w=d.data();const s=scm[w.schuelerId];const name=s?`${s.fname} ${s.lname}`:'Unbekannt';const link=`${location.origin}${location.pathname}?schueler=${w.schuelerId}&lehrer=${currentUser.uid}`;
+    return`<div class="warteliste-row"><div><div class="warteliste-name">${name}</div><div class="warteliste-meta">${fmtDatetime(w.createdAt)}${w.notiz?' · '+escHtml(w.notiz):''}</div></div>
+    <button class="copy-btn" onclick="copyLink('${link}')">🔗 Link</button><button class="btn btn-success btn-sm" onclick="removeFromWarteliste('${d.id}')">✓ Erledigt</button></div>`;}).join('');
+};
+window.removeFromWarteliste=async function(id){await updateDoc(doc(db,'warteliste',id),{abgearbeitet:true});toast('Erledigt.','success');pages['lehrer-warteliste'](document.getElementById('main-content'));};
+
+// ════════════════════════════════
+// LEHRER – EINSTELLUNGEN (Profil)
+// ════════════════════════════════
+pages['lehrer-profil']=async function(el){
+  el.innerHTML=`<div class="page active"><h1 class="page-title">Einstellungen</h1><div class="card"><div id="profil-content"><div class="spinner"></div></div></div></div>`;
+  const[autosSnap,pSnap]=await Promise.all([getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId),orderBy('createdAt'))),getDoc(doc(db,'kalenderUsers',currentUser.uid))]);
+  const p=pSnap.data();const currentAutoId=p.autoId||'';const bd=p.blockDauer||60;
+  const opts=`<option value="">— Kein Auto —</option>`+autosSnap.docs.map(d=>{const a=d.data();return`<option value="${d.id}" ${currentAutoId===d.id?'selected':''}>${a.modell} · ${a.kennzeichen}</option>`;}).join('');
+  let autoHtml='';
+  if(currentAutoId){const ca=autosSnap.docs.find(d=>d.id===currentAutoId);if(ca){const a=ca.data();autoHtml=`<div class="auto-card" style="margin-bottom:16px"><div class="auto-icon">🚗</div><div class="auto-info"><div class="auto-name">${a.modell}</div></div><span class="auto-kennzeichen">${a.kennzeichen}</span></div>`;}}
+  document.getElementById('profil-content').innerHTML=`
+    <div class="card-title">🚘 Mein Auto</div>${autoHtml}
+    <div class="field"><label>Auto auswählen</label><select id="lehrer-auto-sel">${opts}</select></div>
+    <hr class="divider">
+    <div class="card-title">⏱️ Blockdauer</div>
+    <div class="field" style="max-width:180px"><label>Minuten pro Fahrstunde</label>
+      <select id="lehrer-bd">${[45,50,60,75,80,90,100,120].map(m=>`<option value="${m}" ${bd===m?'selected':''}>${m} Min</option>`).join('')}</select>
+    </div>
+    <button class="btn btn-primary" onclick="saveLehrerProfil()">Speichern</button>`;
+};
+window.saveLehrerProfil=async function(){
+  const autoId=document.getElementById('lehrer-auto-sel').value;
+  const bd=parseInt(document.getElementById('lehrer-bd').value)||60;
+  await updateDoc(doc(db,'kalenderUsers',currentUser.uid),{autoId:autoId||null,blockDauer:bd});
+  toast('Gespeichert!','success');pages['lehrer-profil'](document.getElementById('main-content'));
+};
+
+// ════════════════════════════════
+// NOTIZEN
+// ════════════════════════════════
+async function loadNotizenHtml(sid,viewer){
+  const snap=await getDocs(query(collection(db,'notizen'),where('schuelerId','==',sid),orderBy('createdAt')));
+  if(snap.empty)return'<p class="text-muted" style="margin-bottom:8px">Noch keine Notizen.</p>';
+  return snap.docs.map(d=>{const n=d.data();const isOwn=(viewer==='lehrer'&&n.von==='lehrer')||(viewer==='schueler'&&n.von==='schueler');
+    const auth=n.von==='lehrer'?('👨‍🏫 '+(n.lehrerName||'Fahrlehrer')):'🧑‍🎓 Schüler';
+    const del=isOwn?`<button style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:12px" onclick="deleteNotiz('${d.id}','${sid}','${viewer}')">🗑</button>`:'';
+    return`<div class="notiz-block"><div class="notiz-header"><span class="notiz-author">${auth}</span><span style="display:flex;gap:7px;align-items:center"><span class="notiz-date">${fmtDatetime(n.createdAt)}</span>${del}</span></div><div class="notiz-text">${escHtml(n.text)}</div></div>`;}).join('');}
+window.deleteNotiz=async function(nid,sid,viewer){
+  await deleteDoc(doc(db,'notizen',nid));toast('Gelöscht.','success');
+  const c=document.getElementById('notizen-container-'+sid);if(c)c.innerHTML=await loadNotizenHtml(sid,viewer);
+};
+window.addNotizLehrer=async function(sid){
+  const text=document.getElementById('notiz-text-'+sid)?.value.trim();if(!text)return toast('Notiz eingeben.','error');
+  await addDoc(collection(db,'notizen'),{schuelerId:sid,von:'lehrer',lehrerUid:currentUser.uid,lehrerName:currentProfile.fname+' '+currentProfile.lname,text,schoolId:currentSchoolId,createdAt:serverTimestamp()});
+  document.getElementById('notiz-text-'+sid).value='';
+  const c=document.getElementById('notizen-container-'+sid);if(c)c.innerHTML=await loadNotizenHtml(sid,'lehrer');
+  toast('Notiz gespeichert!','success');
+};
+
+// ════════════════════════════════
+// E-MAIL
+// ════════════════════════════════
+async function triggerEmail(type,payload){try{await addDoc(collection(db,'mailQueue'),{type,payload,status:'pending',createdAt:serverTimestamp()});}catch(e){console.warn('Mail trigger:',e);}}
+
+// ════════════════════════════════
+// SCHÜLER BUCHUNGSSEITE
+// ════════════════════════════════
+async function showBookingPage(schuelerId,lehrerUid){
+  show('booking');
+  // ── SCHÜLER-BUCHUNG (vorerst deaktiviert) ──
+  // Die Online-Selbstbuchung per Link ist aktuell deaktiviert, weil sie
+  // einen sicheren, eng begrenzten Zugriff ohne Login erfordert (kommt als
+  // eigenes Feature). Bis dahin: freundliche Info statt Fehlerseite.
+  const BOOKING_AKTIV = false;
+  if (!BOOKING_AKTIV) {
+    const el = document.getElementById('booking-content');
+    if (el) el.innerHTML = '<div class="booking-card" style="text-align:center;padding:32px 20px">'
+      + '<div style="font-size:2.4rem;margin-bottom:12px">📅</div>'
+      + '<h2 style="margin:0 0 8px;font-size:1.1rem">Terminbuchung bald verfügbar</h2>'
+      + '<p class="text-muted" style="line-height:1.5">Die Online-Buchung wird gerade vorbereitet. '
+      + 'Bitte vereinbare deine Fahrstunden vorerst direkt mit deinem Fahrlehrer.</p>'
+      + '</div>';
+    const sub = document.getElementById('booking-subtitle');
+    if (sub) sub.textContent = '';
+    return;
+  }
+  await loadTypes();
+  const[scSnap,lSnap]=await Promise.all([getDoc(doc(db,'schueler',schuelerId)),getDoc(doc(db,'kalenderUsers',lehrerUid))]);
+  if(!scSnap.exists()||!lSnap.exists()){document.getElementById('booking-content').innerHTML='<div class="booking-card"><p class="text-muted text-center">Ungültiger Link.</p></div>';return;}
+  const schueler=scSnap.data();if(schueler.lehrerUid!==lehrerUid){document.getElementById('booking-content').innerHTML='<div class="booking-card"><p class="text-muted text-center">Dieser Link ist nicht gültig.</p></div>';return;}
+  const lehrer=lSnap.data();
+  document.getElementById('booking-subtitle').textContent=`Hallo ${schueler.fname}! Dein Fahrlehrer: ${lehrer.fname} ${lehrer.lname}`;
+  const schoolId=schueler.schoolId;
+  const now=new Date();
+  const[freeSlotsSnap,myBookingsSnap,bSnap,gbSnap,uSnap]=await Promise.all([
+    getDocs(query(collection(db,'slots'),where('lehrerUid','==',lehrerUid),where('bookedBy','==',null),orderBy('startTime'))),
+    getDocs(query(collection(db,'slots'),where('lehrerUid','==',lehrerUid),where('bookedBy','==',schuelerId),orderBy('startTime'))),
+    getDocs(query(collection(db,'blocked'),where('lehrerUid','==',lehrerUid))),
+    getDocs(query(collection(db,'globalBlocked'),where('schoolId','==',schoolId))),
+    getDocs(query(collection(db,'urlaub'),where('lehrerUid','==',lehrerUid))),
+  ]);
+  const blockedSet=new Set(bSnap.docs.map(d=>{const b=d.data();return`${b.year}-${b.month}-${b.day}`;}));
+  gbSnap.docs.forEach(d=>{const b=d.data();blockedSet.add(`${b.year}-${b.month}-${b.day}`);});
+  const urlaubList=uSnap.docs.map(d=>({id:d.id,...d.data()}));
+  const schoolSnap=await getDoc(doc(db,'schools',schoolId));const school=schoolSnap.exists()?schoolSnap.data():null;
+  const freeSlots=freeSlotsSnap.docs.filter(d=>{const s=d.data();const dt=s.startTime.toDate();const key=`${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}`;
+    const ft=getFeiertageName(dt,school?.bundesland);const u=urlaubCoversDate(urlaubList,dt);
+    return dt>now&&!blockedSet.has(key)&&!ft&&!u;});
+  const myBookings=myBookingsSnap.docs.map(d=>({id:d.id,...d.data()}));
+  const CANCEL_HOURS=48;const maxFS=schueler.maxFahrstunden||0;const bookedCount=myBookings.length;const limitReached=maxFS>0&&bookedCount>=maxFS;
+  const maxAktiv=schueler.maxAktiveTermine||0;const aktive=myBookings.filter(s=>s.startTime.toDate()>now);const aktivLimitReached=maxAktiv>0&&aktive.length>=maxAktiv;
+  let autoHtml='';
+  if(schueler.autoId){const aSnap=await getDoc(doc(db,'autos',schueler.autoId));if(aSnap.exists()){const a=aSnap.data();autoHtml=`<div class="booking-card" style="padding:14px 20px"><div style="display:flex;align-items:center;gap:12px"><span style="font-size:24px">🚗</span><div><div style="font-weight:600;font-size:13px">${a.modell}</div><div style="font-size:11px;color:var(--text-muted)">${a.farbe?a.farbe+' · ':''} ${a.notiz||''}</div></div><span class="auto-kennzeichen" style="margin-left:auto">${a.kennzeichen}</span></div></div>`;}}
+  let kontingentHtml='';
+  if(maxFS>0){const pct=Math.min(100,Math.round(bookedCount/maxFS*100));const bc=pct>=100?'var(--danger)':pct>=75?'var(--accent)':'var(--success)';
+    kontingentHtml=`<div class="booking-card" style="padding:16px 20px"><div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-weight:600;font-size:13px">Fahrstunden-Kontingent</span><span style="font-size:13px;font-weight:600;color:${bc}">${bookedCount}/${maxFS}</span></div>
+    <div style="background:var(--surface2);border-radius:20px;height:7px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${bc};border-radius:20px"></div></div>
+    ${limitReached?`<p style="margin-top:8px;font-size:12px;color:var(--danger)">⚠️ Kontingent aufgebraucht.</p>`:`<p style="margin-top:6px;font-size:11px;color:var(--text-muted)">${maxFS-bookedCount} Stunde(n) noch buchbar</p>`}</div>`;}
+  const myBookingsHtml=myBookings.length?myBookings.map(s=>{const dt=s.startTime.toDate();const canCancel=(dt-now)>CANCEL_HOURS*3600000;const isPast=dt<now;
+    return`<div class="slot-row" style="${isPast?'opacity:.5':''}"><div class="slot-time">${fmt(s.startTime)}<br><span style="font-size:11px;font-weight:400">${fmtTime(s.startTime)}–${fmtTime(s.endTime)}</span></div>
+    <div class="slot-info">${typeBadgeHtml(s.type)}${isPast?'<div style="font-size:10px;color:var(--text-muted)">Vergangen</div>':''}</div>
+    ${isPast?'':canCancel?`<button class="btn btn-danger btn-sm" onclick="cancelMyBooking('${s.id}','${schuelerId}','${lehrerUid}')">Stornieren</button>`:'<span style="font-size:11px;color:var(--text-muted)">Nicht mehr stornierbar</span>'}</div>`;}).join(''):'<p class="text-muted">Noch keine Buchungen.</p>';
+  const freeSlotsHtml=limitReached?`<div style="text-align:center;padding:20px;color:var(--danger)">⛔ Kontingent erschöpft.</div>`:freeSlots.length?freeSlots.map(d=>{const s=d.data();const btn=aktivLimitReached?`<button class="btn btn-secondary btn-sm" onclick="openTauschModal('${d.id}','${schuelerId}','${lehrerUid}')">📅 Tauschen</button>`:`<button class="btn btn-primary btn-sm" onclick="bookSlot('${d.id}','${schuelerId}','${lehrerUid}')">Buchen</button>`;
+    return`<div class="slot-row"><div class="slot-time">${fmt(s.startTime)}<br><span style="font-size:11px;font-weight:400">${fmtTime(s.startTime)}–${fmtTime(s.endTime)}</span></div><div class="slot-info">${typeBadgeHtml(s.type)}</div>${btn}</div>`;}).join(''):'<p class="text-muted">Aktuell keine freien Termine.</p>';
+  const notizenHtml=await loadNotizenHtml(schuelerId,'schueler');
+  const wlSnap=await getDocs(query(collection(db,'warteliste'),where('schuelerId','==',schuelerId),where('lehrerUid','==',lehrerUid),where('abgearbeitet','==',false)));
+  const isOnWL=!wlSnap.empty;
+  const wlHtml=!limitReached&&freeSlots.length===0?`<div class="booking-card"><div class="booking-card-title">⏳ Warteliste</div>${isOnWL?`<p style="color:var(--success);font-size:13px">✓ Du stehst auf der Warteliste.</p><button class="btn btn-danger btn-sm" style="margin-top:10px" onclick="leaveWarteliste('${wlSnap.docs[0].id}','${schuelerId}','${lehrerUid}')">Austragen</button>`:`<p class="text-muted" style="margin-bottom:10px">Keine freien Termine. Auf Warteliste eintragen?</p><div class="notiz-compose"><textarea id="wl-notiz" placeholder="Optionale Nachricht…" style="min-height:55px"></textarea></div><button class="btn btn-primary" style="margin-top:8px" onclick="joinWarteliste('${schuelerId}','${lehrerUid}')">Eintragen</button>`}</div>`:'';
+  const pruefungenSchueler=await loadPruefungenForSchueler(schuelerId);
+  const pruefHtml=pruefungenSchueler.length?`<div class="booking-card"><div class="booking-card-title">🎓 Meine Prüfungen</div>${renderPruefungenList(pruefungenSchueler,false,schuelerId)}</div>`:'';
+  const emailSaved=schueler.email;
+  const emailBannerHtml=`<div class="email-banner"><div class="email-banner-icon">📧</div><div class="email-banner-text"><div class="email-banner-title">E-Mail für Benachrichtigungen</div><div class="email-banner-sub">Buchungsbestätigungen und Erinnerungen.</div></div><div class="email-banner-input">${emailSaved?`<span class="email-saved">✓ ${escHtml(emailSaved)}</span><button class="btn btn-secondary btn-sm" onclick="changeEmail('${schuelerId}','${lehrerUid}')">Ändern</button>`:`<input type="email" id="schueler-email-input" placeholder="deine@email.de"><button class="btn btn-primary btn-sm" onclick="saveSchuelerEmail('${schuelerId}','${lehrerUid}')">Speichern</button>`}</div></div>`;
+  document.getElementById('booking-content').innerHTML=`${emailBannerHtml}${autoHtml}${kontingentHtml}${pruefHtml}<div class="booking-card"><div class="booking-card-title">📋 Meine Buchungen</div>${myBookingsHtml}</div><div class="booking-card"><div class="booking-card-title">🗓️ Freie Termine</div>${freeSlotsHtml}</div>${wlHtml}<div class="booking-card"><div class="booking-card-title">📝 Nachrichten</div><div id="notizen-container-${schuelerId}" style="margin-bottom:10px">${notizenHtml}</div><div class="notiz-compose"><textarea id="booking-notiz-text" placeholder="Nachricht an Fahrlehrer…"></textarea><div style="display:flex;justify-content:flex-end;margin-top:7px"><button class="btn btn-primary btn-sm" onclick="addNotizSchueler('${schuelerId}','${lehrerUid}')">Senden</button></div></div></div><p class="text-muted text-center" style="font-size:11px">Stornierung bis 48 Std. vorher möglich.</p>`;
+}
+
+window.saveSchuelerEmail=async function(sid,luid){const e=document.getElementById('schueler-email-input')?.value.trim();if(!e||!e.includes('@'))return toast('Gültige E-Mail eingeben.','error');await updateDoc(doc(db,'schueler',sid),{email:e});toast('E-Mail gespeichert!','success');showBookingPage(sid,luid);};
+window.changeEmail=async function(sid,luid){const snap=await getDoc(doc(db,'schueler',sid));const cur=snap.data().email||'';openModal(`<h2 class="modal-title">E-Mail ändern</h2><div class="field"><label>Neue E-Mail</label><input id="change-email-input" type="email" value="${escHtml(cur)}"></div><button class="btn btn-primary" onclick="confirmChangeEmail('${sid}','${luid}')">Speichern</button>`);};
+window.confirmChangeEmail=async function(sid,luid){const e=document.getElementById('change-email-input')?.value.trim();if(!e||!e.includes('@'))return toast('Gültige E-Mail.','error');await updateDoc(doc(db,'schueler',sid),{email:e});toast('Aktualisiert!','success');closeModal();showBookingPage(sid,luid);};
+window.addNotizSchueler=async function(sid,luid){const text=document.getElementById('booking-notiz-text')?.value.trim();if(!text)return toast('Nachricht eingeben.','error');const scSnap=await getDoc(doc(db,'schueler',sid));await addDoc(collection(db,'notizen'),{schuelerId:sid,lehrerUid:luid,von:'schueler',text,schoolId:scSnap.data().schoolId,createdAt:serverTimestamp()});document.getElementById('booking-notiz-text').value='';const c=document.getElementById('notizen-container-'+sid);if(c)c.innerHTML=await loadNotizenHtml(sid,'schueler');toast('Gesendet!','success');};
+window.bookSlot=async function(slotId,schuelerId,lehrerUid){
+  const[scSnap,slSnap,lSnap]=await Promise.all([getDoc(doc(db,'schueler',schuelerId)),getDoc(doc(db,'slots',slotId)),getDoc(doc(db,'kalenderUsers',lehrerUid))]);
+  const s=scSnap.data(),slot=slSnap.data(),lehrer=lSnap.data();
+  if((s.maxFahrstunden||0)>0&&(s.bookedCount||0)>=(s.maxFahrstunden||0))return toast('Kontingent erschöpft.','error');
+  const maxA=s.maxAktiveTermine||0;
+  if(maxA>0){const now=new Date();const aSnap=await getDocs(query(collection(db,'slots'),where('lehrerUid','==',lehrerUid),where('bookedBy','==',schuelerId),orderBy('startTime')));const aktive=aSnap.docs.filter(d=>d.data().startTime.toDate()>now);if(aktive.length>=maxA)return openTauschModal(slotId,schuelerId,lehrerUid);}
+  await updateDoc(doc(db,'slots',slotId),{bookedBy:schuelerId,bookedAt:serverTimestamp()});
+  await updateDoc(doc(db,'schueler',schuelerId),{bookedCount:(s.bookedCount||0)+1});
+  if(s.email)await triggerEmail('buchungsbestaetigung',{to:s.email,schuelerName:s.fname+' '+s.lname,lehrerName:lehrer.fname+' '+lehrer.lname,datum:slot.startTime.toDate().toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}),von:fmtTime(slot.startTime),bis:fmtTime(slot.endTime),typ:typeLabel(slot.type),slotId,schuelerId,lehrerUid});
+  toast('Termin gebucht!','success');showBookingPage(schuelerId,lehrerUid);
+};
+window.cancelMyBooking=async function(slotId,schuelerId,lehrerUid){
+  const[slSnap,scSnap,lSnap]=await Promise.all([getDoc(doc(db,'slots',slotId)),getDoc(doc(db,'schueler',schuelerId)),getDoc(doc(db,'kalenderUsers',lehrerUid))]);
+  const slot=slSnap.data(),s=scSnap.data(),lehrer=lSnap.data();
+  await updateDoc(doc(db,'slots',slotId),{bookedBy:null,bookedAt:null});
+  await updateDoc(doc(db,'schueler',schuelerId),{bookedCount:Math.max(0,(s.bookedCount||1)-1)});
+  await triggerEmail('stornierung_freigeworden',{datum:slot.startTime.toDate().toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}),von:fmtTime(slot.startTime),bis:fmtTime(slot.endTime),typ:typeLabel(slot.type),lehrerName:lehrer.fname+' '+lehrer.lname,lehrerUid,slotId});
+  await triggerEmail('warteliste_frei',{lehrerUid,slotId});
+  toast('Storniert.','success');showBookingPage(schuelerId,lehrerUid);
+};
+window.joinWarteliste=async function(sid,luid){const notiz=document.getElementById('wl-notiz')?.value.trim()||'';const scSnap=await getDoc(doc(db,'schueler',sid));await addDoc(collection(db,'warteliste'),{schuelerId:sid,lehrerUid:luid,notiz,abgearbeitet:false,schoolId:scSnap.data().schoolId,createdAt:serverTimestamp()});toast('Eingetragen!','success');showBookingPage(sid,luid);};
+window.leaveWarteliste=async function(wlId,sid,luid){await updateDoc(doc(db,'warteliste',wlId),{abgearbeitet:true});toast('Ausgetragen.','success');showBookingPage(sid,luid);};
+window.openTauschModal=async function(newSlotId,schuelerId,lehrerUid){
+  const[nSnap,bkSnap]=await Promise.all([getDoc(doc(db,'slots',newSlotId)),getDocs(query(collection(db,'slots'),where('lehrerUid','==',lehrerUid),where('bookedBy','==',schuelerId),orderBy('startTime')))]);
+  const ns=nSnap.data();const now=new Date();const aktive=bkSnap.docs.filter(d=>d.data().startTime.toDate()>now).map(d=>({id:d.id,...d.data()}));
+  const nDatum=ns.startTime.toDate().toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long'});
+  const rows=aktive.map(b=>{const canC=(b.startTime.toDate()-now)>48*3600000;const datum=b.startTime.toDate().toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long'});
+    return`<div class="slot-row"><div class="slot-info">${typeBadgeHtml(b.type)}<div style="font-size:12px;margin-top:3px">${datum}, ${fmtTime(b.startTime)}–${fmtTime(b.endTime)}</div></div>${canC?`<button class="btn btn-primary btn-sm" onclick="doTausch('${b.id}','${newSlotId}','${schuelerId}','${lehrerUid}')">Tauschen</button>`:'<span style="font-size:11px;color:var(--text-muted)">Nicht stornierbar</span>'}</div>`;}).join('');
+  openModal(`<h2 class="modal-title">Maximum erreicht</h2><div style="background:rgba(212,168,67,.1);border:1px solid rgba(212,168,67,.3);border-radius:7px;padding:11px;margin-bottom:14px"><div style="font-size:12px;color:var(--text-muted);margin-bottom:5px">Neuer Termin:</div><div style="font-weight:600">${nDatum}, ${fmtTime(ns.startTime)}–${fmtTime(ns.endTime)}</div>${typeBadgeHtml(ns.type)}</div><p style="font-size:13px;margin-bottom:12px">Wähle einen bestehenden Termin zum Tauschen:</p>${rows||'<p class="text-muted">Keine tauschbaren Termine.</p>'}`);
+};
+window.doTausch=async function(oldId,newId,sid,luid){
+  const[oSnap,scSnap,lSnap,nSnap]=await Promise.all([getDoc(doc(db,'slots',oldId)),getDoc(doc(db,'schueler',sid)),getDoc(doc(db,'kalenderUsers',luid)),getDoc(doc(db,'slots',newId))]);
+  const s=scSnap.data(),lehrer=lSnap.data(),ns=nSnap.data();
+  await updateDoc(doc(db,'slots',oldId),{bookedBy:null,bookedAt:null});
+  await updateDoc(doc(db,'slots',newId),{bookedBy:sid,bookedAt:serverTimestamp()});
+  if(s.email)await triggerEmail('buchungsbestaetigung',{to:s.email,schuelerName:s.fname+' '+s.lname,lehrerName:lehrer.fname+' '+lehrer.lname,datum:ns.startTime.toDate().toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}),von:fmtTime(ns.startTime),bis:fmtTime(ns.endTime),typ:typeLabel(ns.type),slotId:newId,schuelerId:sid,lehrerUid:luid});
+  toast('Getauscht!','success');closeModal();showBookingPage(sid,luid);
+};
+
+// Mobile table labels
+function injectTableLabels(){document.querySelectorAll('table').forEach(table=>{const headers=[...table.querySelectorAll('th')].map(th=>th.textContent.trim());table.querySelectorAll('tbody tr').forEach(row=>{[...row.querySelectorAll('td')].forEach((td,i)=>{if(headers[i])td.setAttribute('data-label',headers[i]);});});});}
+const _navBase=window.navigate;window.navigate=function(page){_navBase(page);setTimeout(injectTableLabels,300);};
+
+// ════════════════════════════════
+// LEGAL PAGES
+// ════════════════════════════════
+window.showLegal=function(page){
+  const content = {
+    impressum: `
+      <h2 class="modal-title">Impressum</h2>
+      <div class="legal-section">
+        <h3>Angaben gemäß § 5 TMG</h3>
+        <p>ChrisKrossderFahrlehrer<br>
+        Chris Kross<br>
+        [Straße und Hausnummer]<br>
+        [PLZ] [Ort]<br>
+        Deutschland</p>
+      </div>
+      <div class="legal-section">
+        <h3>Kontakt</h3>
+        <p>E-Mail: chriskoo@mail.de</p>
+      </div>
+      <div class="legal-section">
+        <h3>Urheberrecht</h3>
+        <p>Die durch den Seitenbetreiber erstellten Inhalte und Werke auf diesen Seiten unterliegen dem deutschen Urheberrecht. Die Vervielfältigung, Bearbeitung, Verbreitung und jede Art der Verwertung außerhalb der Grenzen des Urheberrechtes bedürfen der schriftlichen Zustimmung des jeweiligen Autors bzw. Erstellers.</p>
+      </div>
+      <div class="legal-section">
+        <h3>Haftung für Inhalte</h3>
+        <p>Als Diensteanbieter sind wir gemäß § 7 Abs.1 TMG für eigene Inhalte auf diesen Seiten nach den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 TMG sind wir als Diensteanbieter jedoch nicht verpflichtet, übermittelte oder gespeicherte fremde Informationen zu überwachen.</p>
+      </div>`,
+
+    datenschutz: `
+      <h2 class="modal-title">Datenschutzerklärung</h2>
+      <div class="legal-section">
+        <h3>1. Verantwortlicher</h3>
+        <p>Verantwortlich für die Datenverarbeitung ist:<br>
+        ChrisKrossderFahrlehrer · chriskoo@mail.de</p>
+      </div>
+      <div class="legal-section">
+        <h3>2. Welche Daten werden gespeichert?</h3>
+        <ul>
+          <li>Name und E-Mail-Adresse von Fahrlehrern und Fahrschülern</li>
+          <li>Gebuchte und angebotene Termine (Datum, Uhrzeit, Fahrstundentyp)</li>
+          <li>Optionale Notizen zwischen Fahrlehrer und Schüler</li>
+          <li>Prüfungsdaten (Datum, Ergebnis, Ort)</li>
+          <li>Fahrzeugdaten (Kennzeichen, Modell)</li>
+        </ul>
+      </div>
+      <div class="legal-section">
+        <h3>3. Zweck der Datenverarbeitung</h3>
+        <p>Die erhobenen Daten werden ausschließlich zur Verwaltung von Fahrstunden, Terminen und Schülerdaten innerhalb der jeweiligen Fahrschule verwendet. Eine Weitergabe an Dritte erfolgt nicht.</p>
+      </div>
+      <div class="legal-section">
+        <h3>4. Datenspeicherung</h3>
+        <p>Alle Daten werden sicher in Google Firebase (Firestore) gespeichert. Google Firebase ist nach DSGVO-Standardvertragsklauseln zertifiziert. Die Server befinden sich in der EU (Region europe-west3, Frankfurt).</p>
+      </div>
+      <div class="legal-section">
+        <h3>5. Ihre Rechte</h3>
+        <p>Sie haben das Recht auf Auskunft, Berichtigung, Löschung und Einschränkung der Verarbeitung Ihrer gespeicherten Daten. Bitte wenden Sie sich dazu an: chriskoo@mail.de</p>
+      </div>
+      <div class="legal-section">
+        <h3>6. Datenlöschung</h3>
+        <p>Daten von Fahrschülern werden auf Anfrage oder nach Beendigung des Ausbildungsverhältnisses gelöscht. Fahrschulen können ihre gesamten Daten jederzeit löschen lassen.</p>
+      </div>`,
+
+    agb: `
+      <h2 class="modal-title">AGB & Nutzungsbedingungen</h2>
+      <div class="legal-section">
+        <h3>1. Geltungsbereich</h3>
+        <p>Diese Allgemeinen Geschäftsbedingungen gelten für die Nutzung der Software „Fahrschule Kalender" (nachfolgend „die App"), entwickelt und betrieben von ChrisKrossderFahrlehrer (nachfolgend „Anbieter").</p>
+      </div>
+      <div class="legal-section">
+        <h3>2. Urheberrecht & geistiges Eigentum</h3>
+        <p>Die App einschließlich aller ihrer Bestandteile (Code, Design, Konzept, Texte, Grafiken) ist urheberrechtlich geschützt. Alle Rechte liegen beim Anbieter.</p>
+        <ul>
+          <li>Es ist <strong>nicht erlaubt</strong>, die App oder Teile davon zu kopieren, weiterzuverkaufen, zu vermieten oder Dritten ohne schriftliche Genehmigung zur Verfügung zu stellen.</li>
+          <li>Es ist <strong>nicht erlaubt</strong>, den Quellcode der App zu dekompilieren, zu reverse-engineeren oder abgeleitete Werke daraus zu erstellen.</li>
+          <li>Es ist <strong>nicht erlaubt</strong>, die App unter eigenem Namen oder als eigenes Produkt anzubieten.</li>
+          <li>Logos, Markennamen und Bezeichnungen des Anbieters dürfen ohne Genehmigung nicht verwendet werden.</li>
+        </ul>
+      </div>
+      <div class="legal-section">
+        <h3>3. Nutzungslizenz</h3>
+        <p>Fahrschulen erhalten eine nicht-übertragbare, nicht-exklusive Lizenz zur Nutzung der App für ihren eigenen Betrieb. Diese Lizenz berechtigt nicht zur Weitergabe an Dritte.</p>
+      </div>
+      <div class="legal-section">
+        <h3>4. Pflichten der Nutzer</h3>
+        <ul>
+          <li>Zugangsdaten sind vertraulich zu behandeln und dürfen nicht an Unbefugte weitergegeben werden.</li>
+          <li>Die App darf nicht für illegale Zwecke oder zur Schädigung anderer Nutzer verwendet werden.</li>
+          <li>Schülerdaten sind gemäß DSGVO zu behandeln. Die Fahrschule ist verantwortlich für die Einhaltung der datenschutzrechtlichen Pflichten gegenüber ihren Schülern.</li>
+        </ul>
+      </div>
+      <div class="legal-section">
+        <h3>5. Verfügbarkeit & Gewährleistung</h3>
+        <p>Der Anbieter bemüht sich um eine hohe Verfügbarkeit der App, übernimmt jedoch keine Garantie für unterbrechungsfreien Betrieb. Wartungsarbeiten werden nach Möglichkeit angekündigt. Eine Haftung für Datenverlust oder Schäden durch Systemausfälle ist ausgeschlossen, soweit dies gesetzlich zulässig ist.</p>
+      </div>
+      <div class="legal-section">
+        <h3>6. Kündigung & Datenlöschung</h3>
+        <p>Der Anbieter behält sich das Recht vor, Accounts bei Verstoß gegen diese AGB ohne Vorankündigung zu sperren. Bei Kündigung werden alle Daten der betreffenden Fahrschule binnen 30 Tagen gelöscht.</p>
+      </div>
+      <div class="legal-section">
+        <h3>7. Änderungen der AGB</h3>
+        <p>Der Anbieter behält sich vor, diese AGB jederzeit zu ändern. Nutzer werden über wesentliche Änderungen informiert. Die fortgesetzte Nutzung der App nach Änderungen gilt als Zustimmung.</p>
+      </div>
+      <div class="legal-section">
+        <h3>8. Anwendbares Recht</h3>
+        <p>Es gilt das Recht der Bundesrepublik Deutschland. Gerichtsstand ist der Sitz des Anbieters.</p>
+      </div>
+      <div class="legal-section">
+        <h3>9. Kontakt</h3>
+        <p>Bei Fragen zu diesen AGB wenden Sie sich an:<br>chriskoo@mail.de</p>
+      </div>`
+  };
+  openModal(content[page] || '<p class="text-muted">Seite nicht gefunden.</p>');
+};
+// URL check on load
+const params=new URLSearchParams(window.location.search);
+if(params.get('schueler')&&params.get('lehrer'))showBookingPage(params.get('schueler'),params.get('lehrer'));
+</script>
+</body>
+</html>
