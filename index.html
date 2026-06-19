@@ -2152,14 +2152,15 @@ window.doRegister = async () => {
       });
     } catch(unErr) { console.warn('username-mapping:', unErr); }
 
-    // Falls Fahrlehrer einen Code eingegeben hat: Fahrschule suchen (jetzt authentifiziert)
+    // Falls Fahrlehrer einen Code eingegeben hat: Fahrschule per schoolCodes-
+    // Nachschlagetabelle finden (get statt list → kein Abgreifen aller Codes).
     let zielFahrschule = null;
     if (regRole === 'fahrlehrer' && fsCode) {
       try {
-        const fsQ = query(collection(db, 'fahrschulen'), where('fahrschulCode', '==', fsCode));
-        const fsSnap = await getDocs(fsQ);
-        if (!fsSnap.empty) {
-          zielFahrschule = { id: fsSnap.docs[0].id, ...fsSnap.docs[0].data() };
+        const codeSnap = await getDoc(doc(db, 'schoolCodes', fsCode));
+        if (codeSnap.exists()) {
+          const sid = codeSnap.data().schoolId;
+          zielFahrschule = { id: sid, name: codeSnap.data().schoolName || null, fahrschulCode: fsCode };
         } else {
           toast('⚠️ Code "' + fsCode + '" nicht gefunden – du wurdest als eigenständiger Lehrer angelegt.');
         }
@@ -2181,6 +2182,13 @@ window.doRegister = async () => {
         abo:           'free',
         createdAt:     Date.now()
       });
+      // Code-Nachschlage-Eintrag anlegen, damit Fahrlehrer per Code beitreten
+      // können, ohne dass alle Fahrschulen lesbar sein müssen.
+      try {
+        await setDoc(doc(db, 'schoolCodes', code), {
+          schoolId: cred.user.uid, schoolName: name, createdAt: Date.now()
+        });
+      } catch(scErr) { console.warn('schoolCode-Eintrag:', scErr); }
       await setDoc(doc(db, 'users', cred.user.uid), {
         uid: cred.user.uid, username: unameLower, email, name,
         fahrschuleId: cred.user.uid,
@@ -2195,7 +2203,7 @@ window.doRegister = async () => {
 
     } else {
       // ── FAHRLEHRER (einzeln) ──
-      await setDoc(doc(db, 'users', cred.user.uid), {
+      const fahrlehrerDoc = {
         uid: cred.user.uid, username: unameLower, email, name,
         fahrschuleId:    zielFahrschule ? zielFahrschule.id : cred.user.uid,
         fahrschuleName:  zielFahrschule ? zielFahrschule.name : null,
@@ -2205,7 +2213,12 @@ window.doRegister = async () => {
         createdAt:       Date.now(),
         datenschutzAkzeptiert: true,
         datenschutzAkzeptiertAm: Date.now()
-      });
+      };
+      // Wenn einer Fahrschule beigetreten wird: Code mitgeben, damit die
+      // Firestore-Regel prüfen kann, dass der Code wirklich zu dieser Schule
+      // gehört (Cross-Tenant-Schutz auch beim Anlegen).
+      if (zielFahrschule && fsCode) fahrlehrerDoc.beitrittCode = fsCode;
+      await setDoc(doc(db, 'users', cred.user.uid), fahrlehrerDoc);
       sendRegistrationNotification({
         name, email, username,
         typ: zielFahrschule ? 'Fahrlehrer (→ ' + zielFahrschule.name + ')' : 'Fahrlehrer (eigenständig)'
@@ -5398,6 +5411,16 @@ async function renderFscodeSection() {
     if (istInhaber && fsDoc.exists() && fsDoc.data().fahrschulCode) {
       // ── FAHRSCHULE: eigenen Code anzeigen ──
       const code = fsDoc.data().fahrschulCode;
+      // Selbstheilung: schoolCodes-Eintrag anlegen, falls noch nicht vorhanden
+      // (Migration bestehender Fahrschulen – läuft automatisch beim Inhaber).
+      try {
+        const scSnap = await getDoc(doc(db, 'schoolCodes', code));
+        if (!scSnap.exists()) {
+          await setDoc(doc(db, 'schoolCodes', code), {
+            schoolId: currentUser.uid, schoolName: fsDoc.data().name || '', createdAt: Date.now()
+          });
+        }
+      } catch(scErr) { console.warn('schoolCode-Selbstheilung:', scErr); }
       body.innerHTML =
         '<div style="font-size:0.8rem;color:var(--muted);line-height:1.5;margin-bottom:10px">Gib diesen Code an deine Fahrlehrer weiter, damit sie sich deiner Fahrschule anschließen können:</div>'
         + '<div style="display:flex;gap:8px;align-items:center">'
@@ -5449,13 +5472,14 @@ window.fahrschuleBeitreten = async () => {
   if (!code) { if(msg){msg.style.color='var(--danger)';msg.textContent='Bitte Code eingeben.';} return; }
   if (msg) { msg.style.color='var(--muted)'; msg.textContent='Suche Fahrschule…'; }
   try {
-    const fsQ = query(collection(db, 'fahrschulen'), where('fahrschulCode', '==', code));
-    const fsSnap = await getDocs(fsQ);
-    if (fsSnap.empty) {
+    // Fahrschule per Code-Nachschlagetabelle finden (get → man muss den Code
+    // kennen; kein Auflisten aller Schulen/Codes möglich).
+    const codeSnap = await getDoc(doc(db, 'schoolCodes', code));
+    if (!codeSnap.exists()) {
       if (msg) { msg.style.color='var(--danger)'; msg.textContent='❌ Code "' + code + '" nicht gefunden. Bitte prüfen.'; }
       return;
     }
-    const ziel = { id: fsSnap.docs[0].id, ...fsSnap.docs[0].data() };
+    const ziel = { id: codeSnap.data().schoolId, name: codeSnap.data().schoolName || null };
     // User-Dokument aktualisieren: dieser Fahrschule zuordnen
     // beitrittCode wird mitgesendet, damit die Firestore-Regel prüfen kann,
     // dass der Code wirklich zu dieser Schule gehört (Cross-Tenant-Schutz).
