@@ -326,7 +326,7 @@ html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--tex
 
 <script type="module">
 import { initializeApp }    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, collection, doc, getDocs, onSnapshot,
+import { getFirestore, collection, doc, getDoc, getDocs, onSnapshot,
          query, where, updateDoc }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
@@ -378,12 +378,21 @@ window.doLogin = async () => {
 
   document.querySelector('.btn-login').textContent = '…';
   try {
-    const q    = query(collection(db,'accessCodes'), where('code','==',code));
-    const snap = await getDocs(q);
-    if (snap.empty) { errEl.textContent = '❌ Code nicht gefunden.'; return; }
-
-    const docRef  = snap.docs[0];
-    const data    = docRef.data();
+    // SICHERHEIT: Der Code ist die Dokument-ID → gezieltes get() statt list().
+    // So ist kein massenhaftes Auslesen der Collection möglich.
+    let docRef = null, data = null;
+    const direct = await getDoc(doc(db,'accessCodes', code));
+    if (direct.exists()) {
+      docRef = direct; data = direct.data();
+    } else {
+      // Fallback für ALTE Codes (vor der Umstellung, noch mit Zufalls-ID).
+      try {
+        const q = query(collection(db,'accessCodes'), where('code','==',code));
+        const snap = await getDocs(q);
+        if (!snap.empty) { docRef = snap.docs[0]; data = docRef.data(); }
+      } catch(_) { /* list evtl. gesperrt – dann bleibt es bei 'nicht gefunden' */ }
+    }
+    if (!docRef || !data) { errEl.textContent = '❌ Code nicht gefunden.'; return; }
 
     if (data.expiresAt && data.expiresAt < Date.now()) {
       errEl.textContent = 'Code abgelaufen – neuen Code beim Fahrlehrer holen.'; return;
