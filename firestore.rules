@@ -134,19 +134,20 @@ service cloud.firestore {
 
       // CREATE: Beim Anlegen des EIGENEN Kontos dürfen sicherheitsrelevante
       // Felder NICHT frei gewählt werden. rolle muss 'fahrlehrer' oder
-      // 'fahrschul-admin' sein (NIE superadmin/fs_admin), status muss
-      // 'ausstehend' sein, und kalenderAktiv darf nicht aktiv sein.
-      // Nur der SuperAdmin darf beliebige Werte setzen.
+      // 'fahrschul-admin' sein (NIE superadmin/fs_admin), kalenderAktiv darf
+      // nicht aktiv sein, und fahrschuleId nur die eigene uid oder eine Schule
+      // mit gültigem Code. status darf 'aktiv' oder 'ausstehend' sein
+      // (Selbstheilung bestehender Konten = 'aktiv'; Neu-Registrierung =
+      // 'ausstehend'). Ein selbst angelegtes Konto ist ein isolierter
+      // Einzel-Lehrer (eigene Daten) – die Schul-Trennung bleibt geschützt.
       allow create: if isAuth() && (
                       isSuperAdmin() ||
                       (
                         request.auth.uid == uid &&
                         request.resource.data.rolle in ['fahrlehrer', 'fahrschul-admin'] &&
-                        request.resource.data.get('status', 'ausstehend') == 'ausstehend' &&
+                        request.resource.data.get('status', 'ausstehend') in ['aktiv', 'ausstehend'] &&
                         request.resource.data.get('kalenderAktiv', false) == false &&
                         (
-                          // fahrschuleId beim Anlegen nur die eigene uid
-                          // (eigenständig/Inhaber) ODER eine Schule mit gültigem Code
                           request.resource.data.fahrschuleId == request.auth.uid ||
                           fahrschulCodeStimmt()
                         )
