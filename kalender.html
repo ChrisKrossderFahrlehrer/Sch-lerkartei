@@ -272,26 +272,12 @@ tr:last-child td{border-bottom:none;}
   <div class="auth-box">
     <div class="auth-logo">🚗 Fahrschule</div>
     <div class="auth-sub">Kalender & Buchungssystem</div>
-    <div class="auth-tabs">
-      <button class="auth-tab active" onclick="switchAuthTab('login')">Anmelden</button>
-      <button class="auth-tab" onclick="switchAuthTab('register')">Neue Fahrschule</button>
-    </div>
     <div id="kal-hinweis" style="display:none;background:rgba(255,180,0,0.12);border:1px solid rgba(255,180,0,0.4);border-radius:10px;padding:14px;margin-bottom:14px;font-size:0.9rem;line-height:1.5;color:#ffd479"></div>
     <div id="login-form">
       <div class="field"><label>E-Mail</label><input id="login-email" type="email" placeholder="admin@fahrschule.de"></div>
       <div class="field"><label>Passwort</label><input id="login-pw" type="password" placeholder="••••••••"></div>
       <button class="btn btn-primary btn-full" onclick="doLogin()">Anmelden</button>
-    </div>
-    <div id="register-form" style="display:none">
-      <div class="field"><label>Name der Fahrschule</label><input id="reg-school" type="text" placeholder="Fahrschule Mustermann"></div>
-      <div class="field"><label>Bundesland</label>
-        <select id="reg-bl"><option value="">— Bitte wählen —</option></select>
-      </div>      <hr class="divider">
-      <div class="field"><label>Ihr Vorname</label><input id="reg-fname" type="text" placeholder="Max"></div>
-      <div class="field"><label>Ihr Nachname</label><input id="reg-lname" type="text" placeholder="Mustermann"></div>
-      <div class="field"><label>E-Mail</label><input id="reg-email" type="email" placeholder="admin@fahrschule.de"></div>
-      <div class="field"><label>Passwort</label><input id="reg-pw" type="password" placeholder="Mindestens 6 Zeichen"></div>
-      <button class="btn btn-primary btn-full" onclick="doRegisterAdmin()">Fahrschule registrieren</button>
+      <div style="margin-top:14px;font-size:0.82rem;color:var(--text-muted,#999);line-height:1.5;text-align:center">Du nutzt dieselben Zugangsdaten wie in der Schülerkartei.<br>Ein neues Konto legst du in der Haupt-App an.</div>
     </div>
   </div>
 </div>
@@ -471,17 +457,9 @@ function show(screen){
   document.getElementById('booking-screen').style.display=screen==='booking'?'flex':'none';
 }
 
-// ── POPULATE BUNDESLAND SELECT ON PAGE LOAD ──
-document.addEventListener('DOMContentLoaded',()=>{
-  const sel=document.getElementById('reg-bl');
-  if(sel)Object.entries(BUNDESLAENDER).forEach(([k,v])=>{const o=document.createElement('option');o.value=k;o.textContent=v;sel.appendChild(o);});
-});
-
 // ── AUTH ──
 window.switchAuthTab=function(tab){
-  document.querySelectorAll('.auth-tab').forEach((b,i)=>b.classList.toggle('active',['login','register'][i]===tab));
-  document.getElementById('login-form').style.display=tab==='login'?'':'none';
-  document.getElementById('register-form').style.display=tab==='register'?'':'none';
+  /* Registrierungs-Tabs entfernt – neue Konten werden in der Haupt-App (ADK) angelegt. */
 };
 window.doLogin=async function(){
   const email=document.getElementById('login-email').value.trim();
@@ -490,19 +468,10 @@ window.doLogin=async function(){
   catch(e){toast('Anmeldung fehlgeschlagen: '+e.message,'error');}
 };
 window.doRegisterAdmin=async function(){
-  const schoolName=document.getElementById('reg-school').value.trim();
-  const bl=document.getElementById('reg-bl').value;
-  const fname=document.getElementById('reg-fname').value.trim();
-  const lname=document.getElementById('reg-lname').value.trim();
-  const email=document.getElementById('reg-email').value.trim();
-  const pw=document.getElementById('reg-pw').value;
-  if(!schoolName||!bl||!fname||!lname||!email||!pw)return toast('Bitte alle Felder ausfüllen.','error');
-  try{
-    const cred=await createUserWithEmailAndPassword(auth,email,pw);
-    const schoolRef=await addDoc(collection(db,'schools'),{name:schoolName,bundesland:bl,adminUid:cred.user.uid,createdAt:serverTimestamp()});
-    await setDoc(doc(db,'kalenderUsers',cred.user.uid),{uid:cred.user.uid,email,fname,lname,role:'admin',approved:true,schoolId:schoolRef.id,createdAt:serverTimestamp()});
-    toast('Fahrschule registriert!','success');
-  }catch(e){toast('Fehler: '+e.message,'error');}
+  // Registrierung läuft ausschließlich in der Haupt-App (Schülerkartei).
+  // Hier KEIN createUserWithEmailAndPassword mehr – das würde die geteilte
+  // ADK-Sitzung zerstören und Konten am Zugangssystem vorbei anlegen.
+  toast('Neue Fahrschulen/Konten werden in der Haupt-App (Schülerkartei) angelegt.','error');
 };
 window.doLogout=async function(){
   currentUser=null;currentRole=null;currentProfile=null;currentSchoolId=null;currentSchool=null;
@@ -717,36 +686,10 @@ async function renderSASchoolList(){
     }).join('')+'</tbody></table>';
 }
 window.saCreateSchool=async function(){
-  const name=document.getElementById('sa-school-name').value.trim();
-  const bl=document.getElementById('sa-school-bl').value;
-  const fname=document.getElementById('sa-admin-fname').value.trim();
-  const lname=document.getElementById('sa-admin-lname').value.trim();
-  const email=document.getElementById('sa-admin-email').value.trim();
-  const pw=document.getElementById('sa-admin-pw').value;
-  if(!name||!bl||!fname||!lname||!email||!pw)return toast('Bitte alle Felder ausfüllen.','error');
-  try{
-    // Speichere Super-Admin Credentials vor dem Wechsel
-    const saEmail=currentUser.email;
-    const cred=await createUserWithEmailAndPassword(auth,email,pw);
-    const schoolRef=await addDoc(collection(db,'schools'),{name,bundesland:bl,adminUid:cred.user.uid,createdAt:serverTimestamp()});
-    await setDoc(doc(db,'kalenderUsers',cred.user.uid),{uid:cred.user.uid,email,fname,lname,role:'admin',approved:true,schoolId:schoolRef.id,createdAt:serverTimestamp()});
-    // Zeige Passwort-Modal für Re-Login
-    openModal(`<h2 class="modal-title">Super-Admin bestätigen</h2>
-      <p class="text-muted" style="margin-bottom:14px">Bitte Super-Admin Passwort eingeben um fortzufahren.</p>
-      <div class="field"><label>Passwort</label><input id="sa-relogin-pw" type="password" placeholder="Dein Passwort"></div>
-      <button class="btn btn-primary btn-full" onclick="saReLogin('${saEmail}')">Bestätigen</button>`);
-    setTimeout(()=>document.getElementById('sa-relogin-pw')?.focus(),100);
-  }catch(e){toast('Fehler: '+e.message,'error');}
-};
-window.saReLogin=async function(saEmail){
-  const pw=document.getElementById('sa-relogin-pw')?.value;
-  if(!pw)return toast('Passwort eingeben.','error');
-  try{
-    await signInWithEmailAndPassword(auth,saEmail,pw);
-    closeModal();
-    toast('Fahrschule angelegt!','success');
-    await renderSASchoolList();
-  }catch(e){toast('Falsches Passwort.','error');}
+  // Fahrschulen werden in der Haupt-App (Schülerkartei) angelegt und dort
+  // fürs Kalender-Modul freigeschaltet. Kein createUser hier (zerstört die
+  // geteilte Sitzung + legt Konten am Zugangssystem vorbei an).
+  toast('Fahrschulen werden in der Haupt-App angelegt und dort fürs Kalender-Modul freigeschaltet.','error');
 };
 window.deleteSchool=async function(schoolId,name){
   if(!confirm(`Fahrschule "${name}" wirklich löschen?\n\nALLE Daten (Lehrer, Schüler, Slots, Buchungen) werden unwiderruflich gelöscht!`))return;
@@ -833,32 +776,10 @@ async function renderLehrerList(){
       </tr>`;}).join('')+'</tbody></table>';
 }
 window.createLehrer=async function(){
-  const fname=document.getElementById('nl-fname').value.trim();
-  const lname=document.getElementById('nl-lname').value.trim();
-  const email=document.getElementById('nl-email').value.trim();
-  const pw=document.getElementById('nl-pw').value;
-  if(!fname||!lname||!email||!pw)return toast('Bitte alle Felder ausfüllen.','error');
-  try{
-    const adminEmail=currentUser.email;
-    const cred=await createUserWithEmailAndPassword(auth,email,pw);
-    await setDoc(doc(db,'kalenderUsers',cred.user.uid),{uid:cred.user.uid,email,fname,lname,role:'lehrer',approved:true,schoolId:currentSchoolId,createdAt:serverTimestamp()});
-    // Modal für Re-Login
-    openModal(`<h2 class="modal-title">Admin bestätigen</h2>
-      <p class="text-muted" style="margin-bottom:14px">Bitte Admin-Passwort eingeben um fortzufahren.</p>
-      <div class="field"><label>Passwort</label><input id="admin-relogin-pw" type="password" placeholder="Dein Passwort"></div>
-      <button class="btn btn-primary btn-full" onclick="adminReLogin('${adminEmail}')">Bestätigen</button>`);
-    setTimeout(()=>document.getElementById('admin-relogin-pw')?.focus(),100);
-  }catch(e){toast('Fehler: '+e.message,'error');}
-};
-window.adminReLogin=async function(adminEmail){
-  const pw=document.getElementById('admin-relogin-pw')?.value;
-  if(!pw)return toast('Passwort eingeben.','error');
-  try{
-    await signInWithEmailAndPassword(auth,adminEmail,pw);
-    closeModal();
-    toast('Fahrlehrer angelegt!','success');
-    await renderLehrerList();
-  }catch(e){toast('Falsches Passwort.','error');}
+  // Fahrlehrer registrieren sich in der Haupt-App und treten der Fahrschule
+  // per Code bei. Sie erscheinen hier automatisch, sobald sie den Kalender
+  // einmal öffnen. Kein createUser hier (zerstört die geteilte Sitzung).
+  toast('Fahrlehrer melden sich in der Haupt-App an und treten per Code bei – danach erscheinen sie hier automatisch.','error');
 };
 window.deleteLehrer=async function(uid,name){
   if(!confirm(`Fahrlehrer "${name}" wirklich löschen?`))return;
