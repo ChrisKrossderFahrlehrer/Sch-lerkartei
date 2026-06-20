@@ -2642,9 +2642,9 @@ onAuthStateChanged(auth, async (user) => {
               fahrschuleId: user.uid,       // eigenständig
               rolle:        'fahrlehrer',
               typ:          'fahrlehrer',
-              status:       'ausstehend',    // muss freigeschaltet werden (Sicherheit: kein Self-Aktiv)
+              status:       'aktiv',         // bestehendes Konto (war schon in Nutzung) → direkt aktiv
               createdAt:    Date.now(),
-              nacherstellt: true             // Markierung: nachträglich angelegt
+              nacherstellt: true             // Markierung: nachträglich angelegt (bestehender Nutzer)
             });
             console.log('✅ Fehlendes users-Dokument für', user.email, 'nachträglich angelegt');
           } catch(healErr) { console.error('Selbstheilung fehlgeschlagen:', healErr); }
@@ -2728,7 +2728,10 @@ onAuthStateChanged(auth, async (user) => {
           }
         }
 
-        if (!istSuperadmin && effektiverStatus === 'ausstehend') {
+        // Nachträglich angelegte Konten (nacherstellt) sind BESTEHENDE Nutzer
+        // und werden NICHT auf den Warte-Bildschirm geschickt – nur echte
+        // Neu-Registrierungen (ohne nacherstellt) warten auf Freigabe.
+        if (!istSuperadmin && effektiverStatus === 'ausstehend' && !profil.nacherstellt) {
           document.querySelectorAll('.screen').forEach(s => { s.classList.remove('active'); s.style.display=''; });
           document.getElementById('screen-warte').classList.add('active');
           document.getElementById('warte-name').textContent =
