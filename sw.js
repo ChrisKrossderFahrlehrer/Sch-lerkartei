@@ -2,7 +2,7 @@
 // HTML kommt IMMER frisch vom Server → kein Cache-Löschen mehr nötig!
 // Cache dient nur als Offline-Fallback.
 
-const CACHE_NAME = 'adk-v11';
+const CACHE_NAME = 'adk-v12';
 
 // Nur statische Assets die sich nie ändern → Cache-First erlaubt
 const STATIC_ASSETS = [
@@ -77,10 +77,11 @@ self.addEventListener('fetch', event => {
   }
 
   // ── HTML & alles andere → NETWORK-FIRST ──
-  // Immer frisch vom Server. Erfolgreiche Antwort aktualisiert den
-  // Offline-Fallback-Cache. Nur wenn offline → Cache.
+  // Immer frisch vom Server. {cache:'no-store'} umgeht Safaris HTTP-Cache UND
+  // den GitHub-Pages-CDN-Cache → Updates erscheinen SOFORT, nicht erst nach
+  // 10 Minuten. Erfolgreiche Antwort aktualisiert den Offline-Fallback-Cache.
   event.respondWith(
-    fetch(event.request)
+    fetch(event.request, { cache: 'no-store' })
       .then(resp => {
         if (resp && resp.status === 200 && resp.type === 'basic') {
           const clone = resp.clone();
