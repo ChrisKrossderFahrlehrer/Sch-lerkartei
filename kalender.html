@@ -1343,9 +1343,9 @@ window.deleteSlotFromList=async function(id){await deleteDoc(doc(db,'slots',id))
 // ════════════════════════════════
 pages['lehrer-buchungen']=async function(el){
   el.innerHTML=`<div class="page active"><h1 class="page-title">Buchungen</h1>
-    <div class="card" style="margin-bottom:16px"><div class="card-title">\ud83d\udd17 Online-Buchung f\u00fcr Sch\u00fcler</div><div id="booking-online"><div class="spinner"></div></div></div>
-    <div class="card" style="margin-bottom:16px"><div class="card-title">\ud83d\udce5 Offene Anfragen</div><div id="booking-requests"><div class="spinner"></div></div></div>
-    <div class="card"><div class="card-title">\u2705 Best\u00e4tigte Buchungen</div><div id="buchungen-list"><div class="spinner"></div></div></div></div>`;
+    <div class="card" style="margin-bottom:16px"><div class="card-title">🔗 Online-Buchung für Schüler</div><div id="booking-online"><div class="spinner"></div></div></div>
+    <div class="card" style="margin-bottom:16px"><div class="card-title">📥 Offene Anfragen</div><div id="booking-requests"><div class="spinner"></div></div></div>
+    <div class="card"><div class="card-title">✅ Bestätigte Buchungen</div><div id="buchungen-list"><div class="spinner"></div></div></div></div>`;
   await publishMyBookingLink();
   await renderBookingOnline();
   await renderBookingRequests();
@@ -1364,6 +1364,17 @@ async function publishMyBookingLink(){
     return {count:freieSlots.length,aktiv};
   }catch(e){console.warn('publishMyBookingLink',e);return{count:0,aktiv:true};}
 }
+async function publishStudentBookings(schuelerId,vorname){
+  try{
+    const snap=await getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid),orderBy('startTime')));
+    const grenze=Date.now()-2*3600000;
+    const meineTermine=snap.docs.filter(d=>{const s=d.data();return s.bookedBy===schuelerId && s.startTime && s.startTime.toDate().getTime()>=grenze;})
+      .map(d=>{const s=d.data();return{start:s.startTime.toDate().toISOString(),ende:s.endTime.toDate().toISOString(),type:s.type||'fahrstunde'};});
+    const payload={lehrerUid:currentUser.uid,meineTermine,updatedAt:serverTimestamp()};
+    if(vorname!==undefined&&vorname!==null)payload.vorname=vorname||'';
+    await setDoc(doc(db,'bookingStudents',schuelerId),payload,{merge:true});
+  }catch(e){console.warn('publishStudentBookings',e);}
+}
 async function renderBookingOnline(){
   const box=document.getElementById('booking-online');if(!box)return;
   let data={aktiv:true,freieSlots:[]};
@@ -1374,14 +1385,14 @@ async function renderBookingOnline(){
   schueler.sort((a,b)=>(((a.fname||'')+(a.lname||'')).localeCompare((b.fname||'')+(b.lname||''))));
   window.__bsList=schueler;
   let html=`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px">
-    <div><div style="font-weight:600;font-size:14px">${aktiv?'<span style="color:var(--success)">\u25cf Aktiv</span>':'<span style="color:var(--text-muted)">\u25cb Inaktiv</span>'}</div>
-    <div class="text-muted" style="font-size:12px">${anzahl} freie Termine f\u00fcr Sch\u00fcler sichtbar</div></div>
+    <div><div style="font-weight:600;font-size:14px">${aktiv?'<span style="color:var(--success)">● Aktiv</span>':'<span style="color:var(--text-muted)">○ Inaktiv</span>'}</div>
+    <div class="text-muted" style="font-size:12px">${anzahl} freie Termine für Schüler sichtbar</div></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-secondary btn-sm" onclick="toggleBookingAktiv(${aktiv?'false':'true'})">${aktiv?'Deaktivieren':'Aktivieren'}</button>
-    <button class="btn btn-secondary btn-sm" onclick="refreshBookingLink()">\u21bb Aktualisieren</button></div></div>`;
-  if(!schueler.length){html+='<p class="text-muted">Noch keine Sch\u00fcler. Lege zuerst unter \u201eMeine Sch\u00fcler\u201c jemanden an, um einen Buchungs-Link zu teilen.</p>';}
+    <button class="btn btn-secondary btn-sm" onclick="refreshBookingLink()">↻ Aktualisieren</button></div></div>`;
+  if(!schueler.length){html+='<p class="text-muted">Noch keine Schüler. Lege zuerst unter „Meine Schüler“ jemanden an, um einen Buchungs-Link zu teilen.</p>';}
   else{
-    html+='<div class="text-muted" style="font-size:12px;margin-bottom:8px">Pers\u00f6nlichen Buchungs-Link an einen Sch\u00fcler senden:</div>';
-    html+='<table><tbody>'+schueler.map((s,i)=>`<tr><td>${escHtml(s.fname||'')} ${escHtml(s.lname||'')}</td><td style="text-align:right"><button class="btn btn-primary btn-sm" onclick="schuelerLinkTeilenByIdx(${i})">\ud83d\udd17 Link kopieren</button></td></tr>`).join('')+'</tbody></table>';
+    html+='<div class="text-muted" style="font-size:12px;margin-bottom:8px">Persönlichen Buchungs-Link an einen Schüler senden:</div>';
+    html+='<table><tbody>'+schueler.map((s,i)=>`<tr><td>${escHtml(s.fname||'')} ${escHtml(s.lname||'')}</td><td style="text-align:right"><button class="btn btn-primary btn-sm" onclick="schuelerLinkTeilenByIdx(${i})">🔗 Link kopieren</button></td></tr>`).join('')+'</tbody></table>';
   }
   box.innerHTML=html;
 }
@@ -1392,8 +1403,9 @@ async function schuelerLinkTeilen(schuelerId,vorname){
   try{await setDoc(doc(db,'bookingStudents',schuelerId),{vorname:vorname||'',lehrerUid:currentUser.uid,aktiv:true,updatedAt:serverTimestamp()},{merge:true});}
   catch(e){toast('Link konnte nicht erstellt werden.','error');return;}
   await publishMyBookingLink();
+  try{await publishStudentBookings(schuelerId,vorname);}catch(e){}
   const link=location.href.split('?')[0].split('#')[0]+'?schueler='+schuelerId+'&lehrer='+currentUser.uid;
-  try{await navigator.clipboard.writeText(link);toast('Link kopiert! Jetzt an den Sch\u00fcler senden.','success');}
+  try{await navigator.clipboard.writeText(link);toast('Link kopiert! Jetzt an den Schüler senden.','success');}
   catch(e){window.prompt('Buchungs-Link (kopieren):',link);}
 }
 async function renderBookingRequests(){
@@ -1404,13 +1416,13 @@ async function renderBookingRequests(){
   if(!reqs.length){box.innerHTML='<p class="text-muted">Keine offenen Anfragen.</p>';return;}
   reqs.sort((a,b)=>(a.start||'').localeCompare(b.start||''));
   const p=n=>String(n).padStart(2,'0');
-  box.innerHTML='<table><thead><tr><th>Sch\u00fcler</th><th>Datum</th><th>Zeit</th><th>Typ</th><th></th></tr></thead><tbody>'+
+  box.innerHTML='<table><thead><tr><th>Schüler</th><th>Datum</th><th>Zeit</th><th>Typ</th><th></th></tr></thead><tbody>'+
     reqs.map(r=>{const d=r.start?new Date(r.start):null,e=r.ende?new Date(r.ende):null;
       const datum=d?d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}):'?';
-      const zeit=d&&e?p(d.getHours())+':'+p(d.getMinutes())+'\u2013'+p(e.getHours())+':'+p(e.getMinutes()):'?';
-      return`<tr><td>${escHtml(r.vorname||'')||'Sch\u00fcler'}</td><td>${datum}</td><td>${zeit}</td><td>${typeBadgeHtml(r.type)}</td>
-        <td style="white-space:nowrap;text-align:right"><button class="btn btn-success btn-sm" onclick="bestaetigeBuchung('${r.id}')">\u2713</button>
-        <button class="btn btn-danger btn-sm" onclick="lehneBuchungAb('${r.id}')">\u2715</button></td></tr>`;}).join('')+'</tbody></table>';
+      const zeit=d&&e?p(d.getHours())+':'+p(d.getMinutes())+'–'+p(e.getHours())+':'+p(e.getMinutes()):'?';
+      return`<tr><td>${escHtml(r.vorname||'')||'Schüler'}</td><td>${datum}</td><td>${zeit}</td><td>${typeBadgeHtml(r.type)}</td>
+        <td style="white-space:nowrap;text-align:right"><button class="btn btn-success btn-sm" onclick="bestaetigeBuchung('${r.id}')">✓</button>
+        <button class="btn btn-danger btn-sm" onclick="lehneBuchungAb('${r.id}')">✕</button></td></tr>`;}).join('')+'</tbody></table>';
 }
 window.bestaetigeBuchung=async function(reqId){
   try{
@@ -1421,11 +1433,12 @@ window.bestaetigeBuchung=async function(reqId){
     if(slotSnap.data().bookedBy){await updateDoc(doc(db,'bookingRequests',reqId),{status:'abgelehnt',grund:'Termin bereits vergeben',bearbeitetAt:serverTimestamp()});toast('Termin ist bereits vergeben.','error');renderBookingRequests();renderBestaetigteBuchungen();return;}
     await updateDoc(doc(db,'slots',req.slotId),{bookedBy:req.schuelerId,bookedAt:serverTimestamp()});
     try{const sc=await getDoc(doc(db,'schueler',req.schuelerId));if(sc.exists())await updateDoc(doc(db,'schueler',req.schuelerId),{bookedCount:(sc.data().bookedCount||0)+1});}catch(e){}
-    await updateDoc(doc(db,'bookingRequests',reqId),{status:'best\u00e4tigt',bearbeitetAt:serverTimestamp()});
+    await updateDoc(doc(db,'bookingRequests',reqId),{status:'bestätigt',bearbeitetAt:serverTimestamp()});
     await publishMyBookingLink();
-    toast('Buchung best\u00e4tigt!','success');
+    try{await publishStudentBookings(req.schuelerId);}catch(e){}
+    toast('Buchung bestätigt!','success');
     renderBookingRequests();renderBestaetigteBuchungen();renderBookingOnline();
-  }catch(e){console.warn(e);toast('Best\u00e4tigung fehlgeschlagen.','error');}
+  }catch(e){console.warn(e);toast('Bestätigung fehlgeschlagen.','error');}
 };
 window.lehneBuchungAb=async function(reqId){try{await updateDoc(doc(db,'bookingRequests',reqId),{status:'abgelehnt',bearbeitetAt:serverTimestamp()});toast('Anfrage abgelehnt.','success');}catch(e){toast('Fehlgeschlagen.','error');}renderBookingRequests();};
 async function renderBestaetigteBuchungen(){
@@ -1439,9 +1452,9 @@ async function renderBestaetigteBuchungen(){
   const scm={},scAutoM={};scSnap.docs.forEach(d=>{const s=d.data();scm[d.id]=s.fname+' '+s.lname;scAutoM[d.id]=s.autoId||null;});
   const am={};autosSnap.docs.forEach(d=>{am[d.id]=d.data();});
   if(snap.empty){bl.innerHTML='<p class="text-muted">Noch keine Buchungen.</p>';return;}
-  bl.innerHTML='<table><thead><tr><th>Sch\u00fcler</th><th>Datum</th><th>Zeit</th><th>Typ</th><th>Auto</th><th></th></tr></thead><tbody>'+
-    snap.docs.map(d=>{const s=d.data();const aid=scAutoM[s.bookedBy];const aStr=aid&&am[aid]?`<span class="auto-kennzeichen" style="font-size:10px">${am[aid].kennzeichen}</span>`:'\u2014';
-      return`<tr><td>${scm[s.bookedBy]||'?'}</td><td>${fmt(s.startTime)}</td><td>${fmtTime(s.startTime)}\u2013${fmtTime(s.endTime)}</td><td>${typeBadgeHtml(s.type)}</td><td>${aStr}</td>
+  bl.innerHTML='<table><thead><tr><th>Schüler</th><th>Datum</th><th>Zeit</th><th>Typ</th><th>Auto</th><th></th></tr></thead><tbody>'+
+    snap.docs.map(d=>{const s=d.data();const aid=scAutoM[s.bookedBy];const aStr=aid&&am[aid]?`<span class="auto-kennzeichen" style="font-size:10px">${am[aid].kennzeichen}</span>`:'—';
+      return`<tr><td>${scm[s.bookedBy]||'?'}</td><td>${fmt(s.startTime)}</td><td>${fmtTime(s.startTime)}–${fmtTime(s.endTime)}</td><td>${typeBadgeHtml(s.type)}</td><td>${aStr}</td>
         <td><button class="btn btn-danger btn-sm" onclick="cancelBookingLehrer('${d.id}')">Stornieren</button></td></tr>`;}).join('')+'</tbody></table>';
 }
 window.cancelBookingLehrer=async function(id){
@@ -1449,6 +1462,7 @@ window.cancelBookingLehrer=async function(id){
   const slot=sSnap.data();await updateDoc(doc(db,'slots',id),{bookedBy:null,bookedAt:null});
   if(slot.bookedBy){const scSnap=await getDoc(doc(db,'schueler',slot.bookedBy));if(scSnap.exists())await updateDoc(doc(db,'schueler',slot.bookedBy),{bookedCount:Math.max(0,(scSnap.data().bookedCount||1)-1)});}
   await triggerEmail('stornierung_freigeworden',{datum:slot.startTime.toDate().toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}),von:fmtTime(slot.startTime),bis:fmtTime(slot.endTime),typ:typeLabel(slot.type),lehrerName:lSnap.data().fname+' '+lSnap.data().lname,lehrerUid:currentUser.uid,slotId:id});
+  if(slot.bookedBy){try{await publishStudentBookings(slot.bookedBy);}catch(e){}}
   toast('Storniert.','success');pages['lehrer-buchungen'](document.getElementById('main-content'));
 };
 
@@ -1744,44 +1758,49 @@ async function showBookingPage(schuelerId,lehrerUid){
   show('booking');
   const content=document.getElementById('booking-content');
   const sub=document.getElementById('booking-subtitle');
-  if(!schuelerId||!lehrerUid){if(content)content.innerHTML='<div class="booking-card"><p class="text-muted text-center">Ung\u00fcltiger Link.</p></div>';return;}
+  if(!schuelerId||!lehrerUid){if(content)content.innerHTML='<div class="booking-card"><p class="text-muted text-center">Ungültiger Link.</p></div>';return;}
   if(content)content.innerHTML='<div class="booking-card"><div class="spinner"></div></div>';
   let linkData=null,stud=null;
   try{
     const[linkSnap,studSnap]=await Promise.all([getDoc(doc(db,'bookingLinks',lehrerUid)),getDoc(doc(db,'bookingStudents',schuelerId))]);
     if(linkSnap.exists())linkData=linkSnap.data();
     if(studSnap.exists())stud=studSnap.data();
-  }catch(e){console.warn('booking load',e);if(content)content.innerHTML='<div class="booking-card"><p class="text-muted text-center">Buchung konnte nicht geladen werden. Bitte sp\u00e4ter erneut versuchen.</p></div>';return;}
-  if(!linkData||linkData.aktiv===false){if(content)content.innerHTML='<div class="booking-card" style="text-align:center;padding:32px 20px"><div style="font-size:2.4rem;margin-bottom:12px">\ud83d\udcc5</div><h2 style="margin:0 0 8px;font-size:1.1rem">Buchung gerade nicht m\u00f6glich</h2><p class="text-muted" style="line-height:1.5">Die Online-Buchung ist aktuell nicht aktiv. Bitte vereinbare deinen Termin direkt mit deinem Fahrlehrer.</p></div>';return;}
-  if(stud&&stud.lehrerUid&&stud.lehrerUid!==lehrerUid){if(content)content.innerHTML='<div class="booking-card"><p class="text-muted text-center">Dieser Link ist nicht g\u00fcltig.</p></div>';return;}
+  }catch(e){console.warn('booking load',e);if(content)content.innerHTML='<div class="booking-card"><p class="text-muted text-center">Buchung konnte nicht geladen werden. Bitte später erneut versuchen.</p></div>';return;}
+  if(!linkData && !stud){if(content)content.innerHTML='<div class="booking-card" style="text-align:center;padding:32px 20px"><div style="font-size:2.4rem;margin-bottom:12px">📅</div><h2 style="margin:0 0 8px;font-size:1.1rem">Buchung nicht verfügbar</h2><p class="text-muted" style="line-height:1.5">Dieser Link ist nicht (mehr) gültig. Bitte wende dich an deinen Fahrlehrer.</p></div>';return;}
+  if(stud&&stud.lehrerUid&&stud.lehrerUid!==lehrerUid){if(content)content.innerHTML='<div class="booking-card"><p class="text-muted text-center">Dieser Link ist nicht gültig.</p></div>';return;}
   const vorname=(stud&&stud.vorname)||'';
-  if(sub)sub.textContent='Hallo'+(vorname?' '+vorname:'')+'! '+(linkData.lehrerName?'Fahrlehrer: '+linkData.lehrerName:'')+(linkData.schoolName?' \u00b7 '+linkData.schoolName:'');
-  const slots=(linkData.freieSlots||[]).filter(s=>s&&s.start&&new Date(s.start).getTime()>Date.now()).sort((a,b)=>a.start.localeCompare(b.start));
-  window.__bookingCtx={schuelerId,lehrerUid,vorname,slots};
-  if(!slots.length){if(content)content.innerHTML='<div class="booking-card" style="text-align:center;padding:28px 20px"><div style="font-size:2.2rem;margin-bottom:10px">\ud83d\uddd3\ufe0f</div><h2 style="margin:0 0 8px;font-size:1.05rem">Aktuell keine freien Termine</h2><p class="text-muted">Dein Fahrlehrer hat gerade keine freien Termine eingestellt. Schau sp\u00e4ter noch einmal vorbei.</p></div>';return;}
+  const _ln=(linkData&&linkData.lehrerName)||'';const _sn=(linkData&&linkData.schoolName)||'';
+  if(sub)sub.textContent='Hallo'+(vorname?' '+vorname:'')+'!'+(_ln?' Fahrlehrer: '+_ln:'')+(_sn?' · '+_sn:'');
   const p=n=>String(n).padStart(2,'0');
-  const groups={};
-  slots.forEach((s,i)=>{const d=new Date(s.start);const key=d.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long'});(groups[key]=groups[key]||[]).push({...s,_i:i});});
-  let html='<div class="booking-card" style="margin-bottom:14px"><h2 style="margin:0 0 4px;font-size:1.1rem">Termin ausw\u00e4hlen</h2><p class="text-muted" style="font-size:13px">Tippe auf einen freien Termin, um ihn anzufragen. Dein Fahrlehrer best\u00e4tigt ihn dann.</p></div>';
-  Object.keys(groups).forEach(day=>{
-    html+='<div class="booking-card"><div class="booking-card-title">'+day+'</div>';
-    groups[day].forEach(s=>{const d=new Date(s.start),e=new Date(s.ende);
-      html+='<div class="slot-row"><div class="slot-time">'+p(d.getHours())+':'+p(d.getMinutes())+'\u2013'+p(e.getHours())+':'+p(e.getMinutes())+'</div><div class="slot-info">'+typeBadgeHtml(s.type)+'</div><button class="btn btn-primary btn-sm" onclick="pickBookingSlot('+s._i+')">Anfragen</button></div>';});
-    html+='</div>';
-  });
+  const fmtRow=(o,btn)=>{const d=new Date(o.start),e=new Date(o.ende);const datum=d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});const zeit=p(d.getHours())+':'+p(d.getMinutes())+'–'+p(e.getHours())+':'+p(e.getMinutes());return '<div class="slot-row"><div class="slot-time">'+datum+'<br><span style="font-size:11px;font-weight:400">'+zeit+'</span></div><div class="slot-info">'+typeBadgeHtml(o.type)+'</div>'+(btn||'')+'</div>';};
+  const meine=((stud&&stud.meineTermine)||[]).filter(t=>t&&t.start&&new Date(t.ende||t.start).getTime()>Date.now()-2*3600000).sort((a,b)=>a.start.localeCompare(b.start));
+  const aktiv=!!(linkData&&linkData.aktiv!==false);
+  const slots=aktiv?((linkData.freieSlots||[]).filter(s=>s&&s.start&&new Date(s.start).getTime()>Date.now()).sort((a,b)=>a.start.localeCompare(b.start))):[];
+  window.__bookingCtx={schuelerId,lehrerUid,vorname,slots};
+  let html='<div class="booking-card" style="margin-bottom:14px"><h2 style="margin:0 0 4px;font-size:1.15rem">'+(vorname?'Hallo '+vorname+'!':'Deine Termine')+'</h2><p class="text-muted" style="font-size:13px">Hier siehst du deine gebuchten Fahrstunden und kannst neue Termine anfragen.</p></div>';
+  html+='<div class="booking-card"><div class="booking-card-title">📅 Meine gebuchten Termine</div>';
+  if(meine.length){html+=meine.map(t=>fmtRow(t,'')).join('');}
+  else{html+='<p class="text-muted">Noch keine bestätigten Termine. Frag dir unten einen freien Termin an.</p>';}
+  html+='</div>';
+  html+='<div class="booking-card"><div class="booking-card-title">🗓️ Freie Termine anfragen</div>';
+  if(!aktiv){html+='<p class="text-muted">Die Online-Buchung ist gerade nicht aktiv. Bitte sprich deinen Fahrlehrer direkt an.</p>';}
+  else if(!slots.length){html+='<p class="text-muted">Aktuell keine freien Termine. Schau später noch einmal vorbei.</p>';}
+  else{html+=slots.map((s,i)=>fmtRow(s,'<button class="btn btn-primary btn-sm" onclick="pickBookingSlot('+i+')">Anfragen</button>')).join('');}
+  html+='</div>';
   if(content)content.innerHTML=html;
 }
+window.zurBuchungsUebersicht=function(){const c=window.__bookingCtx;if(c)showBookingPage(c.schuelerId,c.lehrerUid);};
 window.pickBookingSlot=function(i){
   const c=window.__bookingCtx;if(!c||!c.slots[i])return;
   const s=c.slots[i];const d=new Date(s.start),e=new Date(s.ende);const p=n=>String(n).padStart(2,'0');
-  const txt=d.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long'})+'\nUhrzeit: '+p(d.getHours())+':'+p(d.getMinutes())+'\u2013'+p(e.getHours())+':'+p(e.getMinutes());
+  const txt=d.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long'})+'\nUhrzeit: '+p(d.getHours())+':'+p(d.getMinutes())+'–'+p(e.getHours())+':'+p(e.getMinutes());
   if(window.confirm('Diesen Termin verbindlich anfragen?\n\n'+txt))sendeBuchungsanfrage(c.schuelerId,c.lehrerUid,c.vorname,s);
 };
 window.sendeBuchungsanfrage=async function(schuelerId,lehrerUid,vorname,slot){
   const content=document.getElementById('booking-content');
   try{
     await addDoc(collection(db,'bookingRequests'),{lehrerUid,schuelerId,vorname:vorname||'',slotId:slot.id,start:slot.start,ende:slot.ende,type:slot.type||'fahrstunde',status:'angefragt',createdAt:serverTimestamp()});
-    if(content)content.innerHTML='<div class="booking-card" style="text-align:center;padding:34px 20px"><div style="font-size:2.8rem;margin-bottom:14px">\u2705</div><h2 style="margin:0 0 8px;font-size:1.2rem">Anfrage gesendet!</h2><p class="text-muted" style="line-height:1.5">Dein Fahrlehrer bekommt deine Terminanfrage und best\u00e4tigt sie in K\u00fcrze. Du kannst diese Seite jetzt schlie\u00dfen.</p></div>';
+    if(content)content.innerHTML='<div class="booking-card" style="text-align:center;padding:34px 20px"><div style="font-size:2.8rem;margin-bottom:14px">✅</div><h2 style="margin:0 0 8px;font-size:1.2rem">Anfrage gesendet!</h2><p class="text-muted" style="line-height:1.5">Dein Fahrlehrer bekommt deine Terminanfrage und bestätigt sie in Kürze. Du kannst diese Seite jetzt schließen.</p><button class="btn btn-secondary" style="margin-top:16px" onclick="zurBuchungsUebersicht()">Zurück zur Übersicht</button></div>';
   }catch(e){console.warn(e);toast('Anfrage fehlgeschlagen. Bitte erneut versuchen.','error');}
 }
 
