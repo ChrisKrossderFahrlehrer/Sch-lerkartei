@@ -447,6 +447,44 @@ service cloud.firestore {
     }
 
     // ══════════════════════════════════════════════════════
+    // VARIANTE C – Sichere Schüler-Buchung per Link (OHNE Login)
+    // ══════════════════════════════════════════════════════
+    // bookingLinks/{lehrerUid}: öffentlicher Schnappschuss der FREIEN Termine
+    //   eines Lehrers (lehrerName, schoolName, freieSlots). KEINE Schülerdaten,
+    //   KEINE gebuchten Slots. get per ID erlaubt (Link kennt die UID),
+    //   list gesperrt (keine Enumeration). Schreiben nur der Lehrer selbst.
+    match /bookingLinks/{lehrerUid} {
+      allow get:    if true;
+      allow list:   if false;
+      allow create, update, delete: if isAuth() && request.auth.uid == lehrerUid;
+    }
+    // bookingStudents/{schuelerId}: nur Vorname + lehrerUid (für die Begrüßung).
+    //   get per ID (Link kennt die zufällige Schüler-ID), list gesperrt.
+    //   Anlegen durch den eigenen Lehrer; Ändern/Löschen nur durch den Lehrer,
+    //   dem das Doc bereits gehört (verhindert Übernahme fremder Links).
+    match /bookingStudents/{schuelerId} {
+      allow get:    if true;
+      allow list:   if false;
+      allow create: if isAuth() && request.resource.data.lehrerUid == request.auth.uid;
+      allow update, delete: if isAuth() && resource.data.lehrerUid == request.auth.uid;
+    }
+    // bookingRequests/{id}: Terminanfragen der Schüler.
+    //   Schüler DARF anlegen (ohne Login), aber NICHT lesen → kein Abgriff.
+    //   create nur mit Pflichtfeldern UND wenn ein realer, AKTIVER Buchungslink
+    //   des Lehrers existiert (bindet Anfrage an echte Verknüpfung, bremst Spam).
+    //   Lesen/Ändern/Löschen ausschließlich der betroffene Lehrer.
+    match /bookingRequests/{reqId} {
+      allow read:   if isAuth() && resource.data.lehrerUid == request.auth.uid;
+      allow create: if request.resource.data.status == 'angefragt'
+                    && request.resource.data.keys().hasAll(['lehrerUid','schuelerId','slotId','start','ende','status'])
+                    && request.resource.data.lehrerUid is string
+                    && request.resource.data.schuelerId is string
+                    && exists(/databases/$(database)/documents/bookingLinks/$(request.resource.data.lehrerUid))
+                    && get(/databases/$(database)/documents/bookingLinks/$(request.resource.data.lehrerUid)).data.aktiv == true;
+      allow update, delete: if isAuth() && resource.data.lehrerUid == request.auth.uid;
+    }
+
+    // ══════════════════════════════════════════════════════
     // ALLES ANDERE: VERBOTEN
     // ══════════════════════════════════════════════════════
     match /{document=**} {
