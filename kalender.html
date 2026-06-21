@@ -1342,21 +1342,108 @@ window.deleteSlotFromList=async function(id){await deleteDoc(doc(db,'slots',id))
 // LEHRER – BUCHUNGEN
 // ════════════════════════════════
 pages['lehrer-buchungen']=async function(el){
-  el.innerHTML=`<div class="page active"><h1 class="page-title">Buchungen</h1><div class="card"><div id="buchungen-list"><div class="spinner"></div></div></div></div>`;
-  const[snap,scSnap,autosSnap]=await Promise.all([
+  el.innerHTML=`<div class="page active"><h1 class="page-title">Buchungen</h1>
+    <div class="card" style="margin-bottom:16px"><div class="card-title">\ud83d\udd17 Online-Buchung f\u00fcr Sch\u00fcler</div><div id="booking-online"><div class="spinner"></div></div></div>
+    <div class="card" style="margin-bottom:16px"><div class="card-title">\ud83d\udce5 Offene Anfragen</div><div id="booking-requests"><div class="spinner"></div></div></div>
+    <div class="card"><div class="card-title">\u2705 Best\u00e4tigte Buchungen</div><div id="buchungen-list"><div class="spinner"></div></div></div></div>`;
+  await publishMyBookingLink();
+  await renderBookingOnline();
+  await renderBookingRequests();
+  await renderBestaetigteBuchungen();
+};
+async function publishMyBookingLink(){
+  try{
+    const snap=await getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid),orderBy('startTime')));
+    const nowMs=Date.now();
+    const freieSlots=snap.docs.filter(d=>{const s=d.data();return !s.bookedBy && s.startTime && s.startTime.toDate().getTime()>=nowMs;})
+      .map(d=>{const s=d.data();return{id:d.id,start:s.startTime.toDate().toISOString(),ende:s.endTime.toDate().toISOString(),type:s.type||'fahrstunde'};});
+    const lehrerName=(((currentProfile&&currentProfile.fname)||'')+' '+((currentProfile&&currentProfile.lname)||'')).trim();
+    let aktiv=true;
+    try{const prev=await getDoc(doc(db,'bookingLinks',currentUser.uid));if(prev.exists())aktiv=prev.data().aktiv!==false;}catch(e){}
+    await setDoc(doc(db,'bookingLinks',currentUser.uid),{lehrerUid:currentUser.uid,lehrerName:lehrerName||'Fahrlehrer',schoolName:(currentSchool&&currentSchool.name)||'',schoolId:currentSchoolId||null,freieSlots,aktiv,updatedAt:serverTimestamp()},{merge:true});
+    return {count:freieSlots.length,aktiv};
+  }catch(e){console.warn('publishMyBookingLink',e);return{count:0,aktiv:true};}
+}
+async function renderBookingOnline(){
+  const box=document.getElementById('booking-online');if(!box)return;
+  let data={aktiv:true,freieSlots:[]};
+  try{const s=await getDoc(doc(db,'bookingLinks',currentUser.uid));if(s.exists())data=s.data();}catch(e){}
+  const aktiv=data.aktiv!==false;const anzahl=(data.freieSlots||[]).length;
+  let schueler=[];
+  try{const sc=await getDocs(query(collection(db,'schueler'),where('lehrerUid','==',currentUser.uid)));schueler=sc.docs.map(d=>({id:d.id,...d.data()}));}catch(e){}
+  schueler.sort((a,b)=>(((a.fname||'')+(a.lname||'')).localeCompare((b.fname||'')+(b.lname||''))));
+  window.__bsList=schueler;
+  let html=`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+    <div><div style="font-weight:600;font-size:14px">${aktiv?'<span style="color:var(--success)">\u25cf Aktiv</span>':'<span style="color:var(--text-muted)">\u25cb Inaktiv</span>'}</div>
+    <div class="text-muted" style="font-size:12px">${anzahl} freie Termine f\u00fcr Sch\u00fcler sichtbar</div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-secondary btn-sm" onclick="toggleBookingAktiv(${aktiv?'false':'true'})">${aktiv?'Deaktivieren':'Aktivieren'}</button>
+    <button class="btn btn-secondary btn-sm" onclick="refreshBookingLink()">\u21bb Aktualisieren</button></div></div>`;
+  if(!schueler.length){html+='<p class="text-muted">Noch keine Sch\u00fcler. Lege zuerst unter \u201eMeine Sch\u00fcler\u201c jemanden an, um einen Buchungs-Link zu teilen.</p>';}
+  else{
+    html+='<div class="text-muted" style="font-size:12px;margin-bottom:8px">Pers\u00f6nlichen Buchungs-Link an einen Sch\u00fcler senden:</div>';
+    html+='<table><tbody>'+schueler.map((s,i)=>`<tr><td>${escHtml(s.fname||'')} ${escHtml(s.lname||'')}</td><td style="text-align:right"><button class="btn btn-primary btn-sm" onclick="schuelerLinkTeilenByIdx(${i})">\ud83d\udd17 Link kopieren</button></td></tr>`).join('')+'</tbody></table>';
+  }
+  box.innerHTML=html;
+}
+window.toggleBookingAktiv=async function(val){try{await setDoc(doc(db,'bookingLinks',currentUser.uid),{aktiv:val,lehrerUid:currentUser.uid},{merge:true});toast(val?'Online-Buchung aktiviert.':'Deaktiviert.','success');}catch(e){toast('Fehlgeschlagen.','error');}renderBookingOnline();};
+window.refreshBookingLink=async function(){const r=await publishMyBookingLink();toast(r.count+' freie Termine aktualisiert.','success');renderBookingOnline();};
+window.schuelerLinkTeilenByIdx=function(i){const s=(window.__bsList||[])[i];if(s)schuelerLinkTeilen(s.id,s.fname||'');};
+async function schuelerLinkTeilen(schuelerId,vorname){
+  try{await setDoc(doc(db,'bookingStudents',schuelerId),{vorname:vorname||'',lehrerUid:currentUser.uid,aktiv:true,updatedAt:serverTimestamp()},{merge:true});}
+  catch(e){toast('Link konnte nicht erstellt werden.','error');return;}
+  await publishMyBookingLink();
+  const link=location.href.split('?')[0].split('#')[0]+'?schueler='+schuelerId+'&lehrer='+currentUser.uid;
+  try{await navigator.clipboard.writeText(link);toast('Link kopiert! Jetzt an den Sch\u00fcler senden.','success');}
+  catch(e){window.prompt('Buchungs-Link (kopieren):',link);}
+}
+async function renderBookingRequests(){
+  const box=document.getElementById('booking-requests');if(!box)return;
+  let reqs=[];
+  try{const snap=await getDocs(query(collection(db,'bookingRequests'),where('lehrerUid','==',currentUser.uid)));reqs=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.status==='angefragt');}
+  catch(e){console.warn('requests',e);box.innerHTML='<p class="text-muted">Anfragen konnten nicht geladen werden.</p>';return;}
+  if(!reqs.length){box.innerHTML='<p class="text-muted">Keine offenen Anfragen.</p>';return;}
+  reqs.sort((a,b)=>(a.start||'').localeCompare(b.start||''));
+  const p=n=>String(n).padStart(2,'0');
+  box.innerHTML='<table><thead><tr><th>Sch\u00fcler</th><th>Datum</th><th>Zeit</th><th>Typ</th><th></th></tr></thead><tbody>'+
+    reqs.map(r=>{const d=r.start?new Date(r.start):null,e=r.ende?new Date(r.ende):null;
+      const datum=d?d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}):'?';
+      const zeit=d&&e?p(d.getHours())+':'+p(d.getMinutes())+'\u2013'+p(e.getHours())+':'+p(e.getMinutes()):'?';
+      return`<tr><td>${escHtml(r.vorname||'')||'Sch\u00fcler'}</td><td>${datum}</td><td>${zeit}</td><td>${typeBadgeHtml(r.type)}</td>
+        <td style="white-space:nowrap;text-align:right"><button class="btn btn-success btn-sm" onclick="bestaetigeBuchung('${r.id}')">\u2713</button>
+        <button class="btn btn-danger btn-sm" onclick="lehneBuchungAb('${r.id}')">\u2715</button></td></tr>`;}).join('')+'</tbody></table>';
+}
+window.bestaetigeBuchung=async function(reqId){
+  try{
+    const reqSnap=await getDoc(doc(db,'bookingRequests',reqId));if(!reqSnap.exists())return toast('Anfrage nicht gefunden.','error');
+    const req=reqSnap.data();
+    const slotSnap=await getDoc(doc(db,'slots',req.slotId));
+    if(!slotSnap.exists()){await updateDoc(doc(db,'bookingRequests',reqId),{status:'abgelehnt',grund:'Termin existiert nicht mehr',bearbeitetAt:serverTimestamp()});toast('Termin existiert nicht mehr.','error');renderBookingRequests();return;}
+    if(slotSnap.data().bookedBy){await updateDoc(doc(db,'bookingRequests',reqId),{status:'abgelehnt',grund:'Termin bereits vergeben',bearbeitetAt:serverTimestamp()});toast('Termin ist bereits vergeben.','error');renderBookingRequests();renderBestaetigteBuchungen();return;}
+    await updateDoc(doc(db,'slots',req.slotId),{bookedBy:req.schuelerId,bookedAt:serverTimestamp()});
+    try{const sc=await getDoc(doc(db,'schueler',req.schuelerId));if(sc.exists())await updateDoc(doc(db,'schueler',req.schuelerId),{bookedCount:(sc.data().bookedCount||0)+1});}catch(e){}
+    await updateDoc(doc(db,'bookingRequests',reqId),{status:'best\u00e4tigt',bearbeitetAt:serverTimestamp()});
+    await publishMyBookingLink();
+    toast('Buchung best\u00e4tigt!','success');
+    renderBookingRequests();renderBestaetigteBuchungen();renderBookingOnline();
+  }catch(e){console.warn(e);toast('Best\u00e4tigung fehlgeschlagen.','error');}
+};
+window.lehneBuchungAb=async function(reqId){try{await updateDoc(doc(db,'bookingRequests',reqId),{status:'abgelehnt',bearbeitetAt:serverTimestamp()});toast('Anfrage abgelehnt.','success');}catch(e){toast('Fehlgeschlagen.','error');}renderBookingRequests();};
+async function renderBestaetigteBuchungen(){
+  const bl=document.getElementById('buchungen-list');if(!bl)return;
+  let snap,scSnap,autosSnap;
+  try{[snap,scSnap,autosSnap]=await Promise.all([
     getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid),where('bookedBy','!=',null),orderBy('bookedBy'),orderBy('startTime'))),
     getDocs(query(collection(db,'schueler'),where('lehrerUid','==',currentUser.uid))),
     getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId))),
-  ]);
+  ]);}catch(e){console.warn(e);bl.innerHTML='<p class="text-muted">Buchungen konnten nicht geladen werden.</p>';return;}
   const scm={},scAutoM={};scSnap.docs.forEach(d=>{const s=d.data();scm[d.id]=s.fname+' '+s.lname;scAutoM[d.id]=s.autoId||null;});
-  const am={};autosSnap.docs.forEach(d=>{const a=d.data();am[d.id]=a;});
-  const bl=document.getElementById('buchungen-list');
+  const am={};autosSnap.docs.forEach(d=>{am[d.id]=d.data();});
   if(snap.empty){bl.innerHTML='<p class="text-muted">Noch keine Buchungen.</p>';return;}
-  bl.innerHTML='<table><thead><tr><th>Schüler</th><th>Datum</th><th>Zeit</th><th>Typ</th><th>Auto</th><th></th></tr></thead><tbody>'+
-    snap.docs.map(d=>{const s=d.data();const aid=scAutoM[s.bookedBy];const aStr=aid&&am[aid]?`<span class="auto-kennzeichen" style="font-size:10px">${am[aid].kennzeichen}</span>`:'—';
-      return`<tr><td>${scm[s.bookedBy]||'?'}</td><td>${fmt(s.startTime)}</td><td>${fmtTime(s.startTime)}–${fmtTime(s.endTime)}</td><td>${typeBadgeHtml(s.type)}</td><td>${aStr}</td>
+  bl.innerHTML='<table><thead><tr><th>Sch\u00fcler</th><th>Datum</th><th>Zeit</th><th>Typ</th><th>Auto</th><th></th></tr></thead><tbody>'+
+    snap.docs.map(d=>{const s=d.data();const aid=scAutoM[s.bookedBy];const aStr=aid&&am[aid]?`<span class="auto-kennzeichen" style="font-size:10px">${am[aid].kennzeichen}</span>`:'\u2014';
+      return`<tr><td>${scm[s.bookedBy]||'?'}</td><td>${fmt(s.startTime)}</td><td>${fmtTime(s.startTime)}\u2013${fmtTime(s.endTime)}</td><td>${typeBadgeHtml(s.type)}</td><td>${aStr}</td>
         <td><button class="btn btn-danger btn-sm" onclick="cancelBookingLehrer('${d.id}')">Stornieren</button></td></tr>`;}).join('')+'</tbody></table>';
-};
+}
 window.cancelBookingLehrer=async function(id){
   const[sSnap,lSnap]=await Promise.all([getDoc(doc(db,'slots',id)),getDoc(doc(db,'kalenderUsers',currentUser.uid))]);
   const slot=sSnap.data();await updateDoc(doc(db,'slots',id),{bookedBy:null,bookedAt:null});
@@ -1655,70 +1742,47 @@ async function triggerEmail(type,payload){try{await addDoc(collection(db,'mailQu
 // ════════════════════════════════
 async function showBookingPage(schuelerId,lehrerUid){
   show('booking');
-  // ── SCHÜLER-BUCHUNG (vorerst deaktiviert) ──
-  // Die Online-Selbstbuchung per Link ist aktuell deaktiviert, weil sie
-  // einen sicheren, eng begrenzten Zugriff ohne Login erfordert (kommt als
-  // eigenes Feature). Bis dahin: freundliche Info statt Fehlerseite.
-  const BOOKING_AKTIV = false;
-  if (!BOOKING_AKTIV) {
-    const el = document.getElementById('booking-content');
-    if (el) el.innerHTML = '<div class="booking-card" style="text-align:center;padding:32px 20px">'
-      + '<div style="font-size:2.4rem;margin-bottom:12px">📅</div>'
-      + '<h2 style="margin:0 0 8px;font-size:1.1rem">Terminbuchung bald verfügbar</h2>'
-      + '<p class="text-muted" style="line-height:1.5">Die Online-Buchung wird gerade vorbereitet. '
-      + 'Bitte vereinbare deine Fahrstunden vorerst direkt mit deinem Fahrlehrer.</p>'
-      + '</div>';
-    const sub = document.getElementById('booking-subtitle');
-    if (sub) sub.textContent = '';
-    return;
-  }
-  await loadTypes();
-  const[scSnap,lSnap]=await Promise.all([getDoc(doc(db,'schueler',schuelerId)),getDoc(doc(db,'kalenderUsers',lehrerUid))]);
-  if(!scSnap.exists()||!lSnap.exists()){document.getElementById('booking-content').innerHTML='<div class="booking-card"><p class="text-muted text-center">Ungültiger Link.</p></div>';return;}
-  const schueler=scSnap.data();if(schueler.lehrerUid!==lehrerUid){document.getElementById('booking-content').innerHTML='<div class="booking-card"><p class="text-muted text-center">Dieser Link ist nicht gültig.</p></div>';return;}
-  const lehrer=lSnap.data();
-  document.getElementById('booking-subtitle').textContent=`Hallo ${schueler.fname}! Dein Fahrlehrer: ${lehrer.fname} ${lehrer.lname}`;
-  const schoolId=schueler.schoolId;
-  const now=new Date();
-  const[freeSlotsSnap,myBookingsSnap,bSnap,gbSnap,uSnap]=await Promise.all([
-    getDocs(query(collection(db,'slots'),where('lehrerUid','==',lehrerUid),where('bookedBy','==',null),orderBy('startTime'))),
-    getDocs(query(collection(db,'slots'),where('lehrerUid','==',lehrerUid),where('bookedBy','==',schuelerId),orderBy('startTime'))),
-    getDocs(query(collection(db,'blocked'),where('lehrerUid','==',lehrerUid))),
-    getDocs(query(collection(db,'globalBlocked'),where('schoolId','==',schoolId))),
-    getDocs(query(collection(db,'urlaub'),where('lehrerUid','==',lehrerUid))),
-  ]);
-  const blockedSet=new Set(bSnap.docs.map(d=>{const b=d.data();return`${b.year}-${b.month}-${b.day}`;}));
-  gbSnap.docs.forEach(d=>{const b=d.data();blockedSet.add(`${b.year}-${b.month}-${b.day}`);});
-  const urlaubList=uSnap.docs.map(d=>({id:d.id,...d.data()}));
-  const schoolSnap=await getDoc(doc(db,'schools',schoolId));const school=schoolSnap.exists()?schoolSnap.data():null;
-  const freeSlots=freeSlotsSnap.docs.filter(d=>{const s=d.data();const dt=s.startTime.toDate();const key=`${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}`;
-    const ft=getFeiertageName(dt,school?.bundesland);const u=urlaubCoversDate(urlaubList,dt);
-    return dt>now&&!blockedSet.has(key)&&!ft&&!u;});
-  const myBookings=myBookingsSnap.docs.map(d=>({id:d.id,...d.data()}));
-  const CANCEL_HOURS=48;const maxFS=schueler.maxFahrstunden||0;const bookedCount=myBookings.length;const limitReached=maxFS>0&&bookedCount>=maxFS;
-  const maxAktiv=schueler.maxAktiveTermine||0;const aktive=myBookings.filter(s=>s.startTime.toDate()>now);const aktivLimitReached=maxAktiv>0&&aktive.length>=maxAktiv;
-  let autoHtml='';
-  if(schueler.autoId){const aSnap=await getDoc(doc(db,'autos',schueler.autoId));if(aSnap.exists()){const a=aSnap.data();autoHtml=`<div class="booking-card" style="padding:14px 20px"><div style="display:flex;align-items:center;gap:12px"><span style="font-size:24px">🚗</span><div><div style="font-weight:600;font-size:13px">${a.modell}</div><div style="font-size:11px;color:var(--text-muted)">${a.farbe?a.farbe+' · ':''} ${a.notiz||''}</div></div><span class="auto-kennzeichen" style="margin-left:auto">${a.kennzeichen}</span></div></div>`;}}
-  let kontingentHtml='';
-  if(maxFS>0){const pct=Math.min(100,Math.round(bookedCount/maxFS*100));const bc=pct>=100?'var(--danger)':pct>=75?'var(--accent)':'var(--success)';
-    kontingentHtml=`<div class="booking-card" style="padding:16px 20px"><div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-weight:600;font-size:13px">Fahrstunden-Kontingent</span><span style="font-size:13px;font-weight:600;color:${bc}">${bookedCount}/${maxFS}</span></div>
-    <div style="background:var(--surface2);border-radius:20px;height:7px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${bc};border-radius:20px"></div></div>
-    ${limitReached?`<p style="margin-top:8px;font-size:12px;color:var(--danger)">⚠️ Kontingent aufgebraucht.</p>`:`<p style="margin-top:6px;font-size:11px;color:var(--text-muted)">${maxFS-bookedCount} Stunde(n) noch buchbar</p>`}</div>`;}
-  const myBookingsHtml=myBookings.length?myBookings.map(s=>{const dt=s.startTime.toDate();const canCancel=(dt-now)>CANCEL_HOURS*3600000;const isPast=dt<now;
-    return`<div class="slot-row" style="${isPast?'opacity:.5':''}"><div class="slot-time">${fmt(s.startTime)}<br><span style="font-size:11px;font-weight:400">${fmtTime(s.startTime)}–${fmtTime(s.endTime)}</span></div>
-    <div class="slot-info">${typeBadgeHtml(s.type)}${isPast?'<div style="font-size:10px;color:var(--text-muted)">Vergangen</div>':''}</div>
-    ${isPast?'':canCancel?`<button class="btn btn-danger btn-sm" onclick="cancelMyBooking('${s.id}','${schuelerId}','${lehrerUid}')">Stornieren</button>`:'<span style="font-size:11px;color:var(--text-muted)">Nicht mehr stornierbar</span>'}</div>`;}).join(''):'<p class="text-muted">Noch keine Buchungen.</p>';
-  const freeSlotsHtml=limitReached?`<div style="text-align:center;padding:20px;color:var(--danger)">⛔ Kontingent erschöpft.</div>`:freeSlots.length?freeSlots.map(d=>{const s=d.data();const btn=aktivLimitReached?`<button class="btn btn-secondary btn-sm" onclick="openTauschModal('${d.id}','${schuelerId}','${lehrerUid}')">📅 Tauschen</button>`:`<button class="btn btn-primary btn-sm" onclick="bookSlot('${d.id}','${schuelerId}','${lehrerUid}')">Buchen</button>`;
-    return`<div class="slot-row"><div class="slot-time">${fmt(s.startTime)}<br><span style="font-size:11px;font-weight:400">${fmtTime(s.startTime)}–${fmtTime(s.endTime)}</span></div><div class="slot-info">${typeBadgeHtml(s.type)}</div>${btn}</div>`;}).join(''):'<p class="text-muted">Aktuell keine freien Termine.</p>';
-  const notizenHtml=await loadNotizenHtml(schuelerId,'schueler');
-  const wlSnap=await getDocs(query(collection(db,'warteliste'),where('schuelerId','==',schuelerId),where('lehrerUid','==',lehrerUid),where('abgearbeitet','==',false)));
-  const isOnWL=!wlSnap.empty;
-  const wlHtml=!limitReached&&freeSlots.length===0?`<div class="booking-card"><div class="booking-card-title">⏳ Warteliste</div>${isOnWL?`<p style="color:var(--success);font-size:13px">✓ Du stehst auf der Warteliste.</p><button class="btn btn-danger btn-sm" style="margin-top:10px" onclick="leaveWarteliste('${wlSnap.docs[0].id}','${schuelerId}','${lehrerUid}')">Austragen</button>`:`<p class="text-muted" style="margin-bottom:10px">Keine freien Termine. Auf Warteliste eintragen?</p><div class="notiz-compose"><textarea id="wl-notiz" placeholder="Optionale Nachricht…" style="min-height:55px"></textarea></div><button class="btn btn-primary" style="margin-top:8px" onclick="joinWarteliste('${schuelerId}','${lehrerUid}')">Eintragen</button>`}</div>`:'';
-  const pruefungenSchueler=await loadPruefungenForSchueler(schuelerId);
-  const pruefHtml=pruefungenSchueler.length?`<div class="booking-card"><div class="booking-card-title">🎓 Meine Prüfungen</div>${renderPruefungenList(pruefungenSchueler,false,schuelerId)}</div>`:'';
-  const emailSaved=schueler.email;
-  const emailBannerHtml=`<div class="email-banner"><div class="email-banner-icon">📧</div><div class="email-banner-text"><div class="email-banner-title">E-Mail für Benachrichtigungen</div><div class="email-banner-sub">Buchungsbestätigungen und Erinnerungen.</div></div><div class="email-banner-input">${emailSaved?`<span class="email-saved">✓ ${escHtml(emailSaved)}</span><button class="btn btn-secondary btn-sm" onclick="changeEmail('${schuelerId}','${lehrerUid}')">Ändern</button>`:`<input type="email" id="schueler-email-input" placeholder="deine@email.de"><button class="btn btn-primary btn-sm" onclick="saveSchuelerEmail('${schuelerId}','${lehrerUid}')">Speichern</button>`}</div></div>`;
-  document.getElementById('booking-content').innerHTML=`${emailBannerHtml}${autoHtml}${kontingentHtml}${pruefHtml}<div class="booking-card"><div class="booking-card-title">📋 Meine Buchungen</div>${myBookingsHtml}</div><div class="booking-card"><div class="booking-card-title">🗓️ Freie Termine</div>${freeSlotsHtml}</div>${wlHtml}<div class="booking-card"><div class="booking-card-title">📝 Nachrichten</div><div id="notizen-container-${schuelerId}" style="margin-bottom:10px">${notizenHtml}</div><div class="notiz-compose"><textarea id="booking-notiz-text" placeholder="Nachricht an Fahrlehrer…"></textarea><div style="display:flex;justify-content:flex-end;margin-top:7px"><button class="btn btn-primary btn-sm" onclick="addNotizSchueler('${schuelerId}','${lehrerUid}')">Senden</button></div></div></div><p class="text-muted text-center" style="font-size:11px">Stornierung bis 48 Std. vorher möglich.</p>`;
+  const content=document.getElementById('booking-content');
+  const sub=document.getElementById('booking-subtitle');
+  if(!schuelerId||!lehrerUid){if(content)content.innerHTML='<div class="booking-card"><p class="text-muted text-center">Ung\u00fcltiger Link.</p></div>';return;}
+  if(content)content.innerHTML='<div class="booking-card"><div class="spinner"></div></div>';
+  let linkData=null,stud=null;
+  try{
+    const[linkSnap,studSnap]=await Promise.all([getDoc(doc(db,'bookingLinks',lehrerUid)),getDoc(doc(db,'bookingStudents',schuelerId))]);
+    if(linkSnap.exists())linkData=linkSnap.data();
+    if(studSnap.exists())stud=studSnap.data();
+  }catch(e){console.warn('booking load',e);if(content)content.innerHTML='<div class="booking-card"><p class="text-muted text-center">Buchung konnte nicht geladen werden. Bitte sp\u00e4ter erneut versuchen.</p></div>';return;}
+  if(!linkData||linkData.aktiv===false){if(content)content.innerHTML='<div class="booking-card" style="text-align:center;padding:32px 20px"><div style="font-size:2.4rem;margin-bottom:12px">\ud83d\udcc5</div><h2 style="margin:0 0 8px;font-size:1.1rem">Buchung gerade nicht m\u00f6glich</h2><p class="text-muted" style="line-height:1.5">Die Online-Buchung ist aktuell nicht aktiv. Bitte vereinbare deinen Termin direkt mit deinem Fahrlehrer.</p></div>';return;}
+  if(stud&&stud.lehrerUid&&stud.lehrerUid!==lehrerUid){if(content)content.innerHTML='<div class="booking-card"><p class="text-muted text-center">Dieser Link ist nicht g\u00fcltig.</p></div>';return;}
+  const vorname=(stud&&stud.vorname)||'';
+  if(sub)sub.textContent='Hallo'+(vorname?' '+vorname:'')+'! '+(linkData.lehrerName?'Fahrlehrer: '+linkData.lehrerName:'')+(linkData.schoolName?' \u00b7 '+linkData.schoolName:'');
+  const slots=(linkData.freieSlots||[]).filter(s=>s&&s.start&&new Date(s.start).getTime()>Date.now()).sort((a,b)=>a.start.localeCompare(b.start));
+  window.__bookingCtx={schuelerId,lehrerUid,vorname,slots};
+  if(!slots.length){if(content)content.innerHTML='<div class="booking-card" style="text-align:center;padding:28px 20px"><div style="font-size:2.2rem;margin-bottom:10px">\ud83d\uddd3\ufe0f</div><h2 style="margin:0 0 8px;font-size:1.05rem">Aktuell keine freien Termine</h2><p class="text-muted">Dein Fahrlehrer hat gerade keine freien Termine eingestellt. Schau sp\u00e4ter noch einmal vorbei.</p></div>';return;}
+  const p=n=>String(n).padStart(2,'0');
+  const groups={};
+  slots.forEach((s,i)=>{const d=new Date(s.start);const key=d.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long'});(groups[key]=groups[key]||[]).push({...s,_i:i});});
+  let html='<div class="booking-card" style="margin-bottom:14px"><h2 style="margin:0 0 4px;font-size:1.1rem">Termin ausw\u00e4hlen</h2><p class="text-muted" style="font-size:13px">Tippe auf einen freien Termin, um ihn anzufragen. Dein Fahrlehrer best\u00e4tigt ihn dann.</p></div>';
+  Object.keys(groups).forEach(day=>{
+    html+='<div class="booking-card"><div class="booking-card-title">'+day+'</div>';
+    groups[day].forEach(s=>{const d=new Date(s.start),e=new Date(s.ende);
+      html+='<div class="slot-row"><div class="slot-time">'+p(d.getHours())+':'+p(d.getMinutes())+'\u2013'+p(e.getHours())+':'+p(e.getMinutes())+'</div><div class="slot-info">'+typeBadgeHtml(s.type)+'</div><button class="btn btn-primary btn-sm" onclick="pickBookingSlot('+s._i+')">Anfragen</button></div>';});
+    html+='</div>';
+  });
+  if(content)content.innerHTML=html;
+}
+window.pickBookingSlot=function(i){
+  const c=window.__bookingCtx;if(!c||!c.slots[i])return;
+  const s=c.slots[i];const d=new Date(s.start),e=new Date(s.ende);const p=n=>String(n).padStart(2,'0');
+  const txt=d.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long'})+'\nUhrzeit: '+p(d.getHours())+':'+p(d.getMinutes())+'\u2013'+p(e.getHours())+':'+p(e.getMinutes());
+  if(window.confirm('Diesen Termin verbindlich anfragen?\n\n'+txt))sendeBuchungsanfrage(c.schuelerId,c.lehrerUid,c.vorname,s);
+};
+window.sendeBuchungsanfrage=async function(schuelerId,lehrerUid,vorname,slot){
+  const content=document.getElementById('booking-content');
+  try{
+    await addDoc(collection(db,'bookingRequests'),{lehrerUid,schuelerId,vorname:vorname||'',slotId:slot.id,start:slot.start,ende:slot.ende,type:slot.type||'fahrstunde',status:'angefragt',createdAt:serverTimestamp()});
+    if(content)content.innerHTML='<div class="booking-card" style="text-align:center;padding:34px 20px"><div style="font-size:2.8rem;margin-bottom:14px">\u2705</div><h2 style="margin:0 0 8px;font-size:1.2rem">Anfrage gesendet!</h2><p class="text-muted" style="line-height:1.5">Dein Fahrlehrer bekommt deine Terminanfrage und best\u00e4tigt sie in K\u00fcrze. Du kannst diese Seite jetzt schlie\u00dfen.</p></div>';
+  }catch(e){console.warn(e);toast('Anfrage fehlgeschlagen. Bitte erneut versuchen.','error');}
 }
 
 window.saveSchuelerEmail=async function(sid,luid){const e=document.getElementById('schueler-email-input')?.value.trim();if(!e||!e.includes('@'))return toast('Gültige E-Mail eingeben.','error');await updateDoc(doc(db,'schueler',sid),{email:e});toast('E-Mail gespeichert!','success');showBookingPage(sid,luid);};
