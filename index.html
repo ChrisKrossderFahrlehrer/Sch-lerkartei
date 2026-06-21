@@ -272,13 +272,13 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
   width:60px; height:60px; border-radius:50%;
   background:linear-gradient(135deg, #ffd454, var(--accent)); color:#0d1117; border:none;
   font-size:1.9rem; font-weight:300; cursor:pointer;
-  box-shadow:0 6px 22px rgba(240,180,41,0.55), inset 0 1px 2px rgba(255,255,255,0.5);
+  box-shadow:0 6px 22px rgba(240,180,41,0.44), inset 0 1px 2px rgba(255,255,255,0.5);
   display:flex; align-items:center; justify-content:center;
   z-index:100; transition:transform 0.18s var(--ease-out), box-shadow 0.18s;
   line-height:1;
 }
-.fab:active { transform:scale(0.92); box-shadow:0 2px 10px rgba(240,180,41,0.4); }
-@media (hover:hover) { .fab:hover { transform:translateY(-3px) scale(1.05); box-shadow:0 12px 30px rgba(240,180,41,0.6); } }
+.fab:active { transform:scale(0.92); box-shadow:0 2px 10px rgba(240,180,41,0.32); }
+@media (hover:hover) { .fab:hover { transform:translateY(-3px) scale(1.05); box-shadow:0 12px 30px rgba(240,180,41,0.48); } }
 
 /* ── LIST SCREEN ── */
 .list-header {
@@ -911,7 +911,7 @@ body.light .student-card { box-shadow:0 3px 0 rgba(16,24,40,0.12), 0 7px 16px rg
   <!-- Sortier-Leiste -->
   <div style="display:flex;align-items:center;gap:8px;padding:0 16px 4px">
     <span style="font-size:0.74rem;color:var(--muted);white-space:nowrap">Sortieren:</span>
-    <select id="sort-select" onchange="setSortMode(this.value)" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:7px 10px;font-size:0.8rem;outline:none;cursor:pointer">
+    <select id="sort-select" onchange="setSortMode(this.value)" style="flex:1;background:linear-gradient(180deg,rgba(255,255,255,0.07),rgba(0,0,0,0.06)),var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:9px 12px;font-size:0.8rem;outline:none;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,0.45),0 6px 12px rgba(0,0,0,0.3),inset 0 1px 1px rgba(255,255,255,0.12)">
       <option value="nameAsc">Name (A → Z)</option>
       <option value="nameDesc">Name (Z → A)</option>
       <option value="dateDesc">Neueste zuerst</option>
