@@ -474,6 +474,21 @@ service cloud.firestore {
     //   get per ID (Link kennt die zufällige Schüler-ID), list gesperrt.
     //   Anlegen durch den eigenen Lehrer; Ändern/Löschen nur durch den Lehrer,
     //   dem das Doc bereits gehört (verhindert Übernahme fremder Links).
+    match /bookingWaitlist/{schuelerId} {
+      // Schüler liest eigenen Status (per ID); Lehrer listet eigene Einträge.
+      allow get:    if true;
+      allow list:   if isAuth() && resource.data.lehrerUid == request.auth.uid;
+      allow update: if isAuth() && resource.data.lehrerUid == request.auth.uid;
+      // Austragen: Schüler (kennt eigene schuelerId) oder Lehrer.
+      allow delete: if true;
+      // Eintragen (ohne Login): nur für aktiven Buchungs-Link, eigene ID, Status 'wartend'.
+      allow create: if request.resource.data.status == 'wartend'
+                    && request.resource.data.lehrerUid is string
+                    && request.resource.data.schuelerId == schuelerId
+                    && request.resource.data.keys().hasAll(['lehrerUid','schuelerId','vorname','status','createdAt'])
+                    && exists(/databases/$(database)/documents/bookingLinks/$(request.resource.data.lehrerUid))
+                    && get(/databases/$(database)/documents/bookingLinks/$(request.resource.data.lehrerUid)).data.aktiv == true;
+    }
     match /bookingStudents/{schuelerId} {
       allow get:    if true;
       allow list:   if false;
