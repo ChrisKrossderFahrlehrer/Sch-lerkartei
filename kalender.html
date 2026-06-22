@@ -263,6 +263,39 @@ tr:last-child td{border-bottom:none;}
   .booking-card{padding:16px 12px;}
 }
 @media(max-width:380px){.nav-item{min-width:46px;font-size:8px;padding:4px 5px;}.nav-icon{font-size:15px;}}
+
+/* Schüler-Buchungskalender */
+.bcal-viewtoggle{display:flex;gap:5px;margin-bottom:14px;background:var(--surface2);padding:4px;border-radius:11px;}
+.bcal-vt{flex:1;padding:9px;border:none;border-radius:8px;background:transparent;color:var(--text-muted);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;}
+.bcal-vt.active{background:var(--accent);color:#0f0f0f;box-shadow:0 2px 6px rgba(0,0,0,.3);}
+.bcal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.bcal-title{font-family:var(--font-display);font-size:16px;font-weight:600;text-transform:capitalize;text-align:center;flex:1;}
+.bcal-nav{width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 5px rgba(0,0,0,.35),inset 0 1px 1px rgba(255,255,255,.06);transition:transform .12s;flex-shrink:0;}
+.bcal-nav:active{transform:translateY(2px);}
+.bcal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
+.bcal-wd{text-align:center;font-size:11px;font-weight:700;color:var(--text-muted);padding:2px 0;}
+.bcal-cell{position:relative;aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:10px;font-size:14px;color:var(--text);background:var(--surface2);border:1.5px solid transparent;cursor:default;transition:transform .1s;}
+.bcal-cell.empty{background:transparent;}
+.bcal-cell.active{cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.3);}
+.bcal-cell.active:active{transform:scale(.93);}
+.bcal-cell.today{outline:2px solid rgba(212,168,67,.45);outline-offset:1px;}
+.bcal-cell.sel{background:var(--accent);color:#0f0f0f;font-weight:800;border-color:var(--accent);}
+.bcal-dots{position:absolute;bottom:4px;left:0;right:0;display:flex;gap:3px;justify-content:center;height:5px;}
+.bcal-dot{width:5px;height:5px;border-radius:50%;display:inline-block;}
+.bcal-dot.booked{background:var(--accent);}
+.bcal-dot.free{background:var(--success);}
+.bcal-cell.sel .bcal-dot{background:#0f0f0f;}
+.bcal-legend{display:flex;gap:18px;justify-content:center;margin-top:12px;font-size:11px;color:var(--text-muted);}
+.bcal-legend span{display:flex;align-items:center;gap:5px;}
+.bcal-legend .bcal-dot{width:8px;height:8px;}
+.bcal-detail{margin-top:14px;}
+.bcal-detail-date{font-weight:600;font-size:13px;margin-bottom:10px;text-transform:capitalize;color:var(--accent);}
+.bcal-sub{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin:12px 0 6px;}
+.bcal-booked-tag{font-size:11px;color:var(--success);font-weight:700;white-space:nowrap;}
+.bcal-weekday{padding:9px 0;border-bottom:1px solid var(--border);}
+.bcal-weekday:last-child{border-bottom:none;}
+.bcal-weekday.today .bcal-weekday-h{color:var(--accent);}
+.bcal-weekday-h{font-size:13px;font-weight:600;margin-bottom:7px;text-transform:capitalize;}
 </style>
 </head>
 <body>
@@ -337,7 +370,7 @@ tr:last-child td{border-bottom:none;}
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, collection, query, where, orderBy, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, collection, query, where, orderBy, serverTimestamp, Timestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // ── FIREBASE CONFIG ──
 const firebaseConfig = {
@@ -1316,9 +1349,10 @@ window.addSlot=async function(year,month,day){
   const st=Timestamp.fromDate(new Date(year,month,day,fh,fm));
   const et=Timestamp.fromDate(new Date(year,month,day,Math.floor(tot/60)%24,tot%60));
   await addDoc(collection(db,'slots'),{lehrerUid:currentUser.uid,type,startTime:st,endTime:et,bookedBy:null,schoolId:currentSchoolId,createdAt:serverTimestamp()});
+  try{await publishMyBookingLink();}catch(e){}
   toast('Slot hinzugefügt!','success');closeModal();renderCal();
 };
-window.deleteSlot=async function(id){await deleteDoc(doc(db,'slots',id));toast('Gelöscht.','success');closeModal();renderCal();};
+window.deleteSlot=async function(id){let _bb=null;try{const s=await getDoc(doc(db,'slots',id));if(s.exists())_bb=s.data().bookedBy||null;}catch(e){}await deleteDoc(doc(db,'slots',id));try{await publishMyBookingLink();}catch(e){}if(_bb){try{await publishStudentBookings(_bb);}catch(e){}}toast('Gelöscht.','success');closeModal();renderCal();};
 window.blockDay=async function(year,month,day){await addDoc(collection(db,'blocked'),{lehrerUid:currentUser.uid,year,month,day});toast('Gesperrt.','success');closeModal();renderCal();};
 window.unblockDay=async function(id){await deleteDoc(doc(db,'blocked',id));toast('Entsperrt.','success');closeModal();renderCal();};
 
@@ -1336,7 +1370,7 @@ pages['lehrer-slots']=async function(el){
       <td>${s.bookedBy?`<span class="badge badge-booked">${scm[s.bookedBy]||'?'}</span>`:'<span class="badge badge-free">Frei</span>'}</td>
       <td>${!s.bookedBy?`<button class="btn btn-danger btn-sm" onclick="deleteSlotFromList('${d.id}')">Löschen</button>`:''}</td></tr>`;}).join('')+'</tbody></table>';
 };
-window.deleteSlotFromList=async function(id){await deleteDoc(doc(db,'slots',id));toast('Gelöscht.','success');pages['lehrer-slots'](document.getElementById('main-content'));};
+window.deleteSlotFromList=async function(id){let _bb=null;try{const s=await getDoc(doc(db,'slots',id));if(s.exists())_bb=s.data().bookedBy||null;}catch(e){}await deleteDoc(doc(db,'slots',id));try{await publishMyBookingLink();}catch(e){}if(_bb){try{await publishStudentBookings(_bb);}catch(e){}}toast('Gelöscht.','success');pages['lehrer-slots'](document.getElementById('main-content'));};
 
 // ════════════════════════════════
 // LEHRER – BUCHUNGEN
@@ -1462,6 +1496,7 @@ window.cancelBookingLehrer=async function(id){
   const slot=sSnap.data();await updateDoc(doc(db,'slots',id),{bookedBy:null,bookedAt:null});
   if(slot.bookedBy){const scSnap=await getDoc(doc(db,'schueler',slot.bookedBy));if(scSnap.exists())await updateDoc(doc(db,'schueler',slot.bookedBy),{bookedCount:Math.max(0,(scSnap.data().bookedCount||1)-1)});}
   await triggerEmail('stornierung_freigeworden',{datum:slot.startTime.toDate().toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}),von:fmtTime(slot.startTime),bis:fmtTime(slot.endTime),typ:typeLabel(slot.type),lehrerName:lSnap.data().fname+' '+lSnap.data().lname,lehrerUid:currentUser.uid,slotId:id});
+  try{await publishMyBookingLink();}catch(e){}
   if(slot.bookedBy){try{await publishStudentBookings(slot.bookedBy);}catch(e){}}
   toast('Storniert.','success');pages['lehrer-buchungen'](document.getElementById('main-content'));
 };
@@ -1754,41 +1789,107 @@ async function triggerEmail(type,payload){try{await addDoc(collection(db,'mailQu
 // ════════════════════════════════
 // SCHÜLER BUCHUNGSSEITE
 // ════════════════════════════════
+let __bookingUnsub=[];
 async function showBookingPage(schuelerId,lehrerUid){
   show('booking');
+  __bookingUnsub.forEach(u=>{try{u();}catch(e){}});__bookingUnsub=[];
   const content=document.getElementById('booking-content');
-  const sub=document.getElementById('booking-subtitle');
   if(!schuelerId||!lehrerUid){if(content)content.innerHTML='<div class="booking-card"><p class="text-muted text-center">Ungültiger Link.</p></div>';return;}
   if(content)content.innerHTML='<div class="booking-card"><div class="spinner"></div></div>';
-  let linkData=null,stud=null;
-  try{
-    const[linkSnap,studSnap]=await Promise.all([getDoc(doc(db,'bookingLinks',lehrerUid)),getDoc(doc(db,'bookingStudents',schuelerId))]);
-    if(linkSnap.exists())linkData=linkSnap.data();
-    if(studSnap.exists())stud=studSnap.data();
-  }catch(e){console.warn('booking load',e);if(content)content.innerHTML='<div class="booking-card"><p class="text-muted text-center">Buchung konnte nicht geladen werden. Bitte später erneut versuchen.</p></div>';return;}
-  if(!linkData && !stud){if(content)content.innerHTML='<div class="booking-card" style="text-align:center;padding:32px 20px"><div style="font-size:2.4rem;margin-bottom:12px">📅</div><h2 style="margin:0 0 8px;font-size:1.1rem">Buchung nicht verfügbar</h2><p class="text-muted" style="line-height:1.5">Dieser Link ist nicht (mehr) gültig. Bitte wende dich an deinen Fahrlehrer.</p></div>';return;}
-  if(stud&&stud.lehrerUid&&stud.lehrerUid!==lehrerUid){if(content)content.innerHTML='<div class="booking-card"><p class="text-muted text-center">Dieser Link ist nicht gültig.</p></div>';return;}
+  let linkData=null,stud=null,gotLink=false,gotStud=false;
+  const rerender=()=>{ if(gotLink||gotStud) renderBookingPageContent(schuelerId,lehrerUid,linkData,stud,gotLink&&gotStud); };
+  __bookingUnsub.push(onSnapshot(doc(db,'bookingLinks',lehrerUid),s=>{linkData=s.exists()?s.data():null;gotLink=true;rerender();},e=>{console.warn('live bookingLinks',e);gotLink=true;rerender();}));
+  __bookingUnsub.push(onSnapshot(doc(db,'bookingStudents',schuelerId),s=>{stud=s.exists()?s.data():null;gotStud=true;rerender();},e=>{console.warn('live bookingStudents',e);gotStud=true;rerender();}));
+}
+function renderBookingPageContent(schuelerId,lehrerUid,linkData,stud,complete){
+  const content=document.getElementById('booking-content');
+  const sub=document.getElementById('booking-subtitle');
+  if(!content)return;
+  if(!linkData && !stud){content.innerHTML = complete
+    ? '<div class="booking-card" style="text-align:center;padding:32px 20px"><div style="font-size:2.4rem;margin-bottom:12px">📅</div><h2 style="margin:0 0 8px;font-size:1.1rem">Buchung nicht verfügbar</h2><p class="text-muted" style="line-height:1.5">Dieser Link ist nicht (mehr) gültig. Bitte wende dich an deinen Fahrlehrer.</p></div>'
+    : '<div class="booking-card"><div class="spinner"></div></div>';
+    return;}
+  if(stud&&stud.lehrerUid&&stud.lehrerUid!==lehrerUid){content.innerHTML='<div class="booking-card"><p class="text-muted text-center">Dieser Link ist nicht gültig.</p></div>';return;}
   const vorname=(stud&&stud.vorname)||'';
   const _ln=(linkData&&linkData.lehrerName)||'';const _sn=(linkData&&linkData.schoolName)||'';
   if(sub)sub.textContent='Hallo'+(vorname?' '+vorname:'')+'!'+(_ln?' Fahrlehrer: '+_ln:'')+(_sn?' · '+_sn:'');
   const p=n=>String(n).padStart(2,'0');
-  const fmtRow=(o,btn)=>{const d=new Date(o.start),e=new Date(o.ende);const datum=d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});const zeit=p(d.getHours())+':'+p(d.getMinutes())+'–'+p(e.getHours())+':'+p(e.getMinutes());return '<div class="slot-row"><div class="slot-time">'+datum+'<br><span style="font-size:11px;font-weight:400">'+zeit+'</span></div><div class="slot-info">'+typeBadgeHtml(o.type)+'</div>'+(btn||'')+'</div>';};
-  const meine=((stud&&stud.meineTermine)||[]).filter(t=>t&&t.start&&new Date(t.ende||t.start).getTime()>Date.now()-2*3600000).sort((a,b)=>a.start.localeCompare(b.start));
+  const meine=((stud&&stud.meineTermine)||[]).filter(t=>t&&t.start).sort((a,b)=>a.start.localeCompare(b.start));
+  window.__bookingMeine=meine;
   const aktiv=!!(linkData&&linkData.aktiv!==false);
   const slots=aktiv?((linkData.freieSlots||[]).filter(s=>s&&s.start&&new Date(s.start).getTime()>Date.now()).sort((a,b)=>a.start.localeCompare(b.start))):[];
   window.__bookingCtx={schuelerId,lehrerUid,vorname,slots};
-  let html='<div class="booking-card" style="margin-bottom:14px"><h2 style="margin:0 0 4px;font-size:1.15rem">'+(vorname?'Hallo '+vorname+'!':'Deine Termine')+'</h2><p class="text-muted" style="font-size:13px">Hier siehst du deine gebuchten Fahrstunden und kannst neue Termine anfragen.</p></div>';
-  html+='<div class="booking-card"><div class="booking-card-title">📅 Meine gebuchten Termine</div>';
-  if(meine.length){html+=meine.map(t=>fmtRow(t,'')).join('');}
-  else{html+='<p class="text-muted">Noch keine bestätigten Termine. Frag dir unten einen freien Termin an.</p>';}
-  html+='</div>';
-  html+='<div class="booking-card"><div class="booking-card-title">🗓️ Freie Termine anfragen</div>';
-  if(!aktiv){html+='<p class="text-muted">Die Online-Buchung ist gerade nicht aktiv. Bitte sprich deinen Fahrlehrer direkt an.</p>';}
-  else if(!slots.length){html+='<p class="text-muted">Aktuell keine freien Termine. Schau später noch einmal vorbei.</p>';}
-  else{html+=slots.map((s,i)=>fmtRow(s,'<button class="btn btn-primary btn-sm" onclick="pickBookingSlot('+i+')">Anfragen</button>')).join('');}
-  html+='</div>';
-  if(content)content.innerHTML=html;
+  let html='<div class="booking-card" style="margin-bottom:14px"><h2 style="margin:0 0 4px;font-size:1.15rem">'+(vorname?'Hallo '+vorname+'!':'Deine Termine')+'</h2><p class="text-muted" style="font-size:13px">Hier siehst du deine gebuchten Fahrstunden im Kalender und kannst neue Termine anfragen.</p></div>';
+  window.__bookingFree=slots;
+  html+='<div class="booking-card"><div class="booking-card-title">📅 Mein Fahrstunden-Kalender</div><div id="booking-cal"></div>'+(aktiv?'':'<p class="text-muted" style="font-size:12px;margin-top:12px">Die Online-Buchung ist gerade nicht aktiv — du siehst hier nur deine bereits gebuchten Stunden.</p>')+'</div>';
+  content.innerHTML=html;
+  renderBookingCalendar();
 }
+function _bcalKey(d){return d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate();}
+function _bcalGroup(arr){const m={};(arr||[]).forEach(t=>{if(!t||!t.start)return;const k=_bcalKey(new Date(t.start));(m[k]=m[k]||[]).push(t);});return m;}
+function _bcalRow(t,bookable){const p=n=>String(n).padStart(2,'0');const d=new Date(t.start),e=new Date(t.ende);const time=`${p(d.getHours())}:${p(d.getMinutes())}–${p(e.getHours())}:${p(e.getMinutes())}`;const right=bookable?`<button class="btn btn-primary btn-sm" onclick="pickBookingSlotById('${t.id}')">Anfragen</button>`:'<span class="bcal-booked-tag">✓ gebucht</span>';return `<div class="slot-row"><div class="slot-time">${time}</div><div class="slot-info">${typeBadgeHtml(t.type)}</div>${right}</div>`;}
+function renderBookingCalendar(){
+  const box=document.getElementById('booking-cal');if(!box)return;
+  const view=window.__bookingCalView||'month';
+  const booked=window.__bookingMeine||[];const free=window.__bookingFree||[];
+  let h=`<div class="bcal-viewtoggle"><button class="bcal-vt${view==='month'?' active':''}" onclick="bookingCalSetView('month')">Monat</button><button class="bcal-vt${view==='week'?' active':''}" onclick="bookingCalSetView('week')">Woche</button></div>`;
+  h+=(view==='week')?_bcalWeek(booked,free):_bcalMonth(booked,free);
+  box.innerHTML=h;
+}
+function _bcalMonth(booked,free){
+  if(!window.__bookingCalMonth){const all=booked.concat(free).map(t=>new Date(t.start)).filter(d=>d.getTime()>Date.now()-2*3600000).sort((a,b)=>a-b);const base=all.length?all[0]:new Date();window.__bookingCalMonth=new Date(base.getFullYear(),base.getMonth(),1);}
+  const cur=window.__bookingCalMonth;const y=cur.getFullYear(),m=cur.getMonth();
+  const bD=_bcalGroup(booked),fD=_bcalGroup(free);
+  const monthName=cur.toLocaleDateString('de-DE',{month:'long',year:'numeric'});
+  const startWd=(new Date(y,m,1).getDay()+6)%7;const dim=new Date(y,m+1,0).getDate();
+  const todayK=_bcalKey(new Date());
+  let h=`<div class="bcal-head"><button class="bcal-nav" onclick="bookingCalPrev()">‹</button><div class="bcal-title">${monthName}</div><button class="bcal-nav" onclick="bookingCalNext()">›</button></div><div class="bcal-grid">`;
+  ['Mo','Di','Mi','Do','Fr','Sa','So'].forEach(w=>h+=`<div class="bcal-wd">${w}</div>`);
+  for(let i=0;i<startWd;i++)h+='<div class="bcal-cell empty"></div>';
+  for(let day=1;day<=dim;day++){const k=`${y}-${m}-${day}`;const hasB=!!bD[k];const hasF=(fD[k]||[]).some(s=>new Date(s.start).getTime()>Date.now());
+    let cls='bcal-cell';if(hasB||hasF)cls+=' active';if(k===todayK)cls+=' today';if(k===window.__bookingCalSel)cls+=' sel';
+    let dots='';if(hasB)dots+='<i class="bcal-dot booked"></i>';if(hasF)dots+='<i class="bcal-dot free"></i>';
+    h+=`<div class="${cls}"${(hasB||hasF)?` onclick="bookingCalDay('${k}')"`:''}><span>${day}</span><div class="bcal-dots">${dots}</div></div>`;
+  }
+  h+='</div><div class="bcal-legend"><span><i class="bcal-dot booked"></i> gebucht</span><span><i class="bcal-dot free"></i> frei</span></div>';
+  h+='<div class="bcal-detail">';
+  const sel=window.__bookingCalSel;
+  if(sel&&(bD[sel]||fD[sel])){
+    const pr=sel.split('-');const dd=new Date(+pr[0],+pr[1],+pr[2]);
+    h+=`<div class="bcal-detail-date">${dd.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long'})}</div>`;
+    const bk=(bD[sel]||[]).slice().sort((a,b)=>a.start.localeCompare(b.start));
+    const fr=(fD[sel]||[]).filter(s=>new Date(s.start).getTime()>Date.now()).sort((a,b)=>a.start.localeCompare(b.start));
+    if(bk.length)h+='<div class="bcal-sub">Deine Stunden</div>'+bk.map(t=>_bcalRow(t,false)).join('');
+    if(fr.length)h+='<div class="bcal-sub">Freie Termine – tippe zum Anfragen</div>'+fr.map(t=>_bcalRow(t,true)).join('');
+    if(!bk.length&&!fr.length)h+='<div class="text-muted" style="font-size:12px">Keine Termine an diesem Tag.</div>';
+  } else {
+    h+='<div class="text-muted" style="font-size:12px;text-align:center;padding:8px 4px">Tippe auf einen markierten Tag, um Stunden zu sehen oder zu buchen.</div>';
+  }
+  h+='</div>';
+  return h;
+}
+function _bcalWeek(booked,free){
+  if(!window.__bookingCalWeek){const now=new Date();const dow=(now.getDay()+6)%7;window.__bookingCalWeek=new Date(now.getFullYear(),now.getMonth(),now.getDate()-dow);}
+  const ws=window.__bookingCalWeek;const bD=_bcalGroup(booked),fD=_bcalGroup(free);
+  const we=new Date(ws.getFullYear(),ws.getMonth(),ws.getDate()+6);
+  const dd=d=>d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
+  const todayK=_bcalKey(new Date());
+  let h=`<div class="bcal-head"><button class="bcal-nav" onclick="bookingCalPrev()">‹</button><div class="bcal-title">${dd(ws)} – ${dd(we)}</div><button class="bcal-nav" onclick="bookingCalNext()">›</button></div>`;
+  for(let i=0;i<7;i++){const d=new Date(ws.getFullYear(),ws.getMonth(),ws.getDate()+i);const k=_bcalKey(d);
+    const bk=(bD[k]||[]).slice().sort((a,b)=>a.start.localeCompare(b.start));
+    const fr=(fD[k]||[]).filter(s=>new Date(s.start).getTime()>Date.now()).sort((a,b)=>a.start.localeCompare(b.start));
+    h+=`<div class="bcal-weekday${k===todayK?' today':''}"><div class="bcal-weekday-h">${d.toLocaleDateString('de-DE',{weekday:'long'})}, ${dd(d)}</div>`;
+    if(!bk.length&&!fr.length)h+='<div class="text-muted" style="font-size:12px;padding:1px 0 4px">—</div>';
+    else h+=bk.map(t=>_bcalRow(t,false)).join('')+fr.map(t=>_bcalRow(t,true)).join('');
+    h+='</div>';
+  }
+  return h;
+}
+window.bookingCalSetView=function(v){window.__bookingCalView=v;renderBookingCalendar();};
+window.bookingCalPrev=function(){if((window.__bookingCalView||'month')==='week'){const c=window.__bookingCalWeek||new Date();window.__bookingCalWeek=new Date(c.getFullYear(),c.getMonth(),c.getDate()-7);}else{const c=window.__bookingCalMonth||new Date();window.__bookingCalMonth=new Date(c.getFullYear(),c.getMonth()-1,1);}renderBookingCalendar();};
+window.bookingCalNext=function(){if((window.__bookingCalView||'month')==='week'){const c=window.__bookingCalWeek||new Date();window.__bookingCalWeek=new Date(c.getFullYear(),c.getMonth(),c.getDate()+7);}else{const c=window.__bookingCalMonth||new Date();window.__bookingCalMonth=new Date(c.getFullYear(),c.getMonth()+1,1);}renderBookingCalendar();};
+window.bookingCalDay=function(k){window.__bookingCalSel=(window.__bookingCalSel===k?null:k);renderBookingCalendar();};
+window.pickBookingSlotById=function(id){const c=window.__bookingCtx;if(!c)return;const s=(c.slots||[]).find(x=>x.id===id);if(!s)return;const p=n=>String(n).padStart(2,'0');const d=new Date(s.start),e=new Date(s.ende);const txt=d.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long'})+'\nUhrzeit: '+p(d.getHours())+':'+p(d.getMinutes())+'–'+p(e.getHours())+':'+p(e.getMinutes());if(window.confirm('Diesen Termin verbindlich anfragen?\n\n'+txt))sendeBuchungsanfrage(c.schuelerId,c.lehrerUid,c.vorname,s);};
 window.zurBuchungsUebersicht=function(){const c=window.__bookingCtx;if(c)showBookingPage(c.schuelerId,c.lehrerUid);};
 window.pickBookingSlot=function(i){
   const c=window.__bookingCtx;if(!c||!c.slots[i])return;
@@ -1800,6 +1901,7 @@ window.sendeBuchungsanfrage=async function(schuelerId,lehrerUid,vorname,slot){
   const content=document.getElementById('booking-content');
   try{
     await addDoc(collection(db,'bookingRequests'),{lehrerUid,schuelerId,vorname:vorname||'',slotId:slot.id,start:slot.start,ende:slot.ende,type:slot.type||'fahrstunde',status:'angefragt',createdAt:serverTimestamp()});
+    __bookingUnsub.forEach(u=>{try{u();}catch(e){}});__bookingUnsub=[];
     if(content)content.innerHTML='<div class="booking-card" style="text-align:center;padding:34px 20px"><div style="font-size:2.8rem;margin-bottom:14px">✅</div><h2 style="margin:0 0 8px;font-size:1.2rem">Anfrage gesendet!</h2><p class="text-muted" style="line-height:1.5">Dein Fahrlehrer bekommt deine Terminanfrage und bestätigt sie in Kürze. Du kannst diese Seite jetzt schließen.</p><button class="btn btn-secondary" style="margin-top:16px" onclick="zurBuchungsUebersicht()">Zurück zur Übersicht</button></div>';
   }catch(e){console.warn(e);toast('Anfrage fehlgeschlagen. Bitte erneut versuchen.','error');}
 }
