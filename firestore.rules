@@ -402,6 +402,18 @@ service cloud.firestore {
     match /slots/{docId} {
       allow read, update, delete: if kalOwnsSchool(resource.data.schoolId);
       allow create:               if kalOwnsSchool(request.resource.data.schoolId);
+      // Schüler-Selbststorno (OHNE Login): NUR den eigenen gebuchten Termin
+      // freigeben (bookedBy -> null). Eng begrenzt:
+      //  - nur wenn aktuell gebucht und neuer Wert null
+      //  - die angegebene Schüler-ID muss == aktuell Gebuchter sein (Nachweis)
+      //  - es dürfen NUR diese Felder geändert werden
+      //  - nur, wenn der Termin noch mehr als 48 Std. entfernt ist (serverseitig)
+      allow update: if resource.data.bookedBy != null
+                    && request.resource.data.bookedBy == null
+                    && request.resource.data.storniertVonSchueler == resource.data.bookedBy
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['bookedBy','bookedAt','storniertVonSchueler','storniertAt'])
+                    && resource.data.startTime is timestamp
+                    && resource.data.startTime > request.time + duration.value(48, 'h');
     }
     match /autos/{docId} {
       allow read, update, delete: if kalOwnsSchool(resource.data.schoolId);
@@ -467,6 +479,10 @@ service cloud.firestore {
       allow list:   if false;
       allow create: if isAuth() && request.resource.data.lehrerUid == request.auth.uid;
       allow update, delete: if isAuth() && resource.data.lehrerUid == request.auth.uid;
+      // Schüler darf (ohne Login) NUR die eigene Terminliste anpassen – z.B.
+      // nach einem Selbststorno. lehrerUid/vorname bleiben gesperrt.
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['meineTermine','updatedAt'])
+                    && request.resource.data.lehrerUid == resource.data.lehrerUid;
     }
     // bookingRequests/{id}: Terminanfragen der Schüler.
     //   Schüler DARF anlegen (ohne Login), aber NICHT lesen → kein Abgriff.
