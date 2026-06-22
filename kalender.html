@@ -1813,6 +1813,7 @@ async function triggerEmail(type,payload){try{await addDoc(collection(db,'mailQu
 let __bookingUnsub=[];
 async function showBookingPage(schuelerId,lehrerUid){
   show('booking');
+  window.__bookingPrevFreeIds=undefined;
   __bookingUnsub.forEach(u=>{try{u();}catch(e){}});__bookingUnsub=[];
   const content=document.getElementById('booking-content');
   if(!schuelerId||!lehrerUid){if(content)content.innerHTML='<div class="booking-card"><p class="text-muted text-center">Ungültiger Link.</p></div>';return;}
@@ -1841,6 +1842,9 @@ function renderBookingPageContent(schuelerId,lehrerUid,linkData,stud,complete,wl
   const aktiv=!!(linkData&&linkData.aktiv!==false);
   const slots=aktiv?((linkData.freieSlots||[]).filter(s=>s&&s.start&&new Date(s.start).getTime()>Date.now()).sort((a,b)=>a.start.localeCompare(b.start))):[];
   window.__bookingCtx={schuelerId,lehrerUid,vorname,slots};
+  const _freeIds=slots.map(s=>s.id).filter(Boolean);
+  if(Array.isArray(window.__bookingPrevFreeIds)){const _neu=_freeIds.filter(id=>!window.__bookingPrevFreeIds.includes(id));if(_neu.length&&wl)toast('🎉 Ein Termin ist frei geworden — jetzt anfragen!','success');}
+  window.__bookingPrevFreeIds=_freeIds;
   let html='<div class="booking-card" style="margin-bottom:14px"><h2 style="margin:0 0 4px;font-size:1.15rem">'+(vorname?'Hallo '+vorname+'!':'Deine Termine')+'</h2><p class="text-muted" style="font-size:13px">Hier siehst du deine gebuchten Fahrstunden im Kalender und kannst neue Termine anfragen.</p></div>';
   window.__bookingFree=slots;
   html+='<div class="booking-card"><div class="booking-card-title">📅 Mein Fahrstunden-Kalender</div><div id="booking-cal"></div>'+(aktiv?'':'<p class="text-muted" style="font-size:12px;margin-top:12px">Die Online-Buchung ist gerade nicht aktiv — du siehst hier nur deine bereits gebuchten Stunden.</p>')+'<p class="text-muted" style="font-size:11px;margin-top:12px;text-align:center">ℹ️ Stornieren ist bis 48 Std. vor dem Termin möglich.</p></div>';
