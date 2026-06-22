@@ -1403,8 +1403,9 @@ async function publishStudentBookings(schuelerId,vorname){
     const snap=await getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid),orderBy('startTime')));
     const grenze=Date.now()-2*3600000;
     const meineTermine=snap.docs.filter(d=>{const s=d.data();return s.bookedBy===schuelerId && s.startTime && s.startTime.toDate().getTime()>=grenze;})
-      .map(d=>{const s=d.data();return{start:s.startTime.toDate().toISOString(),ende:s.endTime.toDate().toISOString(),type:s.type||'fahrstunde'};});
-    const payload={lehrerUid:currentUser.uid,meineTermine,updatedAt:serverTimestamp()};
+      .map(d=>{const s=d.data();return{id:d.id,start:s.startTime.toDate().toISOString(),ende:s.endTime.toDate().toISOString(),type:s.type||'fahrstunde'};});
+    let scd={};try{const sc=await getDoc(doc(db,'schueler',schuelerId));if(sc.exists())scd=sc.data();}catch(e){}
+    const payload={lehrerUid:currentUser.uid,meineTermine,maxAktiveTermine:scd.maxAktiveTermine||0,maxFahrstunden:scd.maxFahrstunden||0,bookedCount:scd.bookedCount||0,updatedAt:serverTimestamp()};
     if(vorname!==undefined&&vorname!==null)payload.vorname=vorname||'';
     await setDoc(doc(db,'bookingStudents',schuelerId),payload,{merge:true});
   }catch(e){console.warn('publishStudentBookings',e);}
@@ -1454,7 +1455,7 @@ async function renderBookingRequests(){
     reqs.map(r=>{const d=r.start?new Date(r.start):null,e=r.ende?new Date(r.ende):null;
       const datum=d?d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}):'?';
       const zeit=d&&e?p(d.getHours())+':'+p(d.getMinutes())+'–'+p(e.getHours())+':'+p(e.getMinutes()):'?';
-      return`<tr><td>${escHtml(r.vorname||'')||'Schüler'}</td><td>${datum}</td><td>${zeit}</td><td>${typeBadgeHtml(r.type)}</td>
+      return`<tr><td>${escHtml(r.vorname||'')||'Schüler'}</td><td>${datum}</td><td>${zeit}</td><td>${typeBadgeHtml(r.type)}${r.tausch?' <span style="font-size:10px;color:var(--accent);white-space:nowrap">🔄 Tausch</span>':''}</td>
         <td style="white-space:nowrap;text-align:right"><button class="btn btn-success btn-sm" onclick="bestaetigeBuchung('${r.id}')">✓</button>
         <button class="btn btn-danger btn-sm" onclick="lehneBuchungAb('${r.id}')">✕</button></td></tr>`;}).join('')+'</tbody></table>';
 }
@@ -1466,7 +1467,11 @@ window.bestaetigeBuchung=async function(reqId){
     if(!slotSnap.exists()){await updateDoc(doc(db,'bookingRequests',reqId),{status:'abgelehnt',grund:'Termin existiert nicht mehr',bearbeitetAt:serverTimestamp()});toast('Termin existiert nicht mehr.','error');renderBookingRequests();return;}
     if(slotSnap.data().bookedBy){await updateDoc(doc(db,'bookingRequests',reqId),{status:'abgelehnt',grund:'Termin bereits vergeben',bearbeitetAt:serverTimestamp()});toast('Termin ist bereits vergeben.','error');renderBookingRequests();renderBestaetigteBuchungen();return;}
     await updateDoc(doc(db,'slots',req.slotId),{bookedBy:req.schuelerId,bookedAt:serverTimestamp()});
-    try{const sc=await getDoc(doc(db,'schueler',req.schuelerId));if(sc.exists())await updateDoc(doc(db,'schueler',req.schuelerId),{bookedCount:(sc.data().bookedCount||0)+1});}catch(e){}
+    if(req.tausch && req.swapSlotId){
+      try{const oldSnap=await getDoc(doc(db,'slots',req.swapSlotId));if(oldSnap.exists()&&oldSnap.data().bookedBy===req.schuelerId){await updateDoc(doc(db,'slots',req.swapSlotId),{bookedBy:null,bookedAt:null});}}catch(e){}
+    } else {
+      try{const sc=await getDoc(doc(db,'schueler',req.schuelerId));if(sc.exists())await updateDoc(doc(db,'schueler',req.schuelerId),{bookedCount:(sc.data().bookedCount||0)+1});}catch(e){}
+    }
     await updateDoc(doc(db,'bookingRequests',reqId),{status:'bestätigt',bearbeitetAt:serverTimestamp()});
     await publishMyBookingLink();
     try{await publishStudentBookings(req.schuelerId);}catch(e){}
@@ -1815,7 +1820,7 @@ function renderBookingPageContent(schuelerId,lehrerUid,linkData,stud,complete){
   if(sub)sub.textContent='Hallo'+(vorname?' '+vorname:'')+'!'+(_ln?' Fahrlehrer: '+_ln:'')+(_sn?' · '+_sn:'');
   const p=n=>String(n).padStart(2,'0');
   const meine=((stud&&stud.meineTermine)||[]).filter(t=>t&&t.start).sort((a,b)=>a.start.localeCompare(b.start));
-  window.__bookingMeine=meine;
+  window.__bookingMeine=meine;window.__bookingStud=stud;
   const aktiv=!!(linkData&&linkData.aktiv!==false);
   const slots=aktiv?((linkData.freieSlots||[]).filter(s=>s&&s.start&&new Date(s.start).getTime()>Date.now()).sort((a,b)=>a.start.localeCompare(b.start))):[];
   window.__bookingCtx={schuelerId,lehrerUid,vorname,slots};
@@ -1889,7 +1894,39 @@ window.bookingCalSetView=function(v){window.__bookingCalView=v;renderBookingCale
 window.bookingCalPrev=function(){if((window.__bookingCalView||'month')==='week'){const c=window.__bookingCalWeek||new Date();window.__bookingCalWeek=new Date(c.getFullYear(),c.getMonth(),c.getDate()-7);}else{const c=window.__bookingCalMonth||new Date();window.__bookingCalMonth=new Date(c.getFullYear(),c.getMonth()-1,1);}renderBookingCalendar();};
 window.bookingCalNext=function(){if((window.__bookingCalView||'month')==='week'){const c=window.__bookingCalWeek||new Date();window.__bookingCalWeek=new Date(c.getFullYear(),c.getMonth(),c.getDate()+7);}else{const c=window.__bookingCalMonth||new Date();window.__bookingCalMonth=new Date(c.getFullYear(),c.getMonth()+1,1);}renderBookingCalendar();};
 window.bookingCalDay=function(k){window.__bookingCalSel=(window.__bookingCalSel===k?null:k);renderBookingCalendar();};
-window.pickBookingSlotById=function(id){const c=window.__bookingCtx;if(!c)return;const s=(c.slots||[]).find(x=>x.id===id);if(!s)return;const p=n=>String(n).padStart(2,'0');const d=new Date(s.start),e=new Date(s.ende);const txt=d.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long'})+'\nUhrzeit: '+p(d.getHours())+':'+p(d.getMinutes())+'–'+p(e.getHours())+':'+p(e.getMinutes());if(window.confirm('Diesen Termin verbindlich anfragen?\n\n'+txt))sendeBuchungsanfrage(c.schuelerId,c.lehrerUid,c.vorname,s);};
+window.pickBookingSlotById=function(id){
+  const c=window.__bookingCtx;if(!c)return;
+  const s=(c.slots||[]).find(x=>x.id===id);if(!s)return;
+  const stud=window.__bookingStud||{};
+  const maxF=stud.maxFahrstunden||0,maxA=stud.maxAktiveTermine||0,bc=stud.bookedCount||0;
+  const aktive=(stud.meineTermine||[]).filter(t=>t&&t.start&&new Date(t.start).getTime()>Date.now());
+  if(maxF>0 && bc>=maxF){window.alert('Dein Fahrstunden-Kontingent ist aufgebraucht ('+bc+'/'+maxF+').\nBitte sprich mit deinem Fahrlehrer.');return;}
+  if(maxA>0 && aktive.length>=maxA){openSwapModal(s,aktive);return;}
+  const p=n=>String(n).padStart(2,'0');const d=new Date(s.start),e=new Date(s.ende);
+  const txt=d.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long'})+'\nUhrzeit: '+p(d.getHours())+':'+p(d.getMinutes())+'–'+p(e.getHours())+':'+p(e.getMinutes());
+  if(window.confirm('Diesen Termin verbindlich anfragen?\n\n'+txt))sendeBuchungsanfrage(c.schuelerId,c.lehrerUid,c.vorname,s);
+};
+function openSwapModal(newSlot,aktive){
+  const p=n=>String(n).padStart(2,'0');
+  const nd=new Date(newSlot.start),ne=new Date(newSlot.ende);
+  const newTxt=nd.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long'})+', '+p(nd.getHours())+':'+p(nd.getMinutes())+'–'+p(ne.getHours())+':'+p(ne.getMinutes());
+  window.__swapNew=newSlot;
+  window.__swapList=aktive.slice().filter(t=>t&&t.id).sort((a,b)=>a.start.localeCompare(b.start));
+  if(!window.__swapList.length){window.alert('Tausch gerade nicht möglich. Bitte lade die Seite neu.');return;}
+  const rows=window.__swapList.map((t,i)=>{const d=new Date(t.start),e=new Date(t.ende);const datum=d.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long'});return `<div class="slot-row"><div class="slot-info">${typeBadgeHtml(t.type)}<div style="font-size:12px;margin-top:3px">${datum}, ${p(d.getHours())}:${p(d.getMinutes())}–${p(e.getHours())}:${p(e.getMinutes())}</div></div><button class="btn btn-primary btn-sm" onclick="doSwapRequest(${i})">Tauschen</button></div>`;}).join('');
+  openModal(`<h2 class="modal-title">Dein Limit ist erreicht</h2><div style="background:rgba(212,168,67,.1);border:1px solid rgba(212,168,67,.3);border-radius:8px;padding:11px;margin-bottom:14px"><div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">Gewünschter neuer Termin:</div><div style="font-weight:600">${newTxt}</div></div><p style="font-size:13px;margin-bottom:12px">Du hast bereits die maximale Anzahl aktiver Termine. Welchen bestehenden Termin möchtest du dafür <b>tauschen</b>?</p>${rows}<button class="btn btn-secondary" style="margin-top:12px;width:100%" onclick="closeModal()">Abbrechen</button>`);
+}
+window.doSwapRequest=async function(i){
+  const c=window.__bookingCtx;const newSlot=window.__swapNew;const old=(window.__swapList||[])[i];
+  if(!c||!newSlot||!old)return;
+  closeModal();
+  try{
+    await addDoc(collection(db,'bookingRequests'),{lehrerUid:c.lehrerUid,schuelerId:c.schuelerId,vorname:c.vorname||'',slotId:newSlot.id,swapSlotId:old.id,start:newSlot.start,ende:newSlot.ende,type:newSlot.type||'fahrstunde',status:'angefragt',tausch:true,createdAt:serverTimestamp()});
+    __bookingUnsub.forEach(u=>{try{u();}catch(e){}});__bookingUnsub=[];
+    const content=document.getElementById('booking-content');
+    if(content)content.innerHTML='<div class="booking-card" style="text-align:center;padding:34px 20px"><div style="font-size:2.8rem;margin-bottom:14px">🔄</div><h2 style="margin:0 0 8px;font-size:1.2rem">Tausch-Anfrage gesendet!</h2><p class="text-muted" style="line-height:1.5">Dein Fahrlehrer bestätigt den Tausch in Kürze. Du kannst diese Seite jetzt schließen.</p><button class="btn btn-secondary" style="margin-top:16px" onclick="zurBuchungsUebersicht()">Zurück zur Übersicht</button></div>';
+  }catch(e){console.warn(e);toast('Tausch-Anfrage fehlgeschlagen.','error');}
+};
 window.zurBuchungsUebersicht=function(){const c=window.__bookingCtx;if(c)showBookingPage(c.schuelerId,c.lehrerUid);};
 window.pickBookingSlot=function(i){
   const c=window.__bookingCtx;if(!c||!c.slots[i])return;
