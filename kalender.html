@@ -1826,13 +1826,13 @@ function renderBookingPageContent(schuelerId,lehrerUid,linkData,stud,complete){
   window.__bookingCtx={schuelerId,lehrerUid,vorname,slots};
   let html='<div class="booking-card" style="margin-bottom:14px"><h2 style="margin:0 0 4px;font-size:1.15rem">'+(vorname?'Hallo '+vorname+'!':'Deine Termine')+'</h2><p class="text-muted" style="font-size:13px">Hier siehst du deine gebuchten Fahrstunden im Kalender und kannst neue Termine anfragen.</p></div>';
   window.__bookingFree=slots;
-  html+='<div class="booking-card"><div class="booking-card-title">📅 Mein Fahrstunden-Kalender</div><div id="booking-cal"></div>'+(aktiv?'':'<p class="text-muted" style="font-size:12px;margin-top:12px">Die Online-Buchung ist gerade nicht aktiv — du siehst hier nur deine bereits gebuchten Stunden.</p>')+'</div>';
+  html+='<div class="booking-card"><div class="booking-card-title">📅 Mein Fahrstunden-Kalender</div><div id="booking-cal"></div>'+(aktiv?'':'<p class="text-muted" style="font-size:12px;margin-top:12px">Die Online-Buchung ist gerade nicht aktiv — du siehst hier nur deine bereits gebuchten Stunden.</p>')+'<p class="text-muted" style="font-size:11px;margin-top:12px;text-align:center">ℹ️ Stornieren ist bis 48 Std. vor dem Termin möglich.</p></div>';
   content.innerHTML=html;
   renderBookingCalendar();
 }
 function _bcalKey(d){return d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate();}
 function _bcalGroup(arr){const m={};(arr||[]).forEach(t=>{if(!t||!t.start)return;const k=_bcalKey(new Date(t.start));(m[k]=m[k]||[]).push(t);});return m;}
-function _bcalRow(t,bookable){const p=n=>String(n).padStart(2,'0');const d=new Date(t.start),e=new Date(t.ende);const time=`${p(d.getHours())}:${p(d.getMinutes())}–${p(e.getHours())}:${p(e.getMinutes())}`;const right=bookable?`<button class="btn btn-primary btn-sm" onclick="pickBookingSlotById('${t.id}')">Anfragen</button>`:'<span class="bcal-booked-tag">✓ gebucht</span>';return `<div class="slot-row"><div class="slot-time">${time}</div><div class="slot-info">${typeBadgeHtml(t.type)}</div>${right}</div>`;}
+function _bcalRow(t,bookable){const p=n=>String(n).padStart(2,'0');const d=new Date(t.start),e=new Date(t.ende);const time=`${p(d.getHours())}:${p(d.getMinutes())}–${p(e.getHours())}:${p(e.getMinutes())}`;let right;if(bookable){right=`<button class="btn btn-primary btn-sm" onclick="pickBookingSlotById('${t.id}')">Anfragen</button>`;}else{const stornierbar=t.id&&(new Date(t.start).getTime()-Date.now()>48*3600000);right=stornierbar?`<button class="btn btn-danger btn-sm" onclick="storniereMeinen('${t.id}')">Stornieren</button>`:'<span class="bcal-booked-tag">✓ gebucht</span>';}return `<div class="slot-row"><div class="slot-time">${time}</div><div class="slot-info">${typeBadgeHtml(t.type)}</div>${right}</div>`;}
 function renderBookingCalendar(){
   const box=document.getElementById('booking-cal');if(!box)return;
   const view=window.__bookingCalView||'month';
@@ -1905,6 +1905,21 @@ window.pickBookingSlotById=function(id){
   const p=n=>String(n).padStart(2,'0');const d=new Date(s.start),e=new Date(s.ende);
   const txt=d.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long'})+'\nUhrzeit: '+p(d.getHours())+':'+p(d.getMinutes())+'–'+p(e.getHours())+':'+p(e.getMinutes());
   if(window.confirm('Diesen Termin verbindlich anfragen?\n\n'+txt))sendeBuchungsanfrage(c.schuelerId,c.lehrerUid,c.vorname,s);
+};
+window.storniereMeinen=async function(slotId){
+  const c=window.__bookingCtx;if(!c)return;
+  const meine=window.__bookingMeine||[];const t=meine.find(x=>x.id===slotId);if(!t)return;
+  const p=n=>String(n).padStart(2,'0');const d=new Date(t.start);
+  if(d.getTime()-Date.now()<=48*3600000){toast('Stornieren ist nur bis 48 Std. vor dem Termin möglich.','error');return;}
+  const txt=d.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long'})+' um '+p(d.getHours())+':'+p(d.getMinutes());
+  if(!window.confirm('Diesen Termin wirklich stornieren?\n\n'+txt+'\n\nDer Termin wird danach wieder freigegeben.'))return;
+  try{
+    await updateDoc(doc(db,'slots',slotId),{bookedBy:null,bookedAt:null,storniertVonSchueler:c.schuelerId,storniertAt:serverTimestamp()});
+    const neu=meine.filter(x=>x.id!==slotId);
+    try{await updateDoc(doc(db,'bookingStudents',c.schuelerId),{meineTermine:neu,updatedAt:serverTimestamp()});}catch(e){}
+    window.__bookingMeine=neu;renderBookingCalendar();
+    toast('Termin storniert – wieder freigegeben.','success');
+  }catch(e){console.warn('storno',e);toast('Stornieren fehlgeschlagen. Bitte wende dich an deinen Fahrlehrer.','error');}
 };
 function openSwapModal(newSlot,aktive){
   const p=n=>String(n).padStart(2,'0');
