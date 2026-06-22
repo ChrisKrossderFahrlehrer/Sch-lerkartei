@@ -1958,49 +1958,6 @@ window.sendeBuchungsanfrage=async function(schuelerId,lehrerUid,vorname,slot){
   }catch(e){console.warn(e);toast('Anfrage fehlgeschlagen. Bitte erneut versuchen.','error');}
 }
 
-window.saveSchuelerEmail=async function(sid,luid){const e=document.getElementById('schueler-email-input')?.value.trim();if(!e||!e.includes('@'))return toast('Gültige E-Mail eingeben.','error');await updateDoc(doc(db,'schueler',sid),{email:e});toast('E-Mail gespeichert!','success');showBookingPage(sid,luid);};
-window.changeEmail=async function(sid,luid){const snap=await getDoc(doc(db,'schueler',sid));const cur=snap.data().email||'';openModal(`<h2 class="modal-title">E-Mail ändern</h2><div class="field"><label>Neue E-Mail</label><input id="change-email-input" type="email" value="${escHtml(cur)}"></div><button class="btn btn-primary" onclick="confirmChangeEmail('${sid}','${luid}')">Speichern</button>`);};
-window.confirmChangeEmail=async function(sid,luid){const e=document.getElementById('change-email-input')?.value.trim();if(!e||!e.includes('@'))return toast('Gültige E-Mail.','error');await updateDoc(doc(db,'schueler',sid),{email:e});toast('Aktualisiert!','success');closeModal();showBookingPage(sid,luid);};
-window.addNotizSchueler=async function(sid,luid){const text=document.getElementById('booking-notiz-text')?.value.trim();if(!text)return toast('Nachricht eingeben.','error');const scSnap=await getDoc(doc(db,'schueler',sid));await addDoc(collection(db,'notizen'),{schuelerId:sid,lehrerUid:luid,von:'schueler',text,schoolId:scSnap.data().schoolId,createdAt:serverTimestamp()});document.getElementById('booking-notiz-text').value='';const c=document.getElementById('notizen-container-'+sid);if(c)c.innerHTML=await loadNotizenHtml(sid,'schueler');toast('Gesendet!','success');};
-window.bookSlot=async function(slotId,schuelerId,lehrerUid){
-  const[scSnap,slSnap,lSnap]=await Promise.all([getDoc(doc(db,'schueler',schuelerId)),getDoc(doc(db,'slots',slotId)),getDoc(doc(db,'kalenderUsers',lehrerUid))]);
-  const s=scSnap.data(),slot=slSnap.data(),lehrer=lSnap.data();
-  if((s.maxFahrstunden||0)>0&&(s.bookedCount||0)>=(s.maxFahrstunden||0))return toast('Kontingent erschöpft.','error');
-  const maxA=s.maxAktiveTermine||0;
-  if(maxA>0){const now=new Date();const aSnap=await getDocs(query(collection(db,'slots'),where('lehrerUid','==',lehrerUid),where('bookedBy','==',schuelerId),orderBy('startTime')));const aktive=aSnap.docs.filter(d=>d.data().startTime.toDate()>now);if(aktive.length>=maxA)return openTauschModal(slotId,schuelerId,lehrerUid);}
-  await updateDoc(doc(db,'slots',slotId),{bookedBy:schuelerId,bookedAt:serverTimestamp()});
-  await updateDoc(doc(db,'schueler',schuelerId),{bookedCount:(s.bookedCount||0)+1});
-  if(s.email)await triggerEmail('buchungsbestaetigung',{to:s.email,schuelerName:s.fname+' '+s.lname,lehrerName:lehrer.fname+' '+lehrer.lname,datum:slot.startTime.toDate().toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}),von:fmtTime(slot.startTime),bis:fmtTime(slot.endTime),typ:typeLabel(slot.type),slotId,schuelerId,lehrerUid});
-  toast('Termin gebucht!','success');showBookingPage(schuelerId,lehrerUid);
-};
-window.cancelMyBooking=async function(slotId,schuelerId,lehrerUid){
-  const[slSnap,scSnap,lSnap]=await Promise.all([getDoc(doc(db,'slots',slotId)),getDoc(doc(db,'schueler',schuelerId)),getDoc(doc(db,'kalenderUsers',lehrerUid))]);
-  const slot=slSnap.data(),s=scSnap.data(),lehrer=lSnap.data();
-  await updateDoc(doc(db,'slots',slotId),{bookedBy:null,bookedAt:null});
-  await updateDoc(doc(db,'schueler',schuelerId),{bookedCount:Math.max(0,(s.bookedCount||1)-1)});
-  await triggerEmail('stornierung_freigeworden',{datum:slot.startTime.toDate().toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}),von:fmtTime(slot.startTime),bis:fmtTime(slot.endTime),typ:typeLabel(slot.type),lehrerName:lehrer.fname+' '+lehrer.lname,lehrerUid,slotId});
-  await triggerEmail('warteliste_frei',{lehrerUid,slotId});
-  toast('Storniert.','success');showBookingPage(schuelerId,lehrerUid);
-};
-window.joinWarteliste=async function(sid,luid){const notiz=document.getElementById('wl-notiz')?.value.trim()||'';const scSnap=await getDoc(doc(db,'schueler',sid));await addDoc(collection(db,'warteliste'),{schuelerId:sid,lehrerUid:luid,notiz,abgearbeitet:false,schoolId:scSnap.data().schoolId,createdAt:serverTimestamp()});toast('Eingetragen!','success');showBookingPage(sid,luid);};
-window.leaveWarteliste=async function(wlId,sid,luid){await updateDoc(doc(db,'warteliste',wlId),{abgearbeitet:true});toast('Ausgetragen.','success');showBookingPage(sid,luid);};
-window.openTauschModal=async function(newSlotId,schuelerId,lehrerUid){
-  const[nSnap,bkSnap]=await Promise.all([getDoc(doc(db,'slots',newSlotId)),getDocs(query(collection(db,'slots'),where('lehrerUid','==',lehrerUid),where('bookedBy','==',schuelerId),orderBy('startTime')))]);
-  const ns=nSnap.data();const now=new Date();const aktive=bkSnap.docs.filter(d=>d.data().startTime.toDate()>now).map(d=>({id:d.id,...d.data()}));
-  const nDatum=ns.startTime.toDate().toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long'});
-  const rows=aktive.map(b=>{const canC=(b.startTime.toDate()-now)>48*3600000;const datum=b.startTime.toDate().toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long'});
-    return`<div class="slot-row"><div class="slot-info">${typeBadgeHtml(b.type)}<div style="font-size:12px;margin-top:3px">${datum}, ${fmtTime(b.startTime)}–${fmtTime(b.endTime)}</div></div>${canC?`<button class="btn btn-primary btn-sm" onclick="doTausch('${b.id}','${newSlotId}','${schuelerId}','${lehrerUid}')">Tauschen</button>`:'<span style="font-size:11px;color:var(--text-muted)">Nicht stornierbar</span>'}</div>`;}).join('');
-  openModal(`<h2 class="modal-title">Maximum erreicht</h2><div style="background:rgba(212,168,67,.1);border:1px solid rgba(212,168,67,.3);border-radius:7px;padding:11px;margin-bottom:14px"><div style="font-size:12px;color:var(--text-muted);margin-bottom:5px">Neuer Termin:</div><div style="font-weight:600">${nDatum}, ${fmtTime(ns.startTime)}–${fmtTime(ns.endTime)}</div>${typeBadgeHtml(ns.type)}</div><p style="font-size:13px;margin-bottom:12px">Wähle einen bestehenden Termin zum Tauschen:</p>${rows||'<p class="text-muted">Keine tauschbaren Termine.</p>'}`);
-};
-window.doTausch=async function(oldId,newId,sid,luid){
-  const[oSnap,scSnap,lSnap,nSnap]=await Promise.all([getDoc(doc(db,'slots',oldId)),getDoc(doc(db,'schueler',sid)),getDoc(doc(db,'kalenderUsers',luid)),getDoc(doc(db,'slots',newId))]);
-  const s=scSnap.data(),lehrer=lSnap.data(),ns=nSnap.data();
-  await updateDoc(doc(db,'slots',oldId),{bookedBy:null,bookedAt:null});
-  await updateDoc(doc(db,'slots',newId),{bookedBy:sid,bookedAt:serverTimestamp()});
-  if(s.email)await triggerEmail('buchungsbestaetigung',{to:s.email,schuelerName:s.fname+' '+s.lname,lehrerName:lehrer.fname+' '+lehrer.lname,datum:ns.startTime.toDate().toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}),von:fmtTime(ns.startTime),bis:fmtTime(ns.endTime),typ:typeLabel(ns.type),slotId:newId,schuelerId:sid,lehrerUid:luid});
-  toast('Getauscht!','success');closeModal();showBookingPage(sid,luid);
-};
-
 // Mobile table labels
 function injectTableLabels(){document.querySelectorAll('table').forEach(table=>{const headers=[...table.querySelectorAll('th')].map(th=>th.textContent.trim());table.querySelectorAll('tbody tr').forEach(row=>{[...row.querySelectorAll('td')].forEach((td,i)=>{if(headers[i])td.setAttribute('data-label',headers[i]);});});});}
 const _navBase=window.navigate;window.navigate=function(page){_navBase(page);setTimeout(injectTableLabels,300);};
