@@ -1379,10 +1379,12 @@ pages['lehrer-buchungen']=async function(el){
   el.innerHTML=`<div class="page active"><h1 class="page-title">Buchungen</h1>
     <div class="card" style="margin-bottom:16px"><div class="card-title">🔗 Online-Buchung für Schüler</div><div id="booking-online"><div class="spinner"></div></div></div>
     <div class="card" style="margin-bottom:16px"><div class="card-title">📥 Offene Anfragen</div><div id="booking-requests"><div class="spinner"></div></div></div>
+    <div class="card" style="margin-bottom:16px"><div class="card-title">⏳ Warteliste</div><div id="booking-warteliste"><div class="spinner"></div></div></div>
     <div class="card"><div class="card-title">✅ Bestätigte Buchungen</div><div id="buchungen-list"><div class="spinner"></div></div></div></div>`;
   await publishMyBookingLink();
   await renderBookingOnline();
   await renderBookingRequests();
+  await renderWarteliste();
   await renderBestaetigteBuchungen();
 };
 async function publishMyBookingLink(){
@@ -1431,6 +1433,20 @@ async function renderBookingOnline(){
   }
   box.innerHTML=html;
 }
+async function renderWarteliste(){
+  const box=document.getElementById('booking-warteliste');if(!box)return;
+  let list=[];
+  try{const s=await getDocs(query(collection(db,'bookingWaitlist'),where('lehrerUid','==',currentUser.uid)));list=s.docs.map(d=>({id:d.id,...d.data()}));}catch(e){console.warn('warteliste',e);}
+  list=list.filter(w=>w.status!=='erledigt');
+  list.sort((a,b)=>(((a.createdAt&&a.createdAt.seconds)||0)-((b.createdAt&&b.createdAt.seconds)||0)));
+  if(!list.length){box.innerHTML='<p class="text-muted">Niemand auf der Warteliste.</p>';return;}
+  box.innerHTML='<table><tbody>'+list.map(w=>{
+    const seit=(w.createdAt&&w.createdAt.toDate)?w.createdAt.toDate().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}):'';
+    const notiz=w.notiz?'<div class="text-muted" style="font-size:12px;margin-top:3px">„'+escHtml(w.notiz)+'“</div>':'';
+    return '<tr><td>'+escHtml(w.vorname||'Schüler')+(seit?' <span class="text-muted" style="font-size:11px">seit '+seit+'</span>':'')+notiz+'</td><td style="text-align:right"><button class="btn btn-secondary btn-sm" onclick="wartelisteEntfernen(\''+w.id+'\')">Entfernen</button></td></tr>';
+  }).join('')+'</tbody></table>';
+}
+window.wartelisteEntfernen=async function(id){if(!window.confirm('Diesen Eintrag von der Warteliste entfernen?'))return;try{await deleteDoc(doc(db,'bookingWaitlist',id));toast('Entfernt.','success');renderWarteliste();}catch(e){toast('Fehlgeschlagen.','error');}};
 window.toggleBookingAktiv=async function(val){try{await setDoc(doc(db,'bookingLinks',currentUser.uid),{aktiv:val,lehrerUid:currentUser.uid},{merge:true});toast(val?'Online-Buchung aktiviert.':'Deaktiviert.','success');}catch(e){toast('Fehlgeschlagen.','error');}renderBookingOnline();};
 window.refreshBookingLink=async function(){const r=await publishMyBookingLink();toast(r.count+' freie Termine aktualisiert.','success');renderBookingOnline();};
 window.schuelerLinkTeilenByIdx=function(i){const s=(window.__bsList||[])[i];if(s)schuelerLinkTeilen(s.id,s.fname||'');};
@@ -1801,12 +1817,13 @@ async function showBookingPage(schuelerId,lehrerUid){
   const content=document.getElementById('booking-content');
   if(!schuelerId||!lehrerUid){if(content)content.innerHTML='<div class="booking-card"><p class="text-muted text-center">Ungültiger Link.</p></div>';return;}
   if(content)content.innerHTML='<div class="booking-card"><div class="spinner"></div></div>';
-  let linkData=null,stud=null,gotLink=false,gotStud=false;
-  const rerender=()=>{ if(gotLink||gotStud) renderBookingPageContent(schuelerId,lehrerUid,linkData,stud,gotLink&&gotStud); };
+  let linkData=null,stud=null,wl=null,gotLink=false,gotStud=false;
+  const rerender=()=>{ if(gotLink||gotStud) renderBookingPageContent(schuelerId,lehrerUid,linkData,stud,gotLink&&gotStud,wl); };
   __bookingUnsub.push(onSnapshot(doc(db,'bookingLinks',lehrerUid),s=>{linkData=s.exists()?s.data():null;gotLink=true;rerender();},e=>{console.warn('live bookingLinks',e);gotLink=true;rerender();}));
   __bookingUnsub.push(onSnapshot(doc(db,'bookingStudents',schuelerId),s=>{stud=s.exists()?s.data():null;gotStud=true;rerender();},e=>{console.warn('live bookingStudents',e);gotStud=true;rerender();}));
+  __bookingUnsub.push(onSnapshot(doc(db,'bookingWaitlist',schuelerId),s=>{wl=s.exists()?s.data():null;rerender();},e=>{wl=null;}));
 }
-function renderBookingPageContent(schuelerId,lehrerUid,linkData,stud,complete){
+function renderBookingPageContent(schuelerId,lehrerUid,linkData,stud,complete,wl){
   const content=document.getElementById('booking-content');
   const sub=document.getElementById('booking-subtitle');
   if(!content)return;
@@ -1827,6 +1844,10 @@ function renderBookingPageContent(schuelerId,lehrerUid,linkData,stud,complete){
   let html='<div class="booking-card" style="margin-bottom:14px"><h2 style="margin:0 0 4px;font-size:1.15rem">'+(vorname?'Hallo '+vorname+'!':'Deine Termine')+'</h2><p class="text-muted" style="font-size:13px">Hier siehst du deine gebuchten Fahrstunden im Kalender und kannst neue Termine anfragen.</p></div>';
   window.__bookingFree=slots;
   html+='<div class="booking-card"><div class="booking-card-title">📅 Mein Fahrstunden-Kalender</div><div id="booking-cal"></div>'+(aktiv?'':'<p class="text-muted" style="font-size:12px;margin-top:12px">Die Online-Buchung ist gerade nicht aktiv — du siehst hier nur deine bereits gebuchten Stunden.</p>')+'<p class="text-muted" style="font-size:11px;margin-top:12px;text-align:center">ℹ️ Stornieren ist bis 48 Std. vor dem Termin möglich.</p></div>';
+  if(aktiv){html+='<div class="booking-card">';
+    if(wl){html+='<div class="booking-card-title">⏳ Warteliste</div><p class="text-muted" style="font-size:13px;margin-bottom:10px;line-height:1.5">Du stehst auf der Warteliste. Sobald ein Termin frei wird, meldet sich dein Fahrlehrer bei dir.</p><button class="btn btn-secondary btn-sm" onclick="vonWartelisteRunter()">Von der Warteliste austragen</button>';}
+    else{html+='<div class="booking-card-title">⏳ Kein passender Termin frei?</div><p class="text-muted" style="font-size:13px;margin-bottom:10px;line-height:1.5">Trag dich auf die Warteliste ein — dein Fahrlehrer meldet sich, sobald etwas frei wird.</p><textarea id="wl-notiz" rows="2" placeholder="Optional: Wunschzeiten o. Ä." style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:9px;font-size:13px;font-family:inherit;resize:vertical"></textarea><button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="aufWarteliste()">Auf die Warteliste setzen</button>';}
+    html+='</div>';}
   content.innerHTML=html;
   renderBookingCalendar();
 }
@@ -1920,6 +1941,19 @@ window.storniereMeinen=async function(slotId){
     window.__bookingMeine=neu;renderBookingCalendar();
     toast('Termin storniert – wieder freigegeben.','success');
   }catch(e){console.warn('storno',e);toast('Stornieren fehlgeschlagen. Bitte wende dich an deinen Fahrlehrer.','error');}
+};
+window.aufWarteliste=async function(){
+  const c=window.__bookingCtx;if(!c)return;
+  const notiz=(document.getElementById('wl-notiz')?.value||'').trim();
+  try{
+    await setDoc(doc(db,'bookingWaitlist',c.schuelerId),{lehrerUid:c.lehrerUid,schuelerId:c.schuelerId,vorname:c.vorname||'',notiz,status:'wartend',createdAt:serverTimestamp()});
+    toast('Du stehst jetzt auf der Warteliste.','success');
+  }catch(e){console.warn('wl-join',e);toast('Eintragen fehlgeschlagen. Bitte später erneut versuchen.','error');}
+};
+window.vonWartelisteRunter=async function(){
+  const c=window.__bookingCtx;if(!c)return;
+  try{await deleteDoc(doc(db,'bookingWaitlist',c.schuelerId));toast('Von der Warteliste ausgetragen.','success');}
+  catch(e){console.warn('wl-leave',e);toast('Austragen fehlgeschlagen.','error');}
 };
 function openSwapModal(newSlot,aktive){
   const p=n=>String(n).padStart(2,'0');
