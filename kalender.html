@@ -453,6 +453,60 @@ const DEFAULT_ARTEN = [
   {id:'nachtfahrt',label:'Nachtfahrt',color:'#2d6a8a'},
 ];
 
+// ── SPERR-/ABWESENHEITS-ARTEN ──
+const SPERR_ARTEN = {
+  krank:        {label:'Krank',        color:'#e05555'},
+  weiterbildung:{label:'Weiterbildung',color:'#2d9b8a'},
+  privat:       {label:'Privat',       color:'#9b59b6'},
+  sonstiges:    {label:'Gesperrt',     color:'#888888'},
+};
+function _min2hhmm(m){return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');}
+function _blockLabel(b){return b.grund==='sonstiges'?(b.label||'Gesperrt'):(((SPERR_ARTEN[b.grund]||{}).label)||b.label||'Gesperrt');}
+function _blockColor(b){return (SPERR_ARTEN[b.grund]||{}).color||'#888888';}
+function _blockZeit(b){return (b.ganztags===false&&b.vonMin!=null)?(_min2hhmm(b.vonMin)+'–'+_min2hhmm(b.bisMin)):'ganztägig';}
+function _slotBlocked(sd,sm,em,blocks){return blocks.some(b=>{if(b.year!==sd.getFullYear()||b.month!==sd.getMonth()||b.day!==sd.getDate())return false;if(b.ganztags!==false)return true;if(b.vonMin==null||b.bisMin==null)return true;return sm<b.bisMin&&em>b.vonMin;});}
+function blockFormHtml(year,month,day,lehrerUid){
+  const opts=Object.keys(SPERR_ARTEN).map(k=>`<option value="${k}">${SPERR_ARTEN[k].label}</option>`).join('');
+  return `<div class="field"><label>Grund</label><select id="blk-grund" onchange="document.getElementById('blk-label-wrap').style.display=this.value==='sonstiges'?'block':'none'">${opts}</select></div>
+    <div class="field" id="blk-label-wrap" style="display:none"><label>Bezeichnung</label><input id="blk-label" type="text" placeholder="z.B. Arzttermin"></div>
+    <label style="display:flex;align-items:center;gap:8px;margin:4px 0 10px;font-size:14px;cursor:pointer"><input type="checkbox" id="blk-ganztags" checked onchange="document.getElementById('blk-zeit').style.display=this.checked?'none':'flex'"> Ganztägig</label>
+    <div id="blk-zeit" style="display:none;gap:8px;margin-bottom:10px">
+      <div class="field" style="flex:1;margin:0"><label>Von</label><input id="blk-von" type="time" value="09:00"></div>
+      <div class="field" style="flex:1;margin:0"><label>Bis</label><input id="blk-bis" type="time" value="13:00"></div>
+    </div>
+    <div class="field"><label>Notiz (optional)</label><input id="blk-notiz" type="text"></div>
+    <button class="btn btn-danger" onclick="blockTime(${year},${month},${day},'${lehrerUid}')">🔒 Zeit sperren</button>`;
+}
+function blockListHtml(blocks){
+  if(!blocks||!blocks.length)return'';
+  return '<div style="margin-bottom:10px">'+blocks.map(b=>`<div class="slot-row"><div class="slot-info"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${_blockColor(b)};margin-right:6px;vertical-align:middle"></span>${escHtml(_blockLabel(b))} <span class="text-muted">${_blockZeit(b)}</span>${b.notiz?'<div class="text-muted" style="font-size:11px">'+escHtml(b.notiz)+'</div>':''}</div><button class="btn btn-secondary btn-sm" onclick="unblockTime('${b.id}',${b.lehrerUid===currentUser.uid})">Aufheben</button></div>`).join('')+'</div>';
+}
+window.blockTime=async function(year,month,day,lehrerUid){
+  const grund=document.getElementById('blk-grund').value;
+  const ganztags=document.getElementById('blk-ganztags').checked;
+  let vonMin=null,bisMin=null;
+  if(!ganztags){
+    const von=document.getElementById('blk-von').value,bis=document.getElementById('blk-bis').value;
+    if(!von||!bis)return toast('Bitte Von- und Bis-Zeit angeben.','error');
+    const[vh,vm]=von.split(':').map(Number),[bh,bm]=bis.split(':').map(Number);
+    vonMin=vh*60+vm;bisMin=bh*60+bm;
+    if(bisMin<=vonMin)return toast('Bis-Zeit muss nach Von-Zeit liegen.','error');
+  }
+  const _lblEl=document.getElementById('blk-label');
+  const label=grund==='sonstiges'?(((_lblEl&&_lblEl.value)||'').trim()||'Gesperrt'):((SPERR_ARTEN[grund]||{}).label||'Gesperrt');
+  const _nEl=document.getElementById('blk-notiz');const notiz=((_nEl&&_nEl.value)||'').trim();
+  try{
+    await addDoc(collection(db,'blocked'),{lehrerUid,schoolId:currentSchoolId||null,year,month,day,grund,label,ganztags,vonMin,bisMin,notiz,createdAt:serverTimestamp()});
+    if(lehrerUid===currentUser.uid){try{await publishMyBookingLink();}catch(e){}}
+    toast('Zeit gesperrt.','success');closeModal();
+    if(lehrerUid===currentUser.uid)renderCal();else renderAdminCal();
+  }catch(e){console.warn('block',e);toast('Sperren fehlgeschlagen.','error');}
+};
+window.unblockTime=async function(id,isOwn){
+  try{await deleteDoc(doc(db,'blocked',id));if(isOwn){try{await publishMyBookingLink();}catch(e){}}toast('Aufgehoben.','success');closeModal();if(isOwn)renderCal();else renderAdminCal();}
+  catch(e){toast('Fehlgeschlagen.','error');}
+};
+
 async function loadTypes() {
   try {
     const snap = await getDoc(doc(db,'settings','fahrstundenarten'));
@@ -1235,8 +1289,8 @@ async function renderMonthCal(label,grid){
   ]);
   const slotsByDay={};
   sSnap.docs.forEach(d=>{const s=d.data();const dt=s.startTime.toDate();if(dt.getFullYear()===year&&dt.getMonth()===month){const day=dt.getDate();if(!slotsByDay[day])slotsByDay[day]=[];slotsByDay[day].push({id:d.id,...s});}});
-  const blockedSet=new Set();
-  bSnap.docs.forEach(d=>{const b=d.data();if(b.year===year&&b.month===month)blockedSet.add(b.day);});
+  const blockedSet=new Set();const blocksByDay={};
+  bSnap.docs.forEach(d=>{const b=d.data();if(b.year===year&&b.month===month){blockedSet.add(b.day);(blocksByDay[b.day]=blocksByDay[b.day]||[]).push({id:d.id,...b});}});
   gbSnap.docs.forEach(d=>{const b=d.data();if(b.year===year&&b.month===month)blockedSet.add('g'+b.day);});
   const urlaubList=uSnap.docs.map(d=>({id:d.id,...d.data()}));
   const today=new Date();
@@ -1252,7 +1306,7 @@ async function renderMonthCal(label,grid){
     if(ft)dc+=`<div class="cal-slot" style="background:rgba(212,168,67,.2);color:var(--accent2);font-size:8px">🎉 ${ft}</div>`;
     if(urlaubEntry)dc+=`<div class="cal-slot" style="background:rgba(91,186,122,.2);color:#5bba7a;font-size:8px">🏖️ ${urlaubEntry.label||'Urlaub'}</div>`;
     else if(isGlobal)dc+=`<div class="cal-slot" style="background:rgba(212,168,67,.15);color:var(--accent);font-size:8px">🏫 Gesperrt</div>`;
-    else if(isBlocked)dc+=`<div class="cal-slot" style="background:rgba(224,85,85,.15);color:#e05555;font-size:9px">Gesperrt</div>`;
+    else if(isBlocked){const _bl=blocksByDay[d]||[];dc+=(_bl.slice(0,2).map(b=>`<div class="cal-slot" style="background:${_blockColor(b)}26;color:${_blockColor(b)};font-size:8px">${escHtml(_blockLabel(b))}${b.ganztags===false?' '+_min2hhmm(b.vonMin):''}</div>`).join(''))||`<div class="cal-slot" style="background:rgba(224,85,85,.15);color:#e05555;font-size:9px">Gesperrt</div>`;}
     else dc+=slots.slice(0,3).map(s=>s.bookedBy?`<div class="cal-slot slot-${s.type} slot-booked">${fmtTime(s.startTime)} ${typeLabel(s.type)}</div>`:`<div class="cal-slot" style="background:rgba(91,186,122,.25);color:#5bba7a;font-weight:600">${fmtTime(s.startTime)} Frei</div>`).join('');
     html+=`<div class="cal-day${isToday?' today':''}${isBlocked&&!urlaubEntry?' blocked':''}${urlaubEntry?' urlaub-day':''}${ft&&!urlaubEntry?' feiertag-day':''}" onclick="openDayModal(${year},${month},${d})" style="display:flex;flex-direction:column">
       <div class="cal-day-num">${d}</div>${dc}
@@ -1324,10 +1378,9 @@ window.openDayModal=async function(year,month,day){
     ${ft?`<div style="background:rgba(212,168,67,.1);border:1px solid rgba(212,168,67,.3);border-radius:7px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:var(--accent)">🎉 Feiertag: ${ft}</div>`:''}
     ${urlaubEntry?`<div style="background:rgba(91,186,122,.1);border:1px solid rgba(91,186,122,.3);border-radius:7px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:#5bba7a">🏖️ Urlaub: ${urlaubEntry.label||'Urlaub'}</div>`:''}
     ${isGlobal?`<div style="background:rgba(212,168,67,.1);border:1px solid var(--accent);border-radius:7px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:var(--accent)">🏫 Globaler Sperrtag</div>`:''}
-    <div style="margin-bottom:12px">
-      ${isBlocked?`<button class="btn btn-secondary btn-sm" onclick="unblockDay('${blockedId}',${year},${month},${day})">🔓 Entsperren</button>`:
-      `<button class="btn btn-danger btn-sm" onclick="blockDay(${year},${month},${day})">🔒 Tag sperren</button>`}
-    </div>
+    <div class="card-title">Sperren / Abwesenheit</div>
+    ${blockListHtml(bSnap.docs.map(d=>({id:d.id,...d.data()})))}
+    ${blockFormHtml(year,month,day,currentUser.uid)}
     <hr class="divider">
     <div class="card-title">Slots</div>${slotsHtml}
     <hr class="divider">
@@ -1390,8 +1443,9 @@ pages['lehrer-buchungen']=async function(el){
 async function publishMyBookingLink(){
   try{
     const snap=await getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid),orderBy('startTime')));
+    let _blocks=[];try{const _bs=await getDocs(query(collection(db,'blocked'),where('lehrerUid','==',currentUser.uid)));_blocks=_bs.docs.map(d=>({id:d.id,...d.data()}));}catch(e){}
     const nowMs=Date.now();
-    const freieSlots=snap.docs.filter(d=>{const s=d.data();return !s.bookedBy && s.startTime && s.startTime.toDate().getTime()>=nowMs;})
+    const freieSlots=snap.docs.filter(d=>{const s=d.data();if(s.bookedBy||!s.startTime||s.startTime.toDate().getTime()<nowMs)return false;const _sd=s.startTime.toDate(),_ed=s.endTime.toDate();return !_slotBlocked(_sd,_sd.getHours()*60+_sd.getMinutes(),_ed.getHours()*60+_ed.getMinutes(),_blocks);})
       .map(d=>{const s=d.data();return{id:d.id,start:s.startTime.toDate().toISOString(),ende:s.endTime.toDate().toISOString(),type:s.type||'fahrstunde'};});
     const lehrerName=(((currentProfile&&currentProfile.fname)||'')+' '+((currentProfile&&currentProfile.lname)||'')).trim();
     let aktiv=true;
@@ -1618,7 +1672,7 @@ async function renderAdminCal(){
   const[sSnap,bSnap,scSnap]=await Promise.all([getDocs(query(collection(db,'slots'),where('lehrerUid','==',lehrerUid))),getDocs(query(collection(db,'blocked'),where('lehrerUid','==',lehrerUid))),getDocs(query(collection(db,'schueler'),where('lehrerUid','==',lehrerUid)))]);
   const scm={};scSnap.docs.forEach(d=>{const s=d.data();scm[d.id]=s.fname+' '+s.lname;});
   const slotsByDay={};sSnap.docs.forEach(d=>{const s=d.data();const dt=s.startTime.toDate();if(dt.getFullYear()===year&&dt.getMonth()===month){const day=dt.getDate();if(!slotsByDay[day])slotsByDay[day]=[];slotsByDay[day].push({id:d.id,...s});}});
-  const bSet=new Set();bSnap.docs.forEach(d=>{const b=d.data();if(b.year===year&&b.month===month)bSet.add(b.day);});
+  const bSet=new Set();const blocksByDay={};bSnap.docs.forEach(d=>{const b=d.data();if(b.year===year&&b.month===month){bSet.add(b.day);(blocksByDay[b.day]=blocksByDay[b.day]||[]).push({id:d.id,...b});}});
   const today=new Date();
   for(let i=0;i<startDow;i++)html+=`<div class="cal-day other-month"><div class="cal-day-num">${prevDays-startDow+i+1}</div></div>`;
   for(let d=1;d<=dim;d++){
@@ -1626,7 +1680,7 @@ async function renderAdminCal(){
     const isB=bSet.has(d);const slots=slotsByDay[d]||[];
     const slotHtml=slots.slice(0,2).map(s=>{const sn=s.bookedBy?(scm[s.bookedBy]||'?'):'';return s.bookedBy?`<div class="cal-slot slot-${s.type} slot-booked" title="${sn}">${fmtTime(s.startTime)} ${sn}</div>`:`<div class="cal-slot" style="background:rgba(91,186,122,.25);color:#5bba7a">${fmtTime(s.startTime)} Frei</div>`;}).join('');
     html+=`<div class="cal-day${isT?' today':''}${isB?' blocked':''}" onclick="adminOpenDayDetail(${year},${month},${d})" style="display:flex;flex-direction:column">
-      <div class="cal-day-num">${d}</div>${isB?'<div class="cal-slot" style="background:rgba(224,85,85,.15);color:#e05555;font-size:8px">Gesperrt</div>':slotHtml}
+      <div class="cal-day-num">${d}</div>${isB?((blocksByDay[d]||[]).slice(0,2).map(b=>`<div class="cal-slot" style="background:${_blockColor(b)}26;color:${_blockColor(b)};font-size:8px">${escHtml(_blockLabel(b))}</div>`).join('')||'<div class="cal-slot" style="background:rgba(224,85,85,.15);color:#e05555;font-size:8px">Gesperrt</div>'):slotHtml}
       ${slots.length>2?`<div style="font-size:8px;color:var(--text-muted)">+${slots.length-2}</div>`:''}
     </div>`;
   }
@@ -1637,13 +1691,13 @@ async function renderAdminCal(){
 window.adminOpenDayDetail=async function(year,month,day){
   const lUid=window._adminCalLehrerUid;
   const date=new Date(year,month,day);const dateStr=date.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
-  const[sSnap,scSnap]=await Promise.all([getDocs(query(collection(db,'slots'),where('lehrerUid','==',lUid))),getDocs(query(collection(db,'schueler'),where('lehrerUid','==',lUid)))]);
+  const[sSnap,scSnap,bSnap]=await Promise.all([getDocs(query(collection(db,'slots'),where('lehrerUid','==',lUid))),getDocs(query(collection(db,'schueler'),where('lehrerUid','==',lUid))),getDocs(query(collection(db,'blocked'),where('lehrerUid','==',lUid),where('year','==',year),where('month','==',month),where('day','==',day)))]);
   const scm={};scSnap.docs.forEach(d=>{const s=d.data();scm[d.id]=s.fname+' '+s.lname;});
   const daySlots=sSnap.docs.filter(d=>{const dt=d.data().startTime.toDate();return dt.getFullYear()===year&&dt.getMonth()===month&&dt.getDate()===day;});
   const sHtml=daySlots.length?daySlots.map(d=>{const s=d.data();const sn=s.bookedBy?(scm[s.bookedBy]||'?'):null;
     return`<div class="slot-row"><div class="slot-time">${fmtTime(s.startTime)}–${fmtTime(s.endTime)}</div>
     <div class="slot-info">${typeBadgeHtml(s.type)}${sn?`<div class="slot-student">👤 ${sn}</div>`:'<div class="slot-student" style="color:var(--success)">Frei</div>'}</div></div>`;}).join(''):'<p class="text-muted">Keine Slots.</p>';
-  openModal(`<h2 class="modal-title">${dateStr}</h2><div class="card-title">Slots – ${window._adminCalLehrerName}</div>${sHtml}`);
+  openModal(`<h2 class="modal-title">${dateStr}</h2><div class="card-title">Slots – ${window._adminCalLehrerName}</div>${sHtml}<hr class="divider"><div class="card-title">Sperren / Abwesenheit</div>${blockListHtml(bSnap.docs.map(d=>({id:d.id,...d.data()})))}${blockFormHtml(year,month,day,lUid)}`);
 };
 
 // ════════════════════════════════
