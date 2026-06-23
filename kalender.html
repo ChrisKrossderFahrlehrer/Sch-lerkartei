@@ -1433,11 +1433,13 @@ pages['lehrer-buchungen']=async function(el){
     <div class="card" style="margin-bottom:16px"><div class="card-title">🔗 Online-Buchung für Schüler</div><div id="booking-online"><div class="spinner"></div></div></div>
     <div class="card" style="margin-bottom:16px"><div class="card-title">📥 Offene Anfragen</div><div id="booking-requests"><div class="spinner"></div></div></div>
     <div class="card" style="margin-bottom:16px"><div class="card-title">⏳ Warteliste</div><div id="booking-warteliste"><div class="spinner"></div></div></div>
+    <div class="card" style="margin-bottom:16px"><div class="card-title">✉️ Nachrichten</div><div id="booking-nachrichten"><div class="spinner"></div></div></div>
     <div class="card"><div class="card-title">✅ Bestätigte Buchungen</div><div id="buchungen-list"><div class="spinner"></div></div></div></div>`;
   await publishMyBookingLink();
   await renderBookingOnline();
   await renderBookingRequests();
   await renderWarteliste();
+  await renderNachrichten();
   await renderBestaetigteBuchungen();
 };
 async function publishMyBookingLink(){
@@ -1501,6 +1503,20 @@ async function renderWarteliste(){
   }).join('')+'</tbody></table>';
 }
 window.wartelisteEntfernen=async function(id){if(!window.confirm('Diesen Eintrag von der Warteliste entfernen?'))return;try{await deleteDoc(doc(db,'bookingWaitlist',id));toast('Entfernt.','success');renderWarteliste();}catch(e){toast('Fehlgeschlagen.','error');}};
+async function renderNachrichten(){
+  const box=document.getElementById('booking-nachrichten');if(!box)return;
+  let list=[];
+  try{const s=await getDocs(query(collection(db,'bookingMessages'),where('lehrerUid','==',currentUser.uid)));list=s.docs.map(d=>({id:d.id,...d.data()}));}catch(e){console.warn('nachrichten',e);}
+  list.sort((a,b)=>(((b.createdAt&&b.createdAt.seconds)||0)-((a.createdAt&&a.createdAt.seconds)||0)));
+  if(!list.length){box.innerHTML='<p class="text-muted">Keine Nachrichten.</p>';return;}
+  box.innerHTML=list.map(m=>{
+    const wann=(m.createdAt&&m.createdAt.toDate)?m.createdAt.toDate().toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+    const neu=m.status==='neu';
+    return '<div class="slot-row" style="'+(neu?'border-left:3px solid var(--accent);padding-left:8px':'')+'"><div class="slot-info"><strong>'+escHtml(m.vorname||'Schüler')+'</strong> <span class="text-muted" style="font-size:11px">'+wann+'</span>'+(neu?' <span style="color:var(--accent);font-size:11px">• neu</span>':'')+'<div style="margin-top:3px;white-space:pre-wrap;font-size:13px">'+escHtml(m.text||'')+'</div></div><div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">'+(neu?'<button class="btn btn-secondary btn-sm" onclick="nachrichtGelesen(\''+m.id+'\')">Gelesen</button>':'')+'<button class="btn btn-secondary btn-sm" onclick="nachrichtLoeschen(\''+m.id+'\')">Löschen</button></div></div>';
+  }).join('');
+}
+window.nachrichtGelesen=async function(id){try{await updateDoc(doc(db,'bookingMessages',id),{status:'gelesen'});renderNachrichten();}catch(e){toast('Fehlgeschlagen.','error');}};
+window.nachrichtLoeschen=async function(id){if(!window.confirm('Nachricht löschen?'))return;try{await deleteDoc(doc(db,'bookingMessages',id));toast('Gelöscht.','success');renderNachrichten();}catch(e){toast('Fehlgeschlagen.','error');}};
 window.toggleBookingAktiv=async function(val){try{await setDoc(doc(db,'bookingLinks',currentUser.uid),{aktiv:val,lehrerUid:currentUser.uid},{merge:true});toast(val?'Online-Buchung aktiviert.':'Deaktiviert.','success');}catch(e){toast('Fehlgeschlagen.','error');}renderBookingOnline();};
 window.refreshBookingLink=async function(){const r=await publishMyBookingLink();toast(r.count+' freie Termine aktualisiert.','success');renderBookingOnline();};
 window.schuelerLinkTeilenByIdx=function(i){const s=(window.__bsList||[])[i];if(s)schuelerLinkTeilen(s.id,s.fname||'');};
@@ -1906,6 +1922,7 @@ function renderBookingPageContent(schuelerId,lehrerUid,linkData,stud,complete,wl
     if(wl){html+='<div class="booking-card-title">⏳ Warteliste</div><p class="text-muted" style="font-size:13px;margin-bottom:10px;line-height:1.5">Du stehst auf der Warteliste. Sobald ein Termin frei wird, meldet sich dein Fahrlehrer bei dir.</p><button class="btn btn-secondary btn-sm" onclick="vonWartelisteRunter()">Von der Warteliste austragen</button>';}
     else{html+='<div class="booking-card-title">⏳ Kein passender Termin frei?</div><p class="text-muted" style="font-size:13px;margin-bottom:10px;line-height:1.5">Trag dich auf die Warteliste ein — dein Fahrlehrer meldet sich, sobald etwas frei wird.</p><textarea id="wl-notiz" rows="2" placeholder="Optional: Wunschzeiten o. Ä." style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:9px;font-size:13px;font-family:inherit;resize:vertical"></textarea><button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="aufWarteliste()">Auf die Warteliste setzen</button>';}
     html+='</div>';}
+  html+='<div class="booking-card"><div class="booking-card-title">✉️ Nachricht an deinen Fahrlehrer</div><p class="text-muted" style="font-size:13px;margin-bottom:10px;line-height:1.5">Frage oder kurzer Hinweis? Schreib direkt an deinen Fahrlehrer.</p><textarea id="msg-text" rows="3" placeholder="Deine Nachricht…" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:9px;font-size:13px;font-family:inherit;resize:vertical"></textarea><button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="sendeNachricht()">Senden</button></div>';
   content.innerHTML=html;
   renderBookingCalendar();
 }
@@ -2012,6 +2029,17 @@ window.vonWartelisteRunter=async function(){
   const c=window.__bookingCtx;if(!c)return;
   try{await deleteDoc(doc(db,'bookingWaitlist',c.schuelerId));toast('Von der Warteliste ausgetragen.','success');}
   catch(e){console.warn('wl-leave',e);toast('Austragen fehlgeschlagen.','error');}
+};
+window.sendeNachricht=async function(){
+  const c=window.__bookingCtx;if(!c)return;
+  const el=document.getElementById('msg-text');const text=((el&&el.value)||'').trim();
+  if(!text)return toast('Bitte eine Nachricht eingeben.','error');
+  if(text.length>1000)return toast('Nachricht zu lang (max. 1000 Zeichen).','error');
+  try{
+    await addDoc(collection(db,'bookingMessages'),{lehrerUid:c.lehrerUid,schuelerId:c.schuelerId,vorname:c.vorname||'',text,status:'neu',createdAt:serverTimestamp()});
+    if(el)el.value='';
+    toast('Nachricht gesendet ✓','success');
+  }catch(e){console.warn('msg',e);toast('Senden fehlgeschlagen. Bitte später erneut.','error');}
 };
 function openSwapModal(newSlot,aktive){
   const p=n=>String(n).padStart(2,'0');
