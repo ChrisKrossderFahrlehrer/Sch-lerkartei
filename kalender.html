@@ -1306,7 +1306,7 @@ async function renderMonthCal(label,grid){
   const [sSnap,bSnap,gbSnap,uSnap]=await Promise.all([
     getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid))),
     getDocs(query(collection(db,'blocked'),where('lehrerUid','==',currentUser.uid))),
-    getDocs(query(collection(db,'globalBlocked'),where('schoolId','==',currentSchoolId||'__none__'))),
+    getDocs(query(collection(db,'globalBlocked'),where('schoolId','==',currentSchoolId||'__none__'))).catch(()=>({docs:[]})),
     getDocs(query(collection(db,'urlaub'),where('lehrerUid','==',currentUser.uid))),
   ]);
   const slotsByDay={};
