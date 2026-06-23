@@ -1281,14 +1281,15 @@ async function renderMonthCal(label,grid){
   const first=new Date(year,month,1);
   let startDow=first.getDay()-1;if(startDow<0)startDow=6;
   const dim=new Date(year,month+1,0).getDate(),prevDays=new Date(year,month,0).getDate();
+  try{
   const [sSnap,bSnap,gbSnap,uSnap]=await Promise.all([
     getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid))),
     getDocs(query(collection(db,'blocked'),where('lehrerUid','==',currentUser.uid))),
-    getDocs(query(collection(db,'globalBlocked'),where('schoolId','==',currentSchoolId))),
+    getDocs(query(collection(db,'globalBlocked'),where('schoolId','==',currentSchoolId||'__none__'))),
     getDocs(query(collection(db,'urlaub'),where('lehrerUid','==',currentUser.uid))),
   ]);
   const slotsByDay={};
-  sSnap.docs.forEach(d=>{const s=d.data();const dt=s.startTime.toDate();if(dt.getFullYear()===year&&dt.getMonth()===month){const day=dt.getDate();if(!slotsByDay[day])slotsByDay[day]=[];slotsByDay[day].push({id:d.id,...s});}});
+  sSnap.docs.forEach(d=>{const s=d.data();if(!s.startTime||!s.startTime.toDate)return;const dt=s.startTime.toDate();if(dt.getFullYear()===year&&dt.getMonth()===month){const day=dt.getDate();if(!slotsByDay[day])slotsByDay[day]=[];slotsByDay[day].push({id:d.id,...s});}});
   const blockedSet=new Set();const blocksByDay={};
   bSnap.docs.forEach(d=>{const b=d.data();if(b.year===year&&b.month===month){blockedSet.add(b.day);(blocksByDay[b.day]=blocksByDay[b.day]||[]).push({id:d.id,...b});}});
   gbSnap.docs.forEach(d=>{const b=d.data();if(b.year===year&&b.month===month)blockedSet.add('g'+b.day);});
@@ -1317,12 +1318,14 @@ async function renderMonthCal(label,grid){
   for(let i=1;i<=rem;i++)html+=`<div class="cal-day other-month"><div class="cal-day-num">${i}</div></div>`;
   grid.style.cssText='display:grid;grid-template-columns:repeat(7,1fr);gap:5px';
   grid.innerHTML=html;
+  }catch(e){console.warn('renderMonthCal',e);grid.style.cssText='';grid.innerHTML='<p class="text-muted" style="padding:24px;text-align:center;line-height:1.6">⚠️ Kalender konnte nicht geladen werden.<br>Fehler: <b>'+((e&&e.code)||(e&&e.message)||'unbekannt')+'</b><br><br>Falls „permission-denied": Firestore-Regeln in der Console veröffentlichen. Sonst App neu laden.</p>';}
 }
 
 async function renderWeekCal(label,grid){
   const weekDays=[];for(let i=0;i<7;i++)weekDays.push(new Date(weekStart.getFullYear(),weekStart.getMonth(),weekStart.getDate()+i));
   label.textContent=`${weekDays[0].toLocaleDateString('de-DE',{day:'2-digit',month:'short'})} – ${weekDays[6].toLocaleDateString('de-DE',{day:'2-digit',month:'short',year:'numeric'})}`;
   const startTs=Timestamp.fromDate(weekDays[0]),endTs=Timestamp.fromDate(new Date(weekDays[6].getFullYear(),weekDays[6].getMonth(),weekDays[6].getDate()+1));
+  try{
   const [sSnap,bSnap,scSnap]=await Promise.all([
     getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid),where('startTime','>=',startTs),where('startTime','<',endTs),orderBy('startTime'))),
     getDocs(query(collection(db,'blocked'),where('lehrerUid','==',currentUser.uid))),
@@ -1350,6 +1353,7 @@ async function renderWeekCal(label,grid){
   });
   html+=`</div>`;
   grid.style.cssText='display:block';grid.innerHTML=html;
+  }catch(e){console.warn('renderWeekCal',e);grid.style.cssText='';grid.innerHTML='<p class="text-muted" style="padding:24px;text-align:center;line-height:1.6">⚠️ Wochenansicht konnte nicht geladen werden.<br>Fehler: <b>'+((e&&e.code)||(e&&e.message)||'unbekannt')+'</b></p>';}
 }
 
 window.openDayModal=async function(year,month,day){
@@ -1685,9 +1689,10 @@ async function renderAdminCal(){
   let html=days.map(d=>`<div class="cal-day-label">${d}</div>`).join('');
   const first=new Date(year,month,1);let startDow=first.getDay()-1;if(startDow<0)startDow=6;
   const dim=new Date(year,month+1,0).getDate(),prevDays=new Date(year,month,0).getDate();
+  try{
   const[sSnap,bSnap,scSnap]=await Promise.all([getDocs(query(collection(db,'slots'),where('lehrerUid','==',lehrerUid))),getDocs(query(collection(db,'blocked'),where('lehrerUid','==',lehrerUid))),getDocs(query(collection(db,'schueler'),where('lehrerUid','==',lehrerUid)))]);
   const scm={};scSnap.docs.forEach(d=>{const s=d.data();scm[d.id]=s.fname+' '+s.lname;});
-  const slotsByDay={};sSnap.docs.forEach(d=>{const s=d.data();const dt=s.startTime.toDate();if(dt.getFullYear()===year&&dt.getMonth()===month){const day=dt.getDate();if(!slotsByDay[day])slotsByDay[day]=[];slotsByDay[day].push({id:d.id,...s});}});
+  const slotsByDay={};sSnap.docs.forEach(d=>{const s=d.data();if(!s.startTime||!s.startTime.toDate)return;const dt=s.startTime.toDate();if(dt.getFullYear()===year&&dt.getMonth()===month){const day=dt.getDate();if(!slotsByDay[day])slotsByDay[day]=[];slotsByDay[day].push({id:d.id,...s});}});
   const bSet=new Set();const blocksByDay={};bSnap.docs.forEach(d=>{const b=d.data();if(b.year===year&&b.month===month){bSet.add(b.day);(blocksByDay[b.day]=blocksByDay[b.day]||[]).push({id:d.id,...b});}});
   const today=new Date();
   for(let i=0;i<startDow;i++)html+=`<div class="cal-day other-month"><div class="cal-day-num">${prevDays-startDow+i+1}</div></div>`;
@@ -1703,6 +1708,7 @@ async function renderAdminCal(){
   const total=startDow+dim,rem=total%7===0?0:7-(total%7);
   for(let i=1;i<=rem;i++)html+=`<div class="cal-day other-month"><div class="cal-day-num">${i}</div></div>`;
   grid.innerHTML=html;
+  }catch(e){console.warn('renderAdminCal',e);grid.innerHTML='<p class="text-muted" style="padding:24px;text-align:center;line-height:1.6">⚠️ Kalender konnte nicht geladen werden.<br>Fehler: <b>'+((e&&e.code)||(e&&e.message)||'unbekannt')+'</b></p>';}
 }
 window.adminOpenDayDetail=async function(year,month,day){
   const lUid=window._adminCalLehrerUid;
