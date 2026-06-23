@@ -518,6 +518,23 @@ service cloud.firestore {
     // ══════════════════════════════════════════════════════
     // ALLES ANDERE: VERBOTEN
     // ══════════════════════════════════════════════════════
+    match /bookingMessages/{msgId} {
+      // Lehrer liest/verwaltet eigene Nachrichten; Schüler liest NICHT.
+      allow read:           if isAuth() && resource.data.lehrerUid == request.auth.uid;
+      allow update, delete: if isAuth() && resource.data.lehrerUid == request.auth.uid;
+      // Schüler (ohne Login) darf NUR senden – und nur, wenn die schuelerId
+      // ein echter, vom Lehrer angelegter Link ist (Anti-Spam) + Längenlimit.
+      allow create: if request.resource.data.status == 'neu'
+                    && request.resource.data.lehrerUid is string
+                    && request.resource.data.schuelerId is string
+                    && request.resource.data.text is string
+                    && request.resource.data.text.size() > 0
+                    && request.resource.data.text.size() <= 1000
+                    && request.resource.data.keys().hasAll(['lehrerUid','schuelerId','vorname','text','status','createdAt'])
+                    && exists(/databases/$(database)/documents/bookingStudents/$(request.resource.data.schuelerId))
+                    && get(/databases/$(database)/documents/bookingStudents/$(request.resource.data.schuelerId)).data.lehrerUid == request.resource.data.lehrerUid;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
