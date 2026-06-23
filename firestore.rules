@@ -396,12 +396,12 @@ service cloud.firestore {
     // create prüft die schoolId des NEUEN Dokuments. So kann niemand Daten
     // einer fremden Fahrschule lesen, ändern oder unterschieben.
     match /schueler/{docId} {
-      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId);
-      allow create:               if kalOwnsSchool(request.resource.data.schoolId);
+      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || resource.data.lehrerUid == request.auth.uid;
+      allow create:               if kalOwnsSchool(request.resource.data.schoolId) || request.resource.data.lehrerUid == request.auth.uid;
     }
     match /slots/{docId} {
-      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId);
-      allow create:               if kalOwnsSchool(request.resource.data.schoolId);
+      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || resource.data.lehrerUid == request.auth.uid;
+      allow create:               if kalOwnsSchool(request.resource.data.schoolId) || request.resource.data.lehrerUid == request.auth.uid;
       // Schüler-Selbststorno (OHNE Login): NUR den eigenen gebuchten Termin
       // freigeben (bookedBy -> null). Eng begrenzt:
       //  - nur wenn aktuell gebucht und neuer Wert null
@@ -424,20 +424,20 @@ service cloud.firestore {
       allow create:               if kalOwnsSchool(request.resource.data.schoolId);
     }
     match /urlaub/{docId} {
-      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId);
-      allow create:               if kalOwnsSchool(request.resource.data.schoolId);
+      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || resource.data.lehrerUid == request.auth.uid;
+      allow create:               if kalOwnsSchool(request.resource.data.schoolId) || request.resource.data.lehrerUid == request.auth.uid;
     }
     match /notizen/{docId} {
-      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId);
-      allow create:               if kalOwnsSchool(request.resource.data.schoolId);
+      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || resource.data.lehrerUid == request.auth.uid;
+      allow create:               if kalOwnsSchool(request.resource.data.schoolId) || request.resource.data.lehrerUid == request.auth.uid;
     }
     match /warteliste/{docId} {
-      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId);
-      allow create:               if kalOwnsSchool(request.resource.data.schoolId);
+      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || resource.data.lehrerUid == request.auth.uid;
+      allow create:               if kalOwnsSchool(request.resource.data.schoolId) || request.resource.data.lehrerUid == request.auth.uid;
     }
     match /pruefungen/{docId} {
-      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId);
-      allow create:               if kalOwnsSchool(request.resource.data.schoolId);
+      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || resource.data.lehrerUid == request.auth.uid;
+      allow create:               if kalOwnsSchool(request.resource.data.schoolId) || request.resource.data.lehrerUid == request.auth.uid;
     }
     // blocked hat kein schoolId, nur lehrerUid → über den Lehrer absichern
     match /blocked/{docId} {
