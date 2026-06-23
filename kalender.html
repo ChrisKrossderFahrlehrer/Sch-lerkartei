@@ -387,21 +387,24 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Globales Sicherheitsnetz: fängt nicht abgefangene Firestore-Rechtefehler ab,
-// damit die App bei fehlenden Regeln nicht hängt/abstürzt, sondern klar meldet.
+// Globales Sicherheitsnetz + DIAGNOSE: fängt nicht abgefangene Firestore-
+// Rechtefehler ab und zeigt Fehler + Stack sichtbar an (für Screenshot).
 window.addEventListener('unhandledrejection', ev => {
   const r = ev && ev.reason;
   const isPerm = r && (r.code === 'permission-denied' || (typeof r.message === 'string' && r.message.toLowerCase().indexOf('insufficient permissions') >= 0));
   if (isPerm) {
     ev.preventDefault();
-    console.warn('[Firestore-Regeln nicht aktiv?] Rechtefehler abgefangen:', r);
-    if (!window.__permWarned) {
-      window.__permWarned = true;
-      setTimeout(() => {
-        try { toast('⚠️ Firestore-Regeln nicht aktiv — bitte in der Firebase Console veröffentlichen.', 'error'); }
-        catch (e) { try { alert('Firestore-Regeln nicht aktiv — bitte in der Firebase Console veröffentlichen.'); } catch (e2) {} }
-      }, 800);
+    console.warn('PERMISSION DENIED:', r);
+    const info = 'CODE: ' + (r.code || '?') + '\n' + (r.message || '') + '\n\nWO (Stack):\n' + (r.stack || '(kein Stack verfügbar)');
+    let box = document.getElementById('__permdiag');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = '__permdiag';
+      box.style.cssText = 'position:fixed;bottom:0;left:0;right:0;max-height:48vh;overflow:auto;background:#2a0000;color:#ffd6d6;font:11px/1.45 monospace;padding:12px;z-index:999999;white-space:pre-wrap;border-top:2px solid #ff6666';
+      box.onclick = () => box.remove();
+      document.body.appendChild(box);
     }
+    box.textContent = '⚠️ RECHTEFEHLER — bitte als Screenshot schicken. (Tippen zum Schließen)\n\n' + info;
   }
 });
 
