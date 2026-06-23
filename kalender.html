@@ -387,6 +387,24 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+// Globales Sicherheitsnetz: fängt nicht abgefangene Firestore-Rechtefehler ab,
+// damit die App bei fehlenden Regeln nicht hängt/abstürzt, sondern klar meldet.
+window.addEventListener('unhandledrejection', ev => {
+  const r = ev && ev.reason;
+  const isPerm = r && (r.code === 'permission-denied' || (typeof r.message === 'string' && r.message.toLowerCase().indexOf('insufficient permissions') >= 0));
+  if (isPerm) {
+    ev.preventDefault();
+    console.warn('[Firestore-Regeln nicht aktiv?] Rechtefehler abgefangen:', r);
+    if (!window.__permWarned) {
+      window.__permWarned = true;
+      setTimeout(() => {
+        try { toast('⚠️ Firestore-Regeln nicht aktiv — bitte in der Firebase Console veröffentlichen.', 'error'); }
+        catch (e) { try { alert('Firestore-Regeln nicht aktiv — bitte in der Firebase Console veröffentlichen.'); } catch (e2) {} }
+      }, 800);
+    }
+  }
+});
+
 // ── STATE ──
 let currentUser = null;
 let currentRole = null; // 'superadmin' | 'admin' | 'lehrer'
