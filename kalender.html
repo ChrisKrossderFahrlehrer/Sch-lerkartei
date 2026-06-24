@@ -10,9 +10,14 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg:#0f0f0f; --surface:#1a1a1a; --surface2:#242424; --border:#2e2e2e;
-  --accent:#d4a843; --accent2:#e8c878; --text:#f0ede8; --text-muted:#888;
-  --danger:#e05555; --success:#5bba7a; --radius:10px;
+  --bg:#0d1117; --surface:#161b22; --surface2:#1c2330; --border:#30363d;
+  --accent:#f0b429; --accent2:#e8c878; --green:#3fb950; --text:#e6edf3; --text-muted:#7d8590;
+  --danger:#f85149; --success:#3fb950; --radius:14px;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.28),0 2px 8px rgba(0,0,0,.18);
+  --shadow-md:0 6px 18px rgba(0,0,0,.34);
+  --shadow-lift:0 12px 30px rgba(0,0,0,.44);
+  --ease-out:cubic-bezier(.22,1,.36,1);
+  --safe-top:env(safe-area-inset-top,0px); --safe-bottom:env(safe-area-inset-bottom,0px);
   --font-display:'DM Serif Display',serif; --font-body:'DM Sans',sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -22,6 +27,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 #auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 60% 20%,#1e1608 0%,#0f0f0f 60%);}
 .auth-box{width:400px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:36px;}
 .auth-logo{font-family:var(--font-display);font-size:26px;color:var(--accent);margin-bottom:4px;}
+.auth-logo-img{display:block;width:128px;height:128px;margin:0 auto 10px;object-fit:contain;}
+.topbar-logo{height:32px;width:32px;object-fit:contain;border-radius:7px;flex-shrink:0;}
+.booking-logo-img{display:block;width:96px;height:96px;margin:0 auto 8px;object-fit:contain;}
 .auth-sub{color:var(--text-muted);font-size:13px;margin-bottom:28px;}
 .auth-tabs{display:flex;gap:4px;background:var(--surface2);border-radius:8px;padding:4px;margin-bottom:22px;}
 .auth-tab{flex:1;padding:7px;border:none;background:transparent;color:var(--text-muted);border-radius:6px;cursor:pointer;font-family:var(--font-body);font-size:13px;font-weight:500;transition:all .2s;}
@@ -60,7 +68,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .page-title{font-family:var(--font-display);font-size:26px;color:var(--text);margin-bottom:20px;}
 
 /* ── Cards ── */
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:22px;margin-bottom:16px;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-sm);padding:22px;margin-bottom:16px;}
 .card-title{font-size:13px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:14px;}
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
 .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
@@ -238,7 +246,8 @@ tr:last-child td{border-bottom:none;}
   .layout{flex-direction:column;}
   .sidebar{width:100%;min-height:unset;border-right:none;border-top:1px solid var(--border);padding:6px 6px env(safe-area-inset-bottom);position:fixed;bottom:0;left:0;right:0;z-index:99;display:flex;flex-direction:row;overflow-x:auto;gap:2px;}
   .nav-section{display:none;}
-  .nav-item{flex-direction:column;gap:2px;padding:5px 8px;min-width:55px;font-size:9px;text-align:center;border-radius:7px;white-space:nowrap;flex:1;}
+  .nav-item{flex-direction:column;gap:3px;padding:6px 3px;min-width:0;font-size:9px;text-align:center;border-radius:8px;white-space:nowrap;flex:1;}
+  .nav-label{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .nav-icon{font-size:17px;width:auto;}
   .main{padding:14px 10px;padding-bottom:85px;}
   .page-title{font-size:20px;margin-bottom:14px;}
@@ -252,7 +261,7 @@ tr:last-child td{border-bottom:none;}
   .cal-day{min-height:50px;padding:4px;}
   .cal-slot{font-size:8px;}
   .cal-day-label{font-size:9px;}
-  .modal{width:100%;max-width:100%;margin:0;border-radius:18px 18px 0 0;position:fixed;bottom:0;left:0;right:0;max-height:88vh;padding:22px 18px;}
+  .modal{width:100%;max-width:100%;margin:0;border-radius:18px 18px 0 0;position:fixed;bottom:0;left:0;right:0;max-height:88vh;padding:22px 18px calc(22px + var(--safe-bottom));}
   .modal-overlay{align-items:flex-end;}
   .slot-row{gap:7px;}
   .slot-time{min-width:unset;font-size:12px;}
@@ -262,7 +271,7 @@ tr:last-child td{border-bottom:none;}
   #booking-screen{padding:16px 10px 90px;}
   .booking-card{padding:16px 12px;}
 }
-@media(max-width:380px){.nav-item{min-width:46px;font-size:8px;padding:4px 5px;}.nav-icon{font-size:15px;}}
+@media(max-width:380px){.nav-item{font-size:8px;padding:5px 2px;}.nav-icon{font-size:16px;}}
 
 /* Schüler-Buchungskalender */
 .bcal-viewtoggle{display:flex;gap:5px;margin-bottom:14px;background:var(--surface2);padding:4px;border-radius:11px;}
@@ -303,7 +312,7 @@ tr:last-child td{border-bottom:none;}
 <!-- AUTH -->
 <div id="auth-screen">
   <div class="auth-box">
-    <div class="auth-logo">🚗 Fahrschule</div>
+    <img src="kalender-logo.png" alt="Kalender" class="auth-logo-img">
     <div class="auth-sub">Kalender & Buchungssystem</div>
     <div id="kal-hinweis" style="display:none;background:rgba(255,180,0,0.12);border:1px solid rgba(255,180,0,0.4);border-radius:10px;padding:14px;margin-bottom:14px;font-size:0.9rem;line-height:1.5;color:#ffd479"></div>
     <div id="login-form">
@@ -319,7 +328,7 @@ tr:last-child td{border-bottom:none;}
 <div id="app">
   <div class="topbar">
     <div style="display:flex;align-items:center;gap:10px">
-      <div class="topbar-brand">🚗 Fahrschule</div>
+      <img src="kalender-logo.png" alt="" class="topbar-logo"><div class="topbar-brand">Kalender</div>
       <span id="topbar-school" class="school-badge" style="display:none">🏫 <span id="topbar-school-name"></span></span>
     </div>
     <div class="topbar-right">
@@ -346,7 +355,7 @@ tr:last-child td{border-bottom:none;}
 <!-- BOOKING -->
 <div id="booking-screen">
   <div class="booking-header">
-    <div class="booking-logo">🚗 Fahrschule</div>
+    <img src="kalender-logo.png" alt="Kalender" class="booking-logo-img">
     <div class="booking-sub" id="booking-subtitle">Terminbuchung</div>
   </div>
   <div id="booking-content" style="width:100%;max-width:680px;"></div>
@@ -715,7 +724,7 @@ function buildSidebar(){
     {id:'lehrer-profil',icon:'⚙️',label:'Einstellungen'},
   ];
   const items=currentRole==='superadmin'?saNav:currentRole==='admin'?adminNav:lehrerNav;
-  nav.innerHTML=items.map(i=>`<button class="nav-item" id="nav-${i.id}" onclick="navigate('${i.id}')"><span class="nav-icon">${i.icon}</span>${i.label}</button>`).join('');
+  nav.innerHTML=items.map(i=>`<button class="nav-item" id="nav-${i.id}" onclick="navigate('${i.id}')"><span class="nav-icon">${i.icon}</span><span class="nav-label">${i.label}</span></button>`).join('');
 }
 window.navigate=function(page){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
