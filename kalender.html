@@ -1219,6 +1219,14 @@ window.deleteGlobalSperrtag=async function(id){await deleteDoc(doc(db,'globalBlo
 // ════════════════════════════════
 pages['admin-einstellungen']=async function(el){
   el.innerHTML=`<div class="page active"><h1 class="page-title">Einstellungen</h1>
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title">Berechtigungen</div>
+    <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+      <input type="checkbox" id="set-lehrer-schueler" style="width:18px;height:18px;flex-shrink:0" onchange="saveLehrerDarfSchueler(this.checked)">
+      <span>Fahrlehrer dürfen selbst Fahrschüler anlegen</span>
+    </label>
+    <p class="text-muted" style="font-size:12px;margin-top:8px;line-height:1.5">Wenn aktiviert, können deine Fahrlehrer in „Meine Schüler" eigene Fahrschüler hinzufügen (immer sich selbst zugeordnet). Standard: aus.</p>
+  </div>
   <div class="card">
     <div class="card-title">Fahrstundenarten</div>
     <div id="arten-list"></div>
@@ -1237,6 +1245,14 @@ pages['admin-einstellungen']=async function(el){
   const presets=['#4a90d9','#e07b30','#9b59b6','#2d6a8a','#5bba7a','#e05555','#d4a843','#e8748a','#50c8a8','#f0c040','#8b5cf6','#06b6d4'];
   document.getElementById('preset-colors').innerHTML=presets.map(c=>`<div class="preset-color" style="background:${c}" onclick="document.getElementById('na-color').value='${c}'"></div>`).join('');
   renderArtenList();
+  const _cb=document.getElementById('set-lehrer-schueler');if(_cb)_cb.checked=!!(currentSchool&&currentSchool.lehrerDarfSchuelerAnlegen===true);
+};
+window.saveLehrerDarfSchueler=async function(v){
+  try{
+    await updateDoc(doc(db,'schools',currentSchoolId),{lehrerDarfSchuelerAnlegen:v===true});
+    currentSchool={...currentSchool,lehrerDarfSchuelerAnlegen:v===true};
+    toast(v?'Fahrlehrer dürfen jetzt Schüler anlegen.':'Deaktiviert – nur Admin legt Schüler an.','success');
+  }catch(e){console.warn('saveLehrerDarfSchueler',e);toast('Konnte nicht gespeichert werden'+((e&&e.code)?' ('+e.code+')':'')+'.','error');const _cb=document.getElementById('set-lehrer-schueler');if(_cb)_cb.checked=!v;}
 };
 function renderArtenList(){
   const el=document.getElementById('arten-list');if(!el)return;
@@ -1630,9 +1646,17 @@ window.cancelBookingLehrer=async function(id){
 pages['lehrer-schueler']=async function(el){
   el.innerHTML=`<div class="page active"><h1 class="page-title">Meine Schüler</h1><div id="ls-content"><div class="spinner"></div></div></div>`;
   const[snap,autosSnap]=await Promise.all([getDocs(query(collection(db,'schueler'),where('lehrerUid','==',currentUser.uid))),getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId)))]);
-  const lsContent=document.getElementById('ls-content');
-  if(snap.empty){lsContent.innerHTML='<p class="text-muted">Noch keine Schüler zugewiesen.</p>';return;}
-  let html='';
+  const lsContent=document.getElementById('ls-content');if(!lsContent)return;
+  const _canAdd=!currentSchoolId||(currentSchool&&currentSchool.lehrerDarfSchuelerAnlegen===true);
+  const _addForm=_canAdd?`<div class="card" style="margin-bottom:14px">
+    <div class="card-title">Neuen Schüler anlegen</div>
+    <div class="grid-2"><div class="field"><label>Vorname</label><input id="lns-fname" type="text"></div><div class="field"><label>Nachname</label><input id="lns-lname" type="text"></div></div>
+    <div class="grid-2"><div class="field"><label>E-Mail (optional)</label><input id="lns-email" type="email"></div><div class="field"><label>Telefon (optional)</label><input id="lns-tel" type="text"></div></div>
+    <div class="grid-2"><div class="field"><label>Max. Fahrstunden (0=∞)</label><input id="lns-max" type="number" min="0" value="0"></div><div class="field"><label>Max. gleichzeitige Termine (0=∞)</label><input id="lns-maxaktiv" type="number" min="0" value="0"></div></div>
+    <button class="btn btn-primary" onclick="createSchuelerLehrer()">+ Schüler anlegen</button>
+  </div>`:'';
+  if(snap.empty){lsContent.innerHTML=_addForm+'<p class="text-muted">Noch keine Schüler. '+(_canAdd?'Lege oben deinen ersten an.':'Sie werden von deiner Fahrschule zugewiesen.')+'</p>';return;}
+  let html=_addForm;
   for(const d of snap.docs){
     const s=d.data();
     const link=`${location.origin}${location.pathname}?schueler=${d.id}&lehrer=${currentUser.uid}`;
@@ -1684,6 +1708,18 @@ pages['lehrer-schueler']=async function(el){
   lsContent.innerHTML=html;
 };
 window.saveSchuelerAuto=async function(sid){await updateDoc(doc(db,'schueler',sid),{autoId:document.getElementById('auto-sel-'+sid).value||null});toast('Auto gespeichert!','success');};
+window.createSchuelerLehrer=async function(){
+  const fname=document.getElementById('lns-fname').value.trim(),lname=document.getElementById('lns-lname').value.trim();
+  if(!fname||!lname)return toast('Vor- und Nachname erforderlich.','error');
+  const email=document.getElementById('lns-email').value.trim(),tel=document.getElementById('lns-tel').value.trim();
+  const maxFahrstunden=parseInt(document.getElementById('lns-max').value)||0;
+  const maxAktiveTermine=parseInt(document.getElementById('lns-maxaktiv').value)||0;
+  try{
+    await addDoc(collection(db,'schueler'),{fname,lname,email,tel,lehrerUid:currentUser.uid,maxFahrstunden,maxAktiveTermine,bookedCount:0,schoolId:currentSchoolId||null,createdAt:serverTimestamp()});
+    toast('Schüler angelegt!','success');
+    pages['lehrer-schueler'](document.getElementById('main-content'));
+  }catch(e){console.warn('createSchuelerLehrer',e);toast('Konnte nicht angelegt werden'+((e&&e.code)?' ('+e.code+')':'')+'.','error');}
+};
 
 // ════════════════════════════════
 // ADMIN – LEHRER KALENDER VIEW
