@@ -1036,13 +1036,15 @@ window.loadAuslastung=async function(){
   const von=document.getElementById('aus-von').value,bis=document.getElementById('aus-bis').value;
   if(!von||!bis)return;
   const el=document.getElementById('auslastung-content');el.innerHTML='<div class="spinner"></div>';
-  const [lSnap,slotsSnap]=await Promise.all([
-    getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId),where('role','==','lehrer'),where('approved','==',true))),
-    getDocs(query(collection(db,'slots'),where('schoolId','==',currentSchoolId),where('startTime','>=',Timestamp.fromDate(new Date(von+'T00:00:00'))),where('startTime','<=',Timestamp.fromDate(new Date(bis+'T23:59:59'))),orderBy('startTime'))),
-  ]);
+  const _vMs=new Date(von+'T00:00:00').getTime(),_bMs=new Date(bis+'T23:59:59').getTime();
+  let lSnap,slotsSnap;
+  try{[lSnap,slotsSnap]=await Promise.all([
+    getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId))),
+    getDocs(query(collection(db,'slots'),where('schoolId','==',currentSchoolId))),
+  ]);}catch(e){console.warn('auslastung',e);el.innerHTML='<p class="text-muted">⚠️ Konnte nicht geladen werden. Fehler: '+((e&&e.code)||(e&&e.message)||'?')+'</p>';return;}
   const stats={};
-  lSnap.docs.forEach(d=>{stats[d.id]={name:d.data().fname+' '+d.data().lname,total:0,booked:0,types:{}};});
-  slotsSnap.docs.forEach(d=>{const s=d.data();if(!stats[s.lehrerUid])return;stats[s.lehrerUid].total++;if(s.bookedBy)stats[s.lehrerUid].booked++;stats[s.lehrerUid].types[s.type]=(stats[s.lehrerUid].types[s.type]||0)+1;});
+  lSnap.docs.forEach(d=>{const u=d.data();if(u.role!=='lehrer'||u.approved!==true)return;stats[d.id]={name:u.fname+' '+u.lname,total:0,booked:0,types:{}};});
+  slotsSnap.docs.forEach(d=>{const s=d.data();if(!s.startTime||!s.startTime.toMillis)return;const _t=s.startTime.toMillis();if(_t<_vMs||_t>_bMs)return;if(!stats[s.lehrerUid])return;stats[s.lehrerUid].total++;if(s.bookedBy)stats[s.lehrerUid].booked++;stats[s.lehrerUid].types[s.type]=(stats[s.lehrerUid].types[s.type]||0)+1;});
   const totalS=Object.values(stats).reduce((a,b)=>a+b.total,0);
   const totalB=Object.values(stats).reduce((a,b)=>a+b.booked,0);
   let html=`<div class="grid-2" style="margin-bottom:16px">
@@ -1075,7 +1077,7 @@ pages['admin-fuhrpark']=async function(el){
 };
 async function renderAutoList(){
   const el=document.getElementById('auto-list');if(!el)return;
-  const snap=await getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId),orderBy('createdAt')));
+  const snap=await getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId)));
   if(snap.empty){el.innerHTML='<p class="text-muted">Noch keine Fahrzeuge.</p>';return;}
   el.innerHTML=snap.docs.map(d=>{const a=d.data();return`<div class="auto-card">
     <div class="auto-icon">🚗</div><div class="auto-info"><div class="auto-name">${a.modell}</div><div class="auto-detail">${a.farbe?a.farbe+' · ':''}${a.notiz||''}</div></div>
@@ -1137,7 +1139,7 @@ pages['lehrer-urlaub']=async function(el){
 };
 async function renderUrlaubList(filterUid){
   const el=document.getElementById('urlaub-list');if(!el)return;
-  const q=filterUid?query(collection(db,'urlaub'),where('lehrerUid','==',filterUid),orderBy('von')):query(collection(db,'urlaub'),where('schoolId','==',currentSchoolId),orderBy('von'));
+  const q=filterUid?query(collection(db,'urlaub'),where('lehrerUid','==',filterUid)):query(collection(db,'urlaub'),where('schoolId','==',currentSchoolId));
   const snap=await getDocs(q);
   if(snap.empty){el.innerHTML='<p class="text-muted">Noch keine Urlaube.</p>';return;}
   const lSnap=await getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId),where('role','==','lehrer')));
@@ -1196,7 +1198,7 @@ pages['admin-sperrtage']=async function(el){
 };
 async function renderSperrtageList(){
   const el=document.getElementById('sperrtage-list');if(!el)return;
-  const snap=await getDocs(query(collection(db,'globalBlocked'),where('schoolId','==',currentSchoolId),orderBy('year'),orderBy('month'),orderBy('day')));
+  const snap=await getDocs(query(collection(db,'globalBlocked'),where('schoolId','==',currentSchoolId)));
   if(snap.empty){el.innerHTML='<p class="text-muted">Keine globalen Sperrtage.</p>';return;}
   el.innerHTML='<table><thead><tr><th>Datum</th><th>Beschreibung</th><th></th></tr></thead><tbody>'+
     snap.docs.map(d=>{const b=d.data();const date=new Date(b.year,b.month,b.day);
@@ -1348,13 +1350,13 @@ async function renderWeekCal(label,grid){
   const startTs=Timestamp.fromDate(weekDays[0]),endTs=Timestamp.fromDate(new Date(weekDays[6].getFullYear(),weekDays[6].getMonth(),weekDays[6].getDate()+1));
   try{
   const [sSnap,bSnap,scSnap]=await Promise.all([
-    getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid),where('startTime','>=',startTs),where('startTime','<',endTs),orderBy('startTime'))),
+    getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid))),
     getDocs(query(collection(db,'blocked'),where('lehrerUid','==',currentUser.uid))),
     getDocs(query(collection(db,'schueler'),where('lehrerUid','==',currentUser.uid))),
   ]);
   const scm={};scSnap.docs.forEach(d=>{const s=d.data();scm[d.id]=s.fname+' '+s.lname;});
   const bSet=new Set();bSnap.docs.forEach(d=>{const b=d.data();bSet.add(`${b.year}-${b.month}-${b.day}`);});
-  const slotsByDay={};sSnap.docs.forEach(d=>{const s=d.data();const dt=s.startTime.toDate();const k=dt.toDateString();if(!slotsByDay[k])slotsByDay[k]=[];slotsByDay[k].push({id:d.id,...s,_dt:dt});});
+  const slotsByDay={};sSnap.docs.forEach(d=>{const s=d.data();if(!s.startTime||!s.startTime.toDate)return;const dt=s.startTime.toDate();const k=dt.toDateString();if(!slotsByDay[k])slotsByDay[k]=[];slotsByDay[k].push({id:d.id,...s,_dt:dt});});
   const today=new Date();const HOURS=Array.from({length:14},(_,i)=>i+7);const dn=['Mo','Di','Mi','Do','Fr','Sa','So'];
   let html=`<div style="display:grid;grid-template-columns:48px repeat(7,1fr);border:1px solid var(--border);border-radius:9px;overflow:hidden">`;
   html+=`<div class="week-col-header" style="background:var(--surface2);border-bottom:1px solid var(--border)"></div>`;
@@ -1439,12 +1441,16 @@ window.unblockDay=async function(id){await deleteDoc(doc(db,'blocked',id));toast
 // ════════════════════════════════
 pages['lehrer-slots']=async function(el){
   el.innerHTML=`<div class="page active"><h1 class="page-title">Zeitslots</h1><div class="card"><div id="slots-list"><div class="spinner"></div></div></div></div>`;
-  const[snap,scSnap]=await Promise.all([getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid),orderBy('startTime'))),getDocs(query(collection(db,'schueler'),where('lehrerUid','==',currentUser.uid)))]);
+  let snap,scSnap;
+  try{
+    [snap,scSnap]=await Promise.all([getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid))),getDocs(query(collection(db,'schueler'),where('lehrerUid','==',currentUser.uid)))]);
+  }catch(e){console.warn('lehrer-slots',e);const x=document.getElementById('slots-list');if(x)x.innerHTML='<p class="text-muted" style="line-height:1.6">⚠️ Zeitslots konnten nicht geladen werden.<br>Fehler: <b>'+((e&&e.code)||(e&&e.message)||'unbekannt')+'</b></p>';return;}
   const scm={};scSnap.docs.forEach(d=>{const s=d.data();scm[d.id]=s.fname+' '+s.lname;});
-  const sl=document.getElementById('slots-list');
-  if(snap.empty){sl.innerHTML='<p class="text-muted">Noch keine Slots.</p>';return;}
+  const sl=document.getElementById('slots-list');if(!sl)return;
+  const docs=snap.docs.slice().sort((a,b)=>{const ta=a.data().startTime,tb=b.data().startTime;return((ta&&ta.toMillis)?ta.toMillis():0)-((tb&&tb.toMillis)?tb.toMillis():0);});
+  if(!docs.length){sl.innerHTML='<p class="text-muted">Noch keine Slots.</p>';return;}
   sl.innerHTML='<table><thead><tr><th>Datum</th><th>Zeit</th><th>Typ</th><th>Status</th><th></th></tr></thead><tbody>'+
-    snap.docs.map(d=>{const s=d.data();return`<tr><td>${fmt(s.startTime)}</td><td>${fmtTime(s.startTime)}–${fmtTime(s.endTime)}</td><td>${typeBadgeHtml(s.type)}</td>
+    docs.map(d=>{const s=d.data();return`<tr><td>${fmt(s.startTime)}</td><td>${fmtTime(s.startTime)}–${fmtTime(s.endTime)}</td><td>${typeBadgeHtml(s.type)}</td>
       <td>${s.bookedBy?`<span class="badge badge-booked">${scm[s.bookedBy]||'?'}</span>`:'<span class="badge badge-free">Frei</span>'}</td>
       <td>${!s.bookedBy?`<button class="btn btn-danger btn-sm" onclick="deleteSlotFromList('${d.id}')">Löschen</button>`:''}</td></tr>`;}).join('')+'</tbody></table>';
 };
@@ -1469,7 +1475,7 @@ pages['lehrer-buchungen']=async function(el){
 };
 async function publishMyBookingLink(){
   try{
-    const snap=await getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid),orderBy('startTime')));
+    const snap=await getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid)));
     let _blocks=[];try{const _bs=await getDocs(query(collection(db,'blocked'),where('lehrerUid','==',currentUser.uid)));_blocks=_bs.docs.map(d=>({id:d.id,...d.data()}));}catch(e){}
     const nowMs=Date.now();
     const freieSlots=snap.docs.filter(d=>{const s=d.data();if(s.bookedBy||!s.startTime||s.startTime.toDate().getTime()<nowMs)return false;const _sd=s.startTime.toDate(),_ed=s.endTime.toDate();return !_slotBlocked(_sd,_sd.getHours()*60+_sd.getMinutes(),_ed.getHours()*60+_ed.getMinutes(),_blocks);})
@@ -1483,7 +1489,7 @@ async function publishMyBookingLink(){
 }
 async function publishStudentBookings(schuelerId,vorname){
   try{
-    const snap=await getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid),orderBy('startTime')));
+    const snap=await getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid)));
     const grenze=Date.now()-2*3600000;
     const meineTermine=snap.docs.filter(d=>{const s=d.data();return s.bookedBy===schuelerId && s.startTime && s.startTime.toDate().getTime()>=grenze;})
       .map(d=>{const s=d.data();return{id:d.id,start:s.startTime.toDate().toISOString(),ende:s.endTime.toDate().toISOString(),type:s.type||'fahrstunde'};});
@@ -1595,15 +1601,16 @@ async function renderBestaetigteBuchungen(){
   const bl=document.getElementById('buchungen-list');if(!bl)return;
   let snap,scSnap,autosSnap;
   try{[snap,scSnap,autosSnap]=await Promise.all([
-    getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid),where('bookedBy','!=',null),orderBy('bookedBy'),orderBy('startTime'))),
+    getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid))),
     getDocs(query(collection(db,'schueler'),where('lehrerUid','==',currentUser.uid))),
     getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId))),
   ]);}catch(e){console.warn(e);bl.innerHTML='<p class="text-muted">Buchungen konnten nicht geladen werden.</p>';return;}
   const scm={},scAutoM={};scSnap.docs.forEach(d=>{const s=d.data();scm[d.id]=s.fname+' '+s.lname;scAutoM[d.id]=s.autoId||null;});
   const am={};autosSnap.docs.forEach(d=>{am[d.id]=d.data();});
-  if(snap.empty){bl.innerHTML='<p class="text-muted">Noch keine Buchungen.</p>';return;}
+  const bookedDocs=snap.docs.filter(d=>d.data().bookedBy).sort((a,b)=>{const ta=a.data().startTime,tb=b.data().startTime;return((ta&&ta.toMillis)?ta.toMillis():0)-((tb&&tb.toMillis)?tb.toMillis():0);});
+  if(!bookedDocs.length){bl.innerHTML='<p class="text-muted">Noch keine Buchungen.</p>';return;}
   bl.innerHTML='<table><thead><tr><th>Schüler</th><th>Datum</th><th>Zeit</th><th>Typ</th><th>Auto</th><th></th></tr></thead><tbody>'+
-    snap.docs.map(d=>{const s=d.data();const aid=scAutoM[s.bookedBy];const aStr=aid&&am[aid]?`<span class="auto-kennzeichen" style="font-size:10px">${am[aid].kennzeichen}</span>`:'—';
+    bookedDocs.map(d=>{const s=d.data();const aid=scAutoM[s.bookedBy];const aStr=aid&&am[aid]?`<span class="auto-kennzeichen" style="font-size:10px">${am[aid].kennzeichen}</span>`:'—';
       return`<tr><td>${scm[s.bookedBy]||'?'}</td><td>${fmt(s.startTime)}</td><td>${fmtTime(s.startTime)}–${fmtTime(s.endTime)}</td><td>${typeBadgeHtml(s.type)}</td><td>${aStr}</td>
         <td><button class="btn btn-danger btn-sm" onclick="cancelBookingLehrer('${d.id}')">Stornieren</button></td></tr>`;}).join('')+'</tbody></table>';
 }
@@ -1622,7 +1629,7 @@ window.cancelBookingLehrer=async function(id){
 // ════════════════════════════════
 pages['lehrer-schueler']=async function(el){
   el.innerHTML=`<div class="page active"><h1 class="page-title">Meine Schüler</h1><div id="ls-content"><div class="spinner"></div></div></div>`;
-  const[snap,autosSnap]=await Promise.all([getDocs(query(collection(db,'schueler'),where('lehrerUid','==',currentUser.uid))),getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId),orderBy('createdAt')))]);
+  const[snap,autosSnap]=await Promise.all([getDocs(query(collection(db,'schueler'),where('lehrerUid','==',currentUser.uid))),getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId)))]);
   const lsContent=document.getElementById('ls-content');
   if(snap.empty){lsContent.innerHTML='<p class="text-muted">Noch keine Schüler zugewiesen.</p>';return;}
   let html='';
@@ -1748,7 +1755,7 @@ window.adminOpenDayDetail=async function(year,month,day){
 // ════════════════════════════════
 function pruefungStatusBadge(status){const map={bestanden:'Bestanden',nicht_bestanden:'Nicht bestanden',ausstehend:'Ausstehend'};const cls=status==='nicht_bestanden'?'nicht-bestanden':status;return`<span class="badge badge-${cls}">${map[status]||status}</span>`;}
 function pruefungStatusDot(s){return{bestanden:'#5bba7a',nicht_bestanden:'#e05555',ausstehend:'#d4a843'}[s]||'#888';}
-async function loadPruefungenForSchueler(sid){const snap=await getDocs(query(collection(db,'pruefungen'),where('schuelerId','==',sid),orderBy('datum','desc')));return snap.docs.map(d=>({id:d.id,...d.data()}));}
+async function loadPruefungenForSchueler(sid){const snap=await getDocs(query(collection(db,'pruefungen'),where('schuelerId','==',sid)));return snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(b.datum||'').localeCompare(String(a.datum||'')));}
 function renderPruefungenList(list,canEdit,sid){
   if(!list.length)return'<p class="text-muted">Noch keine Prüfungen.</p>';
   return list.map(p=>{const ds=p.datum?new Date(p.datum+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'}):'—';
@@ -1807,9 +1814,9 @@ pages['admin-pruefungen']=async function(el){
 };
 let _apCache=[];
 async function loadAdminPruefungen(){
-  const[scSnap,pSnap,lSnap]=await Promise.all([getDocs(query(collection(db,'schueler'),where('schoolId','==',currentSchoolId))),getDocs(query(collection(db,'pruefungen'),where('schoolId','==',currentSchoolId),orderBy('datum','desc'))),getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId),where('role','==','lehrer')))]);
+  const[scSnap,pSnap,lSnap]=await Promise.all([getDocs(query(collection(db,'schueler'),where('schoolId','==',currentSchoolId))),getDocs(query(collection(db,'pruefungen'),where('schoolId','==',currentSchoolId))),getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId)))]);
   const lm={};lSnap.docs.forEach(d=>{const u=d.data();lm[d.id]=u.fname+' '+u.lname;});
-  const pbS={};pSnap.docs.forEach(d=>{const p={id:d.id,...d.data()};if(!pbS[p.schuelerId])pbS[p.schuelerId]=[];pbS[p.schuelerId].push(p);});
+  const pbS={};pSnap.docs.slice().sort((a,b)=>String(b.data().datum||'').localeCompare(String(a.data().datum||''))).forEach(d=>{const p={id:d.id,...d.data()};if(!pbS[p.schuelerId])pbS[p.schuelerId]=[];pbS[p.schuelerId].push(p);});
   _apCache=scSnap.docs.map(d=>({id:d.id,...d.data(),pruefungen:pbS[d.id]||[]}));
   const bestanden=_apCache.filter(s=>s.pruefungen.some(p=>p.status==='bestanden')).length;
   const stats=document.getElementById('ap-stats');
@@ -1839,12 +1846,14 @@ window.togglePruefungDetail=function(sid){const el=document.getElementById('pd-'
 // ════════════════════════════════
 pages['lehrer-warteliste']=async function(el){
   el.innerHTML=`<div class="page active"><h1 class="page-title">Warteliste</h1><div class="card"><div id="wl-list"><div class="spinner"></div></div></div></div>`;
-  const snap=await getDocs(query(collection(db,'warteliste'),where('lehrerUid','==',currentUser.uid),where('abgearbeitet','==',false),orderBy('createdAt')));
-  const wl=document.getElementById('wl-list');
-  if(snap.empty){wl.innerHTML='<p class="text-muted">Keine Einträge auf der Warteliste.</p>';return;}
-  const scIds=[...new Set(snap.docs.map(d=>d.data().schuelerId))];const scm={};
+  let snap;
+  try{snap=await getDocs(query(collection(db,'warteliste'),where('lehrerUid','==',currentUser.uid)));}catch(e){console.warn('warteliste-alt',e);const x=document.getElementById('wl-list');if(x)x.innerHTML='<p class="text-muted">⚠️ Konnte nicht geladen werden. Fehler: '+((e&&e.code)||(e&&e.message)||'?')+'</p>';return;}
+  const wl=document.getElementById('wl-list');if(!wl)return;
+  const docs=snap.docs.filter(d=>d.data().abgearbeitet!==true).sort((a,b)=>(((a.data().createdAt&&a.data().createdAt.seconds)||0)-((b.data().createdAt&&b.data().createdAt.seconds)||0)));
+  if(!docs.length){wl.innerHTML='<p class="text-muted">Keine Einträge auf der Warteliste.</p>';return;}
+  const scIds=[...new Set(docs.map(d=>d.data().schuelerId))];const scm={};
   for(const id of scIds){const s=await getDoc(doc(db,'schueler',id));if(s.exists())scm[id]=s.data();}
-  wl.innerHTML=snap.docs.map(d=>{const w=d.data();const s=scm[w.schuelerId];const name=s?`${s.fname} ${s.lname}`:'Unbekannt';const link=`${location.origin}${location.pathname}?schueler=${w.schuelerId}&lehrer=${currentUser.uid}`;
+  wl.innerHTML=docs.map(d=>{const w=d.data();const s=scm[w.schuelerId];const name=s?`${s.fname} ${s.lname}`:'Unbekannt';const link=`${location.origin}${location.pathname}?schueler=${w.schuelerId}&lehrer=${currentUser.uid}`;
     return`<div class="warteliste-row"><div><div class="warteliste-name">${name}</div><div class="warteliste-meta">${fmtDatetime(w.createdAt)}${w.notiz?' · '+escHtml(w.notiz):''}</div></div>
     <button class="copy-btn" onclick="copyLink('${link}')">🔗 Link</button><button class="btn btn-success btn-sm" onclick="removeFromWarteliste('${d.id}')">✓ Erledigt</button></div>`;}).join('');
 };
@@ -1855,7 +1864,7 @@ window.removeFromWarteliste=async function(id){await updateDoc(doc(db,'wartelist
 // ════════════════════════════════
 pages['lehrer-profil']=async function(el){
   el.innerHTML=`<div class="page active"><h1 class="page-title">Einstellungen</h1><div class="card"><div id="profil-content"><div class="spinner"></div></div></div></div>`;
-  const[autosSnap,pSnap]=await Promise.all([getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId),orderBy('createdAt'))),getDoc(doc(db,'kalenderUsers',currentUser.uid))]);
+  const[autosSnap,pSnap]=await Promise.all([getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId))),getDoc(doc(db,'kalenderUsers',currentUser.uid))]);
   const p=pSnap.data();const currentAutoId=p.autoId||'';const bd=p.blockDauer||60;
   const opts=`<option value="">— Kein Auto —</option>`+autosSnap.docs.map(d=>{const a=d.data();return`<option value="${d.id}" ${currentAutoId===d.id?'selected':''}>${a.modell} · ${a.kennzeichen}</option>`;}).join('');
   let autoHtml='';
@@ -1881,9 +1890,9 @@ window.saveLehrerProfil=async function(){
 // NOTIZEN
 // ════════════════════════════════
 async function loadNotizenHtml(sid,viewer){
-  const snap=await getDocs(query(collection(db,'notizen'),where('schuelerId','==',sid),orderBy('createdAt')));
+  const snap=await getDocs(query(collection(db,'notizen'),where('schuelerId','==',sid)));
   if(snap.empty)return'<p class="text-muted" style="margin-bottom:8px">Noch keine Notizen.</p>';
-  return snap.docs.map(d=>{const n=d.data();const isOwn=(viewer==='lehrer'&&n.von==='lehrer')||(viewer==='schueler'&&n.von==='schueler');
+  return snap.docs.slice().sort((a,b)=>(((a.data().createdAt&&a.data().createdAt.seconds)||0)-((b.data().createdAt&&b.data().createdAt.seconds)||0))).map(d=>{const n=d.data();const isOwn=(viewer==='lehrer'&&n.von==='lehrer')||(viewer==='schueler'&&n.von==='schueler');
     const auth=n.von==='lehrer'?('👨‍🏫 '+(n.lehrerName||'Fahrlehrer')):'🧑‍🎓 Schüler';
     const del=isOwn?`<button style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:12px" onclick="deleteNotiz('${d.id}','${sid}','${viewer}')">🗑</button>`:'';
     return`<div class="notiz-block"><div class="notiz-header"><span class="notiz-author">${auth}</span><span style="display:flex;gap:7px;align-items:center"><span class="notiz-date">${fmtDatetime(n.createdAt)}</span>${del}</span></div><div class="notiz-text">${escHtml(n.text)}</div></div>`;}).join('');}
