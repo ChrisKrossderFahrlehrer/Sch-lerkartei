@@ -316,8 +316,8 @@ tr:last-child td{border-bottom:none;}
     <div class="auth-sub">Kalender & Buchungssystem</div>
     <div id="kal-hinweis" style="display:none;background:rgba(255,180,0,0.12);border:1px solid rgba(255,180,0,0.4);border-radius:10px;padding:14px;margin-bottom:14px;font-size:0.9rem;line-height:1.5;color:#ffd479"></div>
     <div id="login-form">
-      <div class="field"><label>E-Mail</label><input id="login-email" type="email" placeholder="admin@fahrschule.de"></div>
-      <div class="field"><label>Passwort</label><input id="login-pw" type="password" placeholder="••••••••"></div>
+      <div class="field"><label>E-Mail</label><input id="login-email" type="email" placeholder="admin@fahrschule.de" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"></div>
+      <div class="field"><label>Passwort</label><input id="login-pw" type="password" placeholder="••••••••" autocomplete="current-password"></div>
       <button class="btn btn-primary btn-full" onclick="doLogin()">Anmelden</button>
       <div style="margin-top:14px;font-size:0.82rem;color:var(--text-muted,#999);line-height:1.5;text-align:center">Du nutzt dieselben Zugangsdaten wie in der Schülerkartei.<br>Ein neues Konto legst du in der Haupt-App an.</div>
     </div>
@@ -378,7 +378,7 @@ tr:last-child td{border-bottom:none;}
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, collection, query, where, orderBy, serverTimestamp, Timestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // ── FIREBASE CONFIG ──
@@ -581,7 +581,7 @@ window.switchAuthTab=function(tab){
 window.doLogin=async function(){
   const email=document.getElementById('login-email').value.trim();
   const pw=document.getElementById('login-pw').value;
-  try{await signInWithEmailAndPassword(auth,email,pw);}
+  try{await setPersistence(auth,browserLocalPersistence);await signInWithEmailAndPassword(auth,email,pw);}
   catch(e){toast('Anmeldung fehlgeschlagen: '+e.message,'error');}
 };
 window.doRegisterAdmin=async function(){
@@ -1348,7 +1348,7 @@ async function renderMonthCal(label,grid){
     const thisDate=new Date(year,month,d);
     const isToday=d===today.getDate()&&month===today.getMonth()&&year===today.getFullYear();
     const isBlocked=blockedSet.has(d);const isGlobal=blockedSet.has('g'+d);
-    const ft=getFeiertageName(thisDate,currentSchool?.bundesland);
+    const ft=getFeiertageName(thisDate,currentSchool?.bundesland||currentProfile?.bundesland);
     const urlaubEntry=urlaubCoversDate(urlaubList,thisDate);
     const slots=slotsByDay[d]||[];
     let dc='';
@@ -1407,7 +1407,7 @@ async function renderWeekCal(label,grid){
 window.openDayModal=async function(year,month,day){
   const date=new Date(year,month,day);
   const dateStr=date.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
-  const ft=getFeiertageName(date,currentSchool?.bundesland);
+  const ft=getFeiertageName(date,currentSchool?.bundesland||currentProfile?.bundesland);
   const [sSnap,bSnap,gbSnap,profSnap,uSnap]=await Promise.all([
     getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid))),
     getDocs(query(collection(db,'blocked'),where('lehrerUid','==',currentUser.uid),where('year','==',year),where('month','==',month),where('day','==',day))),
@@ -1922,12 +1922,21 @@ pages['lehrer-profil']=async function(el){
     <div class="field" style="max-width:180px"><label>Minuten pro Fahrstunde</label>
       <select id="lehrer-bd">${[45,50,60,75,80,90,100,120].map(m=>`<option value="${m}" ${bd===m?'selected':''}>${m} Min</option>`).join('')}</select>
     </div>
+    ${!currentSchoolId?`<hr class="divider">
+    <div class="card-title">📍 Bundesland</div>
+    <p class="text-muted" style="margin-bottom:10px;font-size:12px;line-height:1.5">Für die gesetzlichen Feiertage im Kalender. Wähle das Bundesland deines Standorts.</p>
+    <div class="field" style="max-width:260px"><label>Bundesland</label>
+      <select id="lehrer-bl"><option value="">— Bitte wählen —</option>${Object.entries(BUNDESLAENDER).map(([k,v])=>`<option value="${k}" ${p.bundesland===k?'selected':''}>${v}</option>`).join('')}</select>
+    </div>`:''}
     <button class="btn btn-primary" onclick="saveLehrerProfil()">Speichern</button>`;
 };
 window.saveLehrerProfil=async function(){
   const autoId=document.getElementById('lehrer-auto-sel').value;
   const bd=parseInt(document.getElementById('lehrer-bd').value)||60;
-  await updateDoc(doc(db,'kalenderUsers',currentUser.uid),{autoId:autoId||null,blockDauer:bd});
+  const upd={autoId:autoId||null,blockDauer:bd};
+  const blEl=document.getElementById('lehrer-bl');
+  if(blEl){upd.bundesland=blEl.value||null;if(currentProfile)currentProfile.bundesland=blEl.value||null;}
+  await updateDoc(doc(db,'kalenderUsers',currentUser.uid),upd);
   toast('Gespeichert!','success');pages['lehrer-profil'](document.getElementById('main-content'));
 };
 
