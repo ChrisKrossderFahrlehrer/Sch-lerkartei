@@ -423,6 +423,7 @@ let currentRole = null; // 'superadmin' | 'admin' | 'lehrer'
 let currentProfile = null;
 let currentSchoolId = null;
 let currentSchool = null;
+let istEinzelLehrer = false; // Fahrlehrer ohne echte Fahrschule (fahrschuleId fehlt → schoolId = eigene UID)
 let calDate = new Date();
 let calView = 'month';
 let weekStart = null;
@@ -539,8 +540,12 @@ window.unblockTime=async function(id,isOwn){
 
 async function loadTypes() {
   try {
-    const snap = await getDoc(doc(db,'settings','fahrstundenarten'));
-    fahrstundenarten = (snap.exists()&&snap.data().arten?.length) ? snap.data().arten : DEFAULT_ARTEN;
+    if (istEinzelLehrer) {
+      fahrstundenarten = (currentProfile && currentProfile.fahrstundenarten && currentProfile.fahrstundenarten.length) ? currentProfile.fahrstundenarten : DEFAULT_ARTEN;
+    } else {
+      const snap = await getDoc(doc(db,'settings','fahrstundenarten'));
+      fahrstundenarten = (snap.exists()&&snap.data().arten?.length) ? snap.data().arten : DEFAULT_ARTEN;
+    }
   } catch(e) { fahrstundenarten = DEFAULT_ARTEN; }
   injectTypeBadgeStyles();
 }
@@ -612,8 +617,7 @@ onAuthStateChanged(auth,async user=>{
   const params=new URLSearchParams(window.location.search);
   if(params.get('schueler')&&params.get('lehrer')){showBookingPage(params.get('schueler'),params.get('lehrer'));return;}
   if(!user){show('auth');return;}
-  currentUser=user;
-  try { await loadTypes(); } catch(e){ console.warn('loadTypes:',e); }
+  currentUser=user;istEinzelLehrer=false;
 
   // bestehendes kalenderUsers-Doc lesen (best effort)
   let snap=null;
@@ -657,6 +661,7 @@ onAuthStateChanged(auth,async user=>{
     const istInhaber = adkUser.rolle==='fahrschul-admin' || adkUser.rolle==='fs_admin';
     currentRole = istInhaber ? 'admin' : 'lehrer';
     currentSchoolId = fahrschuleId;
+    istEinzelLehrer = (currentRole==='lehrer') && !adkUser.fahrschuleId;
     const namensteile=(adkUser.name||user.email).split(' ');
     const fname=namensteile[0]||'Fahrlehrer';
     const lname=namensteile.slice(1).join(' ')||'';
@@ -690,6 +695,7 @@ onAuthStateChanged(auth,async user=>{
     document.getElementById('topbar-school').style.display='';
     document.getElementById('topbar-school-name').textContent=currentSchool.name;
   }
+  try { await loadTypes(); } catch(e){ console.warn('loadTypes:',e); }
   show('app');buildSidebar();
   navigate(currentRole==='superadmin'?'sa-dashboard':currentRole==='admin'?'admin-dashboard':'lehrer-kalender');
 });
@@ -1288,7 +1294,10 @@ window.addFahrstundenart=async function(){
 window.deleteFahrstundenart=async function(i){if(fahrstundenarten.length<=1)return toast('Mindestens eine Art.','error');fahrstundenarten.splice(i,1);await saveArten();renderArtenList();injectTypeBadgeStyles();};
 window.changeArtColor=async function(i,c){fahrstundenarten[i].color=c;await saveArten();renderArtenList();injectTypeBadgeStyles();};
 window.resetFahrstundenarten=async function(){if(!confirm('Zurücksetzen?'))return;fahrstundenarten=[...DEFAULT_ARTEN];await saveArten();renderArtenList();injectTypeBadgeStyles();toast('Zurückgesetzt.','success');};
-async function saveArten(){await setDoc(doc(db,'settings','fahrstundenarten'),{arten:fahrstundenarten});}
+async function saveArten(){
+  if(istEinzelLehrer){await updateDoc(doc(db,'kalenderUsers',currentUser.uid),{fahrstundenarten});if(currentProfile)currentProfile.fahrstundenarten=fahrstundenarten;}
+  else{await setDoc(doc(db,'settings','fahrstundenarten'),{arten:fahrstundenarten});}
+}
 
 // ════════════════════════════════
 // LEHRER – KALENDER
@@ -1656,7 +1665,7 @@ pages['lehrer-schueler']=async function(el){
   el.innerHTML=`<div class="page active"><h1 class="page-title">Meine Schüler</h1><div id="ls-content"><div class="spinner"></div></div></div>`;
   const[snap,autosSnap]=await Promise.all([getDocs(query(collection(db,'schueler'),where('lehrerUid','==',currentUser.uid))),getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId)))]);
   const lsContent=document.getElementById('ls-content');if(!lsContent)return;
-  const _canAdd=!currentSchoolId||(currentSchool&&currentSchool.lehrerDarfSchuelerAnlegen===true);
+  const _canAdd=istEinzelLehrer||(currentSchool&&currentSchool.lehrerDarfSchuelerAnlegen===true);
   const _addForm=_canAdd?`<div class="card" style="margin-bottom:14px">
     <div class="card-title">Neuen Schüler anlegen</div>
     <div class="grid-2"><div class="field"><label>Vorname</label><input id="lns-fname" type="text"></div><div class="field"><label>Nachname</label><input id="lns-lname" type="text"></div></div>
@@ -1922,13 +1931,33 @@ pages['lehrer-profil']=async function(el){
     <div class="field" style="max-width:180px"><label>Minuten pro Fahrstunde</label>
       <select id="lehrer-bd">${[45,50,60,75,80,90,100,120].map(m=>`<option value="${m}" ${bd===m?'selected':''}>${m} Min</option>`).join('')}</select>
     </div>
-    ${!currentSchoolId?`<hr class="divider">
+    ${istEinzelLehrer?`<hr class="divider">
     <div class="card-title">📍 Bundesland</div>
     <p class="text-muted" style="margin-bottom:10px;font-size:12px;line-height:1.5">Für die gesetzlichen Feiertage im Kalender. Wähle das Bundesland deines Standorts.</p>
     <div class="field" style="max-width:260px"><label>Bundesland</label>
       <select id="lehrer-bl"><option value="">— Bitte wählen —</option>${Object.entries(BUNDESLAENDER).map(([k,v])=>`<option value="${k}" ${p.bundesland===k?'selected':''}>${v}</option>`).join('')}</select>
     </div>`:''}
-    <button class="btn btn-primary" onclick="saveLehrerProfil()">Speichern</button>`;
+    <button class="btn btn-primary" onclick="saveLehrerProfil()">Speichern</button>${istEinzelLehrer?`<hr class="divider">
+    <div class="card-title">🎨 Meine Stundenarten</div>
+    <p class="text-muted" style="margin-bottom:10px;font-size:12px;line-height:1.5">Eigene Fahrstundenarten mit Farben — werden im Kalender verwendet.</p>
+    <div id="arten-list"></div>
+    <hr class="divider">
+    <div class="card-title">Neue Art</div>
+    <div class="grid-2"><div class="field"><label>Name</label><input id="na-label" placeholder="z.B. Überlandfahrt"></div><div class="field"><label>ID (keine Leerzeichen)</label><input id="na-id" placeholder="z.B. ueberland"></div></div>
+    <div class="field"><label>Farbe</label>
+      <div style="display:flex;align-items:center;gap:10px">
+        <input type="color" id="na-color" value="#5bba7a" style="width:44px;height:36px;border-radius:7px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;padding:2px;">
+        <div class="preset-colors" id="preset-colors"></div>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="addFahrstundenart()">Art hinzufügen</button>
+    <hr class="divider">
+    <button class="btn btn-danger" onclick="resetFahrstundenarten()">Auf Standard zurücksetzen</button>`:''}`;
+  if(istEinzelLehrer){
+    const _presets=['#4a90d9','#e07b30','#9b59b6','#2d6a8a','#5bba7a','#e05555','#d4a843','#e8748a','#50c8a8','#f0c040','#8b5cf6','#06b6d4'];
+    const _pc=document.getElementById('preset-colors');if(_pc)_pc.innerHTML=_presets.map(c=>`<div class="preset-color" style="background:${c}" onclick="document.getElementById('na-color').value='${c}'"></div>`).join('');
+    renderArtenList();
+  }
 };
 window.saveLehrerProfil=async function(){
   const autoId=document.getElementById('lehrer-auto-sel').value;
