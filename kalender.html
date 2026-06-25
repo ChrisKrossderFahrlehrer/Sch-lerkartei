@@ -732,7 +732,21 @@ function buildSidebar(){
   const items=currentRole==='superadmin'?saNav:currentRole==='admin'?adminNav:lehrerNav;
   nav.innerHTML=items.map(i=>`<button class="nav-item" id="nav-${i.id}" onclick="navigate('${i.id}')"><span class="nav-icon">${i.icon}</span><span class="nav-label">${i.label}</span></button>`).join('');
 }
+// ── Live-Updates: Listener pro Seite, beim Seitenwechsel automatisch abgemeldet ──
+let __pageUnsub=[];
+function liveOn(qy,cb){try{let first=true;const u=onSnapshot(qy,()=>{if(first){first=false;return;}try{cb();}catch(e){console.warn('live cb',e);}},e=>{first=false;});__pageUnsub.push(u);}catch(e){console.warn('liveOn',e);}}
+
+// ── Auto-Update nach Deploy: vergleicht Last-Modified der HTML ──
+let __loadedLM=0;try{const _lm=document.lastModified?new Date(document.lastModified).getTime():0;if(_lm&&!isNaN(_lm))__loadedLM=_lm;}catch(e){}
+let __updatePending=false;
+function __showUpdateBanner(){if(document.getElementById('update-banner'))return;const b=document.createElement('div');b.id='update-banner';b.textContent='🔄 Neue Version verfügbar – tippen zum Laden';b.style.cssText='position:fixed;left:12px;right:12px;bottom:calc(74px + var(--safe-bottom,0px));margin:0 auto;max-width:400px;z-index:99999;background:var(--green,#3fb950);color:#03210e;font-weight:700;text-align:center;padding:13px 16px;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.45);cursor:pointer;font-size:14px;';b.onclick=()=>location.reload();document.body.appendChild(b);}
+async function __checkForUpdate(){if(!__loadedLM)return;try{const r=await fetch(location.pathname+'?_cv='+Date.now(),{method:'HEAD',cache:'no-store'});const lm=r.headers.get('last-modified');if(!lm)return;const t=new Date(lm).getTime();if(t&&!isNaN(t)&&t>__loadedLM+2000){__updatePending=true;if(document.visibilityState==='visible')__showUpdateBanner();}}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){if(__updatePending){location.reload();return;}__checkForUpdate();}});
+setInterval(__checkForUpdate,240000);
+setTimeout(__checkForUpdate,15000);
+
 window.navigate=function(page){
+  __pageUnsub.forEach(u=>{try{u();}catch(e){}});__pageUnsub=[];
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const btn=document.getElementById('nav-'+page);if(btn)btn.classList.add('active');
   const main=document.getElementById('main-content');
@@ -1318,6 +1332,7 @@ pages['lehrer-kalender']=function(el){
     <div id="cal-grid"></div>
   </div></div>`;
   renderCal();
+  liveOn(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid)),()=>renderCal());
 };
 window.setCalView=function(v){calView=v;document.querySelectorAll('.cal-view-btn').forEach(b=>b.classList.toggle('active',b.textContent.trim()===(v==='month'?'Monat':'Woche')));renderCal();};
 window.calPrev=function(){if(calView==='month')calDate.setMonth(calDate.getMonth()-1);else weekStart=new Date(weekStart.getFullYear(),weekStart.getMonth(),weekStart.getDate()-7);renderCal();};
@@ -1506,6 +1521,11 @@ pages['lehrer-buchungen']=async function(el){
   await renderWarteliste();
   await renderNachrichten();
   await renderBestaetigteBuchungen();
+  const _rbuch=()=>{publishMyBookingLink();renderBookingOnline();renderBookingRequests();renderWarteliste();renderNachrichten();renderBestaetigteBuchungen();};
+  liveOn(query(collection(db,'bookingRequests'),where('lehrerUid','==',currentUser.uid)),_rbuch);
+  liveOn(query(collection(db,'bookingMessages'),where('lehrerUid','==',currentUser.uid)),_rbuch);
+  liveOn(query(collection(db,'bookingWaitlist'),where('lehrerUid','==',currentUser.uid)),_rbuch);
+  liveOn(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid)),_rbuch);
 };
 async function publishMyBookingLink(){
   try{
