@@ -661,7 +661,7 @@ onAuthStateChanged(auth,async user=>{
     const istInhaber = adkUser.rolle==='fahrschul-admin' || adkUser.rolle==='fs_admin';
     currentRole = istInhaber ? 'admin' : 'lehrer';
     currentSchoolId = fahrschuleId;
-    istEinzelLehrer = (currentRole==='lehrer') && !adkUser.fahrschuleId;
+    istEinzelLehrer = (currentRole==='lehrer') && (!adkUser.fahrschuleId || adkUser.fahrschuleId === user.uid);
     const namensteile=(adkUser.name||user.email).split(' ');
     const fname=namensteile[0]||'Fahrlehrer';
     const lname=namensteile.slice(1).join(' ')||'';
