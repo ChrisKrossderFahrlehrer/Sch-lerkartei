@@ -1722,7 +1722,7 @@ body.light .student-card { box-shadow:0 3px 0 rgba(16,24,40,0.12), 0 7px 16px rg
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider, verifyBeforeUpdateEmail } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getAuth, setPersistence, browserLocalPersistence, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider, verifyBeforeUpdateEmail } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, enableIndexedDbPersistence, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, getDocs, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -2065,12 +2065,33 @@ function validateUsername(u) {
   return /^[a-zA-Z0-9.\-]{3,30}$/.test(u);
 }
 
+// ── FaceID/Schlüsselbund: nach automatischem Ausfüllen direkt anmelden ──
+(function(){
+  const wire=()=>{
+    const u=document.getElementById('login-username'), p=document.getElementById('login-pw');
+    if(!u||!p){ setTimeout(wire,600); return; }
+    let typed=false, tried=false;
+    const mark=()=>{ typed=true; };
+    u.addEventListener('keydown',mark); p.addEventListener('keydown',mark);
+    const tryAuto=()=>{
+      if(tried||typed) return;
+      if(u.value.trim() && p.value.trim()){
+        tried=true;
+        setTimeout(()=>{ if(!typed && u.value.trim() && p.value.trim() && typeof window.doLogin==='function') window.doLogin(); }, 400);
+      }
+    };
+    u.addEventListener('input',tryAuto); p.addEventListener('input',tryAuto);
+  };
+  wire();
+})();
+
 window.doLogin = async () => {
   const eingabe = document.getElementById('login-username').value.trim();
   const pw = document.getElementById('login-pw').value;
   const btn = document.getElementById('btn-login');
   if (!eingabe || !pw) { setAuthError('Bitte Benutzername/E-Mail und Passwort eingeben.'); return; }
   btn.disabled = true; btn.textContent = '…';
+  try { await setPersistence(auth, browserLocalPersistence); } catch(e) { /* Persistenz best effort */ }
 
   // Mögliche E-Mail-Adressen sammeln, die wir nacheinander probieren
   const versuche = [];
