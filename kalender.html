@@ -379,7 +379,7 @@ tr:last-child td{border-bottom:none;}
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, collection, query, where, orderBy, serverTimestamp, Timestamp, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, collection, query, where, orderBy, serverTimestamp, Timestamp, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // ── FIREBASE CONFIG ──
 const firebaseConfig = {
@@ -1939,25 +1939,40 @@ window.removeFromWarteliste=async function(id){await updateDoc(doc(db,'wartelist
 pages['lehrer-profil']=async function(el){
   el.innerHTML=`<div class="page active"><h1 class="page-title">Einstellungen</h1><div class="card"><div id="profil-content"><div class="spinner"></div></div></div></div>`;
   const[autosSnap,pSnap]=await Promise.all([getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId))),getDoc(doc(db,'kalenderUsers',currentUser.uid))]);
-  const p=pSnap.data();const currentAutoId=p.autoId||'';const bd=p.blockDauer||60;
+  const p=pSnap.data();const currentAutoId=p.autoId||'';const bd=p.blockDauer||60;const sp=p.slotplan||{};
   const opts=`<option value="">— Kein Auto —</option>`+autosSnap.docs.map(d=>{const a=d.data();return`<option value="${d.id}" ${currentAutoId===d.id?'selected':''}>${a.modell} · ${a.kennzeichen}</option>`;}).join('');
   let autoHtml='';
   if(currentAutoId){const ca=autosSnap.docs.find(d=>d.id===currentAutoId);if(ca){const a=ca.data();autoHtml=`<div class="auto-card" style="margin-bottom:16px"><div class="auto-icon">🚗</div><div class="auto-info"><div class="auto-name">${a.modell}</div></div><span class="auto-kennzeichen">${a.kennzeichen}</span></div>`;}}
   document.getElementById('profil-content').innerHTML=`
     <div class="card-title">🚘 Mein Auto</div>${autoHtml}
     <div class="field"><label>Auto auswählen</label><select id="lehrer-auto-sel">${opts}</select></div>
-    <hr class="divider">
-    <div class="card-title">⏱️ Blockdauer</div>
-    <div class="field" style="max-width:180px"><label>Minuten pro Fahrstunde</label>
-      <select id="lehrer-bd">${[45,50,60,75,80,90,100,120].map(m=>`<option value="${m}" ${bd===m?'selected':''}>${m} Min</option>`).join('')}</select>
-    </div>
     ${istEinzelLehrer?`<hr class="divider">
     <div class="card-title">📍 Bundesland</div>
     <p class="text-muted" style="margin-bottom:10px;font-size:12px;line-height:1.5">Für die gesetzlichen Feiertage im Kalender. Wähle das Bundesland deines Standorts.</p>
     <div class="field" style="max-width:260px"><label>Bundesland</label>
       <select id="lehrer-bl"><option value="">— Bitte wählen —</option>${Object.entries(BUNDESLAENDER).map(([k,v])=>`<option value="${k}" ${p.bundesland===k?'selected':''}>${v}</option>`).join('')}</select>
     </div>`:''}
-    <button class="btn btn-primary" onclick="saveLehrerProfil()">Speichern</button>${istEinzelLehrer?`<hr class="divider">
+    <button class="btn btn-primary" onclick="saveLehrerProfil()">Speichern</button>
+    <hr class="divider">
+    <div class="card-title">🗓️ Slotplaner</div>
+    <p class="text-muted" style="margin-bottom:10px;font-size:12px;line-height:1.5">Arbeitszeit + Pause festlegen → daraus freie Buchungsblöcke erzeugen. Feiertage, dein Urlaub und Sperrtage werden ausgelassen; schon belegte Zeiten bleiben erhalten. Pause leer lassen = keine.</p>
+    <div class="grid-2">
+      <div class="field"><label>Arbeit von</label><input type="time" id="sp-von" value="${sp.von||'08:00'}"></div>
+      <div class="field"><label>Arbeit bis</label><input type="time" id="sp-bis" value="${sp.bis||'18:00'}"></div>
+    </div>
+    <div class="grid-2">
+      <div class="field"><label>Pause von</label><input type="time" id="sp-pause-von" value="${sp.pauseVon||''}"></div>
+      <div class="field"><label>Pause bis</label><input type="time" id="sp-pause-bis" value="${sp.pauseBis||''}"></div>
+    </div>
+    <div class="grid-2">
+      <div class="field"><label>Blocklänge (Min)</label><input type="number" id="lehrer-bd" min="15" step="5" value="${bd}"></div>
+      <div class="field"><label>Zeitraum</label><select id="sp-weeks"><option value="1">1 Woche</option><option value="2" selected>2 Wochen</option><option value="3">3 Wochen</option><option value="4">4 Wochen</option></select></div>
+    </div>
+    <div class="field"><label>Wochentage</label>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:4px">${['Mo','Di','Mi','Do','Fr','Sa','So'].map((dn,ix)=>{const wd=[1,2,3,4,5,6,0][ix];const on=(sp.tage||[1,2,3,4,5]).includes(wd);return `<label style="display:flex;align-items:center;gap:5px;font-size:14px"><input type="checkbox" class="sp-day" value="${wd}" ${on?'checked':''}>${dn}</label>`;}).join('')}</div>
+    </div>
+    <button class="btn btn-primary" id="sp-btn" onclick="generateSlots()">Blöcke erzeugen</button>
+    <button class="btn btn-danger" id="sp-clear" onclick="clearGeneratedSlots()" style="margin-top:8px">Erzeugte freie Blöcke löschen</button>${istEinzelLehrer?`<hr class="divider">
     <div class="card-title">🎨 Meine Stundenarten</div>
     <p class="text-muted" style="margin-bottom:10px;font-size:12px;line-height:1.5">Eigene Fahrstundenarten mit Farben — werden im Kalender verwendet.</p>
     <div id="arten-list"></div>
@@ -1987,6 +2002,76 @@ window.saveLehrerProfil=async function(){
   if(blEl){upd.bundesland=blEl.value||null;if(currentProfile)currentProfile.bundesland=blEl.value||null;}
   await updateDoc(doc(db,'kalenderUsers',currentUser.uid),upd);
   toast('Gespeichert!','success');pages['lehrer-profil'](document.getElementById('main-content'));
+};
+window.generateSlots=async function(){
+  const von=document.getElementById('sp-von').value, bis=document.getElementById('sp-bis').value;
+  const pVon=document.getElementById('sp-pause-von').value, pBis=document.getElementById('sp-pause-bis').value;
+  const blockMin=parseInt(document.getElementById('lehrer-bd').value)||60;
+  const weeks=parseInt(document.getElementById('sp-weeks').value)||2;
+  const tage=[...document.querySelectorAll('.sp-day:checked')].map(c=>parseInt(c.value));
+  if(!von||!bis)return toast('Arbeitszeit von und bis angeben.','error');
+  if(von>=bis)return toast('„Von" muss vor „Bis" liegen.','error');
+  if(!tage.length)return toast('Mindestens einen Wochentag wählen.','error');
+  if(pVon&&pBis&&pVon>=pBis)return toast('Pause: „von" muss vor „bis" liegen.','error');
+  if(blockMin<15)return toast('Blocklänge mind. 15 Min.','error');
+  const[vH,vM]=von.split(':').map(Number),[bH,bM]=bis.split(':').map(Number);
+  const startMin=vH*60+vM, endMin=bH*60+bM;
+  if(endMin-startMin<blockMin)return toast('Arbeitszeit ist kürzer als ein Block.','error');
+  let pStart=null,pEnd=null;
+  if(pVon&&pBis){const[ph,pm]=pVon.split(':').map(Number),[qh,qm]=pBis.split(':').map(Number);pStart=ph*60+pm;pEnd=qh*60+qm;}
+  const bl=(currentSchool&&currentSchool.bundesland)||(currentProfile&&currentProfile.bundesland)||null;
+  const btn=document.getElementById('sp-btn');if(btn){btn.disabled=true;btn.textContent='Erzeuge…';}
+  try{
+    try{await updateDoc(doc(db,'kalenderUsers',currentUser.uid),{blockDauer:blockMin,slotplan:{von,bis,pauseVon:pVon||'',pauseBis:pBis||'',tage}});if(currentProfile)currentProfile.blockDauer=blockMin;}catch(e){console.warn('slotplan save',e);}
+    const today=new Date();today.setHours(0,0,0,0);
+    const endDate=new Date(today);endDate.setDate(endDate.getDate()+weeks*7);
+    const existSnap=await getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid)));
+    const existing=new Set();existSnap.docs.forEach(d=>{const s=d.data();if(s.startTime&&s.startTime.toDate)existing.add(s.startTime.toDate().getTime());});
+    const urlSnap=await getDocs(query(collection(db,'urlaub'),where('lehrerUid','==',currentUser.uid)));
+    const urlaube=urlSnap.docs.map(d=>d.data()).filter(u=>u.von&&u.bis);
+    const blkSet=new Set();
+    try{const blkSnap=await getDocs(query(collection(db,'globalBlocked'),where('schoolId','==',currentSchoolId)));blkSnap.docs.forEach(d=>{const b=d.data();blkSet.add(b.year+'-'+b.month+'-'+b.day);});}catch(e){}
+    const pad=n=>String(n).padStart(2,'0');
+    const ops=[];let skippedDays=0,skippedExist=0;
+    for(let d=new Date(today); d<endDate; d.setDate(d.getDate()+1)){
+      if(!tage.includes(d.getDay()))continue;
+      const dayStr=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+      if(bl&&getFeiertageName(new Date(d),bl)){skippedDays++;continue;}
+      if(urlaube.some(u=>dayStr>=u.von&&dayStr<=u.bis)){skippedDays++;continue;}
+      if(blkSet.has(d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate())){skippedDays++;continue;}
+      for(let m=startMin; m+blockMin<=endMin; m+=blockMin){
+        if(pStart!==null&&m<pEnd&&(m+blockMin)>pStart)continue;
+        const st=new Date(d.getFullYear(),d.getMonth(),d.getDate(),Math.floor(m/60),m%60);
+        if(st.getTime()<Date.now())continue;
+        if(existing.has(st.getTime())){skippedExist++;continue;}
+        const em=m+blockMin;const et=new Date(d.getFullYear(),d.getMonth(),d.getDate(),Math.floor(em/60),em%60);
+        ops.push({st:Timestamp.fromDate(st),et:Timestamp.fromDate(et)});
+        existing.add(st.getTime());
+      }
+    }
+    let created=0,i=0;
+    while(i<ops.length){
+      const batch=writeBatch(db);
+      ops.slice(i,i+450).forEach(o=>{const ref=doc(collection(db,'slots'));batch.set(ref,{lehrerUid:currentUser.uid,type:'normal',startTime:o.st,endTime:o.et,bookedBy:null,schoolId:currentSchoolId,auto:true,createdAt:serverTimestamp()});});
+      await batch.commit();created+=Math.min(450,ops.length-i);i+=450;
+    }
+    try{await publishMyBookingLink();}catch(e){}
+    toast(created+' Blöcke erzeugt'+(skippedExist?', '+skippedExist+' schon vorhanden':'')+(skippedDays?', '+skippedDays+' Tage ausgelassen':'')+'.','success');
+  }catch(e){console.warn('generateSlots',e);toast('Fehler beim Erzeugen'+((e&&e.code)?' ('+e.code+')':'')+'.','error');}
+  if(btn){btn.disabled=false;btn.textContent='Blöcke erzeugen';}
+};
+window.clearGeneratedSlots=async function(){
+  if(!confirm('Alle selbst erzeugten, noch FREIEN Blöcke ab heute löschen? Gebuchte bleiben erhalten.'))return;
+  const btn=document.getElementById('sp-clear');if(btn){btn.disabled=true;btn.textContent='Lösche…';}
+  try{
+    const snap=await getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid)));
+    const now=Date.now();const dels=[];
+    snap.docs.forEach(d=>{const s=d.data();if(s.auto===true&&(s.bookedBy==null)&&s.startTime&&s.startTime.toDate&&s.startTime.toDate().getTime()>=now)dels.push(d.id);});
+    let i=0;while(i<dels.length){const batch=writeBatch(db);dels.slice(i,i+450).forEach(id=>batch.delete(doc(db,'slots',id)));await batch.commit();i+=450;}
+    try{await publishMyBookingLink();}catch(e){}
+    toast(dels.length+' freie Blöcke gelöscht.','success');
+  }catch(e){console.warn('clearGeneratedSlots',e);toast('Fehler beim Löschen.','error');}
+  if(btn){btn.disabled=false;btn.textContent='Erzeugte freie Blöcke löschen';}
 };
 
 // ════════════════════════════════
