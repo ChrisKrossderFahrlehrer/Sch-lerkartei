@@ -496,6 +496,9 @@ function _blockLabel(b){return b.grund==='sonstiges'?(b.label||'Gesperrt'):(((SP
 function _blockColor(b){return (SPERR_ARTEN[b.grund]||{}).color||'#888888';}
 function _blockZeit(b){return (b.ganztags===false&&b.vonMin!=null)?(_min2hhmm(b.vonMin)+'–'+_min2hhmm(b.bisMin)):'ganztägig';}
 function _slotBlocked(sd,sm,em,blocks){return blocks.some(b=>{if(b.year!==sd.getFullYear()||b.month!==sd.getMonth()||b.day!==sd.getDate())return false;if(b.ganztags!==false)return true;if(b.vonMin==null||b.bisMin==null)return true;return sm<b.bisMin&&em>b.vonMin;});}
+const MAX_FAHRZEIT_MIN=495;
+function slotsTotalMin(arr){return (arr||[]).reduce((s,o)=>{const zaehlt=o.bookedBy||o.auto!==true;if(!zaehlt)return s;const a=o.startTime&&o.startTime.toDate&&o.startTime.toDate(),b=o.endTime&&o.endTime.toDate&&o.endTime.toDate();return s+((a&&b)?Math.round((b-a)/60000):0);},0);}
+function fahrzeitBadge(min){const over=min>MAX_FAHRZEIT_MIN;return `<span style="color:${over?'#e05555':'var(--success,#3fb950)'};font-weight:700">${min} / ${MAX_FAHRZEIT_MIN} Min${over?' ⚠️ über Grenze':''}</span>`;}
 function blockFormHtml(year,month,day,lehrerUid){
   const opts=Object.keys(SPERR_ARTEN).map(k=>`<option value="${k}">${SPERR_ARTEN[k].label}</option>`).join('');
   return `<div class="field"><label>Grund</label><select id="blk-grund" onchange="document.getElementById('blk-label-wrap').style.display=this.value==='sonstiges'?'block':'none'">${opts}</select></div>
@@ -1376,6 +1379,8 @@ async function renderMonthCal(label,grid){
     const urlaubEntry=urlaubCoversDate(urlaubList,thisDate);
     const slots=slotsByDay[d]||[];
     let dc='';
+    const _fz=slotsTotalMin(slots);
+    if(_fz>0)dc+=`<div class="cal-slot" style="background:${_fz>MAX_FAHRZEIT_MIN?'rgba(224,85,85,.25)':'rgba(63,185,80,.18)'};color:${_fz>MAX_FAHRZEIT_MIN?'#e05555':'#3fb950'};font-size:8px;font-weight:700">⏱ ${_fz} Min${_fz>MAX_FAHRZEIT_MIN?' ⚠️':''}</div>`;
     if(ft)dc+=`<div class="cal-slot" style="background:rgba(212,168,67,.2);color:var(--accent2);font-size:8px">🎉 ${ft}</div>`;
     if(urlaubEntry)dc+=`<div class="cal-slot" style="background:rgba(91,186,122,.2);color:#5bba7a;font-size:8px">🏖️ ${urlaubEntry.label||'Urlaub'}</div>`;
     else if(isGlobal)dc+=`<div class="cal-slot" style="background:rgba(212,168,67,.15);color:var(--accent);font-size:8px">🏫 Gesperrt</div>`;
@@ -1458,22 +1463,25 @@ window.openDayModal=async function(year,month,day){
     ${blockListHtml(bSnap.docs.map(d=>({id:d.id,...d.data()})))}
     ${blockFormHtml(year,month,day,currentUser.uid)}
     <hr class="divider">
-    <div class="card-title">Slots</div>${slotsHtml}
+    <div class="card-title">Slots</div>
+    <p class="text-muted" style="margin:-2px 0 10px">Fahrzeit heute: ${fahrzeitBadge(slotsTotalMin(daySlots.map(d=>d.data())))}</p>${slotsHtml}
     <hr class="divider">
     <div class="card-title">Neuer Slot</div>
-    <p class="text-muted" style="margin-bottom:10px">Blockdauer: <strong>${blockDauer} Min</strong></p>
-    <div class="field"><label>Startzeit</label><input id="ns-from" type="time" value="08:00" oninput="updateEndTime(${blockDauer})"></div>
+    <div class="grid-2">
+      <div class="field"><label>Startzeit</label><input id="ns-from" type="time" value="08:00" oninput="updateEndTime()"></div>
+      <div class="field"><label>Dauer (Min)</label><input id="ns-dauer" type="number" min="15" step="5" value="${blockDauer}" oninput="updateEndTime()"></div>
+    </div>
     <div class="field"><label>Endzeit (auto)</label><input id="ns-to" type="time" value="09:00" style="opacity:.6" readonly></div>
     <div class="field"><label>Typ</label><select id="ns-type">${fahrstundenarten.map(t=>`<option value="${t.id}">${t.label}</option>`).join('')}</select></div>
     <button class="btn btn-primary" onclick="addSlot(${year},${month},${day})">Slot hinzufügen</button>`);
   setTimeout(()=>updateEndTime(blockDauer),50);
 };
-window.updateEndTime=function(bd){const f=document.getElementById('ns-from'),t=document.getElementById('ns-to');if(!f||!t||!f.value)return;const[h,m]=f.value.split(':').map(Number);const tot=h*60+m+bd;t.value=`${String(Math.floor(tot/60)%24).padStart(2,'0')}:${String(tot%60).padStart(2,'0')}`;};
+window.updateEndTime=function(bd){const f=document.getElementById('ns-from'),t=document.getElementById('ns-to'),dEl=document.getElementById('ns-dauer');if(!f||!t||!f.value)return;const dur=dEl?(parseInt(dEl.value)||60):(bd||60);const[h,m]=f.value.split(':').map(Number);const tot=h*60+m+dur;t.value=`${String(Math.floor(tot/60)%24).padStart(2,'0')}:${String(tot%60).padStart(2,'0')}`;};
 window.addSlot=async function(year,month,day){
   const from=document.getElementById('ns-from').value,type=document.getElementById('ns-type').value;
   if(!from)return toast('Bitte Startzeit angeben.','error');
-  const pSnap=await getDoc(doc(db,'kalenderUsers',currentUser.uid));
-  const bd=pSnap.exists()?(pSnap.data().blockDauer||60):60;
+  const bd=parseInt(document.getElementById('ns-dauer').value)||60;
+  if(bd<15)return toast('Dauer mindestens 15 Minuten.','error');
   const[fh,fm]=from.split(':').map(Number);const tot=fh*60+fm+bd;
   const st=Timestamp.fromDate(new Date(year,month,day,fh,fm));
   const et=Timestamp.fromDate(new Date(year,month,day,Math.floor(tot/60)%24,tot%60));
