@@ -1540,7 +1540,10 @@ async function publishMyBookingLink(){
     const snap=await getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid)));
     let _blocks=[];try{const _bs=await getDocs(query(collection(db,'blocked'),where('lehrerUid','==',currentUser.uid)));_blocks=_bs.docs.map(d=>({id:d.id,...d.data()}));}catch(e){}
     const nowMs=Date.now();
-    const freieSlots=snap.docs.filter(d=>{const s=d.data();if(s.bookedBy||!s.startTime||s.startTime.toDate().getTime()<nowMs)return false;const _sd=s.startTime.toDate(),_ed=s.endTime.toDate();return !_slotBlocked(_sd,_sd.getHours()*60+_sd.getMinutes(),_ed.getHours()*60+_ed.getMinutes(),_blocks);})
+    const _dayKey=dt=>dt.getFullYear()+'-'+dt.getMonth()+'-'+dt.getDate();
+    const _committedByDay={};
+    snap.docs.forEach(d=>{const s=d.data();if(!s.startTime||!s.startTime.toDate||!s.endTime||!s.endTime.toDate)return;if(!(s.bookedBy||s.auto!==true))return;const a=s.startTime.toDate();_committedByDay[_dayKey(a)]=(_committedByDay[_dayKey(a)]||0)+Math.round((s.endTime.toDate()-a)/60000);});
+    const freieSlots=snap.docs.filter(d=>{const s=d.data();if(s.bookedBy||!s.startTime||s.startTime.toDate().getTime()<nowMs)return false;const _sd=s.startTime.toDate(),_ed=s.endTime.toDate();if(_slotBlocked(_sd,_sd.getHours()*60+_sd.getMinutes(),_ed.getHours()*60+_ed.getMinutes(),_blocks))return false;const _dur=Math.round((_ed-_sd)/60000);const _wouldBe=(_committedByDay[_dayKey(_sd)]||0)+(s.auto===true?_dur:0);if(_wouldBe>MAX_FAHRZEIT_MIN)return false;return true;})
       .map(d=>{const s=d.data();return{id:d.id,start:s.startTime.toDate().toISOString(),ende:s.endTime.toDate().toISOString(),type:s.type||'fahrstunde'};});
     const lehrerName=(((currentProfile&&currentProfile.fname)||'')+' '+((currentProfile&&currentProfile.lname)||'')).trim();
     let aktiv=true;
@@ -1645,6 +1648,14 @@ window.bestaetigeBuchung=async function(reqId){
     const slotSnap=await getDoc(doc(db,'slots',req.slotId));
     if(!slotSnap.exists()){await updateDoc(doc(db,'bookingRequests',reqId),{status:'abgelehnt',grund:'Termin existiert nicht mehr',bearbeitetAt:serverTimestamp()});toast('Termin existiert nicht mehr.','error');renderBookingRequests();return;}
     if(slotSnap.data().bookedBy){await updateDoc(doc(db,'bookingRequests',reqId),{status:'abgelehnt',grund:'Termin bereits vergeben',bearbeitetAt:serverTimestamp()});toast('Termin ist bereits vergeben.','error');renderBookingRequests();renderBestaetigteBuchungen();return;}
+    const _ss=slotSnap.data();const _sd=_ss.startTime.toDate();
+    try{
+      const _aS=await getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid)));
+      const _dayS=_aS.docs.map(d=>({id:d.id,...d.data()})).filter(s=>{const t=s.startTime&&s.startTime.toDate&&s.startTime.toDate();return t&&t.getFullYear()===_sd.getFullYear()&&t.getMonth()===_sd.getMonth()&&t.getDate()===_sd.getDate();});
+      const _dur=Math.round((_ss.endTime.toDate()-_sd)/60000);
+      const _neu=slotsTotalMin(_dayS)+(_ss.auto===true?_dur:0);
+      if(_neu>MAX_FAHRZEIT_MIN){await updateDoc(doc(db,'bookingRequests',reqId),{status:'abgelehnt',grund:'Tagesgrenze von '+MAX_FAHRZEIT_MIN+' Min erreicht',bearbeitetAt:serverTimestamp()});toast('Tagesgrenze von '+MAX_FAHRZEIT_MIN+' Min erreicht – nicht bestätigt.','error');renderBookingRequests();renderBestaetigteBuchungen();return;}
+    }catch(e){console.warn('495-check',e);}
     await updateDoc(doc(db,'slots',req.slotId),{bookedBy:req.schuelerId,bookedAt:serverTimestamp()});
     if(req.tausch && req.swapSlotId){
       try{const oldSnap=await getDoc(doc(db,'slots',req.swapSlotId));if(oldSnap.exists()&&oldSnap.data().bookedBy===req.schuelerId){await updateDoc(doc(db,'slots',req.swapSlotId),{bookedBy:null,bookedAt:null});}}catch(e){}
