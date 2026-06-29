@@ -1726,8 +1726,9 @@ pages['lehrer-schueler']=async function(el){
     let autoHtml='';
     if(s.autoId){const ca=autosSnap.docs.find(x=>x.id===s.autoId);if(ca){const a=ca.data();autoHtml=`<span class="auto-kennzeichen" style="font-size:10px">${a.kennzeichen}</span> <span style="font-size:11px;color:var(--text-muted)">${a.modell}</span>`;}}
     const autoOptsS=`<option value="">— Kein Auto —</option>`+autosSnap.docs.map(x=>{const a=x.data();return`<option value="${x.id}" ${s.autoId===x.id?'selected':''}>${a.modell} · ${a.kennzeichen}</option>`;}).join('');
-    const notizenHtml=await loadNotizenHtml(d.id,'lehrer');
-    const pruefungen=await loadPruefungenForSchueler(d.id);
+    let notizenHtml='',pruefungen=[];
+    try{notizenHtml=await loadNotizenHtml(d.id,'lehrer');}catch(e){console.warn('notizen',e);}
+    try{pruefungen=await loadPruefungenForSchueler(d.id);}catch(e){console.warn('pruefungen',e);}
     const letzteStatus=pruefungen.length?pruefungen[0].status:null;
     html+=`<div class="card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:14px">
@@ -1852,7 +1853,7 @@ window.adminOpenDayDetail=async function(year,month,day){
 // ════════════════════════════════
 function pruefungStatusBadge(status){const map={bestanden:'Bestanden',nicht_bestanden:'Nicht bestanden',ausstehend:'Ausstehend'};const cls=status==='nicht_bestanden'?'nicht-bestanden':status;return`<span class="badge badge-${cls}">${map[status]||status}</span>`;}
 function pruefungStatusDot(s){return{bestanden:'#5bba7a',nicht_bestanden:'#e05555',ausstehend:'#d4a843'}[s]||'#888';}
-async function loadPruefungenForSchueler(sid){const snap=await getDocs(query(collection(db,'pruefungen'),where('schuelerId','==',sid)));return snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(b.datum||'').localeCompare(String(a.datum||'')));}
+async function loadPruefungenForSchueler(sid){const snap=await getDocs(query(collection(db,'pruefungen'),where('schuelerId','==',sid),where('schoolId','==',currentSchoolId)));return snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(b.datum||'').localeCompare(String(a.datum||'')));}
 function renderPruefungenList(list,canEdit,sid){
   if(!list.length)return'<p class="text-muted">Noch keine Prüfungen.</p>';
   return list.map(p=>{const ds=p.datum?new Date(p.datum+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'}):'—';
@@ -2101,7 +2102,7 @@ window.clearGeneratedSlots=async function(){
 // NOTIZEN
 // ════════════════════════════════
 async function loadNotizenHtml(sid,viewer){
-  const snap=await getDocs(query(collection(db,'notizen'),where('schuelerId','==',sid)));
+  const snap=await getDocs(query(collection(db,'notizen'),where('schuelerId','==',sid),where('lehrerUid','==',currentUser.uid)));
   if(snap.empty)return'<p class="text-muted" style="margin-bottom:8px">Noch keine Notizen.</p>';
   return snap.docs.slice().sort((a,b)=>(((a.data().createdAt&&a.data().createdAt.seconds)||0)-((b.data().createdAt&&b.data().createdAt.seconds)||0))).map(d=>{const n=d.data();const isOwn=(viewer==='lehrer'&&n.von==='lehrer')||(viewer==='schueler'&&n.von==='schueler');
     const auth=n.von==='lehrer'?('👨‍🏫 '+(n.lehrerName||'Fahrlehrer')):'🧑‍🎓 Schüler';
