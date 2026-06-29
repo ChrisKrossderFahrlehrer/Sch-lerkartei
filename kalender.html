@@ -244,9 +244,10 @@ tr:last-child td{border-bottom:none;}
   .topbar{padding:0 14px;height:50px;}
   .topbar-user{display:none;}
   .layout{flex-direction:column;}
-  .sidebar{width:100%;min-height:unset;border-right:none;border-top:1px solid var(--border);padding:6px 6px env(safe-area-inset-bottom);position:fixed;bottom:0;left:0;right:0;z-index:99;display:flex;flex-direction:row;overflow-x:auto;gap:2px;}
+  .sidebar{width:100%;min-height:unset;border-right:none;border-top:1px solid var(--border);padding:6px 6px env(safe-area-inset-bottom);position:fixed;bottom:0;left:0;right:0;z-index:99;display:flex;flex-direction:row;overflow-x:auto;gap:2px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+  .sidebar::-webkit-scrollbar{display:none;}
   .nav-section{display:none;}
-  .nav-item{flex-direction:column;gap:3px;padding:6px 3px;min-width:0;font-size:9px;text-align:center;border-radius:8px;white-space:nowrap;flex:1;}
+  .nav-item{flex-direction:column;gap:3px;padding:6px 7px;min-width:62px;font-size:9px;text-align:center;border-radius:8px;white-space:nowrap;flex:0 0 auto;}
   .nav-label{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .nav-icon{font-size:17px;width:auto;}
   .main{padding:14px 10px;padding-bottom:85px;}
@@ -1743,7 +1744,7 @@ pages['lehrer-schueler']=async function(el){
         </div>
         <button class="copy-btn" onclick="copyLink('${link}')">🔗 Buchungslink</button>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
+      <div class="grid-3" style="gap:16px">
         <div>
           <div class="card-title" style="margin-bottom:10px">🚗 Auto</div>
           <div class="field" style="margin-bottom:7px"><select id="auto-sel-${d.id}">${autoOptsS}</select></div>
