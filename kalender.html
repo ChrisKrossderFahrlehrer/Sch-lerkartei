@@ -681,6 +681,8 @@ onAuthStateChanged(auth,async user=>{
           createdAt:serverTimestamp()
         });
       } catch(e){ console.warn('kalenderUsers anlegen:',e); }
+    } else if(snap.data().schoolId !== fahrschuleId){
+      try { await updateDoc(doc(db,'kalenderUsers',user.uid),{schoolId:fahrschuleId}); if(currentProfile)currentProfile.schoolId=fahrschuleId; } catch(e){ console.warn('kalenderUsers schoolId-Fix:',e); }
     }
 
     // Kalender-eigenes School-Objekt (für Topbar), best effort
@@ -1702,7 +1704,9 @@ window.cancelBookingLehrer=async function(id){
 // ════════════════════════════════
 pages['lehrer-schueler']=async function(el){
   el.innerHTML=`<div class="page active"><h1 class="page-title">Meine Schüler</h1><div id="ls-content"><div class="spinner"></div></div></div>`;
-  const[snap,autosSnap]=await Promise.all([getDocs(query(collection(db,'schueler'),where('lehrerUid','==',currentUser.uid))),getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId)))]);
+  let snap={docs:[]},autosSnap={docs:[]};
+  try{snap=await getDocs(query(collection(db,'schueler'),where('lehrerUid','==',currentUser.uid)));}catch(e){console.warn('schueler read',e);}
+  try{autosSnap=await getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId)));}catch(e){console.warn('autos read',e);}
   const lsContent=document.getElementById('ls-content');if(!lsContent)return;
   const _canAdd=istEinzelLehrer||(currentSchool&&currentSchool.lehrerDarfSchuelerAnlegen===true);
   const _addForm=_canAdd?`<div class="card" style="margin-bottom:14px">
