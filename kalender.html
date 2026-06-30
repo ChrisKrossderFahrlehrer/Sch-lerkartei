@@ -24,7 +24,7 @@
 body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-height:100vh;font-size:15px;}
 
 /* ── Auth ── */
-#auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 60% 20%,#1e1608 0%,#0f0f0f 60%);}
+#auth-screen{min-height:100vh;display:none;align-items:center;justify-content:center;background:radial-gradient(ellipse at 60% 20%,#1e1608 0%,#0f0f0f 60%);}
 .auth-box{width:400px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:36px;}
 .auth-logo{font-family:var(--font-display);font-size:26px;color:var(--accent);margin-bottom:4px;}
 .auth-logo-img{display:block;width:128px;height:128px;margin:0 auto 10px;object-fit:contain;}
@@ -52,6 +52,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 
 /* ── App Layout ── */
 #app{display:none;min-height:100vh;flex-direction:column;}
+  #splash{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:radial-gradient(ellipse at 50% 30%,#0d1520 0%,#0f0f0f 70%);}
+  .spinner-lg{width:42px;height:42px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;}
 .topbar{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:56px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
 .topbar-brand{font-family:var(--font-display);font-size:19px;color:var(--accent);}
 .topbar-role{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);background:var(--surface2);padding:3px 9px;border-radius:20px;}
@@ -314,6 +316,8 @@ tr:last-child td{border-bottom:none;}
 </style>
 </head>
 <body>
+
+<div id="splash"><div class="spinner-lg"></div><div style="color:var(--text-muted,#999);font-size:.92rem">Anmeldung wird geladen…</div></div>
 
 <!-- AUTH -->
 <div id="auth-screen">
@@ -583,6 +587,7 @@ function fmtDatetime(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(
 function escHtml(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function generateCode(){return Math.random().toString(36).substring(2,8).toUpperCase();}
 function show(screen){
+  document.getElementById('splash').style.display=screen==='splash'?'flex':'none';
   document.getElementById('auth-screen').style.display=screen==='auth'?'flex':'none';
   document.getElementById('app').style.display=screen==='app'?'flex':'none';
   document.getElementById('booking-screen').style.display=screen==='booking'?'flex':'none';
@@ -622,7 +627,10 @@ function zeigeKalenderHinweis(msg){
   const h=document.getElementById('kal-hinweis');
   if(h){ h.style.display='block'; h.innerHTML=msg; }
 }
+let __authResolved=false;
+setTimeout(()=>{ if(!__authResolved) show('auth'); }, 12000);
 onAuthStateChanged(auth,async user=>{
+  __authResolved=true;
   const params=new URLSearchParams(window.location.search);
   if(params.get('schueler')&&params.get('lehrer')){showBookingPage(params.get('schueler'),params.get('lehrer'));return;}
   if(!user){show('auth');return;}
