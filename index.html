@@ -6454,6 +6454,10 @@ window.closeProtokoll = () => {
 let protoKalMonat   = new Date().getMonth();
 let protoKalJahr    = new Date().getFullYear();
 let protoGewaehltesDatum = null; // 'YYYY-MM-DD'
+// FIX: Screen-Kalender-State (protokollKal*) war nicht deklariert - Umbenennung unvollstaendig.
+// Ohne Deklaration -> ReferenceError im strict mode -> Protokoll-Screen + Kalender oeffnen nicht.
+let protokollKalMonat = new Date().getMonth();
+let protokollKalJahr  = new Date().getFullYear();
 
 // Modal öffnen + Kalender rendern
 window.openNeuerEintrag = () => {
