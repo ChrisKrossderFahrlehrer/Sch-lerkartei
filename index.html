@@ -5890,6 +5890,10 @@ function renderEigenThemaRow(t, s) {
     +'</div>';
 }
 
+// FIX(Audit): escHtml war nirgends definiert (halbe Umbenennung) -> PDF-Export,
+// Lernziele- und Broadcast-Rendering crashten mit ReferenceError beim Aufruf.
+// Alias auf vorhandene Escape-Funktion; function-Hoisting macht ihn ueberall nutzbar.
+function escHtml(s) { return escapeHtmlEigen(s); }
 function escapeHtmlEigen(str) {
   return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
@@ -6474,6 +6478,10 @@ window.openNeuerEintrag = () => {
   document.getElementById('proto-datum-zeile').style.display = 'none';
   document.getElementById('proto-form').style.display = 'none';
   document.getElementById('protokoll-modal').classList.add('open');
+  // FIX(Audit): initSignaturePad() wurde nie aufgerufen -> Unterschrift-Canvas ohne
+  // Pointer-Events, Unterschreiben war unmoeglich. Einmalige Init nach Modal-Layout
+  // (gleiches Muster wie initAbschlussSigPad); Guard verhindert doppelte Listener.
+  if (!sigCanvas) setTimeout(() => initSignaturePad(), 120);
   renderProtoKalender();
 };
 
@@ -7277,6 +7285,9 @@ window.closeChat = () => {
   document.getElementById('screen-detail').classList.add('active');
 };
 
+// FIX(Audit): onclick="loadChatMessages()" im Chat lief ins Leere, da Modul-
+// Funktionen nicht global sind. Wrapper exponiert die gehoistete Funktion.
+window.loadChatMessages = () => loadChatMessages();
 function loadChatMessages() {
   if (unsubChat) unsubChat();
   const messagesEl = document.getElementById('chat-messages');
