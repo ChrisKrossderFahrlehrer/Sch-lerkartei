@@ -3,7 +3,7 @@
 ╔══════════════════════════════════════════════════════════════════════╗
 ║                                                                        ║
 ║   ADK – DIGITALE KARTEI                                                 ║
-║   © 2026 ChrisKross der Fahrlehrer (Chriskoo) · fahrschülerkartei.de    ║
+║   © 2026 ChrisKross der Fahrlehrer (Chriskoo) · fahrsync.de    ║
 ║                                                                        ║
 ║   ════════════════ ALLE RECHTE VORBEHALTEN ════════════════           ║
 ║                                                                        ║
@@ -21,7 +21,7 @@
 ║   (§ 106 UrhG: Freiheitsstrafe bis zu 3 Jahren oder Geldstrafe).       ║
 ║                                                                        ║
 ║   Dieser Code wird laufend überwacht. Verstöße werden dokumentiert     ║
-║   und rechtlich geahndet. Kontakt: chriskoo@mail.de                    ║
+║   und rechtlich geahndet. Kontakt: kontakt@fahrsync.de                    ║
 ║                                                                        ║
 ╚══════════════════════════════════════════════════════════════════════╝
 -->
@@ -2310,14 +2310,14 @@ function sendRegistrationNotification({ name, email, username, typ, code }) {
   try {
     emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
     emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
-      to_email: 'chriskoo@mail.de',
+      to_email: 'kontakt@fahrsync.de',
       fs_name:  (typ ? '[' + typ + '] ' : '') + name,
       inhaber:  name,
       email:    email,
       stadt:    'Benutzername: ' + username + (code ? ' · Fahrschul-Code: ' + code : ''),
       datum:    new Date().toLocaleString('de-DE'),
-      link:     'https://fahrschuelerkartei.de/adk-platform.html'
-    }).then(() => console.log('✅ Registrierungs-Info an chriskoo@mail.de gesendet'))
+      link:     'https://fahrsync.de/adk-platform.html'
+    }).then(() => console.log('✅ Registrierungs-Info an kontakt@fahrsync.de gesendet'))
       .catch(err => console.error('EmailJS:', err));
   } catch(e) { console.error('EmailJS Init:', e); }
 }
@@ -2356,7 +2356,7 @@ window.requestPasswordReset = async () => {
       try {
         emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
         emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
-          to_email: 'chriskoo@mail.de',
+          to_email: 'kontakt@fahrsync.de',
           fs_name:  '🔑 PASSWORT-RESET ANFRAGE',
           inhaber:  username,
           email:    kontakt,
@@ -6793,8 +6793,8 @@ window.openImpressum = async () => {
   const strasse = '';
   const ort     = platImp.ort    || 'Deutschland';
   const tel     = '';
-  const email   = platImp.email  || 'chriskoo@mail.de';
-  const web     = platImp.web    || 'fahrschülerkartei.de';
+  const email   = platImp.email  || 'kontakt@fahrsync.de';
+  const web     = platImp.web    || 'fahrsync.de';
   const fsnr    = '';
 
   const logoHTML = fsLogo
@@ -6866,7 +6866,7 @@ window.openImpressum = async () => {
         <div style="font-size:0.84rem;line-height:1.7;color:var(--muted)">
           Die Software <strong style="color:var(--text)">„ADK – Digitale Kartei"</strong> ist urheberrechtlich geschützt.<br><br>
           <strong style="color:var(--text)">Entwicklung & Eigentumsrecht:</strong><br>
-          ADK – Digitale Kartei wurde entwickelt von <strong style="color:var(--accent)">Chriskoo</strong> (fahrschülerkartei.de). Alle Rechte vorbehalten.<br><br>
+          ADK – Digitale Kartei wurde entwickelt von <strong style="color:var(--accent)">Chriskoo</strong> (fahrsync.de). Alle Rechte vorbehalten.<br><br>
           <strong style="color:var(--text)">Nutzungslizenz:</strong><br>
           Die Nutzung der App erfolgt auf Basis einer nicht-übertragbaren Einzellizenz. Die Lizenz berechtigt ausschließlich zur bestimmungsgemäßen Nutzung als digitale Fahrschülerverwaltung.<br><br>
           <strong style="color:var(--text)">Verboten ist:</strong><br>
@@ -6905,7 +6905,7 @@ window.openImpressum = async () => {
     <div style="background:rgba(240,180,41,0.08);border:1px solid rgba(240,180,41,0.2);border-radius:12px;padding:14px;margin-top:4px">
       <div style="font-size:0.78rem;line-height:1.6;color:var(--muted);text-align:center">
         <strong style="color:var(--accent)">ADK – Digitale Kartei</strong><br>
-        Entwickelt von ${platImp.name||'Chriskoo'} · ${platImp.web||'fahrschülerkartei.de'}<br>
+        Entwickelt von ${platImp.name||'Chriskoo'} · ${platImp.web||'fahrsync.de'}<br>
         © ${new Date().getFullYear()} ${platImp.name||'Chriskoo'} · Alle Rechte vorbehalten<br>
         <span style="font-size:0.7rem">Version 1.0 · Powered by Firebase · Made in Germany 🇩🇪</span>
       </div>
