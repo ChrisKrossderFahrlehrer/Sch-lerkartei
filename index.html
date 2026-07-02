@@ -565,6 +565,7 @@ body.light .student-card { box-shadow:0 3px 0 rgba(16,24,40,0.12), 0 7px 16px rg
 </style>
 </head>
 <body>
+<div id="demo-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:var(--accent);color:#0d1117;padding:6px 12px;font-size:0.76rem;font-weight:700;align-items:center;justify-content:center;gap:10px"><span>🎮 DEMO – Änderungen werden nicht gespeichert</span><button onclick="endDemo()" style="background:#0d1117;color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:0.7rem;font-weight:700;cursor:pointer">Beenden</button></div>
 
 <!-- OFFLINE-BANNER -->
 <div id="offline-bar" style="display:none;position:fixed;top:0;left:0;right:0;z-index:8000;background:#f0b429;color:#0d1117;padding:8px 16px;font-size:0.78rem;font-weight:700;align-items:center;justify-content:center;gap:8px;font-family:'Manrope',sans-serif">
@@ -750,6 +751,7 @@ body.light .student-card { box-shadow:0 3px 0 rgba(16,24,40,0.12), 0 7px 16px rg
         <input class="form-input" id="login-pw" type="password" placeholder="••••••••" autocomplete="current-password">
       </div>
       <button class="btn-main" id="btn-login" onclick="doLogin()">Anmelden</button>
+      <button class="btn-secondary" onclick="startDemo()" style="margin-top:10px">🎮 Demo ansehen (24 h)</button>
       <div style="text-align:center;margin-top:10px">
         <button onclick="openPwReset()" style="background:none;border:none;color:var(--muted);
           font-size:0.78rem;cursor:pointer;text-decoration:underline;font-family:'Manrope',sans-serif">
@@ -2024,6 +2026,73 @@ let customThemen = [];
 let customGruppen = [];
 let unsubGruppen = null;
 let protokollEintraege = []; // { id, datum, notiz, fortschritt }
+
+/* ==== DEMO-MODUS (lokal, nichts wird gespeichert) ==== */
+window.__DEMO = false;
+window.__DEMO_PROTO = {};
+window.__demoWrite = (op, args) => {
+  try {
+    const ref = args[0] || {}; const seg = (ref.path||'').split('/');
+    const coll = seg[0], id = seg[1], data = args[1] || {};
+    const nid = 'demo-' + Math.random().toString(36).slice(2,9);
+    if (op === 'add') {
+      if (coll === 'students') { students.push({ id:nid, ...data }); try{renderList();}catch(e){} }
+      else if (coll === 'protokoll') { protokollEintraege.push({ id:nid, ...data }); const sid=data.studentId; (window.__DEMO_PROTO[sid]=window.__DEMO_PROTO[sid]||[]).push({ id:nid, ...data }); try{renderProtokollScreen();}catch(e){} }
+      demoHinweis(); return Promise.resolve({ id:nid });
+    }
+    if (op === 'set' || op === 'upd') {
+      if (coll === 'students' && id) { const s = students.find(x=>x.id===id); if (s) Object.assign(s, data); try{renderList();}catch(e){} if (activeId===id){ try{renderDetail();}catch(e){} } }
+      demoHinweis(); return Promise.resolve();
+    }
+    if (op === 'del') {
+      if (coll === 'students' && id) { students = students.filter(x=>x.id!==id); try{renderList();}catch(e){} }
+      else if (coll === 'protokoll' && id) { protokollEintraege = protokollEintraege.filter(x=>x.id!==id); try{renderProtokollScreen();}catch(e){} }
+      demoHinweis(); return Promise.resolve();
+    }
+  } catch(e) { console.warn('demoWrite', e); }
+  demoHinweis(); return Promise.resolve({ id:'demo-x' });
+};
+let __demoHinweisTs = 0;
+function demoHinweis(){ const n=Date.now(); if(n-__demoHinweisTs>2500){ __demoHinweisTs=n; try{ toast('\U0001F3AE Demo \u2013 wird nicht gespeichert'); }catch(e){} } }
+const dbAdd = (...a) => window.__DEMO ? window.__demoWrite('add', a) : addDoc(...a);
+const dbSet = (...a) => window.__DEMO ? window.__demoWrite('set', a) : setDoc(...a);
+const dbUpd = (...a) => window.__DEMO ? window.__demoWrite('upd', a) : updateDoc(...a);
+const dbDel = (...a) => window.__DEMO ? window.__demoWrite('del', a) : deleteDoc(...a);
+function __demoDaten(){
+  const now=Date.now(), nm=(d)=>now-d*86400000, base=new Date();
+  const iso=(o)=>{ const x=new Date(base); x.setDate(x.getDate()+o); return x.toISOString().slice(0,10); };
+  const students=[
+    { id:'demo-s1', uid:'demo-user', fahrschuleId:'demo-user', schuelerNr:1, vorname:'Lena', nachname:'Bauer', geburt:'2006-04-12', klasse:'B', klassen:['B'], ziel:30, fahrstunden:14, sonderfahrten:3, theorieBestanden:true, archiviert:false, pinned:true, createdAt:nm(40) },
+    { id:'demo-s2', uid:'demo-user', fahrschuleId:'demo-user', schuelerNr:2, vorname:'Jonas', nachname:'Klein', geburt:'2005-09-30', klasse:'B', klassen:['B'], ziel:30, fahrstunden:6, sonderfahrten:0, theorieBestanden:false, archiviert:false, pinned:false, createdAt:nm(20) },
+    { id:'demo-s3', uid:'demo-user', fahrschuleId:'demo-user', schuelerNr:3, vorname:'Mia', nachname:'Schulz', geburt:'2004-01-18', klasse:'BE', klassen:['BE'], ziel:12, fahrstunden:9, sonderfahrten:2, theorieBestanden:true, archiviert:false, pinned:false, createdAt:nm(10) }
+  ];
+  const proto={
+    'demo-s1':[
+      { id:'demo-p1', studentId:'demo-s1', uid:'demo-user', datum:iso(-7), notiz:'Einparken geuebt, klappt gut.', maengel:['Schulterblick'], sterne:4, stunde:12, fortschritt:70, unterschrift:null, typ:'fahrstunde', createdAt:nm(7) },
+      { id:'demo-p2', studentId:'demo-s1', uid:'demo-user', datum:iso(-3), notiz:'Autobahn, sehr sicher.', maengel:[], sterne:5, stunde:14, fortschritt:78, unterschrift:null, typ:'fahrstunde', createdAt:nm(3) },
+      { id:'demo-p3', studentId:'demo-s1', uid:'demo-user', datum:iso(3), notiz:'Naechste Stunde: Nachtfahrt.', maengel:[], sterne:0, stunde:0, fortschritt:0, unterschrift:null, typ:'planung', createdAt:now }
+    ],
+    'demo-s2':[ { id:'demo-p4', studentId:'demo-s2', uid:'demo-user', datum:iso(-5), notiz:'Erste Stunden, Grundlagen.', maengel:['Kupplung'], sterne:3, stunde:6, fortschritt:20, unterschrift:null, typ:'fahrstunde', createdAt:nm(5) } ],
+    'demo-s3':[ { id:'demo-p5', studentId:'demo-s3', uid:'demo-user', datum:iso(-2), notiz:'Anhaenger rangieren.', maengel:['Rueckwaerts'], sterne:4, stunde:9, fortschritt:75, unterschrift:null, typ:'fahrstunde', createdAt:nm(2) } ]
+  };
+  return { students, proto };
+}
+window.startDemo = () => {
+  const DEMO_MS=24*60*60*1000, now=Date.now();
+  let s=0; try{ s=parseInt(localStorage.getItem('demo_start')||'0',10)||0; }catch(e){}
+  if (s && now-s>DEMO_MS){ setAuthError('\U0001F3AE Dein Demo-Zeitraum (24 h) ist abgelaufen. Registriere dich kostenlos, um weiterzumachen.'); return; }
+  if (!s){ try{ localStorage.setItem('demo_start', String(now)); }catch(e){} }
+  window.__DEMO = true;
+  currentUser = { uid:'demo-user', email:'demo@fahrsync.de', displayName:'Demo-Fahrlehrer', _fahrschuleId:'demo-user', _rolle:'fahrlehrer', _fsName:'Demo-Fahrschule', _kalenderAktiv:false };
+  const d = __demoDaten(); students = d.students; window.__DEMO_PROTO = d.proto;
+  document.querySelectorAll('.screen').forEach(sc => { sc.classList.remove('active'); sc.style.display=''; });
+  document.getElementById('screen-list').classList.add('active');
+  const bn = document.getElementById('demo-banner'); if (bn) bn.style.display='flex';
+  try { renderList(); } catch(e) { console.error(e); }
+};
+window.endDemo = () => { window.__DEMO = false; try{location.reload();}catch(e){} };
+/* ==== ENDE DEMO-MODUS ==== */
+
 let themaScope = 'all';
 
 // ─────────────────────────────────────────
@@ -2208,7 +2277,7 @@ window.doRegister = async () => {
 
     // Benutzername → E-Mail-Zuordnung speichern (für Login per Benutzername)
     try {
-      await setDoc(doc(db, 'usernames', unameLower), {
+      await dbSet(doc(db, 'usernames', unameLower), {
         username: unameLower, email, uid: cred.user.uid, createdAt: Date.now()
       });
     } catch(unErr) { console.warn('username-mapping:', unErr); }
@@ -2233,7 +2302,7 @@ window.doRegister = async () => {
     if (regRole === 'fahrschule') {
       // ── FAHRSCHULE (Inhaber) ──
       const code = generateFahrschulCode();
-      await setDoc(doc(db, 'fahrschulen', cred.user.uid), {
+      await dbSet(doc(db, 'fahrschulen', cred.user.uid), {
         name, inhaber: name, stadt: '', email,
         username:      unameLower,
         adminUid:      cred.user.uid,
@@ -2246,11 +2315,11 @@ window.doRegister = async () => {
       // Code-Nachschlage-Eintrag anlegen, damit Fahrlehrer per Code beitreten
       // können, ohne dass alle Fahrschulen lesbar sein müssen.
       try {
-        await setDoc(doc(db, 'schoolCodes', code), {
+        await dbSet(doc(db, 'schoolCodes', code), {
           schoolId: cred.user.uid, schoolName: name, createdAt: Date.now()
         });
       } catch(scErr) { console.warn('schoolCode-Eintrag:', scErr); }
-      await setDoc(doc(db, 'users', cred.user.uid), {
+      await dbSet(doc(db, 'users', cred.user.uid), {
         uid: cred.user.uid, username: unameLower, email, name,
         fahrschuleId: cred.user.uid,
         rolle:        'fahrschul-admin',
@@ -2279,7 +2348,7 @@ window.doRegister = async () => {
       // Firestore-Regel prüfen kann, dass der Code wirklich zu dieser Schule
       // gehört (Cross-Tenant-Schutz auch beim Anlegen).
       if (zielFahrschule && fsCode) fahrlehrerDoc.beitrittCode = fsCode;
-      await setDoc(doc(db, 'users', cred.user.uid), fahrlehrerDoc);
+      await dbSet(doc(db, 'users', cred.user.uid), fahrlehrerDoc);
       sendRegistrationNotification({
         name, email, username,
         typ: zielFahrschule ? 'Fahrlehrer (→ ' + zielFahrschule.name + ')' : 'Fahrlehrer (eigenständig)'
@@ -2344,7 +2413,7 @@ window.requestPasswordReset = async () => {
   btn.disabled = true; btn.textContent = '…';
   try {
     // 1. Anfrage in Firestore (SuperAdmin sieht sie im Dashboard)
-    await addDoc(collection(db, 'passwordResets'), {
+    await dbAdd(collection(db, 'passwordResets'), {
       username,
       kontakt,
       status:    'offen',
@@ -2424,7 +2493,7 @@ async function loadAboStatus(uid) {
       // Abgelaufen? → Free
       if (aboExpiry && aboExpiry < Date.now()) {
         aboStatus = 'free';
-        await updateDoc(doc(db,'fahrschulen',fsId), { abo:'free', aboExpiry:null });
+        await dbUpd(doc(db,'fahrschulen',fsId), { abo:'free', aboExpiry:null });
       }
     }
   } catch(e) { console.error('Abo-Check:', e); }
@@ -2537,7 +2606,7 @@ async function activateAbo(subscriptionId, plan) {
       : Date.now() + 365*24*60*60*1000;
     const userDoc = await getDoc(doc(db,'users',currentUser.uid));
     const fsId    = userDoc.exists() ? (userDoc.data().fahrschuleId || currentUser.uid) : currentUser.uid;
-    await updateDoc(doc(db,'fahrschulen',fsId), {
+    await dbUpd(doc(db,'fahrschulen',fsId), {
       abo:            'pro_' + plan,
       aboExpiry:      expiry,
       aboPaypalId:    subscriptionId,
@@ -2642,7 +2711,7 @@ async function migrateOldAccessCodes() {
         const protokollSnapshot = pSnap.docs.map(d => ({ id: d.id, ...d.data() }));
         
         // Snapshot hinzufügen (Datenschutz: minimiert)
-        await updateDoc(doc(db, 'accessCodes', codeDoc.id), {
+        await dbUpd(doc(db, 'accessCodes', codeDoc.id), {
           studentSnapshot: buildPortalSnapshot({ ...s, id: data.studentId }, data.code, data.expiresAt || (Date.now()+CODE_LAUFZEIT_MS)),
           protokollSnapshot: buildPortalProtokoll(protokollSnapshot),
           migratedAt: Date.now()
@@ -2679,6 +2748,7 @@ async function migrateOldAccessCodes() {
 }
 
 onAuthStateChanged(auth, async (user) => {
+  if (window.__DEMO) return;
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('code') && !user) { checkUrlCode(); return; }
 
@@ -2695,7 +2765,7 @@ onAuthStateChanged(auth, async (user) => {
         if (user.email !== 'chriskoo@mail.de') {
           try {
             const unameGuess = (user.email || '').split('@')[0] || '';
-            await setDoc(doc(db, 'users', user.uid), {
+            await dbSet(doc(db, 'users', user.uid), {
               uid:          user.uid,
               username:     unameGuess,
               email:        user.email || '',
@@ -2784,7 +2854,7 @@ onAuthStateChanged(auth, async (user) => {
             // Im Hintergrund den Status persistieren (best effort)
             try {
               const targetId = (fsId === user.uid) ? user.uid : fsId;
-              await updateDoc(doc(db,'fahrschulen',targetId), { status:'zahlung_offen', statusUpdatedAt:Date.now(), autoLocked:true });
+              await dbUpd(doc(db,'fahrschulen',targetId), { status:'zahlung_offen', statusUpdatedAt:Date.now(), autoLocked:true });
             } catch(e) {}
           }
         }
@@ -2868,6 +2938,7 @@ onAuthStateChanged(auth, async (user) => {
 // FIRESTORE
 // ─────────────────────────────────────────
 function listenStudents() {
+  if (window.__DEMO) { try{renderList();}catch(e){} return; }
   if (unsubSnapshot) unsubSnapshot();
   // Multi-Tenant: Nach fahrschuleId filtern wenn vorhanden, sonst nach uid (Rückwärtskompatibilität)
   const fsId = currentUser._fahrschuleId;
@@ -2888,7 +2959,7 @@ function listenStudents() {
       const aktiveAnzahl = students.filter(s => !s.archiviert).length;
       if (currentUser && currentUser.uid && window.__lastStudentCount !== aktiveAnzahl) {
         window.__lastStudentCount = aktiveAnzahl;
-        updateDoc(doc(db, 'users', currentUser.uid), {
+        dbUpd(doc(db, 'users', currentUser.uid), {
           studentCount: aktiveAnzahl,
           studentCountUpdated: Date.now()
         }).catch(() => {}); // still scheitern lassen (z.B. Alt-Konto ohne Doc)
@@ -2917,7 +2988,7 @@ window.addCustomField = async () => {
   const name = document.getElementById('inp-field-name').value.trim();
   if (!name) { toast('Bitte einen Namen eingeben.'); return; }
   try {
-    await addDoc(collection(db, 'customFields'), {
+    await dbAdd(collection(db, 'customFields'), {
       uid: currentUser.uid,
       name,
       createdAt: Date.now()
@@ -2930,7 +3001,7 @@ window.addCustomField = async () => {
 window.deleteCustomField = async (fieldId) => {
   if (!confirm('Dieses Feld bei allen Schülern löschen?')) return;
   try {
-    await deleteDoc(doc(db, 'customFields', fieldId));
+    await dbDel(doc(db, 'customFields', fieldId));
     toast('Feld gelöscht.');
   } catch(e) { console.error('deleteCustomField:', e); toast('❌ Fehler: ' + e.message); }
 };
@@ -3016,7 +3087,7 @@ window.addCustomThema = async () => {
   if (!name) { toast('Bitte einen Namen eingeben.'); return; }
   const kategorie = document.getElementById('inp-thema-kategorie').value;
   try {
-    await addDoc(collection(db, 'customThemen'), {
+    await dbAdd(collection(db, 'customThemen'), {
       uid: currentUser.uid,
       name,
       kategorie: kategorie || null,
@@ -3033,7 +3104,7 @@ window.deleteCustomThema = async (themaId) => {
   const msg = t?.scope === 'all' ? 'Dieses Thema bei allen Schülern löschen?' : 'Dieses Thema löschen?';
   if (!confirm(msg)) return;
   try {
-    await deleteDoc(doc(db, 'customThemen', themaId));
+    await dbDel(doc(db, 'customThemen', themaId));
     toast('Thema gelöscht.');
   } catch(e) { console.error('deleteCustomThema:', e); toast('❌ Fehler: ' + e.message); }
 };
@@ -3101,7 +3172,7 @@ async function saveToFirestore(studentId, data) {
     if (fsId && !payload.fahrschuleId) payload.fahrschuleId = fsId;
     // Letzte Aktivität automatisch stempeln (für Inaktivitäts-Hinweis)
     payload.lastActivity = Date.now();
-    await updateDoc(doc(db, 'students', studentId), payload);
+    await dbUpd(doc(db, 'students', studentId), payload);
   } catch(e) {
     console.error('saveToFirestore Fehler:', e.code, e.message);
     if (e.code === 'permission-denied') {
@@ -4228,7 +4299,7 @@ async function syncLernzieleToPortal(ziele) {
     const cq = query(collection(db,'accessCodes'), where('studentId','==',activeId));
     const cs = await getDocs(cq);
     for (const d of cs.docs) {
-      await updateDoc(doc(db,'accessCodes',d.id), { lernziele: ziele });
+      await dbUpd(doc(db,'accessCodes',d.id), { lernziele: ziele });
     }
   } catch(e) { console.error('syncLernziele:', e); }
 }
@@ -4550,7 +4621,7 @@ window.addProtokollEintrag = async () => {
     : null;
 
   try {
-    await addDoc(collection(db, 'protokoll'), {
+    await dbAdd(collection(db, 'protokoll'), {
       studentId:   activeId,
       uid:         currentUser.uid,
       fahrschuleId:currentUser._fahrschuleId || currentUser.uid,
@@ -4589,12 +4660,13 @@ window.addProtokollEintrag = async () => {
           .sort((a,b) => (b.createdAt||0)-(a.createdAt||0)).slice(0,50)
           .map(p => ({...p, fortschritt: p.fortschritt ?? null, stunde: p.stunde||0}))
       );
-      await updateDoc(doc(db,'accessCodes',_cs.docs[0].id), { protokollSnapshot: _proto, expiresAt: Date.now() + CODE_LAUFZEIT_MS });
+      await dbUpd(doc(db,'accessCodes',_cs.docs[0].id), { protokollSnapshot: _proto, expiresAt: Date.now() + CODE_LAUFZEIT_MS });
     }
   } catch(_e) { console.error('ProtokollSnapshot-Update:', _e); }
 };
 
 function listenProtokoll(studentId) {
+  if (window.__DEMO) { protokollEintraege = ((window.__DEMO_PROTO||{})[studentId]||[]).map(x=>({...x})); try{renderProtokollScreen();}catch(e){} return; }
   if (unsubProtokoll) { unsubProtokoll(); unsubProtokoll = null; }
   const q = query(collection(db, 'protokoll'), where('studentId', '==', studentId), where('uid', '==', currentUser.uid));
   unsubProtokoll = onSnapshot(q, snap => {
@@ -4611,7 +4683,7 @@ function listenProtokoll(studentId) {
 window.deleteProtokollEintrag = async (id) => {
   if (!confirm('Diesen Eintrag löschen?')) return;
   try {
-    await deleteDoc(doc(db, 'protokoll', id));
+    await dbDel(doc(db, 'protokoll', id));
     toast('Eintrag gelöscht.');
     try { renderProtokollScreen(); } catch(e) { console.error('renderProtokollScreen:', e); }
   } catch(e) { console.error('deleteProtokollEintrag:', e); toast('❌ Fehler: ' + e.message); }
@@ -4811,7 +4883,7 @@ window.savePruefKommentar = async () => {
     const q = query(collection(db,'accessCodes'), where('studentId','==',activeId));
     const snap = await getDocs(q);
     await Promise.all(snap.docs.map(d =>
-      updateDoc(doc(db,'accessCodes',d.id), {
+      dbUpd(doc(db,'accessCodes',d.id), {
         'studentSnapshot.pruefKommentar': pruefKommentar,
         expiresAt: Date.now() + CODE_LAUFZEIT_MS
       })
@@ -4830,7 +4902,7 @@ window.verlaengereCode = async () => {
     const snap = await getDocs(q);
     if (snap.empty) { toast('⚠️ Noch kein Code vorhanden'); return; }
     const neuExpiry = Date.now() + CODE_LAUFZEIT_MS;
-    await updateDoc(doc(db,'accessCodes',snap.docs[0].id), { expiresAt: neuExpiry });
+    await dbUpd(doc(db,'accessCodes',snap.docs[0].id), { expiresAt: neuExpiry });
     document.getElementById('code-valid-until').textContent =
       'Gültig bis: ' + new Date(neuExpiry).toLocaleDateString('de-DE');
     toast('⏰ Code um 1 Jahr verlängert ✓');
@@ -4871,7 +4943,7 @@ window.openTeacherChat = async () => {
     teacherChatData  = snap.docs[0].data();
     renderTeacherChat();
     // 🔔 Als gelesen markieren → Badges verschwinden (live via Badge-Listener)
-    updateDoc(doc(db,'accessCodes',teacherChatDocId), { teacherLastRead: Date.now() })
+    dbUpd(doc(db,'accessCodes',teacherChatDocId), { teacherLastRead: Date.now() })
       .catch(e => console.error('teacherLastRead:', e));
     // Live-Listener
     if (teacherChatUnsub) teacherChatUnsub();
@@ -4922,7 +4994,7 @@ window.sendTeacherMessage = async () => {
   };
   try {
     const newMsgs = [...(teacherChatData?.messages || []), msg].slice(-50);
-    await updateDoc(doc(db,'accessCodes',teacherChatDocId), { messages: newMsgs, expiresAt: Date.now() + CODE_LAUFZEIT_MS });
+    await dbUpd(doc(db,'accessCodes',teacherChatDocId), { messages: newMsgs, expiresAt: Date.now() + CODE_LAUFZEIT_MS });
     teacherChatData = { ...teacherChatData, messages: newMsgs };
     renderTeacherChat();
     toast('✓ Nachricht gesendet');
@@ -4958,7 +5030,7 @@ window.savePlannedLesson = async () => {
     if (snap.empty) { toast('⚠️ Code nicht gefunden'); return; }
     const docRef   = snap.docs[0];
     const existing = docRef.data().plannedLessons || [];
-    await updateDoc(doc(db,'accessCodes',docRef.id), { plannedLessons: [...existing, newLesson], expiresAt: Date.now() + CODE_LAUFZEIT_MS });
+    await dbUpd(doc(db,'accessCodes',docRef.id), { plannedLessons: [...existing, newLesson], expiresAt: Date.now() + CODE_LAUFZEIT_MS });
     document.getElementById('plan-lesson-modal').classList.remove('open');
     toast(`📅 Fahrstunde am ${datum.split('-').reverse().join('.')} geplant`);
   } catch(e) { toast('Fehler: ' + e.message); }
@@ -5067,13 +5139,13 @@ window.deleteStudent = async () => {
   const backup = { id: activeId, data: { ...s } };
   delete backup.data.id; // id nicht doppelt speichern
   try {
-    await deleteDoc(doc(db,'students',activeId));
+    await dbDel(doc(db,'students',activeId));
     activeId = null;
     goBack();
     zeigeUndoBalken(`🗑️ ${s.vorname} ${s.nachname} gelöscht`, async () => {
       // Rückgängig: Schüler mit gleicher ID wiederherstellen
       try {
-        await setDoc(doc(db,'students',backup.id), backup.data);
+        await dbSet(doc(db,'students',backup.id), backup.data);
         toast('✓ Wiederhergestellt');
       } catch(e) { console.error('undo student:', e); toast('❌ Wiederherstellen fehlgeschlagen'); }
     });
@@ -5164,7 +5236,7 @@ window.addStudent = async () => {
     // Nächste fortlaufende Schüler-Nummer ermitteln (höchste vorhandene + 1)
     const maxNr = students.reduce((max, st) => Math.max(max, st.schuelerNr || 0), 0);
     const neueNr = maxNr + 1;
-    await addDoc(collection(db,'students'),{
+    await dbAdd(collection(db,'students'),{
       uid: currentUser.uid,
       fahrschuleId: currentUser._fahrschuleId || currentUser.uid,
       schuelerNr: neueNr,
@@ -5494,7 +5566,7 @@ async function renderFscodeSection() {
       try {
         const scSnap = await getDoc(doc(db, 'schoolCodes', code));
         if (!scSnap.exists()) {
-          await setDoc(doc(db, 'schoolCodes', code), {
+          await dbSet(doc(db, 'schoolCodes', code), {
             schoolId: currentUser.uid, schoolName: fsDoc.data().name || '', createdAt: Date.now()
           });
         }
@@ -5561,7 +5633,7 @@ window.fahrschuleBeitreten = async () => {
     // User-Dokument aktualisieren: dieser Fahrschule zuordnen
     // beitrittCode wird mitgesendet, damit die Firestore-Regel prüfen kann,
     // dass der Code wirklich zu dieser Schule gehört (Cross-Tenant-Schutz).
-    await updateDoc(doc(db, 'users', currentUser.uid), {
+    await dbUpd(doc(db, 'users', currentUser.uid), {
       fahrschuleId:   ziel.id,
       fahrschuleName: ziel.name || null,
       beitrittCode:   code
@@ -5579,7 +5651,7 @@ window.fahrschuleBeitreten = async () => {
 window.fahrschuleVerlassen = async () => {
   if (!confirm('Möchtest du die Fahrschule wirklich verlassen?\n\nDu wirst danach wieder als eigenständiger Fahrlehrer geführt. Deine Schüler bleiben erhalten.')) return;
   try {
-    await updateDoc(doc(db, 'users', currentUser.uid), {
+    await dbUpd(doc(db, 'users', currentUser.uid), {
       fahrschuleId:   currentUser.uid,  // zurück zu eigenständig
       fahrschuleName: null
     });
@@ -5644,7 +5716,7 @@ window.changeEmail = async () => {
 
     // Die neue E-Mail schon mal in Firestore vormerken (wird nach Bestätigung aktiv)
     try {
-      await updateDoc(doc(db, 'users', currentUser.uid), {
+      await dbUpd(doc(db, 'users', currentUser.uid), {
         emailPending: neueEmail,
         emailPendingSince: Date.now()
       });
@@ -5652,7 +5724,7 @@ window.changeEmail = async () => {
       const profDoc = await getDoc(doc(db, 'users', currentUser.uid));
       const uname = profDoc.exists() ? profDoc.data().username : null;
       if (uname) {
-        await setDoc(doc(db, 'usernames', uname), {
+        await dbSet(doc(db, 'usernames', uname), {
           username: uname, email: neueEmail, uid: currentUser.uid, updatedAt: Date.now()
         }, { merge: true });
       }
@@ -5706,7 +5778,7 @@ window.transferStudent = async () => {
     const targetUid = snap.docs[0].data().uid;
     if (targetUid === currentUser.uid) { errEl.textContent = 'Das ist dein eigener Benutzername.'; return; }
 
-    await updateDoc(doc(db, 'students', activeId), { uid: targetUid });
+    await dbUpd(doc(db, 'students', activeId), { uid: targetUid });
     document.getElementById('transfer-modal').classList.remove('open');
     goBack();
     toast(`${s.vorname} ${s.nachname} wurde übertragen ✓`);
@@ -5819,7 +5891,7 @@ window.generateCode = async () => {
     // Alte Codes für diesen Schüler löschen
     const q = query(collection(db,'accessCodes'), where('studentId','==',activeId));
     const snap = await getDocs(q);
-    for (const d of snap.docs) await deleteDoc(doc(db,'accessCodes',d.id));
+    for (const d of snap.docs) await dbDel(doc(db,'accessCodes',d.id));
 
     // Protokoll laden für Snapshot
     const pq = query(
@@ -5835,7 +5907,7 @@ window.generateCode = async () => {
     // SICHERHEIT: Der Code ist die Dokument-ID. So kann das Portal per get()
     // gezielt EIN Dokument laden – ein massenhaftes Auslesen (list) der ganzen
     // Collection ist durch die Rules gesperrt.
-    await setDoc(doc(db,'accessCodes', code), {
+    await dbSet(doc(db,'accessCodes', code), {
       code,
       studentId:        activeId,
       teacherUid:       currentUser.uid,
@@ -6007,7 +6079,7 @@ window.addEigenThema = async () => {
     const fsId     = currentUser._fahrschuleId || currentUser.uid;
     const gruppeId = document.getElementById('sel-eigen-gruppe')?.value || null;
     letzteGruppeId = gruppeId || ''; // Auswahl merken — überlebt Re-Render
-    await addDoc(collection(db, 'customThemen'), {
+    await dbAdd(collection(db, 'customThemen'), {
       name,
       scope,
       gruppeId:     gruppeId || null,
@@ -6030,7 +6102,7 @@ window.addEigenGruppe = async () => {
   try {
     const scope = eigenScope === 'single' ? activeId : 'all';
     const fsId  = currentUser._fahrschuleId || currentUser.uid;
-    const docRef = await addDoc(collection(db, 'customGruppen'), {
+    const docRef = await dbAdd(collection(db, 'customGruppen'), {
       name,
       scope,
       uid:          currentUser.uid,
@@ -6052,9 +6124,9 @@ window.deleteEigenGruppe = async (gruppeId) => {
   try {
     // Themen aus der Gruppe lösen
     await Promise.all(themenDrin.map(t =>
-      updateDoc(doc(db, 'customThemen', t.id), { gruppeId: null })
+      dbUpd(doc(db, 'customThemen', t.id), { gruppeId: null })
     ));
-    await deleteDoc(doc(db, 'customGruppen', gruppeId));
+    await dbDel(doc(db, 'customGruppen', gruppeId));
     toast('Gruppe gelöscht.');
   } catch(err) { console.error('deleteEigenGruppe:', err); toast('❌ Fehler: ' + err.message); }
 };
@@ -6065,9 +6137,9 @@ window.gruppeAufAlle = async (gruppeId) => {
   const themenDrin = customThemen.filter(t => t.gruppeId === gruppeId && t.scope !== 'all');
   if (!confirm(`Gruppe "${g.name}" für ALLE Schüler übernehmen?\n\n${themenDrin.length ? 'Die ' + themenDrin.length + ' Übung(en) darin werden ebenfalls für alle sichtbar.' : ''}`)) return;
   try {
-    await updateDoc(doc(db, 'customGruppen', gruppeId), { scope: 'all' });
+    await dbUpd(doc(db, 'customGruppen', gruppeId), { scope: 'all' });
     await Promise.all(themenDrin.map(t =>
-      updateDoc(doc(db, 'customThemen', t.id), { scope: 'all' })
+      dbUpd(doc(db, 'customThemen', t.id), { scope: 'all' })
     ));
     toast(`👥 "${g.name}" gilt jetzt für alle Schüler`);
   } catch(err) { console.error('gruppeAufAlle:', err); toast('❌ Fehler: ' + err.message); }
@@ -7363,7 +7435,7 @@ window.sendChatMessage = async () => {
   inp.value = '';
   inp.style.height = '42px';
   try {
-    await addDoc(collection(db, 'chat'), {
+    await dbAdd(collection(db, 'chat'), {
       studentId:   chatStudentId,
       fahrschuleId: currentUser._fahrschuleId || currentUser.uid,
       senderUid:   currentUser.uid,
