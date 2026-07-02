@@ -1982,7 +1982,8 @@ const ADK_THEMEN_BE = [
 // ── OFFLINE-PERSISTENZ ──────────────────────────────────────
 // Firestore speichert alle Daten lokal in IndexedDB.
 // Änderungen offline werden automatisch synchronisiert sobald Internet zurück ist.
-enableIndexedDbPersistence(db).catch(err => {
+// FIX(Login-Speed): IndexedDB-Offline-Cache deaktiviert - auf iPhone der Haupt-Bremsklotz beim Anmelden. Jederzeit reaktivierbar.
+Promise.resolve().catch(err => {
   if (err.code === 'failed-precondition') {
     console.warn('Offline-Modus: Mehrere Tabs offen – nur ein Tab kann offline cachen.');
   } else if (err.code === 'unimplemented') {
@@ -4118,6 +4119,7 @@ function initSignaturePad() {
   // Skalierung für Retina
   const dpr = window.devicePixelRatio || 1;
   const rect = sigCanvas.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return; // FIX: Canvas noch unsichtbar (Formular display:none) -> spaeter erneut initialisieren
   sigCanvas.width  = rect.width  * dpr;
   sigCanvas.height = rect.height * dpr;
   sigCtx.scale(dpr, dpr);
@@ -4131,6 +4133,8 @@ function initSignaturePad() {
     const src = e.touches ? e.touches[0] : e;
     return { x: src.clientX - r.left, y: src.clientY - r.top };
   };
+  if (sigCanvas.__sigBound) return; // FIX: Zeichen-Listener nur einmal binden
+  sigCanvas.__sigBound = true;
   sigCanvas.addEventListener('pointerdown', e => {
     sigDrawing = true;
     const p = getPos(e);
@@ -6585,6 +6589,7 @@ window.protoWaehlDatum = (dateStr) => {
   document.getElementById('proto-form-bewertung').style.display = isZukunft ? 'none' : 'block';
   document.getElementById('proto-form-maengel').style.display   = isZukunft ? 'none' : 'block';
   document.getElementById('proto-form-sig').style.display       = isZukunft ? 'none' : 'block';
+  if (!isZukunft) setTimeout(() => initSignaturePad(), 40); // FIX: Signatur-Canvas erst initialisieren, wenn sichtbar
   document.getElementById('proto-notiz-label').textContent      = isZukunft
     ? '📌 Was soll geübt werden?'
     : 'Notiz zur Stunde (optional)';
