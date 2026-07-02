@@ -809,7 +809,7 @@ function sendRegistrationNotification({ name, inhaber, email, stadt }) {
   try {
     emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
     emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
-      to_email:  'chriskoo@mail.de',
+      to_email:  'kontakt@fahrsync.de',
       fs_name:   name,
       inhaber:   inhaber,
       email:     email,
@@ -817,7 +817,7 @@ function sendRegistrationNotification({ name, inhaber, email, stadt }) {
       datum:     new Date().toLocaleString('de-DE'),
       link:      'https://fahrschuelerkartei.de/adk-platform.html'
     }).then(() => {
-      console.log('✅ Benachrichtigung gesendet an chriskoo@mail.de');
+      console.log('✅ Benachrichtigung gesendet an kontakt@fahrsync.de');
     }).catch(err => {
       console.error('EmailJS Fehler:', err);
     });
@@ -1574,7 +1574,7 @@ async function renderSuperAdminEinst() {
       </div>
       <div class="form-group">
         <label class="form-label">E-Mail</label>
-        <input class="form-input" id="sa-imp-email" type="email" value="${imp.email||'chriskoo@mail.de'}" placeholder="chriskoo@mail.de">
+        <input class="form-input" id="sa-imp-email" type="email" value="${imp.email||'kontakt@fahrsync.de'}" placeholder="kontakt@fahrsync.de">
       </div>
       <div class="form-group">
         <label class="form-label">Stadt / Land</label>
@@ -2263,6 +2263,7 @@ function friendlyError(code) {
     'auth/weak-password':       'Passwort zu schwach (min. 8 Zeichen).',
     'auth/invalid-credential':  'E-Mail oder Passwort falsch.',
     'auth/too-many-requests':   'Zu viele Versuche. Bitte kurz warten.',
+    'auth/unauthorized-domain': 'Diese Domain ist in Firebase nicht freigegeben: Firebase Console \u2192 Authentication \u2192 Settings \u2192 Authorized domains \u2192 fahrsync.de hinzuf\u00fcgen.',
   };
   return map[code] || 'Fehler: ' + code;
 }
