@@ -6474,7 +6474,7 @@ window.openNeuerEintrag = () => {
   protoKalJahr  = new Date().getFullYear();
   protoGewaehltesDatum = null;
   aktiveSterne  = 0;
-  aktiveMaengel.clear();
+  aktiveMaengel = []; // FIX: aktiveMaengel ist ein Array, nicht Set - .clear() warf TypeError und blockierte das Oeffnen des Eintrag-Fensters (+ und Tag-Tap)
   document.querySelectorAll('.mangel-chip').forEach(c => c.classList.remove('active'));
   document.querySelectorAll('.stern-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('inp-proto-notiz').value = '';
