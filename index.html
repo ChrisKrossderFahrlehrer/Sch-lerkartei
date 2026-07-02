@@ -6621,6 +6621,17 @@ window.kalNavMonat = (delta) => {
   renderProtokollScreen();
 };
 
+// Screen-Kalender: Tag antippen -> Eintrag-Dialog mit vorgewaehltem Datum.
+// Nutzt den bestehenden Modal-Flow (openNeuerEintrag + protoWaehlDatum) wieder.
+window.openEintragFuerTag = (datum) => {
+  openNeuerEintrag();
+  const [jj, mm] = datum.split('-').map(Number);
+  protoKalMonat = mm - 1;
+  protoKalJahr  = jj;
+  renderProtoKalender();
+  protoWaehlDatum(datum);
+};
+
 function renderProtokollScreen() {
   const body = document.getElementById('protokoll-screen-body');
   if (!body) return;
@@ -6656,8 +6667,8 @@ function renderProtokollScreen() {
       background:${hasFahrt?'var(--accent)':isToday?'var(--surface2)':'none'};
       color:${hasFahrt?'#0d1117':isToday?'var(--text)':'var(--muted)'};
       border:${isToday&&!hasFahrt?'1.5px solid var(--accent)':'none'};
-      margin:2px auto;cursor:default;position:relative
-    ">${d}${hasFahrt&&anzahl>1?`<span style="position:absolute;top:0;right:0;background:var(--danger);color:#fff;border-radius:50%;width:12px;height:12px;font-size:0.5rem;display:flex;align-items:center;justify-content:center">${anzahl}</span>`:''}</div>`;
+      margin:2px auto;cursor:pointer;position:relative
+    " onclick="openEintragFuerTag('${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}')">${d}${hasFahrt&&anzahl>1?`<span style="position:absolute;top:0;right:0;background:var(--danger);color:#fff;border-radius:50%;width:12px;height:12px;font-size:0.5rem;display:flex;align-items:center;justify-content:center">${anzahl}</span>`:''}</div>`;
   }
 
   // Einträge dieses Monats gefiltert + sortiert
@@ -6714,6 +6725,7 @@ function renderProtokollScreen() {
           ${['Mo','Di','Mi','Do','Fr','Sa','So'].map(t=>`<div style="font-size:0.65rem;color:var(--muted);font-weight:700;padding-bottom:6px">${t}</div>`).join('')}
           ${kalCells}
         </div>
+        <div style="text-align:center;font-size:0.68rem;color:var(--muted);margin-top:8px">👆 Tag antippen, um eine Stunde oder Planung einzutragen</div>
       </div>
 
       <!-- Einträge dieses Monats -->
