@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
   ADK - DIGITALE KARTEI
-  (c) 2026 ChrisKross der Fahrlehrer (Chriskoo) - fahrschuelerkartei.de
+  (c) 2026 ChrisKross der Fahrlehrer (Chriskoo) - fahrsync.de
   ALLE RECHTE VORBEHALTEN.
   Diese Software ist urheberrechtlich geschuetzt (§ 69a ff. UrhG).
   Kopieren, Nachbauen, Klonen oder Verbreiten - auch in Teilen - ist
@@ -17,12 +17,14 @@
 <meta name="robots" content="noarchive">
 <!-- EmailJS für Benachrichtigungen -->
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#f0b429">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="ADK">
-<title>ADK – Digitale Kartei</title>
+<title>SuperAdmin – FahrSync Plattform</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/png" href="./icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ── RESET & VARS ── */
@@ -205,6 +207,8 @@ html { overscroll-behavior-y: contain; }
 </style>
 </head>
 <body>
+<h1 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">FahrSync SuperAdmin-Bereich</h1>
+<noscript><div style="padding:24px;text-align:center;font-family:system-ui;color:#e6edf3;background:#0d1117">Bitte JavaScript aktivieren – FahrSync ist eine Web-App und benötigt JavaScript.</div></noscript>
 
 <!-- TOAST -->
 <div id="toast"></div>
@@ -815,7 +819,7 @@ function sendRegistrationNotification({ name, inhaber, email, stadt }) {
       email:     email,
       stadt:     stadt,
       datum:     new Date().toLocaleString('de-DE'),
-      link:      'https://fahrschuelerkartei.de/adk-platform.html'
+      link:      'https://fahrsync.de/adk-platform.html'
     }).then(() => {
       console.log('✅ Benachrichtigung gesendet an kontakt@fahrsync.de');
     }).catch(err => {
@@ -1570,7 +1574,7 @@ async function renderSuperAdminEinst() {
       </div>
       <div class="form-group">
         <label class="form-label">Webseite</label>
-        <input class="form-input" id="sa-imp-web" value="${imp.web||'fahrschuelerkartei.de'}" placeholder="fahrschuelerkartei.de">
+        <input class="form-input" id="sa-imp-web" value="${imp.web||'fahrsync.de'}" placeholder="fahrsync.de">
       </div>
       <div class="form-group">
         <label class="form-label">E-Mail</label>
@@ -1754,7 +1758,7 @@ function renderSuperadmin() {
             + '<button onclick="resolvePwReset(\'' + r.id + '\')" style="background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.4);color:var(--accent2);border-radius:8px;padding:6px 10px;font-size:0.7rem;font-weight:700;cursor:pointer;white-space:nowrap">✓ Erledigt</button>'
             + '</div>';
         }).join('')
-      + '<a href="https://console.firebase.google.com/project/fahrschule-ebc65/authentication/users" target="_blank" '
+      + '<a href="https://console.firebase.google.com/project/fahrschule-ebc65/authentication/users" target="_blank" rel="noopener noreferrer" '
       + 'style="display:block;margin-top:10px;text-align:center;font-size:0.72rem;color:var(--blue);text-decoration:underline">→ Firebase Console öffnen (Passwort zurücksetzen)</a>'
       + '</div>'
     : '';
@@ -1805,7 +1809,7 @@ window.openFsDetail = (fsId) => {
   if (!fs) return;
   document.getElementById('modal-fs-name').textContent = fs.name;
   const logoHTML = fs.logoUrl
-    ? `<img src="${fs.logoUrl}" style="width:60px;height:60px;border-radius:12px;object-fit:contain;border:1px solid var(--border);margin-bottom:8px">`
+    ? `<img alt="Fahrschul-Logo" src="${fs.logoUrl}" style="width:60px;height:60px;border-radius:12px;object-fit:contain;border:1px solid var(--border);margin-bottom:8px">`
     : '';
   document.getElementById('modal-fs-content').innerHTML = `
     <div style="text-align:center;margin-bottom:12px">${logoHTML}</div>
@@ -2049,7 +2053,7 @@ async function renderFsAdmin() {
     const fsDoc = await getDoc(doc(db, 'fahrschulen', currentProfil.fahrschuleId));
     const fs = fsDoc.data();
     const logoPreview = fs.logoUrl
-      ? `<img id="logo-preview" src="${fs.logoUrl}" style="width:80px;height:80px;border-radius:14px;object-fit:contain;border:1px solid var(--border);display:block;margin:0 auto 8px">`
+      ? `<img alt="Logo-Vorschau" id="logo-preview" src="${fs.logoUrl}" style="width:80px;height:80px;border-radius:14px;object-fit:contain;border:1px solid var(--border);display:block;margin:0 auto 8px">`
       : `<div id="logo-preview" style="width:80px;height:80px;border-radius:14px;background:var(--surface2);border:2px dashed var(--border);display:flex;align-items:center;justify-content:center;margin:0 auto 8px;font-size:2rem;color:var(--muted)">🏫</div>`;
     body.innerHTML = `
       <div class="section-hd">🖼️ Fahrschul-Logo</div>
