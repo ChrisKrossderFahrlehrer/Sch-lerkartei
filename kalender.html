@@ -5,7 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#1a1a1a">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>Fahrschule Kalender</title>
+<title>FahrschulKalender – Digitale Terminplanung | FahrSync</title>
+<meta name="description" content="FahrschulKalender – Terminplanung & Online-Buchung für Fahrschulen und Fahrlehrer. Teil der FahrSync-Plattform.">
+<link rel="canonical" href="https://fahrsync.de/kalender.html">
+<meta property="og:type" content="website">
+<meta property="og:title" content="FahrschulKalender – Digitale Terminplanung">
+<meta property="og:description" content="Termine, Slots & Schüler-Buchungen für Fahrschulen – direkt mit der ADK verbunden.">
+<meta property="og:url" content="https://fahrsync.de/kalender.html">
+<meta property="og:image" content="https://fahrsync.de/kalender-logo.png">
+<link rel="icon" type="image/png" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
 <style>
@@ -316,6 +325,8 @@ tr:last-child td{border-bottom:none;}
 </style>
 </head>
 <body>
+<h1 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">FahrschulKalender – Digitale Terminplanung für Fahrschulen</h1>
+<noscript><div style="padding:24px;text-align:center;font-family:system-ui;color:#e6edf3;background:#0d1117">Bitte JavaScript aktivieren – FahrSync ist eine Web-App und benötigt JavaScript.</div></noscript>
 
 <div id="splash"><div class="spinner-lg"></div><div style="color:var(--text-muted,#999);font-size:.92rem">Anmeldung wird geladen…</div></div>
 
@@ -788,7 +799,7 @@ const pages={};
 // SUPER ADMIN PAGES
 // ════════════════════════════════
 pages['sa-dashboard']=async function(el){
-  el.innerHTML=`<div class="page active"><h1 class="page-title">Super-Admin Übersicht</h1>
+  el.innerHTML=`<div class="page active"><h2 class="page-title">Super-Admin Übersicht</h2>
   <div id="sa-stats" class="grid-3" style="margin-bottom:20px"></div>
   <div class="card"><div class="card-title">Alle Fahrschulen</div><div id="sa-list"><div class="spinner"></div></div></div></div>`;
   const [schoolsSnap,usersSnap]=await Promise.all([getDocs(collection(db,'schools')),getDocs(collection(db,'kalenderUsers'))]);
@@ -815,7 +826,7 @@ pages['sa-dashboard']=async function(el){
   }).join('');
 };
 pages['sa-fahrschulen']=async function(el){
-  el.innerHTML=`<div class="page active"><h1 class="page-title">Fahrschulen</h1>
+  el.innerHTML=`<div class="page active"><h2 class="page-title">Fahrschulen</h2>
   <div class="card" style="margin-bottom:16px">
     <div class="card-title">Neue Fahrschule anlegen</div>
     <div class="grid-2">
@@ -882,7 +893,7 @@ window.deleteSchool=async function(schoolId,name){
 // ADMIN – DASHBOARD
 // ════════════════════════════════
 pages['admin-dashboard']=async function(el){
-  el.innerHTML=`<div class="page active"><h1 class="page-title">Übersicht</h1>
+  el.innerHTML=`<div class="page active"><h2 class="page-title">Übersicht</h2>
   <div class="grid-2" style="margin-bottom:16px">
     <div class="stat-card"><div class="stat-label">Fahrlehrer</div><div class="stat-val" id="stat-lehrer"><div class="spinner"></div></div></div>
     <div class="stat-card"><div class="stat-label">Fahrschüler</div><div class="stat-val" id="stat-schueler"><div class="spinner"></div></div></div>
@@ -910,7 +921,7 @@ window.approveLehrer=async function(uid){
 // ADMIN – LEHRER
 // ════════════════════════════════
 pages['admin-lehrer']=async function(el){
-  el.innerHTML=`<div class="page active"><h1 class="page-title">Fahrlehrer</h1>
+  el.innerHTML=`<div class="page active"><h2 class="page-title">Fahrlehrer</h2>
   <div class="card" style="margin-bottom:16px">
     <div class="card-title">Neuen Fahrlehrer anlegen</div>
     <div class="grid-2">
@@ -968,7 +979,7 @@ window.unassignSchueler=async function(id){await updateDoc(doc(db,'schueler',id)
 // ADMIN – SCHÜLER
 // ════════════════════════════════
 pages['admin-schueler']=async function(el){
-  el.innerHTML=`<div class="page active"><h1 class="page-title">Fahrschüler</h1>
+  el.innerHTML=`<div class="page active"><h2 class="page-title">Fahrschüler</h2>
   <div class="card" style="margin-bottom:14px">
     <div class="card-title">Neuen Schüler anlegen</div>
     <div class="grid-2"><div class="field"><label>Vorname</label><input id="ns-fname" type="text"></div><div class="field"><label>Nachname</label><input id="ns-lname" type="text"></div></div>
@@ -1052,7 +1063,7 @@ window.saveSchueler=async function(id){
 // ════════════════════════════════
 pages['admin-schule']=async function(el){
   const school=currentSchool||{};
-  el.innerHTML=`<div class="page active"><h1 class="page-title">Fahrschule</h1>
+  el.innerHTML=`<div class="page active"><h2 class="page-title">Fahrschule</h2>
   <div class="card">
     <div class="card-title">Stammdaten</div>
     <div class="field"><label>Name</label><input id="sc-name" value="${school.name||''}"></div>
@@ -1077,7 +1088,7 @@ window.saveSchule=async function(){
 // ADMIN – AUSLASTUNG
 // ════════════════════════════════
 pages['admin-auslastung']=async function(el){
-  el.innerHTML=`<div class="page active"><h1 class="page-title">Auslastung</h1>
+  el.innerHTML=`<div class="page active"><h2 class="page-title">Auslastung</h2>
   <div class="card" style="margin-bottom:14px">
     <div class="grid-2">
       <div class="field"><label>Von</label><input type="date" id="aus-von"></div>
@@ -1123,7 +1134,7 @@ window.loadAuslastung=async function(){
 // ADMIN – FUHRPARK
 // ════════════════════════════════
 pages['admin-fuhrpark']=async function(el){
-  el.innerHTML=`<div class="page active"><h1 class="page-title">Fuhrpark</h1>
+  el.innerHTML=`<div class="page active"><h2 class="page-title">Fuhrpark</h2>
   <div class="card" style="margin-bottom:14px">
     <div class="card-title">+ Auto hinzufügen</div>
     <div class="grid-2"><div class="field"><label>Marke/Modell</label><input id="ac-modell" placeholder="VW Golf"></div><div class="field"><label>Kennzeichen</label><input id="ac-kennzeichen" placeholder="AB-CD 123"></div></div>
@@ -1172,7 +1183,7 @@ window.deleteAuto=async function(id){if(!confirm('Auto löschen?'))return;await 
 // ADMIN – URLAUB
 // ════════════════════════════════
 pages['admin-urlaub']=async function(el){
-  el.innerHTML=`<div class="page active"><h1 class="page-title">Urlaub</h1>
+  el.innerHTML=`<div class="page active"><h2 class="page-title">Urlaub</h2>
   <div class="card" style="margin-bottom:14px">
     <div class="card-title">Urlaub eintragen</div>
     <div class="grid-2"><div class="field"><label>Fahrlehrer</label><select id="urlaub-lehrer"><option value="">— Wählen —</option></select></div><div class="field"><label>Bezeichnung</label><input id="urlaub-label" placeholder="Sommerurlaub"></div></div>
@@ -1186,7 +1197,7 @@ pages['admin-urlaub']=async function(el){
   await renderUrlaubList();
 };
 pages['lehrer-urlaub']=async function(el){
-  el.innerHTML=`<div class="page active"><h1 class="page-title">Mein Urlaub</h1>
+  el.innerHTML=`<div class="page active"><h2 class="page-title">Mein Urlaub</h2>
   <div class="card" style="margin-bottom:14px">
     <div class="field"><label>Bezeichnung</label><input id="urlaub-label" placeholder="Sommerurlaub"></div>
     <div class="grid-2"><div class="field"><label>Von</label><input id="urlaub-von" type="date"></div><div class="field"><label>Bis</label><input id="urlaub-bis" type="date"></div></div>
@@ -1245,7 +1256,7 @@ function urlaubCoversDate(list,date){
 // ADMIN – SPERRTAGE
 // ════════════════════════════════
 pages['admin-sperrtage']=async function(el){
-  el.innerHTML=`<div class="page active"><h1 class="page-title">Globale Sperrtage</h1>
+  el.innerHTML=`<div class="page active"><h2 class="page-title">Globale Sperrtage</h2>
   <div class="card" style="margin-bottom:14px">
     <p class="text-muted" style="margin-bottom:14px">Globale Sperrtage gelten für alle Fahrlehrer dieser Fahrschule.</p>
     <div class="grid-2"><div class="field"><label>Datum</label><input type="date" id="gs-date"></div><div class="field"><label>Beschreibung</label><input type="text" id="gs-label" placeholder="z.B. Betriebsferien"></div></div>
@@ -1276,7 +1287,7 @@ window.deleteGlobalSperrtag=async function(id){await deleteDoc(doc(db,'globalBlo
 // ADMIN – EINSTELLUNGEN (Fahrstundenarten)
 // ════════════════════════════════
 pages['admin-einstellungen']=async function(el){
-  el.innerHTML=`<div class="page active"><h1 class="page-title">Einstellungen</h1>
+  el.innerHTML=`<div class="page active"><h2 class="page-title">Einstellungen</h2>
   <div class="card" style="margin-bottom:14px">
     <div class="card-title">Berechtigungen</div>
     <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
@@ -1347,7 +1358,7 @@ async function saveArten(){
 // ════════════════════════════════
 pages['lehrer-kalender']=function(el){
   if(!weekStart){const now=new Date();const dow=now.getDay()===0?6:now.getDay()-1;weekStart=new Date(now.getFullYear(),now.getMonth(),now.getDate()-dow);}
-  el.innerHTML=`<div class="page active"><h1 class="page-title">Kalender</h1>
+  el.innerHTML=`<div class="page active"><h2 class="page-title">Kalender</h2>
   <div class="card">
     <div class="cal-header">
       <button class="btn btn-secondary btn-sm" onclick="calPrev()">◀</button>
@@ -1523,7 +1534,7 @@ window.unblockDay=async function(id){await deleteDoc(doc(db,'blocked',id));toast
 // LEHRER – SLOTS LISTE
 // ════════════════════════════════
 pages['lehrer-slots']=async function(el){
-  el.innerHTML=`<div class="page active"><h1 class="page-title">Zeitslots</h1><div class="card"><div id="slots-list"><div class="spinner"></div></div></div></div>`;
+  el.innerHTML=`<div class="page active"><h2 class="page-title">Zeitslots</h2><div class="card"><div id="slots-list"><div class="spinner"></div></div></div></div>`;
   let snap,scSnap;
   try{
     [snap,scSnap]=await Promise.all([getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid))),getDocs(query(collection(db,'schueler'),where('lehrerUid','==',currentUser.uid)))]);
@@ -1543,7 +1554,7 @@ window.deleteSlotFromList=async function(id){let _bb=null;try{const s=await getD
 // LEHRER – BUCHUNGEN
 // ════════════════════════════════
 pages['lehrer-buchungen']=async function(el){
-  el.innerHTML=`<div class="page active"><h1 class="page-title">Buchungen</h1>
+  el.innerHTML=`<div class="page active"><h2 class="page-title">Buchungen</h2>
     <div class="card" style="margin-bottom:16px"><div class="card-title">🔗 Online-Buchung für Schüler</div><div id="booking-online"><div class="spinner"></div></div></div>
     <div class="card" style="margin-bottom:16px"><div class="card-title">📥 Offene Anfragen</div><div id="booking-requests"><div class="spinner"></div></div></div>
     <div class="card" style="margin-bottom:16px"><div class="card-title">⏳ Warteliste</div><div id="booking-warteliste"><div class="spinner"></div></div></div>
@@ -1727,7 +1738,7 @@ window.cancelBookingLehrer=async function(id){
 // LEHRER – MEINE SCHÜLER
 // ════════════════════════════════
 pages['lehrer-schueler']=async function(el){
-  el.innerHTML=`<div class="page active"><h1 class="page-title">Meine Schüler</h1><div id="ls-content"><div class="spinner"></div></div></div>`;
+  el.innerHTML=`<div class="page active"><h2 class="page-title">Meine Schüler</h2><div id="ls-content"><div class="spinner"></div></div></div>`;
   let snap={docs:[]},autosSnap={docs:[]};
   try{snap=await getDocs(query(collection(db,'schueler'),where('lehrerUid','==',currentUser.uid)));}catch(e){console.warn('schueler read',e);}
   try{autosSnap=await getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId)));}catch(e){console.warn('autos read',e);}
@@ -1815,7 +1826,7 @@ window.viewLehrerKalender=async function(lehrerUid,lehrerName){
   main.innerHTML=`<div class="page active">
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
       <button class="btn btn-secondary btn-sm" onclick="navigate('admin-lehrer')">← Zurück</button>
-      <h1 class="page-title" style="margin-bottom:0">📅 ${lehrerName}</h1>
+      <h2 class="page-title" style="margin-bottom:0">📅 ${lehrerName}</h2>
     </div>
     <div class="card">
       <div class="cal-header">
@@ -1914,7 +1925,7 @@ window.deletePruefung=async function(pid,sid){
   const c=document.getElementById('pruefungen-container-'+sid);if(c){const l=await loadPruefungenForSchueler(sid);c.innerHTML=renderPruefungenList(l,true,sid);}
 };
 pages['lehrer-pruefungen']=async function(el){
-  el.innerHTML=`<div class="page active"><h1 class="page-title">Prüfungen</h1><div id="lp-content"><div class="spinner"></div></div></div>`;
+  el.innerHTML=`<div class="page active"><h2 class="page-title">Prüfungen</h2><div id="lp-content"><div class="spinner"></div></div></div>`;
   const snap=await getDocs(query(collection(db,'schueler'),where('lehrerUid','==',currentUser.uid)));
   const lp=document.getElementById('lp-content');if(snap.empty){lp.innerHTML='<p class="text-muted">Keine Schüler.</p>';return;}
   let html='';
@@ -1925,7 +1936,7 @@ pages['lehrer-pruefungen']=async function(el){
   lp.innerHTML=html;
 };
 pages['admin-pruefungen']=async function(el){
-  el.innerHTML=`<div class="page active"><h1 class="page-title">Prüfungen</h1>
+  el.innerHTML=`<div class="page active"><h2 class="page-title">Prüfungen</h2>
   <div class="card" style="margin-bottom:14px">
     <div class="card-title">Filter</div>
     <div class="field" style="max-width:220px"><label>Status</label><select id="ap-filter" onchange="filterAdminPruefungen()"><option value="">Alle</option><option value="ausstehend">Ausstehend</option><option value="bestanden">Bestanden</option><option value="nicht_bestanden">Nicht bestanden</option></select></div>
@@ -1967,7 +1978,7 @@ window.togglePruefungDetail=function(sid){const el=document.getElementById('pd-'
 // WARTELISTE
 // ════════════════════════════════
 pages['lehrer-warteliste']=async function(el){
-  el.innerHTML=`<div class="page active"><h1 class="page-title">Warteliste</h1><div class="card"><div id="wl-list"><div class="spinner"></div></div></div></div>`;
+  el.innerHTML=`<div class="page active"><h2 class="page-title">Warteliste</h2><div class="card"><div id="wl-list"><div class="spinner"></div></div></div></div>`;
   let snap;
   try{snap=await getDocs(query(collection(db,'warteliste'),where('lehrerUid','==',currentUser.uid)));}catch(e){console.warn('warteliste-alt',e);const x=document.getElementById('wl-list');if(x)x.innerHTML='<p class="text-muted">⚠️ Konnte nicht geladen werden. Fehler: '+((e&&e.code)||(e&&e.message)||'?')+'</p>';return;}
   const wl=document.getElementById('wl-list');if(!wl)return;
@@ -1985,7 +1996,7 @@ window.removeFromWarteliste=async function(id){await updateDoc(doc(db,'wartelist
 // LEHRER – EINSTELLUNGEN (Profil)
 // ════════════════════════════════
 pages['lehrer-profil']=async function(el){
-  el.innerHTML=`<div class="page active"><h1 class="page-title">Einstellungen</h1><div class="card"><div id="profil-content"><div class="spinner"></div></div></div></div>`;
+  el.innerHTML=`<div class="page active"><h2 class="page-title">Einstellungen</h2><div class="card"><div id="profil-content"><div class="spinner"></div></div></div></div>`;
   const[autosSnap,pSnap]=await Promise.all([getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId))),getDoc(doc(db,'kalenderUsers',currentUser.uid))]);
   const p=pSnap.data();const currentAutoId=p.autoId||'';const bd=p.blockDauer||60;const sp=p.slotplan||{};
   const opts=`<option value="">— Kein Auto —</option>`+autosSnap.docs.map(d=>{const a=d.data();return`<option value="${d.id}" ${currentAutoId===d.id?'selected':''}>${a.modell} · ${a.kennzeichen}</option>`;}).join('');
