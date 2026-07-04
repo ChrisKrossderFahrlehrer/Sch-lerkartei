@@ -1283,6 +1283,37 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 </div>
 
 <!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="invite-modal" onclick="closeModal(event)">
+  <div class="modal-sheet">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.05rem">👥 Fahrlehrer einladen</div>
+      <button class="btn-icon-sm" aria-label="Schließen" onclick="document.getElementById('invite-modal').classList.remove('open')">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Name des Fahrlehrers <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+      <input class="form-input" id="inv-name" type="text" placeholder="z. B. Max Mustermann" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label class="form-label">E-Mail des Fahrlehrers</label>
+      <input class="form-input" id="inv-email" type="email" placeholder="z. B. max@beispiel.de" autocomplete="off">
+    </div>
+    <button class="btn-main" id="inv-create-btn" onclick="createInvite()">🔗 Einladungslink erstellen</button>
+    <div id="inv-result" style="display:none;margin-top:14px;background:var(--surface2);border:1px solid var(--accent);border-radius:12px;padding:12px">
+      <div style="font-size:0.78rem;font-weight:700;margin-bottom:6px">✅ Link erstellt – jetzt an den Fahrlehrer senden:</div>
+      <input class="form-input" id="inv-link" readonly onclick="this.select()" style="font-size:0.72rem;margin-bottom:8px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-secondary" style="flex:1;min-width:90px" onclick="copyInviteLink()">📋 Kopieren</button>
+        <button class="btn-secondary" style="flex:1;min-width:90px" id="inv-wa-btn" onclick="waInvite()">💬 WhatsApp</button>
+        <button class="btn-secondary" style="flex:1;min-width:90px" id="inv-mail-btn" onclick="mailInvite()">✉️ E-Mail</button>
+      </div>
+      <div style="font-size:0.68rem;color:var(--muted);margin-top:8px">Der Link ist 14 Tage gültig und kann nur einmal verwendet werden. Der Fahrlehrer erscheint nach seiner Registrierung zur Freigabe in deiner SuperAdmin-Warteliste.</div>
+    </div>
+    <div id="inv-list-wrap" style="margin-top:16px">
+      <div style="font-size:0.78rem;font-weight:700;margin-bottom:8px">Offene Einladungen</div>
+      <div id="inv-list" style="font-size:0.78rem;color:var(--muted)">–</div>
+    </div>
+  </div>
+</div>
 <div class="modal-overlay" id="settings-modal" onclick="closeModal(event)">
   <div class="modal-sheet">
     <div class="sheet-title">⚙️ Einstellungen</div>
@@ -1335,6 +1366,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');startTutorial()" style="background:var(--surface2);margin-bottom:8px">🎓 Tutorial nochmal anzeigen</button>
     <button class="btn-sheet-cancel" onclick="exportAlleDaten()" style="background:var(--surface2);margin-bottom:8px">💾 Alle Daten exportieren (Backup)</button>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openImpressum()" style="background:var(--surface2);margin-bottom:12px">📄 Impressum</button>
+    <button class="btn-sheet-cancel" id="btn-invite-settings" style="display:none;background:var(--surface2);margin-bottom:8px" onclick="document.getElementById('settings-modal').classList.remove('open');openInviteModal()">👥 Fahrlehrer einladen</button>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open')">Schließen</button>
     <div style="text-align:center;margin-top:14px;font-size:0.7rem;color:var(--muted);opacity:0.7">
       © 2026 ChrisKross der Fahrlehrer
@@ -2306,7 +2338,10 @@ window.doRegister = async () => {
     // Falls Fahrlehrer einen Code eingegeben hat: Fahrschule per schoolCodes-
     // Nachschlagetabelle finden (get statt list → kein Abgreifen aller Codes).
     let zielFahrschule = null;
-    if (regRole === 'fahrlehrer' && fsCode) {
+    if (window.__inviteData) {
+      const inv = window.__inviteData;
+      zielFahrschule = { id: inv.fahrschuleId, name: inv.fsName || null, fahrschulCode: inv.fahrschulCode || null };
+    } else if (regRole === 'fahrlehrer' && fsCode) {
       try {
         const codeSnap = await getDoc(doc(db, 'schoolCodes', fsCode));
         if (codeSnap.exists()) {
@@ -2368,8 +2403,14 @@ window.doRegister = async () => {
       // Wenn einer Fahrschule beigetreten wird: Code mitgeben, damit die
       // Firestore-Regel prüfen kann, dass der Code wirklich zu dieser Schule
       // gehört (Cross-Tenant-Schutz auch beim Anlegen).
-      if (zielFahrschule && fsCode) fahrlehrerDoc.beitrittCode = fsCode;
+      const beitrittsCode = window.__inviteData ? (window.__inviteData.fahrschulCode || null) : fsCode;
+      if (zielFahrschule && beitrittsCode) fahrlehrerDoc.beitrittCode = beitrittsCode;
+      if (window.__inviteData) fahrlehrerDoc.einladung = window.__inviteData.token;
       await dbSet(doc(db, 'users', cred.user.uid), fahrlehrerDoc);
+      if (window.__inviteData) {
+        try { await dbUpd(doc(db, 'invites', window.__inviteData.token), { used: true, usedBy: cred.user.uid, usedAt: Date.now() }); }
+        catch(invErr) { console.warn('Invite-Markierung:', invErr); }
+      }
       sendRegistrationNotification({
         name, email, username,
         typ: zielFahrschule ? 'Fahrlehrer (→ ' + zielFahrschule.name + ')' : 'Fahrlehrer (eigenständig)'
@@ -2411,6 +2452,142 @@ function sendRegistrationNotification({ name, email, username, typ, code }) {
       .catch(err => console.error('EmailJS:', err));
   } catch(e) { console.error('EmailJS Init:', e); }
 }
+
+
+/* ==== FAHRLEHRER-EINLADUNGEN (Fahrschule → Link → Registrierung) ==== */
+window.__inviteData = null;
+let __invFs = null; // { code, name } der eigenen Fahrschule (Cache)
+
+function __invToken() {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  return Array.from(crypto.getRandomValues(new Uint8Array(22))).map(b => chars[b % 36]).join('');
+}
+window.openInviteModal = async () => {
+  document.getElementById('inv-result').style.display = 'none';
+  document.getElementById('inv-name').value = '';
+  document.getElementById('inv-email').value = '';
+  document.getElementById('invite-modal').classList.add('open');
+  __modalOpenGuardTs = Date.now();
+  if (!__invFs) {
+    try {
+      const fsDoc = await getDoc(doc(db, 'fahrschulen', currentUser.uid));
+      if (fsDoc.exists()) __invFs = { code: fsDoc.data().fahrschulCode || null, name: fsDoc.data().name || '' };
+    } catch(e) { console.warn('invite fs-load', e); }
+  }
+  renderInviteList();
+};
+window.createInvite = async () => {
+  const email = (document.getElementById('inv-email').value || '').trim();
+  const nameV = (document.getElementById('inv-name').value || '').trim();
+  if (!email || !email.includes('@')) { toast('⚠️ Bitte eine gültige E-Mail-Adresse eingeben.'); return; }
+  const btn = document.getElementById('inv-create-btn');
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    if (!__invFs) {
+      const fsDoc = await getDoc(doc(db, 'fahrschulen', currentUser.uid));
+      if (fsDoc.exists()) __invFs = { code: fsDoc.data().fahrschulCode || null, name: fsDoc.data().name || '' };
+    }
+    const token = __invToken();
+    await dbSet(doc(db, 'invites', token), {
+      fahrschuleId:  currentUser.uid,
+      fsName:        (__invFs && __invFs.name) || '',
+      fahrschulCode: (__invFs && __invFs.code) || null,
+      name:  nameV || null,
+      email: email,
+      used:  false,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 14 * 86400000
+    });
+    const link = 'https://fahrsync.de/?invite=' + token;
+    document.getElementById('inv-link').value = link;
+    document.getElementById('inv-result').style.display = 'block';
+    renderInviteList();
+  } catch(e) {
+    console.error('createInvite', e);
+    if (e && e.code === 'permission-denied') {
+      toast('⚠️ Firestore-Regeln fehlen – bitte die aktualisierten Regeln in der Firebase Console veröffentlichen.');
+    } else { toast('⚠️ Einladung konnte nicht erstellt werden.'); }
+  }
+  btn.disabled = false; btn.textContent = '🔗 Einladungslink erstellen';
+};
+window.copyInviteLink = () => {
+  const el = document.getElementById('inv-link'); el.select();
+  try { navigator.clipboard.writeText(el.value).then(() => toast('📋 Link kopiert!')); }
+  catch(e) { document.execCommand('copy'); toast('📋 Link kopiert!'); }
+};
+window.waInvite = () => {
+  const link = document.getElementById('inv-link').value;
+  const txt = 'Hallo! Du wurdest zu FahrSync eingeladen 🚗 Registriere dich hier: ' + link;
+  window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank', 'noopener');
+};
+window.mailInvite = () => {
+  const link = document.getElementById('inv-link').value;
+  const email = (document.getElementById('inv-email').value || '').trim();
+  const sub = encodeURIComponent('Deine Einladung zu FahrSync');
+  const body = encodeURIComponent('Hallo!\n\nDu wurdest zu FahrSync (digitale Schülerkartei) eingeladen.\n\nRegistriere dich hier:\n' + link + '\n\nDer Link ist 14 Tage gültig.');
+  window.location.href = 'mailto:' + email + '?subject=' + sub + '&body=' + body;
+};
+window.renderInviteList = async () => {
+  const box = document.getElementById('inv-list'); if (!box) return;
+  box.textContent = 'Lade…';
+  try {
+    const snap = await getDocs(query(collection(db, 'invites'),
+      where('fahrschuleId', '==', currentUser.uid), where('used', '==', false)));
+    if (snap.empty) { box.textContent = 'Keine offenen Einladungen.'; return; }
+    let html = '';
+    snap.forEach(d => {
+      const v = d.data();
+      const abgelaufen = v.expiresAt && Date.now() > v.expiresAt;
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">'
+        + '<div style="flex:1;min-width:0"><div style="color:var(--text);overflow:hidden;text-overflow:ellipsis">' + escHtml(v.email || '') + '</div>'
+        + '<div style="font-size:0.68rem">' + (v.name ? escHtml(v.name) + ' · ' : '') + new Date(v.createdAt).toLocaleDateString('de-DE') + (abgelaufen ? ' · ⛔ abgelaufen' : '') + '</div></div>'
+        + '<button class="btn-icon-sm" aria-label="Link kopieren" onclick="navigator.clipboard.writeText(\'https://fahrsync.de/?invite=' + d.id + '\').then(()=>toast(\'📋 Kopiert\'))">📋</button>'
+        + '<button class="btn-icon-sm" aria-label="Einladung löschen" onclick="deleteInvite(\'' + d.id + '\')">🗑️</button>'
+        + '</div>';
+    });
+    box.innerHTML = html;
+  } catch(e) {
+    console.warn('renderInviteList', e);
+    box.innerHTML = (e && e.code === 'permission-denied')
+      ? '⚠️ Regeln noch nicht veröffentlicht – Einladungsliste nicht verfügbar.'
+      : 'Liste konnte nicht geladen werden.';
+  }
+};
+window.deleteInvite = async (id) => {
+  try { await dbDel(doc(db, 'invites', id)); toast('🗑️ Einladung gelöscht'); renderInviteList(); }
+  catch(e) { toast('⚠️ Löschen fehlgeschlagen.'); }
+};
+window.checkInviteParam = async (token) => {
+  try {
+    const snap = await getDoc(doc(db, 'invites', token));
+    if (!snap.exists()) { setAuthError('⚠️ Diese Einladung ist ungültig.'); return; }
+    const inv = snap.data();
+    if (inv.used) { setAuthError('⚠️ Diese Einladung wurde bereits verwendet.'); return; }
+    if (inv.expiresAt && Date.now() > inv.expiresAt) { setAuthError('⚠️ Diese Einladung ist abgelaufen. Bitte eine neue anfordern.'); return; }
+    window.__inviteData = { token, fahrschuleId: inv.fahrschuleId, fsName: inv.fsName || '', fahrschulCode: inv.fahrschulCode || null };
+    try { if (typeof setRegRole === 'function') setRegRole('fahrlehrer'); } catch(e) {}
+    try {
+      const rb1 = document.getElementById('role-fahrschule'), rb2 = document.getElementById('role-fahrlehrer');
+      if (rb1 && rb1.parentElement) rb1.parentElement.style.display = 'none'; else { if (rb1) rb1.style.display='none'; if (rb2) rb2.style.display='none'; }
+      const fw = document.getElementById('reg-fscode-wrap'); if (fw) fw.style.display = 'none';
+      const ne = document.getElementById('reg-name');
+      if (ne && ne.parentElement && !document.getElementById('inv-banner')) {
+        const info = document.createElement('div');
+        info.id = 'inv-banner';
+        info.style.cssText = 'background:var(--surface2);border:1px solid var(--accent);border-radius:12px;padding:10px 12px;margin-bottom:14px;font-size:0.8rem';
+        info.innerHTML = '📨 Du wurdest von <b>' + escHtml(window.__inviteData.fsName || 'deiner Fahrschule') + '</b> eingeladen. Erstelle dein Fahrlehrer-Konto – du wirst automatisch der Fahrschule zugeordnet.';
+        ne.parentElement.parentElement.insertBefore(info, ne.parentElement);
+      }
+      const em = document.getElementById('reg-email'); if (em && !em.value && inv.email) em.value = inv.email;
+      if (ne && !ne.value && inv.name) ne.value = inv.name;
+      (document.getElementById('btn-register') || ne).scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } catch(uiErr) { console.warn('invite ui', uiErr); }
+  } catch(e) {
+    console.error('checkInviteParam', e);
+    setAuthError('⚠️ Einladung konnte nicht geprüft werden.');
+  }
+};
+/* ==== ENDE EINLADUNGEN ==== */
 
 // ── PASSWORT-RESET ANFRAGE ──────────────────────────────────
 window.openPwReset = () => {
@@ -2772,9 +2949,11 @@ onAuthStateChanged(auth, async (user) => {
   if (window.__DEMO) return;
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('code') && !user) { checkUrlCode(); return; }
+  if (urlParams.get('invite') && !user) { checkInviteParam(urlParams.get('invite')); }
 
   if (user) {
     currentUser = user;
+    if (urlParams.get('invite')) { try { toast('ℹ️ Einladungslink erkannt – bitte zuerst abmelden, um ihn einzulösen.'); } catch(e){} }
 
     // Profil + Fahrschul-Status laden
     try {
@@ -2794,7 +2973,7 @@ onAuthStateChanged(auth, async (user) => {
               fahrschuleId: user.uid,       // eigenständig
               rolle:        'fahrlehrer',
               typ:          'fahrlehrer',
-              status:       'aktiv',         // bestehendes Konto (war schon in Nutzung) → direkt aktiv
+              status:       'ausstehend',    // FIX: keine Auto-Freischaltung – auch nachgeheilte Konten brauchen die SuperAdmin-Freigabe
               createdAt:    Date.now(),
               nacherstellt: true             // Markierung: nachträglich angelegt (bestehender Nutzer)
             });
@@ -2842,6 +3021,11 @@ onAuthStateChanged(auth, async (user) => {
         }
 
         // Status kommt von der Fahrschule (falls zugeordnet) ODER vom User selbst (eigenständiger Lehrer)
+        window.__userRolle = profil.rolle || null;
+        window.__userTyp   = profil.typ   || null;
+        try { const bi = document.getElementById('btn-invite-settings');
+          if (bi && (profil.typ === 'fahrschule' || profil.rolle === 'fahrschul-admin')) bi.style.display = 'block';
+        } catch(e) {}
         let effektiverStatus = profil.status || null;
         let aboData = null; // für Ablauf-Prüfung
         const fsId = profil.fahrschuleId;
@@ -2850,7 +3034,11 @@ onAuthStateChanged(auth, async (user) => {
           try {
             const fsDoc = await getDoc(doc(db, 'fahrschulen', fsId));
             if (fsDoc.exists()) {
-              if (fsDoc.data().status) effektiverStatus = fsDoc.data().status;
+              // FIX Freigabe-Lücke: Der Fahrschul-Status kann den Fahrlehrer nur
+              // SPERREN (gesperrt/ausstehend), aber nie freischalten – jeder
+              // Fahrlehrer braucht seine eigene SuperAdmin-Freigabe.
+              const fsStatus = fsDoc.data().status;
+              if (fsStatus && fsStatus !== 'aktiv') effektiverStatus = fsStatus;
               aboData = fsDoc.data();
             }
           } catch(e) {}
