@@ -82,6 +82,21 @@ service cloud.firestore {
     // Auflisten (list) ist gesperrt → kein Abgreifen aller Codes/Schulen.
     // Dadurch kann 'fahrschulen' streng (nur Mitglieder) gelesen werden.
     // ══════════════════════════════════════════════════════
+    match /invites/{token} {
+      // Einladung per Link: get ist öffentlich (Token = 22 Zeichen Zufall,
+      // gleiches Muster wie bookingLinks). Enthält den Fahrschul-Code, damit
+      // die bestehende users-Beitritts-Regel greift.
+      allow get: if true;
+      allow list: if isAuth() && resource.data.fahrschuleId == userFsId();
+      allow create: if isAuth() && userDocExists() && userData().typ == 'fahrschule'
+                    && request.resource.data.fahrschuleId == request.auth.uid
+                    && request.resource.data.used == false;
+      allow update: if isAuth() && resource.data.used == false
+                    && request.resource.data.used == true
+                    && request.resource.data.fahrschuleId == resource.data.fahrschuleId
+                    && request.resource.data.fahrschulCode == resource.data.fahrschulCode;
+      allow delete: if isSuperAdmin() || (isAuth() && resource.data.fahrschuleId == userFsId());
+    }
     match /schoolCodes/{code} {
       allow get:    if isAuth();
       allow list:   if isSuperAdmin();
