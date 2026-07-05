@@ -2720,9 +2720,17 @@ async function loadAboStatus(uid) {
       } catch(e) { console.warn('Fahrschul-Abo nicht ladbar:', e); }
     }
     aboStatus = src.abo || 'free';
-    aboMaxLehrerAktuell = (src.abo && src.abo !== 'free' && Object.prototype.hasOwnProperty.call(src, 'aboMaxLehrer'))
-      ? src.aboMaxLehrer
-      : 1;
+    // BESTANDSSCHUTZ: Alle Konten, die VOR dem PayPal-Start registriert wurden,
+    // nutzen die App dauerhaft kostenlos in vollem Umfang (kein Banner, keine
+    // Einladungs-Grenze). Freiwilliges Upgrade (z.B. fuer den Planer) bleibt moeglich.
+    const BESTAND_CUTOFF = 1782950400000; // 06.07.2026, 00:00 UTC (PayPal-Launch-Nacht)
+    if (aboStatus === 'free' && (src.createdAt || 0) < BESTAND_CUTOFF) {
+      aboStatus = 'bestand';
+    }
+    aboMaxLehrerAktuell =
+      (aboStatus !== 'free' && aboStatus !== 'bestand' && Object.prototype.hasOwnProperty.call(src, 'aboMaxLehrer'))
+        ? src.aboMaxLehrer
+        : (aboStatus === 'bestand' ? null : 1);
   } catch(e) { console.error('Abo-Check:', e); }
   aboStatus === 'free' ? showBanner() : hideBanner();
   updateAboUI();
@@ -2741,10 +2749,10 @@ function updateAboUI() {
     return;
   }
   const upgradeBtn = document.getElementById('btn-upgrade');
-  if (upgradeBtn) upgradeBtn.style.display = (aboStatus === 'free' && window.__billingOwner) ? 'block' : 'none';
+  if (upgradeBtn) upgradeBtn.style.display = ((aboStatus === 'free' || aboStatus === 'bestand') && window.__billingOwner) ? 'block' : 'none';
   const existingBadge = document.getElementById('abo-badge');
   if (existingBadge) existingBadge.remove();
-  if (aboStatus !== 'free') {
+  if (aboStatus !== 'free' && aboStatus !== 'bestand') {
     const header = document.querySelector('.header-title');
     if (header && !document.getElementById('abo-badge')) {
       const badge = document.createElement('span');
