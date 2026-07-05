@@ -2754,7 +2754,7 @@ function initPayPal() {
     // PayPal SDK dynamisch laden
     const script = document.createElement('script');
     // ⚠️ DEINE PayPal Client-ID hier eintragen:
-    script.src = 'https://www.paypal.com/sdk/js?client-id=DEINE_PAYPAL_CLIENT_ID&vault=true&intent=subscription&currency=EUR';
+    script.src = 'https://www.paypal.com/sdk/js?client-id=ASK2ElSjrJ6L5th4v-RjbT9ZOfYnmN5BaM-2Dc_Xz3hWKk2evaBlzCNQ-s5jm7Mp-vSdpYI7yTvUth5g&vault=true&intent=subscription&currency=EUR';
     script.onload  = () => renderPayPalButtons();
     script.onerror = () => {
       document.getElementById('paypal-button-container').innerHTML =
