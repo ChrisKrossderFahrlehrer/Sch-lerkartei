@@ -1209,9 +1209,9 @@ async function renderAbos() {
       </div>`;
 
     // Abo-Tabelle
-    const aboLabel = { free:'Free', pro_monat:'Pro Monat', pro_jahr:'Pro Jahr' };
-    const aboBg    = { free:'var(--surface)', pro_monat:'rgba(63,185,80,0.1)', pro_jahr:'rgba(240,180,41,0.1)' };
-    const aboColor = { free:'var(--muted)', pro_monat:'var(--accent2)', pro_jahr:'var(--accent)' };
+    const aboLabel = { free:'Free', solo:'Solo', bis5:'bis 5 FL', bis10:'bis 10 FL', bis15:'bis 15 FL', unbegrenzt:'Unbegrenzt', pro_monat:'Pro Monat', pro_jahr:'Pro Jahr' };
+    const aboBg    = { free:'var(--surface)', solo:'rgba(88,166,255,0.1)', bis5:'rgba(63,185,80,0.1)', bis10:'rgba(63,185,80,0.1)', bis15:'rgba(63,185,80,0.1)', unbegrenzt:'rgba(240,180,41,0.1)', pro_monat:'rgba(63,185,80,0.1)', pro_jahr:'rgba(240,180,41,0.1)' };
+    const aboColor = { free:'var(--muted)', solo:'#58a6ff', bis5:'var(--accent2)', bis10:'var(--accent2)', bis15:'var(--accent2)', unbegrenzt:'var(--accent)', pro_monat:'var(--accent2)', pro_jahr:'var(--accent)' };
 
     const rowsHTML = alle.map(fs => {
       const abo     = fs.abo || 'free';
@@ -1231,9 +1231,11 @@ async function renderAbos() {
               </span>
               <select onchange="setFsAbo('${fs.id}', this.value)"
                 style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:4px 8px;font-size:0.72rem;cursor:pointer">
-                <option value="free"      ${abo==='free'?'selected':''}>Free</option>
-                <option value="pro_monat" ${abo==='pro_monat'?'selected':''}>Pro Monat</option>
-                <option value="pro_jahr"  ${abo==='pro_jahr'?'selected':''}>Pro Jahr</option>
+                <option value="free"       ${abo==='free'?'selected':''}>Free</option>
+                <option value="bis5"       ${abo==='bis5'?'selected':''}>bis 5 Fahrlehrer</option>
+                <option value="bis10"      ${abo==='bis10'?'selected':''}>bis 10 Fahrlehrer</option>
+                <option value="bis15"      ${abo==='bis15'?'selected':''}>bis 15 Fahrlehrer</option>
+                <option value="unbegrenzt" ${abo==='unbegrenzt'?'selected':''}>Unbegrenzt</option>
               </select>
             </div>
           </div>
@@ -1250,6 +1252,7 @@ async function renderAbos() {
               <div style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:3px;left:${fs.kalenderAktiv ? '23px' : '3px'};transition:0.2s"></div>
             </div>
           </div>
+          ${(fs.aboPlaner && !fs.kalenderAktiv) ? `<div style="margin-top:8px;background:rgba(240,180,41,0.12);border:1px solid rgba(240,180,41,0.4);border-radius:8px;padding:6px 10px;font-size:0.72rem;color:var(--accent);font-weight:700">💳 Planer bezahlt – bitte oben freischalten</div>` : ''}
           ${ABO_ENABLED ? `
             <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
               ${fs.status === 'zahlung_offen'
@@ -1288,6 +1291,7 @@ async function renderAbos() {
               <div style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:3px;left:${l.kalenderAktiv ? '23px' : '3px'};transition:0.2s"></div>
             </div>
           </div>
+          ${(l.aboPlaner && !l.kalenderAktiv) ? `<div style="margin-top:8px;background:rgba(240,180,41,0.12);border:1px solid rgba(240,180,41,0.4);border-radius:8px;padding:6px 10px;font-size:0.72rem;color:var(--accent);font-weight:700">💳 Planer bezahlt – bitte oben freischalten</div>` : ''}
         </div>`;
     }).join('');
 
@@ -1313,21 +1317,18 @@ async function renderAbos() {
   }
 }
 
+const ABO_MAXLEHRER = { free:1, solo:1, bis5:5, bis10:10, bis15:15, unbegrenzt:null, pro_monat:null, pro_jahr:null };
+
 window.setFsAbo = async (fsId, abo) => {
   try {
-    const now      = Date.now();
-    const expiry   = abo === 'pro_monat'
-      ? now + 30*24*60*60*1000
-      : abo === 'pro_jahr'
-        ? now + 365*24*60*60*1000
-        : null;
     await updateDoc(doc(db,'fahrschulen',fsId), {
       abo,
-      aboExpiry:     expiry,
+      aboMaxLehrer:  ABO_MAXLEHRER[abo] === undefined ? null : ABO_MAXLEHRER[abo],
       aboSetByAdmin: true,
-      aboUpdatedAt:  now
+      aboUpdatedAt:  Date.now()
     });
     toast(`✅ Abo auf "${abo}" gesetzt`);
+    renderAbos();
   } catch(e) {
     toast('Fehler: ' + e.message);
   }
