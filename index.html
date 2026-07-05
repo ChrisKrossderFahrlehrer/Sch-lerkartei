@@ -625,25 +625,17 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
           .join('')}
       </div>
 
-      <!-- Pläne -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
-        <!-- Monatlich -->
-        <div id="plan-monat" onclick="selectPlan('monat')"
-          style="border:2px solid var(--border);border-radius:12px;padding:14px;text-align:center;cursor:pointer;transition:border-color .2s">
-          <div style="font-size:0.7rem;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:4px">Monatlich</div>
-          <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.4rem;color:var(--accent)">9,99 €</div>
-          <div style="font-size:0.68rem;color:var(--muted);margin-top:2px">pro Monat</div>
-        </div>
-        <!-- Jährlich (empfohlen) -->
-        <div id="plan-jahr" onclick="selectPlan('jahr')"
-          style="border:2px solid var(--accent);border-radius:12px;padding:14px;text-align:center;cursor:pointer;position:relative">
-          <div style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);
-               background:var(--accent);color:#0d1117;border-radius:999px;padding:2px 10px;
-               font-size:0.62rem;font-weight:800;white-space:nowrap">BELIEBT · 34% RABATT</div>
-          <div style="font-size:0.7rem;color:var(--muted);font-weight:700;text-transform:uppercase;margin-bottom:4px">Jährlich</div>
-          <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.4rem;color:var(--accent)">79 €</div>
-          <div style="font-size:0.68rem;color:var(--muted);margin-top:2px">= 6,58 € / Monat</div>
-        </div>
+      <!-- Stufen -->
+      <div id="tier-cards" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px"></div>
+
+      <label style="display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:14px;cursor:pointer">
+        <input type="checkbox" id="chk-planer" onchange="togglePlaner()" style="width:20px;height:20px;flex-shrink:0;accent-color:var(--accent)">
+        <span style="font-size:0.82rem"><b>📅 Planer (Kalender) dazubuchen</b><br><span style="color:var(--muted);font-size:0.72rem">Termine, Fahrstunden-Buchung &amp; Kalender-Sync</span></span>
+      </label>
+
+      <div style="text-align:center;margin-bottom:14px">
+        <div id="tier-price-value" style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.6rem;color:var(--accent)">–</div>
+        <div id="tier-price-sub" style="font-size:0.7rem;color:var(--muted)">pro Monat</div>
       </div>
 
       <!-- PayPal Button Container -->
@@ -2476,6 +2468,11 @@ window.openInviteModal = async () => {
   }
   renderInviteList();
 };
+async function countAktiveLehrer() {
+  const snap = await getDocs(query(collection(db, 'users'), where('fahrschuleId', '==', currentUser.uid)));
+  return snap.size;
+}
+
 window.createInvite = async () => {
   const email = (document.getElementById('inv-email').value || '').trim();
   const nameV = (document.getElementById('inv-name').value || '').trim();
@@ -2483,6 +2480,14 @@ window.createInvite = async () => {
   const btn = document.getElementById('inv-create-btn');
   btn.disabled = true; btn.textContent = '…';
   try {
+    if (ABO_ENABLED && aboMaxLehrerAktuell !== null) {
+      const activeCount = await countAktiveLehrer();
+      if (activeCount >= aboMaxLehrerAktuell) {
+        toast(`⚠️ Dein Plan erlaubt bis zu ${aboMaxLehrerAktuell} Fahrlehrer. Bitte Plan erweitern, um mehr einzuladen.`);
+        btn.disabled = false; btn.textContent = '🔗 Einladungslink erstellen';
+        return;
+      }
+    }
     if (!__invFs) {
       const fsDoc = await getDoc(doc(db, 'fahrschulen', currentUser.uid));
       if (fsDoc.exists()) __invFs = { code: fsDoc.data().fahrschulCode || null, name: fsDoc.data().name || '' };
@@ -2661,16 +2666,27 @@ window.doLogout = async () => {
 // ─────────────────────────────────────────
 // ⚙️ FEATURE-FLAG: Bezahlfunktion aktivieren/deaktivieren
 // Auf true setzen sobald PayPal-Pläne eingerichtet sind!
-const ABO_ENABLED = false;
+const ABO_ENABLED = true;
 
-let aboStatus      = 'free';  // 'free' | 'pro_monat' | 'pro_jahr'
-let aboExpiry      = null;
-let selectedPlanId = 'jahr';  // default Jahres-Plan
-let paypalRendered = false;
+// FIX: 10 echte PayPal-Abo-Plaene (5 Fahrlehrer-Stufen x mit/ohne Planer).
+// maxLehrer:null bedeutet unbegrenzt. price* nur fuer die UI-Anzeige,
+// der echte Preis kommt aus dem PayPal-Plan selbst.
+const PLANS = {
+  solo:       { label:'Solo (eigenstaendiger Fahrlehrer)', maxLehrer:1,    price:9.99,  pricePlaner:13.99, id:'P-4NU22633BD298162DNJFEWLI', idPlaner:'P-5WR5028990092335YNJFEXYA' },
+  bis5:       { label:'Fahrschule bis 5 Fahrlehrer',       maxLehrer:5,    price:12.99, pricePlaner:16.99, id:'P-6MT978804E871203DNJFEY6I',  idPlaner:'P-62X57828ND5677308NJFEZVA' },
+  bis10:      { label:'Fahrschule bis 10 Fahrlehrer',      maxLehrer:10,   price:20.99, pricePlaner:25.99, id:'P-6PU84465TJ206253SNJFE2GI',  idPlaner:'P-0R339159LA0608445NJFE2ZQ' },
+  bis15:      { label:'Fahrschule bis 15 Fahrlehrer',      maxLehrer:15,   price:26.99, pricePlaner:34.99, id:'P-73W48950B2092742VNJFE3KY',  idPlaner:'P-3P20164845621960ANJFE35A' },
+  unbegrenzt: { label:'Fahrschule unbegrenzt',             maxLehrer:null, price:34.99, pricePlaner:40.99, id:'P-22Y05276M00023207NJFE4ZA',  idPlaner:'P-4SF532859T7264908NJFE5PQ' }
+};
+
+let aboStatus           = 'free';
+let aboMaxLehrerAktuell = 1;
+let selectedTier        = null;
+let planerGewuenscht    = false;
+let paypalRendered      = false;
 
 // ─ Abo laden & Banner steuern ───────────
 async function loadAboStatus(uid) {
-  // Bezahlfunktion deaktiviert: kein Banner, kein Pro-Button, App voll nutzbar
   if (!ABO_ENABLED) {
     hideBanner();
     const upBtn = document.getElementById('btn-upgrade');
@@ -2678,22 +2694,35 @@ async function loadAboStatus(uid) {
     return;
   }
   try {
-    // Abo steht in der Fahrschule (aus adk-platform gesetzt)
     const userDoc = await getDoc(doc(db,'users',uid));
     if (!userDoc.exists()) { showBanner(); return; }
-    const data   = userDoc.data();
-    const fsId   = data.fahrschuleId || uid;
-    const fsDoc  = await getDoc(doc(db,'fahrschulen',fsId));
-    if (fsDoc.exists()) {
-      const fs  = fsDoc.data();
-      aboStatus = fs.abo || 'free';
-      aboExpiry = fs.aboExpiry || null;
-      // Abgelaufen? → Free
-      if (aboExpiry && aboExpiry < Date.now()) {
-        aboStatus = 'free';
-        await dbUpd(doc(db,'fahrschulen',fsId), { abo:'free', aboExpiry:null });
-      }
+    const data = userDoc.data();
+
+    if (data.typ === 'fahrschule') {
+      window.__billingOwner  = true;
+      window.__billingScope  = 'fahrschule';
+      window.__billingDocRef = { coll:'fahrschulen', id:uid };
+    } else if (!data.fahrschuleId || data.fahrschuleId === uid) {
+      window.__billingOwner  = true;
+      window.__billingScope  = 'solo';
+      window.__billingDocRef = { coll:'users', id:uid };
+    } else {
+      window.__billingOwner  = false;
+      window.__billingScope  = null;
+      window.__billingDocRef = null;
     }
+
+    let src = data;
+    if (!window.__billingOwner && data.fahrschuleId) {
+      try {
+        const fsDoc = await getDoc(doc(db, 'fahrschulen', data.fahrschuleId));
+        if (fsDoc.exists()) src = fsDoc.data();
+      } catch(e) { console.warn('Fahrschul-Abo nicht ladbar:', e); }
+    }
+    aboStatus = src.abo || 'free';
+    aboMaxLehrerAktuell = (src.abo && src.abo !== 'free' && Object.prototype.hasOwnProperty.call(src, 'aboMaxLehrer'))
+      ? src.aboMaxLehrer
+      : 1;
   } catch(e) { console.error('Abo-Check:', e); }
   aboStatus === 'free' ? showBanner() : hideBanner();
   updateAboUI();
@@ -2712,7 +2741,7 @@ function updateAboUI() {
     return;
   }
   const upgradeBtn = document.getElementById('btn-upgrade');
-  if (upgradeBtn) upgradeBtn.style.display = aboStatus === 'free' ? 'block' : 'none';
+  if (upgradeBtn) upgradeBtn.style.display = (aboStatus === 'free' && window.__billingOwner) ? 'block' : 'none';
   const existingBadge = document.getElementById('abo-badge');
   if (existingBadge) existingBadge.remove();
   if (aboStatus !== 'free') {
@@ -2730,24 +2759,63 @@ function updateAboUI() {
 // ─ Upgrade Modal ────────────────────────
 window.openUpgradeModal = () => {
   if (!ABO_ENABLED) { toast('💳 Abo-Funktion kommt bald'); return; }
+  if (!window.__billingOwner) { toast('ℹ️ Nur der Fahrschul-Inhaber kann das Abo verwalten.'); return; }
   document.getElementById('upgrade-modal').classList.add('open');
-  selectPlan('jahr');
+  renderTierCards();
   if (!paypalRendered) initPayPal();
 };
 
-window.selectPlan = (plan) => {
-  selectedPlanId = plan;
-  ['monat','jahr'].forEach(p => {
-    const el = document.getElementById('plan-' + p);
-    if (el) el.style.borderColor = p === plan ? 'var(--accent)' : 'var(--border)';
+function priceStr(n) { return n.toFixed(2).replace('.', ',') + ' €'; }
+
+function renderTierCards() {
+  const isSolo = window.__billingScope === 'solo';
+  const keys = isSolo ? ['solo'] : ['bis5','bis10','bis15','unbegrenzt'];
+  document.getElementById('tier-cards').innerHTML = keys.map(k => {
+    const p = PLANS[k];
+    return `<div data-tier="${k}" onclick="selectTier('${k}')"
+      style="border:2px solid var(--border);border-radius:12px;padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px">
+      <div style="min-width:0">
+        <div style="font-weight:700;font-size:0.86rem">${p.label.replace('Fahrschule ', '')}</div>
+        <div style="font-size:0.68rem;color:var(--muted)">${p.maxLehrer ? 'bis ' + p.maxLehrer + ' Fahrlehrer' : 'unbegrenzt viele Fahrlehrer'}</div>
+      </div>
+      <div style="font-weight:800;color:var(--accent);white-space:nowrap">${priceStr(p.price)}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('chk-planer').checked = false;
+  planerGewuenscht = false;
+  window.selectTier(keys[0]);
+}
+
+window.selectTier = (tier) => {
+  selectedTier = tier;
+  document.querySelectorAll('#tier-cards [data-tier]').forEach(el => {
+    el.style.borderColor = el.dataset.tier === tier ? 'var(--accent)' : 'var(--border)';
   });
-  // PayPal Buttons neu rendern wenn nötig
+  updateTierPriceUI();
+  rerenderPaypal();
+};
+
+window.togglePlaner = () => {
+  planerGewuenscht = document.getElementById('chk-planer').checked;
+  updateTierPriceUI();
+  rerenderPaypal();
+};
+
+function updateTierPriceUI() {
+  const p = PLANS[selectedTier];
+  if (!p) return;
+  const price = planerGewuenscht ? p.pricePlaner : p.price;
+  document.getElementById('tier-price-value').textContent = priceStr(price);
+  document.getElementById('tier-price-sub').textContent = 'pro Monat' + (planerGewuenscht ? ' · inkl. Planer' : '');
+}
+
+function rerenderPaypal() {
   if (paypalRendered) {
     document.getElementById('paypal-button-container').innerHTML = '';
     paypalRendered = false;
-    initPayPal();
   }
-};
+  initPayPal();
+}
 
 function initPayPal() {
   if (typeof paypal === 'undefined') {
@@ -2767,27 +2835,16 @@ function initPayPal() {
 }
 
 function renderPayPalButtons() {
-  // ⚠️ DEINE PayPal Subscription-Plan-IDs hier eintragen:
-  const planIds = {
-    monat: 'P-XXXXXXXXXXXXXXXXXXXXXX_MONAT',   // ← PayPal Plan-ID (monatlich)
-    jahr:  'P-XXXXXXXXXXXXXXXXXXXXXX_JAHR'     // ← PayPal Plan-ID (jährlich)
-  };
-  const planId = planIds[selectedPlanId];
-  if (!planId || planId.includes('XXXX')) {
-    document.getElementById('paypal-button-container').innerHTML =
-      `<div style="background:rgba(240,180,41,0.1);border:1px solid rgba(240,180,41,0.3);
-       border-radius:10px;padding:14px;text-align:center;font-size:0.78rem;color:var(--accent)">
-       ⚠️ PayPal noch nicht eingerichtet.<br>
-       <span style="color:var(--muted)">Plan-IDs in index.html eintragen.</span></div>`;
-    return;
-  }
+  const p = PLANS[selectedTier];
+  if (!p) return;
+  const planId = planerGewuenscht ? p.idPlaner : p.id;
   paypal.Buttons({
     style: { shape:'rect', color:'gold', layout:'vertical', label:'subscribe' },
     createSubscription: (data, actions) => {
       return actions.subscription.create({ plan_id: planId });
     },
     onApprove: async (data) => {
-      await activateAbo(data.subscriptionID, selectedPlanId);
+      await activateAbo(data.subscriptionID, planId);
     },
     onError: (err) => {
       toast('❌ PayPal-Fehler: ' + err);
@@ -2796,25 +2853,27 @@ function renderPayPalButtons() {
   paypalRendered = true;
 }
 
-async function activateAbo(subscriptionId, plan) {
+async function activateAbo(subscriptionId, planId) {
   try {
-    if (!currentUser) return;
-    const expiry = plan === 'pro_monat'
-      ? Date.now() + 30*24*60*60*1000
-      : Date.now() + 365*24*60*60*1000;
-    const userDoc = await getDoc(doc(db,'users',currentUser.uid));
-    const fsId    = userDoc.exists() ? (userDoc.data().fahrschuleId || currentUser.uid) : currentUser.uid;
-    await dbUpd(doc(db,'fahrschulen',fsId), {
-      abo:            'pro_' + plan,
-      aboExpiry:      expiry,
-      aboPaypalId:    subscriptionId,
-      aboActivatedAt: Date.now()
+    if (!currentUser || !window.__billingDocRef) return;
+    const p = PLANS[selectedTier];
+    await dbUpd(doc(db, window.__billingDocRef.coll, window.__billingDocRef.id), {
+      abo:               selectedTier,
+      aboPlaner:         planerGewuenscht,
+      aboMaxLehrer:      p.maxLehrer,
+      aboSubscriptionId: subscriptionId,
+      aboPlanId:         planId,
+      aboAktiviertAm:    Date.now(),
+      aboSetByAdmin:     false
     });
-    aboStatus = 'pro_' + plan;
+    aboStatus = selectedTier;
+    aboMaxLehrerAktuell = p.maxLehrer;
     hideBanner();
     updateAboUI();
     document.getElementById('upgrade-modal').classList.remove('open');
-    toast(`🎉 ADK Pro aktiviert! ${plan === 'pro_monat' ? 'Monatlich' : 'Jährlich'}`);
+    toast(planerGewuenscht
+      ? '🎉 Zahlung erfolgreich! Kartei sofort aktiv - der Kalender wird in Kürze freigeschaltet.'
+      : '🎉 Zahlung erfolgreich! Dein Abo ist aktiv.');
   } catch(e) {
     toast('Fehler bei Aktivierung: ' + e.message);
   }
