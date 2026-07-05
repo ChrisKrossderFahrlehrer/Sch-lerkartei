@@ -48,7 +48,9 @@ service cloud.firestore {
     }
 
     function isFsAdmin() {
-      return isAuth() && userDocExists() && userData().rolle == 'fs_admin';
+      // FIX: Rolle wird ueberall als 'fahrschul-admin' gespeichert, nicht 'fs_admin'.
+      // Ohne diesen Fix war isFsAdmin() IMMER false (Tippfehler-Bug).
+      return isAuth() && userDocExists() && userData().rolle == 'fahrschul-admin';
     }
 
     // Helper: Dokument gehört zum User (neue oder alte Struktur)
