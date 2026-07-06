@@ -1554,6 +1554,13 @@ async function renderSuperAdminEinst() {
     console.log('platform/impressum noch nicht vorhanden – wird beim Speichern angelegt');
   }
 
+  // Bestehende Werbedaten laden
+  let w = {};
+  try {
+    const wDoc = await getDoc(doc(db, 'platform', 'werbung'));
+    if (wDoc.exists()) w = wDoc.data();
+  } catch(e) { console.log('platform/werbung noch nicht vorhanden'); }
+
   // Bestehende Broadcast-Nachricht laden
   let bc = {};
   try {
@@ -1629,6 +1636,32 @@ async function renderSuperAdminEinst() {
       <button class="btn-secondary" style="margin-top:8px" onclick="clearPlatformBroadcast()">🗑️ Nachricht entfernen</button>
     </div>
 
+
+    <div class="section-hd" style="margin-top:8px">📣 Werbebanner (Free-Nutzer)</div>
+    <div class="card" style="margin-bottom:8px">
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:14px;line-height:1.5">
+        Wird bei allen Free-Konten im Banner angezeigt – automatisch als „ANZEIGE" gekennzeichnet.
+        Inaktiv oder leer = Standard-Eigenwerbung fürs Abo.
+      </div>
+      <div class="form-group">
+        <label class="form-label">Werbetext</label>
+        <input class="form-input" id="sa-ad-text" value="${(w.text||'').replace(/"/g,'&quot;')}" placeholder="z.B. Lehrmittel jetzt 10% günstiger bei …">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Bild-URL <span style="color:var(--muted);font-weight:400">(optional, ersetzt den Text)</span></label>
+        <input class="form-input" id="sa-ad-img" value="${(w.img||'').replace(/"/g,'&quot;')}" placeholder="https://…/banner.png">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ziel-Link</label>
+        <input class="form-input" id="sa-ad-link" value="${(w.link||'').replace(/"/g,'&quot;')}" placeholder="https://…">
+      </div>
+      <label style="display:flex;align-items:center;gap:10px;margin-bottom:12px;cursor:pointer">
+        <input type="checkbox" id="sa-ad-aktiv" ${w.aktiv?'checked':''} style="width:18px;height:18px;accent-color:var(--accent)">
+        <span style="font-size:0.85rem">Werbung aktiv (ersetzt Standard-Banner)</span>
+      </label>
+      <div id="sa-ad-status" style="font-size:0.82rem;min-height:20px;margin-bottom:8px;text-align:center;padding:8px;border-radius:8px"></div>
+      <button class="btn-main" onclick="saveWerbung()">💾 Werbung speichern</button>
+    </div>
     <div class="section-hd" style="margin-top:8px">⚙️ Mein Account</div>
     <div class="card">
       <div style="font-size:0.88rem;color:var(--muted);margin-bottom:4px">${currentUser?.email}</div>
@@ -1682,6 +1715,33 @@ window.savePlatformBroadcast = async () => {
     }
     statusEl.style.color = 'var(--danger)';
     statusEl.style.background = 'rgba(248,81,73,0.1)';
+  }
+};
+
+window.saveWerbung = async () => {
+  const statusEl = document.getElementById('sa-ad-status');
+  try {
+    const data = {
+      aktiv: document.getElementById('sa-ad-aktiv').checked,
+      text: (document.getElementById('sa-ad-text').value || '').trim(),
+      img:  (document.getElementById('sa-ad-img').value  || '').trim(),
+      link: (document.getElementById('sa-ad-link').value || '').trim(),
+      updatedAt: Date.now()
+    };
+    if (data.aktiv && !data.text && !data.img) {
+      statusEl.textContent = '⚠️ Bitte Werbetext oder Bild-URL angeben';
+      statusEl.style.color = 'var(--danger)'; return;
+    }
+    if (data.link && !/^https:\/\//.test(data.link)) {
+      statusEl.textContent = '⚠️ Der Ziel-Link muss mit https:// beginnen';
+      statusEl.style.color = 'var(--danger)'; return;
+    }
+    await setDoc(doc(db, 'platform', 'werbung'), data, { merge: true });
+    statusEl.textContent = data.aktiv ? '✅ Werbung ist live!' : '✅ Gespeichert (inaktiv – Standard-Banner läuft)';
+    statusEl.style.color = 'var(--accent2)'; statusEl.style.background = 'rgba(63,185,80,0.1)';
+  } catch(e) {
+    statusEl.textContent = '❌ ' + e.message;
+    statusEl.style.color = 'var(--danger)'; statusEl.style.background = 'rgba(248,81,73,0.1)';
   }
 };
 
