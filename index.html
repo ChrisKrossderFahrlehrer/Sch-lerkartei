@@ -2766,6 +2766,26 @@ async function loadAboStatus(uid) {
 
 function showBanner() {
   document.getElementById('ad-banner').style.display = 'block';
+  loadWerbeBanner();
+}
+let __werbungLoaded = false;
+async function loadWerbeBanner() {
+  if (__werbungLoaded) return; __werbungLoaded = true;
+  try {
+    const d = await getDoc(doc(db, 'platform', 'werbung'));
+    if (!d.exists()) return;
+    const w = d.data();
+    if (!w.aktiv || (!w.text && !w.img)) return;
+    const box = document.getElementById('ad-content'); if (!box) return;
+    const kennz = '<span style="font-size:0.56rem;color:var(--muted);flex-shrink:0;border:1px solid var(--border);border-radius:4px;padding:1px 4px;letter-spacing:.4px">ANZEIGE</span>';
+    const inner = w.img
+      ? '<img src="' + w.img.replace(/"/g,'&quot;') + '" alt="Werbeanzeige" style="max-height:32px;max-width:100%;border-radius:6px;display:block">'
+      : '<span style="font-size:0.72rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(w.text || '') + '</span>';
+    const core = w.link
+      ? '<a href="' + w.link.replace(/"/g,'&quot;') + '" target="_blank" rel="noopener noreferrer sponsored" style="flex:1;min-width:0;display:flex;align-items:center;text-decoration:none">' + inner + '</a>'
+      : '<div style="flex:1;min-width:0;display:flex;align-items:center">' + inner + '</div>';
+    box.innerHTML = kennz + core + '<button onclick="openUpgradeModal()" aria-label="Werbefrei mit ADK Pro" style="flex-shrink:0;background:var(--accent);color:#0d1117;border:none;border-radius:8px;padding:5px 10px;font-size:0.7rem;font-weight:800;cursor:pointer">⭐</button>';
+  } catch(e) { console.warn('werbung', e); }
 }
 function hideBanner() {
   document.getElementById('ad-banner').style.display = 'none';
