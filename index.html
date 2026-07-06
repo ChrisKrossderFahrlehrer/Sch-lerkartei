@@ -649,7 +649,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
         <div id="tier-price-sub" style="font-size:0.7rem;color:var(--muted)">pro Monat</div>
       </div>
 
-      <!-- PayPal Button Container -->
+      <div style="font-size:0.7rem;color:var(--muted);text-align:center;margin-bottom:8px">Es gelten unsere AGB (Registrierung / Einstellungen → Rechtliches) und die <a onclick="document.getElementById('datenschutz-modal').classList.add('open')" style="color:var(--accent);text-decoration:underline;cursor:pointer">Datenschutzerklärung</a>.</div>
+      <div id="checkout-pflichtinfo" style="border:1px solid var(--accent);background:rgba(240,180,41,0.08);border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:0.75rem;line-height:1.65;color:var(--text)"></div>
+      <!-- PayPal Button Container (§312j: zwischen Pflichtinfo und Button steht nichts) -->
       <div id="paypal-button-container" style="margin-bottom:12px"></div>
 
       <!-- Hinweis -->
@@ -753,6 +755,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
         <h1 style="font-size:1.3rem;line-height:1.25;margin:0 0 8px">Die digitale Kartei für Fahrlehrer</h1>
         <p style="color:var(--muted);font-size:.83rem;line-height:1.5;margin:0">Ausbildungsnachweis · Protokoll mit Unterschrift · Lernkurve · Kalender</p>
         <p style="color:var(--muted);font-size:.72rem;margin:6px 0 0">🇩🇪 Hosting in Frankfurt · DSGVO-konform · SSL-verschlüsselt</p>
+        <p style="color:var(--accent);font-size:.74rem;font-weight:700;margin:8px 0 0">Abo-Software: 14 Tage kostenlos testen · danach ab 9,99 €/Monat · monatlich kündbar</p>
       </div>
       
   <div class="login-box">
@@ -838,6 +841,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
         </label>
       </div>
       <button class="btn-main" id="btn-register" onclick="doRegister()">Konto erstellen</button>
+      <div style="font-size:0.68rem;color:var(--muted);text-align:center;margin-top:8px;line-height:1.5">Die Registrierung ist kostenlos. Für die dauerhafte Nutzung ist nach der 14-tägigen Testphase ein kostenpflichtiges Abo erforderlich (ab 9,99 €/Monat, monatlich kündbar).</div>
     </div>
     <div id="schueler-form" style="display:none">
       <div style="text-align:center;margin-bottom:20px">
@@ -895,6 +899,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 
       <strong style="color:var(--text)">8. Kontakt</strong><br>
       Bei Fragen zum Datenschutz wenden Sie sich an den im Impressum genannten Verantwortlichen.<br><br>
+
+      <strong style="color:var(--text)">9. Zahlungsdienstleister (PayPal)</strong><br>
+      Für kostenpflichtige Abonnements erfolgt die Zahlungsabwicklung über PayPal (Europe) S.à r.l. et Cie, S.C.A., 22–24 Boulevard Royal, L-2449 Luxemburg. Die für die Zahlung erforderlichen Daten werden direkt bei PayPal erhoben und verarbeitet; ergänzend gelten die Datenschutzhinweise von PayPal. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung). Diese App speichert keine Zahlungsdaten, sondern lediglich den Abo-Status und die PayPal-Abonnement-Kennung.<br><br>
 
       <span style="font-size:0.72rem;color:var(--muted)">Diese Datenschutzerklärung dient als Grundlage und sollte für den produktiven Einsatz rechtlich geprüft werden.</span>
     </div>
@@ -1286,6 +1293,20 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 </div>
 
 <!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="abo-verwalten-modal" onclick="closeModal(event)">
+  <div class="modal-sheet">
+    <div class="sheet-title">💳 Abo verwalten &amp; kündigen</div>
+    <div style="font-size:0.8rem;line-height:1.65;color:var(--muted);margin-top:12px">
+      Dein Abonnement läuft über PayPal und ist <b style="color:var(--text)">jederzeit zum Ende des Abrechnungsmonats kündbar</b> – ganz ohne Frist oder Angabe von Gründen.<br><br>
+      <b style="color:var(--text)">Weg 1 – direkt bei PayPal:</b><br>
+      PayPal-Konto öffnen → Zahlungen → Abonnements → „FahrSync" auswählen → Kündigen. Die Kündigung wirkt zum Ende des bezahlten Zeitraums.<br><br>
+      <b style="color:var(--text)">Weg 2 – per E-Mail:</b><br>
+      Formlose Nachricht an <a href="mailto:kontakt@fahrsync.de?subject=K%C3%BCndigung%20FahrSync-Abo" style="color:var(--accent)">kontakt@fahrsync.de</a> genügt – wir bestätigen den Eingang und das Vertragsende.<br><br>
+      Nach Vertragsende bleiben deine Daten 30 Tage zum Export erhalten und werden danach unwiderruflich gelöscht.
+    </div>
+    <button class="btn-sheet-cancel" onclick="document.getElementById('abo-verwalten-modal').classList.remove('open')" style="margin-top:16px">Schließen</button>
+  </div>
+</div>
 <div class="modal-overlay" id="invite-modal" onclick="closeModal(event)">
   <div class="modal-sheet">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
@@ -1370,6 +1391,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     <button class="btn-sheet-cancel" onclick="exportAlleDaten()" style="background:var(--surface2);margin-bottom:8px">💾 Alle Daten exportieren (Backup)</button>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openImpressum()" style="background:var(--surface2);margin-bottom:12px">📄 Impressum</button>
     <button class="btn-sheet-cancel" id="btn-invite-settings" style="display:none;background:var(--surface2);margin-bottom:8px" onclick="document.getElementById('settings-modal').classList.remove('open');openInviteModal()">👥 Fahrlehrer einladen</button>
+    <button class="btn-sheet-cancel" id="btn-abo-settings" style="display:none;background:var(--surface2);margin-bottom:8px" onclick="document.getElementById('settings-modal').classList.remove('open');document.getElementById('abo-verwalten-modal').classList.add('open')">💳 Abo verwalten &amp; kündigen</button>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open')">Schließen</button>
     <div style="text-align:center;margin-top:14px;font-size:0.7rem;color:var(--muted);opacity:0.7">
       © 2026 ChrisKross der Fahrlehrer
@@ -2687,7 +2709,7 @@ const PLANS = {
   bis5:       { label:'Fahrschule bis 5 Fahrlehrer',       maxLehrer:5,    price:12.99, pricePlaner:16.99, id:'P-6MT978804E871203DNJFEY6I',  idPlaner:'P-62X57828ND5677308NJFEZVA' },
   bis10:      { label:'Fahrschule bis 10 Fahrlehrer',      maxLehrer:10,   price:20.99, pricePlaner:25.99, id:'P-6PU84465TJ206253SNJFE2GI',  idPlaner:'P-0R339159LA0608445NJFE2ZQ' },
   bis15:      { label:'Fahrschule bis 15 Fahrlehrer',      maxLehrer:15,   price:26.99, pricePlaner:34.99, id:'P-73W48950B2092742VNJFE3KY',  idPlaner:'P-3P20164845621960ANJFE35A' },
-  unbegrenzt: { label:'Fahrschule unbegrenzt',             maxLehrer:null, price:34.99, pricePlaner:40.99, id:'P-22Y05276M00023207NJFE4ZA',  idPlaner:'P-4SF532859T7264908NJFE5PQ' }
+  unbegrenzt: { label:'Fahrschule unbegrenzt',             maxLehrer:null, price:34.99, pricePlaner:40.99, setup:42.99, setupPlaner:45.99, id:'P-22Y05276M00023207NJFE4ZA',  idPlaner:'P-4SF532859T7264908NJFE5PQ' }
 };
 
 let aboStatus           = 'free';
@@ -2761,6 +2783,8 @@ function updateAboUI() {
   }
   const upgradeBtn = document.getElementById('btn-upgrade');
   if (upgradeBtn) upgradeBtn.style.display = ((aboStatus === 'free' || aboStatus === 'bestand') && window.__billingOwner) ? 'block' : 'none';
+  const aboBtn = document.getElementById('btn-abo-settings');
+  if (aboBtn) aboBtn.style.display = window.__billingOwner ? 'block' : 'none';
   const existingBadge = document.getElementById('abo-badge');
   if (existingBadge) existingBadge.remove();
   if (aboStatus !== 'free' && aboStatus !== 'bestand') {
@@ -2797,7 +2821,7 @@ function renderTierCards() {
         <div style="font-weight:700;font-size:0.86rem">${p.label.replace('Fahrschule ', '')}</div>
         <div style="font-size:0.68rem;color:var(--muted)">${p.maxLehrer ? 'bis ' + p.maxLehrer + ' Fahrlehrer' : 'unbegrenzt viele Fahrlehrer'}</div>
       </div>
-      <div style="font-weight:800;color:var(--accent);white-space:nowrap">${priceStr(p.price)}</div>
+      <div style="text-align:right;white-space:nowrap"><div style="font-weight:800;color:var(--accent)">${priceStr(p.price)}</div>${p.setup ? `<div style="font-size:0.6rem;color:var(--muted)">+ einmalig ab ${priceStr(p.setup)}</div>` : ''}</div>
     </div>`;
   }).join('');
   document.getElementById('chk-planer').checked = false;
@@ -2824,8 +2848,20 @@ function updateTierPriceUI() {
   const p = PLANS[selectedTier];
   if (!p) return;
   const price = planerGewuenscht ? p.pricePlaner : p.price;
+  const setup = planerGewuenscht ? (p.setupPlaner || 0) : (p.setup || 0);
   document.getElementById('tier-price-value').textContent = priceStr(price);
-  document.getElementById('tier-price-sub').textContent = 'pro Monat' + (planerGewuenscht ? ' · inkl. Planer' : '');
+  document.getElementById('tier-price-sub').textContent = 'pro Monat' + (planerGewuenscht ? ' · inkl. Planer' : '') + (setup ? ' + einmalig ' + priceStr(setup) + ' Einrichtung' : '');
+  // §312j: Pflichtinformationen unmittelbar vor der Bestellung – Merkmale,
+  // Gesamtpreis je Abrechnungszeitraum, Testphase/automatische Verlängerung,
+  // Laufzeit und Kündigungsbedingungen.
+  const info = document.getElementById('checkout-pflichtinfo');
+  if (info) {
+    info.innerHTML =
+      '<b>FahrSync – ' + p.label + (planerGewuenscht ? ' + Planer (Kalender-Modul)' : '') + '</b> · webbasierte Fahrschul-Software<br>' +
+      'Preis: <b>' + priceStr(price) + ' pro Monat</b>' + (setup ? ' zzgl. <b>einmalig ' + priceStr(setup) + '</b> Einrichtungsgebühr' : '') + ' · gemäß § 19 UStG wird keine Umsatzsteuer berechnet<br>' +
+      'Testphase: <b>14 Tage kostenlos</b> – danach verlängert sich das Abonnement automatisch als <b>zahlungspflichtiges Monats-Abo</b>, wenn nicht zuvor gekündigt wird<br>' +
+      'Laufzeit: unbefristet · <b>jederzeit zum Ende des Abrechnungsmonats kündbar</b> – direkt in deinem PayPal-Konto (Zahlungen → Abonnements) oder formlos per E-Mail an kontakt@fahrsync.de';
+  }
 }
 
 function rerenderPaypal() {
@@ -7246,17 +7282,27 @@ window.openImpressum = async () => {
       <div class="section-body">
         <div style="font-size:0.84rem;line-height:1.7;color:var(--muted)">
           <strong style="color:var(--text)">§ 1 Leistungsgegenstand</strong><br>
-          ADK – Digitale Kartei stellt eine webbasierte Software zur Verwaltung von Fahrschülern und Ausbildungsnachweisen bereit.<br><br>
-          <strong style="color:var(--text)">§ 2 Nutzungsbedingungen</strong><br>
-          Die Nutzung erfolgt ausschließlich für legale Zwecke im Rahmen der Fahrausbildung. Zugangsdaten sind vertraulich zu behandeln und dürfen nicht an Dritte weitergegeben werden.<br><br>
-          <strong style="color:var(--text)">§ 3 Datenverantwortung</strong><br>
+          FahrSync (ADK – Digitale Kartei) stellt eine webbasierte Software zur Verwaltung von Fahrschülern und Ausbildungsnachweisen bereit. Optional kann das Zusatzmodul „Planer" (Kalender &amp; Terminplanung) gebucht werden. Die verfügbaren Preisstufen unterscheiden sich in der zulässigen Anzahl an Fahrlehrer-Konten; die jeweils gültigen Stufen und Preise sind in der App auf der Bestellseite ausgewiesen.<br><br>
+          <strong style="color:var(--text)">§ 2 Geltungsbereich – Angebot nur für Unternehmer</strong><br>
+          Das Angebot richtet sich ausschließlich an Unternehmer im Sinne des § 14 BGB (Fahrschulen und Fahrlehrer in Ausübung ihrer gewerblichen oder selbständigen beruflichen Tätigkeit), nicht an Verbraucher. Mit der Registrierung und dem Abschluss eines Abonnements bestätigt der Kunde, als Unternehmer zu handeln. Ein gesetzliches Widerrufsrecht für Verbraucher besteht daher nicht.<br><br>
+          <strong style="color:var(--text)">§ 3 Testphase und Vertragsschluss</strong><br>
+          Die Registrierung eines Kontos ist kostenlos. Ein kostenpflichtiges Abonnement kommt erst durch den Abschluss über den Zahlungsdienstleister PayPal zustande. Jedes Abonnement beginnt mit einer 14-tägigen kostenlosen Testphase. Nach Ablauf der Testphase verlängert sich das Abonnement automatisch als zahlungspflichtiges Monats-Abonnement zum ausgewiesenen Preis, sofern es nicht zuvor gekündigt wird. Auf die Kostenpflicht wird vor Abschluss deutlich hingewiesen.<br><br>
+          <strong style="color:var(--text)">§ 4 Preise und Zahlung</strong><br>
+          Es gelten die zum Zeitpunkt der Bestellung in der App ausgewiesenen Preise. Die Abrechnung erfolgt monatlich im Voraus über PayPal. Gemäß § 19 UStG wird keine Umsatzsteuer berechnet. Für die Stufe „Unbegrenzt" fällt zusätzlich eine einmalige, nicht erstattungsfähige Einrichtungsgebühr an, die auf der Bestellseite ausgewiesen ist. Preisänderungen werden mindestens sechs Wochen im Voraus per E-Mail oder In-App-Mitteilung angekündigt; dem Kunden steht in diesem Fall ein Sonderkündigungsrecht zum Zeitpunkt des Wirksamwerdens der Änderung zu.<br><br>
+          <strong style="color:var(--text)">§ 5 Laufzeit und Kündigung</strong><br>
+          Das Abonnement läuft auf unbestimmte Zeit und ist jederzeit zum Ende des laufenden Abrechnungsmonats kündbar. Die Kündigung erfolgt wahlweise direkt im PayPal-Konto des Kunden (Zahlungen → Abonnements → Kündigen) oder formlos per E-Mail an kontakt@fahrsync.de. Nach Wirksamwerden der Kündigung endet der Zugriff auf die kostenpflichtigen Funktionen; § 10 bleibt unberührt. Ein Wechsel der Preisstufe erfolgt durch Kündigung des bestehenden und Abschluss eines neuen Abonnements.<br><br>
+          <strong style="color:var(--text)">§ 6 Zahlungsverzug und Sperrung</strong><br>
+          Schlägt eine fällige Abbuchung fehl, wiederholt PayPal den Einzug. Bleibt die Zahlung aus, ist der Betreiber berechtigt, den Zugang bis zum Ausgleich der offenen Forderung zu sperren. Während der Sperrung bleiben die Daten des Kunden erhalten.<br><br>
+          <strong style="color:var(--text)">§ 7 Nutzungsbedingungen</strong><br>
+          Die Nutzung erfolgt ausschließlich für legale Zwecke im Rahmen der Fahrausbildung. Zugangsdaten sind vertraulich zu behandeln und dürfen nicht an Dritte weitergegeben werden. Die Anzahl der Fahrlehrer-Konten richtet sich nach der gebuchten Preisstufe.<br><br>
+          <strong style="color:var(--text)">§ 8 Datenverantwortung</strong><br>
           Der Nutzer ist Verantwortlicher i.S.d. Art. 4 Nr. 7 DSGVO für alle eingegebenen Schülerdaten und stellt sicher, dass eine Rechtsgrundlage für deren Verarbeitung vorliegt.<br><br>
-          <strong style="color:var(--text)">§ 4 Verfügbarkeit</strong><br>
+          <strong style="color:var(--text)">§ 9 Verfügbarkeit</strong><br>
           Eine ständige Verfügbarkeit der Software wird nicht garantiert. Wartungsarbeiten können zu vorübergehenden Einschränkungen führen.<br><br>
-          <strong style="color:var(--text)">§ 5 Kündigung & Datenlöschung</strong><br>
-          Bei Beendigung des Nutzungsverhältnisses werden alle Daten nach 30 Tagen unwiderruflich gelöscht.<br><br>
-          <strong style="color:var(--text)">§ 6 Anwendbares Recht</strong><br>
-          Es gilt das Recht der Bundesrepublik Deutschland.
+          <strong style="color:var(--text)">§ 10 Beendigung &amp; Datenlöschung</strong><br>
+          Bei Beendigung des Nutzungsverhältnisses werden alle Daten nach 30 Tagen unwiderruflich gelöscht. Bis dahin kann der Kunde einen Export seiner Daten anfordern.<br><br>
+          <strong style="color:var(--text)">§ 11 Anwendbares Recht</strong><br>
+          Es gilt das Recht der Bundesrepublik Deutschland. Gerichtsstand ist, soweit gesetzlich zulässig, der Sitz des Betreibers.
         </div>
       </div>
     </div>
