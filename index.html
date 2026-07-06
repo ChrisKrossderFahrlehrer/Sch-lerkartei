@@ -601,20 +601,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 </div>
 
 <!-- ══ WERBEBANNER (nur Free-User) ══ -->
-<div id="ad-banner" style="display:none;position:fixed;bottom:60px;left:0;right:0;z-index:7000;
-     background:var(--surface);border-top:1px solid var(--border);padding:0">
-  <!-- Werbefläche: hier Google AdSense oder eigene Werbung einbinden -->
-  <div id="ad-content" style="padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px">
-    <div style="flex:1;background:var(--surface2);border:1px dashed var(--border);border-radius:8px;
-         padding:10px;text-align:center;font-size:0.75rem;color:var(--muted)">
-      <!-- AdSense-Code hier einfügen -->
-      📢 Werbung
-    </div>
-    <button onclick="openUpgradeModal()" style="flex-shrink:0;background:var(--accent);color:#0d1117;
-        border:none;border-radius:8px;padding:8px 12px;font-size:0.72rem;font-weight:700;cursor:pointer;
-        white-space:nowrap">
-      ⭐ Kein Werbe
-    </button>
+<div id="ad-banner" style="display:none;position:fixed;bottom:60px;left:0;right:0;z-index:400;background:var(--surface);border-top:1px solid var(--border)">
+  <div id="ad-content" style="padding:5px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px;max-width:520px;margin:0 auto">
+    <div style="flex:1;font-size:0.68rem;color:var(--muted);overflow:hidden;white-space:nowrap;text-overflow:ellipsis">📢 Werbung · werbefrei mit ADK Pro</div>
+    <button onclick="openUpgradeModal()" style="flex-shrink:0;background:var(--accent);color:#0d1117;border:none;border-radius:8px;padding:5px 12px;font-size:0.7rem;font-weight:800;cursor:pointer">⭐ ab 9,99 €</button>
   </div>
 </div>
 
@@ -632,10 +622,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     <div style="padding:20px">
       <!-- Features -->
       <div style="margin-bottom:20px">
-        ${['✅ Keine Werbung','✅ Unbegrenzt Schüler','✅ Chat mit Schülern',
-           '✅ Fahrstunden-Planer','✅ Schüler-Portal','✅ PDF-Export','✅ Alle zukünftigen Features']
-          .map(f=>`<div style="padding:6px 0;font-size:0.88rem;border-bottom:1px solid var(--border)">${f}</div>`)
-          .join('')}
+        <div style="padding:6px 0;font-size:0.88rem;border-bottom:1px solid var(--border)">✅ Keine Werbung</div>
+        <div style="padding:6px 0;font-size:0.88rem;border-bottom:1px solid var(--border)">✅ Unbegrenzt Schüler</div>
+        <div style="padding:6px 0;font-size:0.88rem;border-bottom:1px solid var(--border)">✅ Chat mit Schülern</div>
+        <div style="padding:6px 0;font-size:0.88rem;border-bottom:1px solid var(--border)">✅ Schüler-Portal</div>
+        <div style="padding:6px 0;font-size:0.88rem;border-bottom:1px solid var(--border)">✅ PDF-Export &amp; Ausbildungsnachweis</div>
+        <div style="padding:6px 0;font-size:0.88rem;border-bottom:1px solid var(--border)">✅ Alle zukünftigen Features</div>
+        <div style="padding:6px 0;font-size:0.8rem;color:var(--muted)">📅 Planer (Kalender) optional dazubuchbar</div>
       </div>
 
       <!-- Stufen -->
