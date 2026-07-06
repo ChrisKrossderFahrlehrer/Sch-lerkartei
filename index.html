@@ -577,16 +577,18 @@ body.light .student-card { box-shadow:0 3px 0 rgba(16,24,40,0.12), 0 7px 16px rg
 /* A11y: sichtbarer Tastatur-Fokus */
 button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* FIX: Login/Registrierung scrollbar – Inhalt (Hero + Formulare) kann höher
-   als der Bildschirm sein. margin:auto-Technik: zentriert bei wenig Inhalt,
-   scrollt sauber bei viel Inhalt (statt oben+unten abzuschneiden). */
+/* FIX v2: Login/Registrierung scrollbar – Safari-sicher ohne margin:auto
+   (Auto-Margins in Scroll-Containern machen Überlauf in Safari teils
+   unerreichbar). Inhalt startet oben und scrollt zuverlässig. */
 #screen-login {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   justify-content: flex-start;
+  padding-top: max(24px, env(safe-area-inset-top));
+  padding-bottom: 48px;
 }
-#screen-login > :first-child { margin-top: auto; }
-#screen-login > :last-child  { margin-bottom: auto; }
+#screen-login > :first-child { margin-top: 0; }
+#screen-login > :last-child  { margin-bottom: 0; }
 </style>
 </head>
 <body>
@@ -2934,7 +2936,12 @@ async function activateAbo(subscriptionId, planId) {
   }
 }
 
-function setAuthError(msg) { document.getElementById('auth-error').textContent = msg; }
+function setAuthError(msg) {
+  document.getElementById('auth-error').textContent = msg;
+  // FIX: Meldung zusätzlich als Toast – sichtbar auch, wenn das Fehlerfeld
+  // außerhalb des sichtbaren Bereichs liegt (z.B. langes Registrierungsformular).
+  if (msg) { try { toast(msg); } catch(e) {} }
+}
 
 function friendlyError(code) {
   const map = {
