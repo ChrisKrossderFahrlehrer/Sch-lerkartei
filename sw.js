@@ -2,7 +2,40 @@
 // HTML kommt IMMER frisch vom Server → kein Cache-Löschen mehr nötig!
 // Cache dient nur als Offline-Fallback.
 
-const CACHE_NAME = 'adk-v37';
+const CACHE_NAME = 'adk-v38';
+
+// ── FCM Push: Hintergrund-Benachrichtigungen (data-only → wir zeigen selbst an) ──
+try {
+  importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
+  importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
+  firebase.initializeApp({
+    apiKey: "AIzaSyD490kLzTOq3h3VdQ9ZqWZd_aXcDRfxBOs",
+    authDomain: "fahrschule-ebc65.firebaseapp.com",
+    projectId: "fahrschule-ebc65",
+    storageBucket: "fahrschule-ebc65.firebasestorage.app",
+    messagingSenderId: "194338111405",
+    appId: "1:194338111405:web:73e2f31d69cde3ac9beb24"
+  });
+  const _fcm = firebase.messaging();
+  _fcm.onBackgroundMessage((p) => {
+    const d = (p && p.data) || {};
+    self.registration.showNotification(d.title || 'FahrSync', {
+      body: d.body || '',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      data: { link: d.link || '/kalender.html' }
+    });
+  });
+  self.addEventListener('notificationclick', (e) => {
+    e.notification.close();
+    const link = (e.notification.data && e.notification.data.link) || '/kalender.html';
+    e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      for (const c of list) { if (c.url.includes('kalender') && 'focus' in c) return c.focus(); }
+      return clients.openWindow(link);
+    }));
+  });
+} catch (e) { /* Push ist optional – Cache-SW läuft trotzdem */ }
+
 
 // Nur statische Assets die sich nie ändern → Cache-First erlaubt
 const STATIC_ASSETS = [
