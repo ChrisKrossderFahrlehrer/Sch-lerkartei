@@ -99,6 +99,13 @@ service cloud.firestore {
                     && request.resource.data.fahrschulCode == resource.data.fahrschulCode;
       allow delete: if isSuperAdmin() || (isAuth() && resource.data.fahrschuleId == userFsId());
     }
+    match /fcmTokens/{token} {
+      // Geräte-Token für Push-Benachrichtigungen. Gelesen werden sie
+      // ausschließlich von den Cloud Functions (Admin SDK, umgeht Rules).
+      allow read: if false;
+      allow create, update: if isAuth() && request.resource.data.uid == request.auth.uid;
+      allow delete: if isAuth() && resource.data.uid == request.auth.uid;
+    }
     match /schoolCodes/{code} {
       allow get:    if isAuth();
       allow list:   if isSuperAdmin();
