@@ -2099,6 +2099,7 @@ let customThemen = [];
 let customGruppen = [];
 let unsubGruppen = null;
 let protokollEintraege = []; // { id, datum, notiz, fortschritt }
+let protoMiniOffset = 0; // Mini-Kalender: Monats-Navigation (0 = aktueller Monat)
 
 /* ==== DEMO-MODUS (lokal, nichts wird gespeichert) ==== */
 window.__DEMO = false;
@@ -4820,34 +4821,44 @@ function renderProtokollListe() {
     return `<div style="font-size:0.82rem;color:var(--muted);text-align:center;padding:8px 0">Noch keine Fahrstunden eingetragen.<br>Tippe auf <strong>+</strong> um die erste Stunde zu erfassen.</div>`;
   }
 
-  // Mini-Kalender: aktueller Monat mit markierten Fahrtagen
+  // Mini-Kalender mit Monats-Navigation: gefahrene (gold) & geplante (blau) Stunden
   const heute = new Date();
-  const year = heute.getFullYear(), month = heute.getMonth();
+  const heuteISO = `${heute.getFullYear()}-${String(heute.getMonth()+1).padStart(2,'0')}-${String(heute.getDate()).padStart(2,'0')}`;
+  const kalBasis = new Date(heute.getFullYear(), heute.getMonth() + protoMiniOffset, 1);
+  const year = kalBasis.getFullYear(), month = kalBasis.getMonth();
   const firstDay = new Date(year, month, 1).getDay() || 7; // Mo=1
   const daysInMonth = new Date(year, month+1, 0).getDate();
-  const fahrtage = new Set(protokollEintraege
-    .filter(e => e.datum && e.datum.startsWith(`${year}-${String(month+1).padStart(2,'0')}`))
-    .map(e => parseInt(e.datum.split('-')[2]))
-  );
+  const mPrefix = `${year}-${String(month+1).padStart(2,'0')}`;
+  const fahrtage = new Set(), plantage = new Set();
+  protokollEintraege.forEach(e => {
+    if (!e.datum || !e.datum.startsWith(mPrefix)) return;
+    const d = parseInt(e.datum.split('-')[2]);
+    if (e.typ === 'planung' || e.datum > heuteISO) plantage.add(d); else fahrtage.add(d);
+  });
   const monate = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
   let kalCells = '';
   for (let i=1; i<firstDay; i++) kalCells += `<div></div>`;
   for (let d=1; d<=daysInMonth; d++) {
-    const isToday = d === heute.getDate();
+    const isToday = protoMiniOffset === 0 && d === heute.getDate();
     const hasFahrt = fahrtage.has(d);
+    const hasPlan  = !hasFahrt && plantage.has(d);
     kalCells += `<button type="button" style="font-family:inherit;padding:0;line-height:1;-webkit-appearance:none;appearance:none;
       width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-      font-size:0.72rem;font-weight:${isToday||hasFahrt?'800':'400'};
-      background:${hasFahrt?'var(--accent)':isToday?'var(--surface2)':'none'};
-      color:${hasFahrt?'#0d1117':isToday?'var(--text)':'var(--muted)'};
-      border:${isToday&&!hasFahrt?'1px solid var(--border)':'none'};
+      font-size:0.72rem;font-weight:${isToday||hasFahrt||hasPlan?'800':'400'};
+      background:${hasFahrt?'var(--accent)':hasPlan?'var(--blue)':isToday?'var(--surface2)':'none'};
+      color:${hasFahrt?'#0d1117':hasPlan?'#fff':isToday?'var(--text)':'var(--muted)'};
+      border:${isToday&&!hasFahrt&&!hasPlan?'1px solid var(--border)':'none'};
       margin:1px auto;
     ">${d}</button>`;
   }
 
   const miniKal = `
     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:14px">
-      <div style="font-size:0.78rem;font-weight:700;color:var(--text);margin-bottom:8px;text-align:center">${monate[month]} ${year} · ${fahrtage.size} Fahrstunde${fahrtage.size!==1?'n':''}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <button type="button" onclick="protoMiniNav(-1)" aria-label="Voriger Monat" style="background:none;border:none;color:var(--muted);font-size:1.05rem;cursor:pointer;padding:2px 10px">‹</button>
+        <div style="font-size:0.78rem;font-weight:700;color:var(--text);text-align:center">${monate[month]} ${year} · ${fahrtage.size} gefahren${plantage.size ? ` · <span style="color:var(--blue)">${plantage.size} geplant</span>` : ''}</div>
+        <button type="button" onclick="protoMiniNav(1)" aria-label="Nächster Monat" style="background:none;border:none;color:var(--muted);font-size:1.05rem;cursor:pointer;padding:2px 10px">›</button>
+      </div>
       <div style="display:grid;grid-template-columns:repeat(7,1fr);text-align:center;gap:0">
         ${['Mo','Di','Mi','Do','Fr','Sa','So'].map(t=>`<div style="font-size:0.62rem;color:var(--muted);font-weight:700;padding-bottom:4px">${t}</div>`).join('')}
         ${kalCells}
@@ -4877,6 +4888,8 @@ function renderProtokollListe() {
 
   return miniKal + `<div style="display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto">${eintraege}</div>`;
 }
+
+window.protoMiniNav = (dir) => { protoMiniOffset += dir; try { renderProtokollScreen(); } catch(e) {} };
 
 function renderCustomFields(s) {
   if (!customFields.length) {
@@ -5009,6 +5022,7 @@ window.addProtokollEintrag = async () => {
 };
 
 function listenProtokoll(studentId) {
+  protoMiniOffset = 0;
   if (window.__DEMO) { protokollEintraege = ((window.__DEMO_PROTO||{})[studentId]||[]).map(x=>({...x})); try{renderProtokollScreen();}catch(e){} return; }
   if (unsubProtokoll) { unsubProtokoll(); unsubProtokoll = null; }
   const q = query(collection(db, 'protokoll'), where('studentId', '==', studentId), where('uid', '==', currentUser.uid));
