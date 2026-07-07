@@ -835,7 +835,7 @@ function startGlobalRequestWatch(){
 }
 
 // ══ PUSH-BENACHRICHTIGUNGEN (FCM) ══
-const VAPID_PUBLIC_KEY = 'DEIN_VAPID_KEY'; // ← Firebase Console → Projekteinstellungen → Cloud Messaging → Web-Push-Zertifikate
+const VAPID_PUBLIC_KEY = 'BC3nJw39xCFsrFABpreUA0YwSYasdaLhkfG0a_bEExB2Fp2qV8M1X1ZdwgRMXfv0l_8HG1jsR7jCRkx-vK-7Gdo'; // Web-Push (öffentlicher Schlüssel)
 window.renderPushStatus = () => {
   const el = document.getElementById('push-status'); if (!el) return;
   if (!('Notification' in window)) { el.textContent = '⚠️ Dieses Gerät unterstützt keine Push-Mitteilungen.'; return; }
