@@ -401,6 +401,7 @@ tr:last-child td{border-bottom:none;}
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, collection, query, where, orderBy, serverTimestamp, Timestamp, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
 
 // ── FIREBASE CONFIG ──
 const firebaseConfig = {
@@ -831,6 +832,42 @@ function startGlobalRequestWatch(){
     );
   } catch(e) { console.warn('startGlobalRequestWatch', e); }
 }
+
+// ══ PUSH-BENACHRICHTIGUNGEN (FCM) ══
+const VAPID_PUBLIC_KEY = 'DEIN_VAPID_KEY'; // ← Firebase Console → Projekteinstellungen → Cloud Messaging → Web-Push-Zertifikate
+window.renderPushStatus = () => {
+  const el = document.getElementById('push-status'); if (!el) return;
+  if (!('Notification' in window)) { el.textContent = '⚠️ Dieses Gerät unterstützt keine Push-Mitteilungen.'; return; }
+  const p = Notification.permission;
+  el.textContent = p === 'granted'
+    ? (localStorage.getItem('pushAktiv') ? '✅ Aktiv auf diesem Gerät' : 'Erlaubt – jetzt unten registrieren')
+    : p === 'denied' ? '⛔ Blockiert (in Browser-/iOS-Einstellungen erlauben)' : 'Noch nicht aktiviert';
+};
+window.aktivierePush = async () => {
+  try {
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) { toast('Push wird auf diesem Gerät nicht unterstützt.','error'); return; }
+    if (VAPID_PUBLIC_KEY.includes('DEIN_')) { toast('⚠️ Push noch nicht konfiguriert – VAPID-Key fehlt.','error'); return; }
+    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    if (isIOS && window.navigator.standalone !== true) {
+      toast('iPhone: Bitte zuerst „Zum Home-Bildschirm hinzufügen" und Push dort in der App aktivieren.','error'); return;
+    }
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { toast('Benachrichtigungen wurden nicht erlaubt.','error'); renderPushStatus(); return; }
+    const supported = await isSupported().catch(() => false);
+    if (!supported) { toast('Push wird von diesem Browser nicht unterstützt.','error'); return; }
+    const reg = await navigator.serviceWorker.ready;
+    const messaging = getMessaging();
+    const tok = await getToken(messaging, { vapidKey: VAPID_PUBLIC_KEY, serviceWorkerRegistration: reg });
+    if (!tok) { toast('Kein Push-Token erhalten – bitte erneut versuchen.','error'); return; }
+    await setDoc(doc(db, 'fcmTokens', tok), { uid: currentUser.uid, ua: navigator.userAgent.slice(0, 120), createdAt: Date.now() });
+    localStorage.setItem('pushAktiv', '1');
+    try { onMessage(messaging, p => { const d = (p && p.data) || {}; toast((d.title ? d.title + ' – ' : '') + (d.body || 'Neue Mitteilung'), 'success'); }); } catch(e) {}
+    toast('🔔 Push aktiviert!', 'success'); renderPushStatus();
+  } catch(e) {
+    console.error('push', e);
+    toast('Push-Aktivierung fehlgeschlagen: ' + (e.code || e.message), 'error');
+  }
+};
 
 const pages={};
 
@@ -1598,11 +1635,15 @@ window.deleteSlotFromList=async function(id){let _bb=null;try{const s=await getD
 // ════════════════════════════════
 pages['lehrer-buchungen']=async function(el){
   el.innerHTML=`<div class="page active"><h2 class="page-title">Buchungen</h2>
+    <div class="card" style="margin-bottom:16px"><div class="card-title">🔔 Push-Benachrichtigungen</div>
+      <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.5;margin-bottom:10px">Mitteilung auf dieses Gerät bei neuen Terminanfragen &amp; Nachrichten – auch wenn die App geschlossen ist.<br><span id="push-status" style="color:var(--text);font-weight:600"></span></div>
+      <button class="btn btn-primary btn-sm" onclick="aktivierePush()">🔔 Auf diesem Gerät aktivieren</button></div>
     <div class="card" style="margin-bottom:16px"><div class="card-title">🔗 Online-Buchung für Schüler</div><div id="booking-online"><div class="spinner"></div></div></div>
     <div class="card" style="margin-bottom:16px"><div class="card-title">📥 Offene Anfragen</div><div id="booking-requests"><div class="spinner"></div></div></div>
     <div class="card" style="margin-bottom:16px"><div class="card-title">⏳ Warteliste</div><div id="booking-warteliste"><div class="spinner"></div></div></div>
     <div class="card" style="margin-bottom:16px"><div class="card-title">✉️ Nachrichten</div><div id="booking-nachrichten"><div class="spinner"></div></div></div>
     <div class="card"><div class="card-title">✅ Bestätigte Buchungen</div><div id="buchungen-list"><div class="spinner"></div></div></div></div>`;
+  renderPushStatus();
   await publishMyBookingLink();
   await renderBookingOnline();
   await renderBookingRequests();
