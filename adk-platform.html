@@ -1209,9 +1209,9 @@ async function renderAbos() {
       </div>`;
 
     // Abo-Tabelle
-    const aboLabel = { free:'Free', solo:'Solo', bis5:'bis 5 FL', bis10:'bis 10 FL', bis15:'bis 15 FL', unbegrenzt:'Unbegrenzt', pro_monat:'Pro Monat', pro_jahr:'Pro Jahr' };
-    const aboBg    = { free:'var(--surface)', solo:'rgba(88,166,255,0.1)', bis5:'rgba(63,185,80,0.1)', bis10:'rgba(63,185,80,0.1)', bis15:'rgba(63,185,80,0.1)', unbegrenzt:'rgba(240,180,41,0.1)', pro_monat:'rgba(63,185,80,0.1)', pro_jahr:'rgba(240,180,41,0.1)' };
-    const aboColor = { free:'var(--muted)', solo:'#58a6ff', bis5:'var(--accent2)', bis10:'var(--accent2)', bis15:'var(--accent2)', unbegrenzt:'var(--accent)', pro_monat:'var(--accent2)', pro_jahr:'var(--accent)' };
+    const aboLabel = { free:'Free', gratis:'🎁 Gratis', solo:'Solo', bis5:'bis 5 FL', bis10:'bis 10 FL', bis15:'bis 15 FL', unbegrenzt:'Unbegrenzt', pro_monat:'Pro Monat', pro_jahr:'Pro Jahr' };
+    const aboBg    = { free:'var(--surface)', gratis:'rgba(163,113,247,0.14)', solo:'rgba(88,166,255,0.1)', bis5:'rgba(63,185,80,0.1)', bis10:'rgba(63,185,80,0.1)', bis15:'rgba(63,185,80,0.1)', unbegrenzt:'rgba(240,180,41,0.1)', pro_monat:'rgba(63,185,80,0.1)', pro_jahr:'rgba(240,180,41,0.1)' };
+    const aboColor = { free:'var(--muted)', gratis:'#a371f7', solo:'#58a6ff', bis5:'var(--accent2)', bis10:'var(--accent2)', bis15:'var(--accent2)', unbegrenzt:'var(--accent)', pro_monat:'var(--accent2)', pro_jahr:'var(--accent)' };
 
     const rowsHTML = alle.map(fs => {
       const abo     = fs.abo || 'free';
@@ -1232,6 +1232,7 @@ async function renderAbos() {
               <select onchange="setFsAbo('${fs.id}', this.value)"
                 style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:4px 8px;font-size:0.72rem;cursor:pointer">
                 <option value="free"       ${abo==='free'?'selected':''}>Free</option>
+                <option value="gratis"     ${abo==='gratis'?'selected':''}>🎁 Gratis (Premium)</option>
                 <option value="bis5"       ${abo==='bis5'?'selected':''}>bis 5 Fahrlehrer</option>
                 <option value="bis10"      ${abo==='bis10'?'selected':''}>bis 10 Fahrlehrer</option>
                 <option value="bis15"      ${abo==='bis15'?'selected':''}>bis 15 Fahrlehrer</option>
@@ -1279,6 +1280,15 @@ async function renderAbos() {
             <span style="background:rgba(88,166,255,0.12);color:#58a6ff;border-radius:6px;padding:2px 8px;font-size:0.66rem;font-weight:700;flex-shrink:0">Eigenständig</span>
           </div>
           <div style="font-size:0.74rem;color:var(--muted);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc2(l.email||'–')}</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px">
+            <span style="font-size:0.72rem;color:var(--muted)">Abo</span>
+            <select onchange="setUserAbo('${l.id}', this.value)"
+              style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:4px 8px;font-size:0.72rem;cursor:pointer">
+              <option value="free"   ${(l.abo||'free')==='free'?'selected':''}>Free</option>
+              <option value="gratis" ${l.abo==='gratis'?'selected':''}>🎁 Gratis (Premium)</option>
+              <option value="solo"   ${l.abo==='solo'?'selected':''}>Solo (bezahlt)</option>
+            </select>
+          </div>
           <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px">
             <div style="display:flex;align-items:center;gap:7px;min-width:0">
               <span style="font-size:1rem">📅</span>
@@ -1317,7 +1327,22 @@ async function renderAbos() {
   }
 }
 
-const ABO_MAXLEHRER = { free:1, solo:1, bis5:5, bis10:10, bis15:15, unbegrenzt:null, pro_monat:null, pro_jahr:null };
+const ABO_MAXLEHRER = { free:1, gratis:null, solo:1, bis5:5, bis10:10, bis15:15, unbegrenzt:null, pro_monat:null, pro_jahr:null };
+
+window.setUserAbo = async (uid, abo) => {
+  try {
+    await updateDoc(doc(db,'users',uid), {
+      abo,
+      aboMaxLehrer:  ABO_MAXLEHRER[abo] === undefined ? null : ABO_MAXLEHRER[abo],
+      aboSetByAdmin: true,
+      aboUpdatedAt:  Date.now()
+    });
+    toast(`✅ Abo auf "${abo}" gesetzt`);
+    renderAbos();
+  } catch(e) {
+    toast('Fehler: ' + e.message);
+  }
+};
 
 window.setFsAbo = async (fsId, abo) => {
   try {
