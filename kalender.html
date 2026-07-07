@@ -827,6 +827,7 @@ function startGlobalRequestWatch(){
           try { toast('📥 Neue Terminanfrage – unter „Buchungen" bestätigen','success'); } catch(e) {}
         }
         __reqPrevCount = n;
+        try { renderCal(); } catch(e) {}
       },
       e => console.warn('reqWatch', e)
     );
@@ -2277,7 +2278,7 @@ function renderBookingPageContent(schuelerId,lehrerUid,linkData,stud,complete,wl
   const meine=((stud&&stud.meineTermine)||[]).filter(t=>t&&t.start).sort((a,b)=>a.start.localeCompare(b.start));
   window.__bookingMeine=meine;window.__bookingStud=stud;
   const aktiv=!!(linkData&&linkData.aktiv!==false);
-  const slots=aktiv?((linkData.freieSlots||[]).filter(s=>s&&s.start&&new Date(s.start).getTime()>Date.now()).sort((a,b)=>a.start.localeCompare(b.start))):[];
+  const slots=aktiv?((linkData.freieSlots||[]).filter(s=>s&&s.start&&new Date(s.start).getTime()>Date.now()).filter(s=>!(window.__meineAnfragen&&window.__meineAnfragen[s.id])).sort((a,b)=>a.start.localeCompare(b.start))):[];
   window.__bookingCtx={schuelerId,lehrerUid,vorname,slots};
   const _freeIds=slots.map(s=>s.id).filter(Boolean);
   if(Array.isArray(window.__bookingPrevFreeIds)){const _neu=_freeIds.filter(id=>!window.__bookingPrevFreeIds.includes(id));if(_neu.length&&wl)toast('🎉 Ein Termin ist frei geworden — jetzt anfragen!','success');}
@@ -2440,6 +2441,7 @@ window.sendeBuchungsanfrage=async function(schuelerId,lehrerUid,vorname,slot){
   const content=document.getElementById('booking-content');
   try{
     await addDoc(collection(db,'bookingRequests'),{lehrerUid,schuelerId,vorname:vorname||'',slotId:slot.id,start:slot.start,ende:slot.ende,type:slot.type||'fahrstunde',status:'angefragt',createdAt:serverTimestamp()});
+    ((window.__meineAnfragen = window.__meineAnfragen || {})[slot.id] = true);
     __bookingUnsub.forEach(u=>{try{u();}catch(e){}});__bookingUnsub=[];
     if(content)content.innerHTML='<div class="booking-card" style="text-align:center;padding:34px 20px"><div style="font-size:2.8rem;margin-bottom:14px">✅</div><h2 style="margin:0 0 8px;font-size:1.2rem">Anfrage gesendet!</h2><p class="text-muted" style="line-height:1.5">Dein Fahrlehrer bekommt deine Terminanfrage und bestätigt sie in Kürze. Du kannst diese Seite jetzt schließen.</p><button class="btn btn-secondary" style="margin-top:16px" onclick="zurBuchungsUebersicht()">Zurück zur Übersicht</button></div>';
   }catch(e){console.warn(e);toast('Anfrage fehlgeschlagen. Bitte erneut versuchen.','error');}
