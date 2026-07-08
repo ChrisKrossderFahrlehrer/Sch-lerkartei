@@ -486,11 +486,26 @@ window.switchPortalTab = (tab) => {
 };
 
 function renderCurrentTab() {
-  if      (activeTab === 'dashboard')   renderDashboard();
-  else if (activeTab === 'planner')     renderPlanner();
-  else if (activeTab === 'protokoll')   renderProtokoll();
-  else if (activeTab === 'fortschritt') renderFortschritt();
-  else if (activeTab === 'chat')        renderChat();
+  // renderCurrentTab-Schutz: Falls ein Render je auf unerwartete Daten trifft,
+  // sieht der Schüler eine klare Meldung statt eines kaputten/leeren Tabs –
+  // und die echte Ursache landet in der Konsole (statt eines stummen Fehlers).
+  try {
+    if      (activeTab === 'dashboard')   renderDashboard();
+    else if (activeTab === 'planner')     renderPlanner();
+    else if (activeTab === 'protokoll')   renderProtokoll();
+    else if (activeTab === 'fortschritt') renderFortschritt();
+    else if (activeTab === 'chat')        renderChat();
+  } catch(err) {
+    console.error('Render-Fehler in Tab "' + activeTab + '":', err);
+    const el = document.getElementById('tab-' + activeTab);
+    if (el) el.innerHTML =
+      '<div style="text-align:center;padding:40px 24px;color:var(--muted)">' +
+      '<div style="font-size:2.4rem;margin-bottom:10px">🔄</div>' +
+      '<div style="font-weight:600;color:var(--text)">Daten werden aktualisiert…</div>' +
+      '<div style="font-size:0.82rem;margin-top:8px;line-height:1.5">Falls das bleibt, bitte einen ' +
+      '<b>neuen Zugangscode</b> beim Fahrlehrer holen – dein aktueller Code stammt evtl. aus einer älteren Version.</div>' +
+      '</div>';
+  }
 }
 
 // ── Dashboard ──────────────────────────────────────────────────
