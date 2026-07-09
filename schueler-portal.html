@@ -386,7 +386,15 @@ window.doLogin = async () => {
     // SICHERHEIT: Der Code ist die Dokument-ID → gezieltes get() statt list().
     // So ist kein massenhaftes Auslesen der Collection möglich.
     let docRef = null, data = null;
-    const direct = await getDoc(doc(db,'accessCodes', code));
+    let direct;
+    try {
+      direct = await getDoc(doc(db,'accessCodes', code));
+    } catch(gErr) {
+      console.error('DIAGNOSE getDoc accessCodes:', gErr);
+      errEl.textContent = '🔒 Code-Abruf abgelehnt (get accessCodes: ' + (gErr.code || gErr.message) + '). Die aktiven Regeln erlauben "get" auf accessCodes nicht – bitte aktuelle Regel-Datei veröffentlichen.';
+      document.querySelector('.btn-login').textContent = 'Einloggen →';
+      return;
+    }
     if (direct.exists()) {
       docRef = direct; data = direct.data();
     } else {
@@ -434,6 +442,12 @@ function startLiveSession(docId, code) {
     if (!snap.exists()) { doLogout(); return; }
     codeData = snap.data();
     onDataUpdate();
+  }, (snapErr) => {
+    console.error('DIAGNOSE onSnapshot accessCodes:', snapErr);
+    const el = document.getElementById('login-error');
+    if (el) el.textContent = '🔒 Live-Verbindung abgelehnt (listen accessCodes: ' + (snapErr.code || snapErr.message) + ').';
+    const so = document.getElementById('screen-login'), sa = document.getElementById('screen-app');
+    if (so && sa) { sa.classList.remove('active'); so.classList.add('active'); }
   });
 }
 
