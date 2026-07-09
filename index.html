@@ -6545,20 +6545,30 @@ window.doSchuelerLogin = async () => {
   if (unsubSchuelerCode) { unsubSchuelerCode(); unsubSchuelerCode = null; }
 
   try {
-    // Erst einmalig Code prüfen
-    const q    = query(collection(db,'accessCodes'), where('code','==',code));
-    const snap = await getDocs(q);
+    // FIX: Code laden per Dokument-ID (get – für nicht eingeloggte Schüler erlaubt),
+    // Fallback auf Query (list – nur für eingeloggte). Bisher wurde NUR die list-Query
+    // genutzt, die die Firestore-Regeln für unangemeldete Schüler sperren → der
+    // eingebaute Schüler-Login scheiterte mit 'permission-denied'. Spiegelt jetzt
+    // schueler-portal.html (dort am 19.6. bereits so gefixt).
+    let codeDoc = null, codeData = null;
+    const direct = await getDoc(doc(db,'accessCodes', code));
+    if (direct.exists()) {
+      codeDoc = direct; codeData = direct.data();
+    } else {
+      try {
+        const q    = query(collection(db,'accessCodes'), where('code','==',code));
+        const snap = await getDocs(q);
+        if (!snap.empty) { codeDoc = snap.docs[0]; codeData = snap.docs[0].data(); }
+      } catch(_) { /* list für nicht-eingeloggte gesperrt – bleibt bei 'ungültig' */ }
+    }
     document.getElementById('loading').style.display = 'none';
 
-    if (snap.empty) {
+    if (!codeDoc || !codeData) {
       document.getElementById('screen-login').classList.add('active');
       switchTab('schueler');
       errEl.textContent = 'Ungültiger Code.';
       return;
     }
-
-    const codeDoc  = snap.docs[0];
-    const codeData = codeDoc.data();
 
     if (codeData.expiresAt && codeData.expiresAt < Date.now()) {
       document.getElementById('screen-login').classList.add('active');
