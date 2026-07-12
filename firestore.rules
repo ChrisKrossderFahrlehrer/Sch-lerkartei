@@ -290,22 +290,20 @@ service cloud.firestore {
     // ACCESS CODES (für Schüler-Zugangscodes)
     // ══════════════════════════════════════════════════════
     match /accessCodes/{docId} {
-      // DATENSCHUTZ-FIX: Firestore unterscheidet 'get' (ein einzelnes Dokument)
-      // und 'list' (Abfrage über die Collection). Das Schüler-Portal liest pro
-      // Code nur EIN Dokument (Code = Dokument-ID) – das erlauben wir. Das
-      // massenhafte Auslesen der GANZEN Collection (list) ist für nicht-
-      // eingeloggte Nutzer VERBOTEN. So kann kein Angreifer alle Schülerdaten
-      // auf einmal abgreifen (DSGVO Art. 32). Eingeloggte Fahrlehrer dürfen
-      // listen (brauchen sie zum Verwalten/Verlängern der Codes).
       allow get:  if true;
-      allow list: if isAuth();
-      allow create: if isAuth();
-      allow delete: if isAuth();
-      // Schüler-Portal: ohne Login NUR messages + plannedLessons + lernziele updaten.
-      allow update: if isAuth() ||
+      allow list: if isAuth() && userDocExists();
+      allow create: if isAuth() && userDocExists();
+      allow delete: if isAuth() && userDocExists();
+      allow update: if (isAuth() && userDocExists()) ||
                        request.resource.data.diff(resource.data)
                          .affectedKeys()
                          .hasOnly(['messages', 'plannedLessons', 'lernziele']);
+    }
+
+    match /studentSessions/{uid} {
+      allow read:   if isAuth() && request.auth.uid == uid;
+      allow create: if isAuth() && request.auth.uid == uid && !userDocExists();
+      allow update, delete: if false;
     }
 
     // ══════════════════════════════════════════════════════
