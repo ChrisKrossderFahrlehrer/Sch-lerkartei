@@ -1845,7 +1845,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, setPersistence, browserLocalPersistence, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider, verifyBeforeUpdateEmail } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { signInAnonymously, getAuth, setPersistence, browserLocalPersistence, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider, verifyBeforeUpdateEmail } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, enableIndexedDbPersistence, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, getDocs, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -3130,6 +3130,14 @@ async function migrateOldAccessCodes() {
 
 onAuthStateChanged(auth, async (user) => {
   if (window.__DEMO) return;
+  // FIX: Anonyme Schüler-Sessions (Kalender-Sync/Push-Grundlage) dürfen NICHT
+  // in die Fahrlehrer-Logik unten fallen - sonst würde die Selbstheilung
+  // faelschlich ein Fahrlehrer-Konto fuer jeden Schueler-Login anlegen.
+  if (user && user.isAnonymous) {
+    const upS = new URLSearchParams(window.location.search);
+    if (upS.get('code')) { try { checkUrlCode(); } catch(e) {} }
+    return;
+  }
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('code') && !user) { checkUrlCode(); return; }
   if (urlParams.get('invite') && !user) { checkInviteParam(urlParams.get('invite')); }
@@ -6632,6 +6640,24 @@ window.doSchuelerLogin = async () => {
       errEl.textContent = '⚠️ Bitte neuen Code beim Fahrlehrer holen.';
       return;
     }
+
+    try {
+      if (!auth.currentUser || auth.currentUser.isAnonymous) {
+        if (!auth.currentUser) { await signInAnonymously(auth); }
+        const sUid = auth.currentUser.uid;
+        const sessRef = doc(db, 'studentSessions', sUid);
+        const sessSnap = await getDoc(sessRef);
+        if (!sessSnap.exists()) {
+          await setDoc(sessRef, {
+            code:         codeDoc.id,
+            studentId:    codeData.studentId    || null,
+            teacherUid:   codeData.teacherUid   || null,
+            fahrschuleId: codeData.fahrschuleId || null,
+            linkedAt:     Date.now()
+          });
+        }
+      }
+    } catch(linkErr) { console.warn('Schüler-Session-Verknüpfung:', linkErr); }
 
     // Live-Listener auf dieses Code-Dokument
     unsubSchuelerCode = onSnapshot(doc(db,'accessCodes',codeDoc.id), (docSnap) => {
