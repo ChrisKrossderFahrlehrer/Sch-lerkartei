@@ -863,23 +863,27 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     <div class="sheet-title">🔒 Datenschutzerklärung</div>
     <div style="font-size:0.8rem;line-height:1.6;color:var(--muted);margin-top:12px">
       <strong style="color:var(--text)">1. Verantwortlicher</strong><br>
-      Verantwortlich für die Datenverarbeitung in dieser App ist der jeweils registrierte Fahrlehrer bzw. die Fahrschule als Verantwortlicher i.S.d. Art. 4 Nr. 7 DSGVO. Die technische Bereitstellung erfolgt durch den Betreiber (Impressum).<br><br>
+      Verantwortlich für die Datenverarbeitung in dieser App ist der jeweils registrierte Fahrlehrer bzw. die Fahrschule als Verantwortlicher i.S.d. Art. 4 Nr. 7 DSGVO. Der Betreiber (Impressum) stellt die Software als Auftragsverarbeiter i.S.d. Art. 28 DSGVO bereit; Grundlage ist ein gesonderter Auftragsverarbeitungsvertrag zwischen Betreiber und Fahrschule.<br><br>
 
       <strong style="color:var(--text)">2. Welche Daten werden verarbeitet?</strong><br>
       • Konto-Daten: E-Mail-Adresse, Name, Passwort (verschlüsselt)<br>
       • Schüler-Daten: Name, Geburtsdatum, Ausbildungsfortschritt, Fahrstunden, Protokolle<br>
-      • Nutzungsdaten: Anmeldezeitpunkte, technische Verbindungsdaten<br><br>
+      • Nutzungsdaten: Anmeldezeitpunkte, technische Verbindungsdaten<br>
+      • Bei minderjährigen Fahrschülern: Für den eigenständigen Zugang (Zugangscode) werden bewusst nur ausbildungsrelevante Daten verwendet; Geburtsdatum und interne Fahrlehrer-Kommentare werden dort nicht angezeigt.<br><br>
 
       <strong style="color:var(--text)">3. Zweck & Rechtsgrundlage (Art. 6 DSGVO)</strong><br>
       Die Verarbeitung erfolgt zur Durchführung und Dokumentation der Fahrausbildung. Rechtsgrundlage ist die Vertragserfüllung (Art. 6 Abs. 1 lit. b DSGVO) sowie ggf. Ihre Einwilligung (Art. 6 Abs. 1 lit. a DSGVO).<br><br>
 
       <strong style="color:var(--text)">4. Speicherort & Hosting</strong><br>
-      Alle Daten werden auf Servern von Google Firebase in Frankfurt am Main (EU, europe-west3) gespeichert. Es findet keine Übermittlung in Drittländer statt. Eine Weitergabe an unbefugte Dritte erfolgt nicht.<br><br>
+      Die Datenbank (Cloud Firestore) wird ausschließlich in Frankfurt am Main (EU, Region europe-west3) betrieben; hierfür findet keine Übermittlung in Drittländer statt. Die Nutzer-Anmeldung (Firebase Authentication) läuft technisch über die globale Infrastruktur des Anbieters Google, die auch außerhalb der EU (u.a. in den USA) verarbeiten kann. Diese Übermittlung ist über die EU-Standardvertragsklauseln (Art. 46 DSGVO) im Rahmen der Google-Auftragsverarbeitungsbedingungen abgesichert. Eine Weitergabe an unbefugte Dritte erfolgt nicht.<br><br>
 
-      <strong style="color:var(--text)">5. Speicherdauer</strong><br>
+      <strong style="color:var(--text)">5. Weitere eingesetzte Dienstleister</strong><br>
+      Für den Versand automatischer Benachrichtigungs-E-Mails (z.B. bei Neuregistrierungen oder Passwort-Zurücksetzung) werden die Dienste EmailJS sowie das E-Mail-Postfach des Betreibers bei IONOS SE (Elgendorfer Str. 57, 56410 Montabaur) genutzt. Dabei werden lediglich die für die jeweilige Benachrichtigung notwendigen Angaben (z.B. Name, E-Mail-Adresse) übermittelt.<br><br>
+
+      <strong style="color:var(--text)">6. Speicherdauer</strong><br>
       Daten werden gespeichert, solange das Nutzungsverhältnis besteht. Nach Beendigung werden alle Daten innerhalb von 30 Tagen unwiderruflich gelöscht.<br><br>
 
-      <strong style="color:var(--text)">6. Ihre Rechte als betroffene Person</strong><br>
+      <strong style="color:var(--text)">7. Ihre Rechte als betroffene Person</strong><br>
       Sie haben das Recht auf:<br>
       • Auskunft über Ihre Daten (Art. 15 DSGVO)<br>
       • Berichtigung (Art. 16 DSGVO)<br>
@@ -887,15 +891,18 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       • Einschränkung der Verarbeitung (Art. 18 DSGVO)<br>
       • Datenübertragbarkeit (Art. 20 DSGVO)<br>
       • Widerspruch gegen die Verarbeitung (Art. 21 DSGVO)<br>
-      • Beschwerde bei einer Aufsichtsbehörde (Art. 77 DSGVO)<br><br>
+      • Beschwerde bei einer Aufsichtsbehörde (Art. 77 DSGVO) – zuständig ist die Datenschutz-Aufsichtsbehörde am Sitz der jeweiligen Fahrschule<br><br>
 
-      <strong style="color:var(--text)">7. Widerruf der Einwilligung</strong><br>
+      <strong style="color:var(--text)">8. Widerruf der Einwilligung</strong><br>
       Eine erteilte Einwilligung können Sie jederzeit mit Wirkung für die Zukunft widerrufen, indem Sie Ihr Konto löschen oder den Betreiber kontaktieren.<br><br>
 
-      <strong style="color:var(--text)">8. Kontakt</strong><br>
+      <strong style="color:var(--text)">9. Lokal gespeicherte Daten (§ 25 TTDSG)</strong><br>
+      Diese App speichert technische Informationen (z.B. Anmeldestatus, ausgewählte Darstellung) lokal auf Ihrem Gerät. Dies ist zur Bereitstellung der App unbedingt erforderlich und erfordert daher keine gesonderte Einwilligung nach § 25 Abs. 2 Nr. 2 TTDSG. Es werden keine Cookies oder lokalen Daten zu Werbe- oder Analysezwecken eingesetzt.<br><br>
+
+      <strong style="color:var(--text)">10. Kontakt</strong><br>
       Bei Fragen zum Datenschutz wenden Sie sich an den im Impressum genannten Verantwortlichen.<br><br>
 
-      <strong style="color:var(--text)">9. Zahlungsdienstleister (PayPal)</strong><br>
+      <strong style="color:var(--text)">11. Zahlungsdienstleister (PayPal)</strong><br>
       Für kostenpflichtige Abonnements erfolgt die Zahlungsabwicklung über PayPal (Europe) S.à r.l. et Cie, S.C.A., 22–24 Boulevard Royal, L-2449 Luxemburg. Die für die Zahlung erforderlichen Daten werden direkt bei PayPal erhoben und verarbeitet; ergänzend gelten die Datenschutzhinweise von PayPal. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung). Diese App speichert keine Zahlungsdaten, sondern lediglich den Abo-Status und die PayPal-Abonnement-Kennung.<br><br>
 
       <span style="font-size:0.72rem;color:var(--muted)">Diese Datenschutzerklärung dient als Grundlage und sollte für den produktiven Einsatz rechtlich geprüft werden.</span>
