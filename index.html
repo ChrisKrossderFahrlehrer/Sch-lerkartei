@@ -3580,6 +3580,27 @@ async function saveToFirestore(studentId, data) {
     // Letzte Aktivität automatisch stempeln (für Inaktivitäts-Hinweis)
     payload.lastActivity = Date.now();
     await dbUpd(doc(db, 'students', studentId), payload);
+
+    // FIX: Portal-Snapshot (Themen/Lernstand, Fahrstunden, Sonderfahrten,
+    // Schaltstunden ...) wurde bisher NUR beim Erstellen eines Zugangscodes
+    // geschrieben – jede spätere Änderung erreichte den Schüler nie, weil
+    // nichts sie erneut in "accessCodes" spiegelte (anders als beim
+    // Protokoll, das schon einen eigenen Live-Abgleich hat). Jetzt: bei
+    // JEDER Speicherung wird ein aktiver Code sofort mit den frischen Daten
+    // aktualisiert – der Schüler sieht die Änderung dank Live-Listener
+    // sofort im Portal.
+    try {
+      const cq = query(collection(db,'accessCodes'), where('studentId','==',studentId), where('teacherUid','==',currentUser.uid));
+      const cs = await getDocs(cq);
+      if (!cs.empty) {
+        const frisch = { ...(getStudent(studentId) || {}), ...payload, id: studentId };
+        for (const cd of cs.docs) {
+          await dbUpd(doc(db,'accessCodes',cd.id), {
+            studentSnapshot: buildPortalSnapshot(frisch, cd.data().code, cd.data().expiresAt)
+          });
+        }
+      }
+    } catch(syncErr) { console.warn('Portal-Snapshot-Sync:', syncErr); }
   } catch(e) {
     console.error('saveToFirestore Fehler:', e.code, e.message);
     if (e.code === 'permission-denied') {
