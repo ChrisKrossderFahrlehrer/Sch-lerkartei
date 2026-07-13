@@ -2,7 +2,7 @@
 // HTML kommt IMMER frisch vom Server → kein Cache-Löschen mehr nötig!
 // Cache dient nur als Offline-Fallback.
 
-const CACHE_NAME = 'adk-v49';
+const CACHE_NAME = 'adk-v50';
 
 // ── FCM Push: Hintergrund-Benachrichtigungen (data-only → wir zeigen selbst an) ──
 try {
