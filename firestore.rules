@@ -46,6 +46,14 @@ service cloud.firestore {
     function userFsId() {
       return userDocExists() ? userData().fahrschuleId : request.auth.uid;
     }
+    // SICHERHEITS-AUDIT: unterscheidet ein ECHTES Fahrlehrer/Fahrschul-Konto
+    // von einer anonymen Schüler-Session. Wo Regeln bisher nur "isAuth()"
+    // prüften, konnte eine anonyme Session dieselben Rechte erhalten wie ein
+    // echter Account (z.B. sich selbst als Fahrlehrer eintragen, fremde
+    // Fahrschul-Chats beschreiben). Schließt das für alle Schreibzugriffe.
+    function isRealAccount() {
+      return isAuth() && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
 
     function isFsAdmin() {
       // FIX: Rolle wird ueberall als 'fahrschul-admin' gespeichert, nicht 'fs_admin'.
@@ -93,7 +101,7 @@ service cloud.firestore {
       allow create: if isAuth() && userDocExists() && userData().typ == 'fahrschule'
                     && request.resource.data.fahrschuleId == request.auth.uid
                     && request.resource.data.used == false;
-      allow update: if isAuth() && resource.data.used == false
+      allow update: if isRealAccount() && resource.data.used == false
                     && request.resource.data.used == true
                     && request.resource.data.fahrschuleId == resource.data.fahrschuleId
                     && request.resource.data.fahrschulCode == resource.data.fahrschulCode;
@@ -136,7 +144,7 @@ service cloud.firestore {
       // Nur der Inhaber selbst (schoolId == eigene uid) oder SuperAdmin darf
       // einen Code-Eintrag anlegen/ändern. Verhindert das Fälschen von Einträgen.
       allow create, update: if isSuperAdmin() ||
-                               (isAuth() && request.resource.data.schoolId == request.auth.uid);
+                               (isRealAccount() && request.resource.data.schoolId == request.auth.uid);
       allow delete: if isSuperAdmin() ||
                        (isAuth() && resource.data.schoolId == request.auth.uid);
     }
@@ -153,7 +161,7 @@ service cloud.firestore {
                      (isAuth() && fsId == userFsId());
       allow list: if isSuperAdmin();
 
-      allow create: if isAuth() &&
+      allow create: if isRealAccount() &&
                        (request.resource.data.adminUid == request.auth.uid ||
                         fsId == request.auth.uid);
 
@@ -191,6 +199,7 @@ service cloud.firestore {
       allow create: if isAuth() && (
                       isSuperAdmin() ||
                       (
+                        isRealAccount() &&
                         request.auth.uid == uid &&
                         request.resource.data.rolle in ['fahrlehrer', 'fahrschul-admin'] &&
                         request.resource.data.get('status', 'ausstehend') in ['aktiv', 'ausstehend'] &&
@@ -241,7 +250,7 @@ service cloud.firestore {
     match /students/{studentId} {
       // SuperAdmin darf lesen (nötig zum Auffinden beim Voll-Löschen)
       allow read:   if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
-      allow create: if isAuth() &&
+      allow create: if isRealAccount() &&
                        request.resource.data.uid == request.auth.uid;
       allow update: if isAuth() && (
                        docBelongsToUser(resource.data) ||
@@ -255,7 +264,7 @@ service cloud.firestore {
     // ══════════════════════════════════════════════════════
     match /protokoll/{eintragId} {
       allow read:   if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
-      allow create: if isAuth() &&
+      allow create: if isRealAccount() &&
                        request.resource.data.uid == request.auth.uid;
       allow update: if isAuth() && docBelongsToUser(resource.data);
       allow delete: if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
@@ -266,7 +275,7 @@ service cloud.firestore {
     // ══════════════════════════════════════════════════════
     match /customFields/{docId} {
       allow read:   if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
-      allow create: if isAuth() &&
+      allow create: if isRealAccount() &&
                        request.resource.data.uid == request.auth.uid;
       allow update: if isAuth() && docBelongsToUser(resource.data);
       allow delete: if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
@@ -277,7 +286,7 @@ service cloud.firestore {
     // ══════════════════════════════════════════════════════
     match /customThemen/{docId} {
       allow read:   if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
-      allow create: if isAuth() &&
+      allow create: if isRealAccount() &&
                        request.resource.data.uid == request.auth.uid;
       allow update: if isAuth() && docBelongsToUser(resource.data);
       allow delete: if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
@@ -288,7 +297,7 @@ service cloud.firestore {
     // ══════════════════════════════════════════════════════
     match /customGruppen/{docId} {
       allow read:   if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
-      allow create: if isAuth() &&
+      allow create: if isRealAccount() &&
                        request.resource.data.uid == request.auth.uid;
       allow update: if isAuth() && docBelongsToUser(resource.data);
       allow delete: if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
@@ -337,7 +346,8 @@ service cloud.firestore {
       allow read:   if isAuth() &&
                        resource.data.fahrschuleId == userFsId();
       allow create: if isAuth() &&
-                       request.resource.data.senderUid == request.auth.uid;
+                       request.resource.data.senderUid == request.auth.uid &&
+                       request.resource.data.fahrschuleId == userFsId();
       allow update: if false;
       allow delete: if isAuth() &&
                        resource.data.senderUid == request.auth.uid;
@@ -394,7 +404,7 @@ service cloud.firestore {
     // Gehört ein Lehrer (per UID) zu meiner Schule? (für Collections ohne schoolId, z.B. blocked)
     function kalLehrerInMySchool(luid) {
       return kalIsSuperAdmin() ||
-             (luid == request.auth.uid) ||
+             (isRealAccount() && luid == request.auth.uid) ||
              (kalUserExists() &&
               exists(/databases/$(database)/documents/kalenderUsers/$(luid)) &&
               get(/databases/$(database)/documents/kalenderUsers/$(luid)).data.schoolId == kalMySchool());
@@ -418,10 +428,10 @@ service cloud.firestore {
                        (kalAuth() && request.auth.uid == uid) ||
                        (kalUserExists() && resource.data.schoolId == kalMySchool());
       allow create: if kalIsSuperAdmin() ||
-                       (kalAuth() && request.auth.uid == uid &&
+                       (isRealAccount() && request.auth.uid == uid &&
                         request.resource.data.schoolId == kalAdkFahrschuleId());
       allow update: if kalIsSuperAdmin() ||
-                       (kalAuth() && request.auth.uid == uid &&
+                       (isRealAccount() && request.auth.uid == uid &&
                         request.resource.data.schoolId == kalAdkFahrschuleId());
       allow delete: if kalIsSuperAdmin() ||
                        (kalAuth() && request.auth.uid == uid);
@@ -431,7 +441,7 @@ service cloud.firestore {
     match /schools/{schoolId} {
       allow read:   if kalIsSuperAdmin() ||
                        (kalUserExists() && kalMySchool() == schoolId);
-      allow create: if kalAuth() && request.resource.data.adminUid == request.auth.uid;
+      allow create: if isRealAccount() && request.resource.data.adminUid == request.auth.uid;
       allow update: if kalIsSuperAdmin() ||
                        (kalUserExists() && kalMySchool() == schoolId);
       allow delete: if kalIsSuperAdmin();
@@ -443,11 +453,11 @@ service cloud.firestore {
     // einer fremden Fahrschule lesen, ändern oder unterschieben.
     match /schueler/{docId} {
       allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || resource.data.lehrerUid == request.auth.uid;
-      allow create:               if kalOwnsSchool(request.resource.data.schoolId) || request.resource.data.lehrerUid == request.auth.uid;
+      allow create:               if kalOwnsSchool(request.resource.data.schoolId) || (isRealAccount() && request.resource.data.lehrerUid == request.auth.uid);
     }
     match /slots/{docId} {
       allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || resource.data.lehrerUid == request.auth.uid;
-      allow create:               if kalOwnsSchool(request.resource.data.schoolId) || request.resource.data.lehrerUid == request.auth.uid;
+      allow create:               if kalOwnsSchool(request.resource.data.schoolId) || (isRealAccount() && request.resource.data.lehrerUid == request.auth.uid);
       // Schüler-Selbststorno (OHNE Login): NUR den eigenen gebuchten Termin
       // freigeben (bookedBy -> null). Eng begrenzt:
       //  - nur wenn aktuell gebucht und neuer Wert null
@@ -471,19 +481,19 @@ service cloud.firestore {
     }
     match /urlaub/{docId} {
       allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || resource.data.lehrerUid == request.auth.uid;
-      allow create:               if kalOwnsSchool(request.resource.data.schoolId) || request.resource.data.lehrerUid == request.auth.uid;
+      allow create:               if kalOwnsSchool(request.resource.data.schoolId) || (isRealAccount() && request.resource.data.lehrerUid == request.auth.uid);
     }
     match /notizen/{docId} {
       allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || resource.data.lehrerUid == request.auth.uid;
-      allow create:               if kalOwnsSchool(request.resource.data.schoolId) || request.resource.data.lehrerUid == request.auth.uid;
+      allow create:               if kalOwnsSchool(request.resource.data.schoolId) || (isRealAccount() && request.resource.data.lehrerUid == request.auth.uid);
     }
     match /warteliste/{docId} {
       allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || resource.data.lehrerUid == request.auth.uid;
-      allow create:               if kalOwnsSchool(request.resource.data.schoolId) || request.resource.data.lehrerUid == request.auth.uid;
+      allow create:               if kalOwnsSchool(request.resource.data.schoolId) || (isRealAccount() && request.resource.data.lehrerUid == request.auth.uid);
     }
     match /pruefungen/{docId} {
       allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || resource.data.lehrerUid == request.auth.uid;
-      allow create:               if kalOwnsSchool(request.resource.data.schoolId) || request.resource.data.lehrerUid == request.auth.uid;
+      allow create:               if kalOwnsSchool(request.resource.data.schoolId) || (isRealAccount() && request.resource.data.lehrerUid == request.auth.uid);
     }
     // blocked hat kein schoolId, nur lehrerUid → über den Lehrer absichern
     match /blocked/{docId} {
@@ -494,7 +504,7 @@ service cloud.firestore {
     // Nutzer darf eine Mail EINREIHEN (create), aber nur SuperAdmin/System
     // darf den Inhalt LESEN. Kein Lesen durch normale Nutzer.
     match /mailQueue/{docId} {
-      allow create: if kalAuth();
+      allow create: if isRealAccount();
       allow read:   if kalIsSuperAdmin();
       allow update, delete: if kalIsSuperAdmin();
     }
