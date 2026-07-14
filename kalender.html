@@ -402,6 +402,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, collection, query, where, orderBy, serverTimestamp, Timestamp, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
 
 // ── FIREBASE CONFIG ──
 const firebaseConfig = {
@@ -844,6 +845,76 @@ window.renderPushStatus = () => {
     ? (localStorage.getItem('pushAktiv') ? '✅ Aktiv auf diesem Gerät' : 'Erlaubt – jetzt unten registrieren')
     : p === 'denied' ? '⛔ Blockiert (in Browser-/iOS-Einstellungen erlauben)' : 'Noch nicht aktiviert';
 };
+
+
+// ══ GOOGLE-KALENDER-VERBINDUNG ══
+const GOOGLE_OAUTH_CLIENT_ID = '140641089306-iovtr6gnoggkg6me8k2tk0c522o4oh0e.apps.googleusercontent.com';
+const GOOGLE_OAUTH_REDIRECT  = 'https://europe-west3-fahrschule-ebc65.cloudfunctions.net/kalenderOAuthCallback';
+let unsubCalStatus = null;
+
+window.renderCalStatus = (connected) => {
+  const el = document.getElementById('cal-status');
+  const bC = document.getElementById('cal-connect-btn');
+  const bD = document.getElementById('cal-disconnect-btn');
+  if (!el) return;
+  el.textContent = connected ? '✅ Verbunden' : 'Noch nicht verbunden';
+  if (bC) bC.style.display = connected ? 'none' : 'inline-block';
+  if (bD) bD.style.display = connected ? 'inline-block' : 'none';
+};
+
+function startCalStatusWatch() {
+  if (unsubCalStatus || !currentUser) return;
+  try {
+    unsubCalStatus = onSnapshot(doc(db, 'calendarStatus', currentUser.uid), (snap) => {
+      renderCalStatus(!!(snap.exists() && snap.data().connected));
+    }, () => renderCalStatus(false));
+  } catch(e) { renderCalStatus(false); }
+}
+
+window.kalenderVerbinden = async () => {
+  try {
+    if (!currentUser) { toast('Bitte zuerst anmelden.','error'); return; }
+    const stateId = 'st_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    await setDoc(doc(db, 'oauthStates', stateId), { uid: currentUser.uid, createdAt: Date.now() });
+    const params = new URLSearchParams({
+      client_id: GOOGLE_OAUTH_CLIENT_ID,
+      redirect_uri: GOOGLE_OAUTH_REDIRECT,
+      response_type: 'code',
+      scope: 'https://www.googleapis.com/auth/calendar.events',
+      access_type: 'offline',
+      prompt: 'consent',
+      state: stateId
+    });
+    window.location.href = 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
+  } catch(e) { toast('Verbindung konnte nicht gestartet werden: ' + e.message, 'error'); }
+};
+
+window.kalenderTrennen = async () => {
+  try {
+    const fns = getFunctions(app, 'europe-west3');
+    await httpsCallable(fns, 'trennKalenderVerbindung')();
+    toast('Kalender-Verbindung getrennt.', 'success');
+    renderCalStatus(false);
+  } catch(e) { toast('Trennen fehlgeschlagen: ' + e.message, 'error'); }
+};
+
+(function handleCalSyncReturn() {
+  const p = new URLSearchParams(window.location.search);
+  const cs = p.get('calsync');
+  if (!cs) return;
+  const msgs = {
+    success: ['🎉 Google Kalender verbunden!', 'success'],
+    error: ['❌ Verbindung fehlgeschlagen – bitte erneut versuchen.', 'error'],
+    invalid_state: ['❌ Sitzung abgelaufen – bitte erneut versuchen.', 'error'],
+    no_refresh: ['⚠️ Google hat keine dauerhafte Berechtigung erteilt – bitte trennen und erneut verbinden.', 'error']
+  };
+  const [msg, kind] = msgs[cs] || ['Kalender-Rückmeldung: ' + cs, 'error'];
+  setTimeout(() => toast(msg, kind), 400);
+  p.delete('calsync');
+  const clean = window.location.pathname + (p.toString() ? '?' + p.toString() : '');
+  window.history.replaceState({}, '', clean);
+})();
+
 window.aktivierePush = async () => {
   try {
     if (!('Notification' in window) || !('serviceWorker' in navigator)) { toast('Push wird auf diesem Gerät nicht unterstützt.','error'); return; }
@@ -1639,12 +1710,17 @@ pages['lehrer-buchungen']=async function(el){
     <div class="card" style="margin-bottom:16px"><div class="card-title">🔔 Push-Benachrichtigungen</div>
       <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.5;margin-bottom:10px">Mitteilung auf dieses Gerät bei neuen Terminanfragen &amp; Nachrichten – auch wenn die App geschlossen ist.<br><span id="push-status" style="color:var(--text);font-weight:600"></span></div>
       <button class="btn btn-primary btn-sm" onclick="aktivierePush()">🔔 Auf diesem Gerät aktivieren</button></div>
+    <div class="card" style="margin-bottom:16px"><div class="card-title">📅 Google Kalender</div>
+      <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.5;margin-bottom:10px">Bestätigte Fahrstunden erscheinen automatisch in deinem Google-Kalender (auf dem iPhone/Mac über das native „Google"-Konto in der Kalender-App nutzbar).<br><span id="cal-status" style="color:var(--text);font-weight:600"></span></div>
+      <button class="btn btn-primary btn-sm" id="cal-connect-btn" onclick="kalenderVerbinden()">📅 Google Kalender verbinden</button>
+      <button class="btn btn-sm" id="cal-disconnect-btn" style="display:none;background:var(--surface2)" onclick="kalenderTrennen()">Verbindung trennen</button></div>
     <div class="card" style="margin-bottom:16px"><div class="card-title">🔗 Online-Buchung für Schüler</div><div id="booking-online"><div class="spinner"></div></div></div>
     <div class="card" style="margin-bottom:16px"><div class="card-title">📥 Offene Anfragen</div><div id="booking-requests"><div class="spinner"></div></div></div>
     <div class="card" style="margin-bottom:16px"><div class="card-title">⏳ Warteliste</div><div id="booking-warteliste"><div class="spinner"></div></div></div>
     <div class="card" style="margin-bottom:16px"><div class="card-title">✉️ Nachrichten</div><div id="booking-nachrichten"><div class="spinner"></div></div></div>
     <div class="card"><div class="card-title">✅ Bestätigte Buchungen</div><div id="buchungen-list"><div class="spinner"></div></div></div></div>`;
   renderPushStatus();
+  startCalStatusWatch();
   await publishMyBookingLink();
   await renderBookingOnline();
   await renderBookingRequests();
