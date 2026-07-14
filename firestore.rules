@@ -99,6 +99,30 @@ service cloud.firestore {
                     && request.resource.data.fahrschulCode == resource.data.fahrschulCode;
       allow delete: if isSuperAdmin() || (isAuth() && resource.data.fahrschuleId == userFsId());
     }
+    match /oauthStates/{stateId} {
+      // Kurzlebiger CSRF-Schutz fuer den Google-Kalender-OAuth-Flow: der
+      // Client legt vor der Weiterleitung zu Google einen eigenen Eintrag an,
+      // die Cloud Function liest und loescht ihn beim Ruecksprung (Admin SDK,
+      // umgeht Rules). Niemand sonst darf ihn lesen.
+      allow create: if isAuth() && request.resource.data.uid == request.auth.uid;
+      allow read, update, delete: if false;
+    }
+
+    match /calendarTokens/{uid} {
+      // Google-OAuth-Tokens fuer den Kalender-Abgleich. Ausschliesslich von
+      // den Cloud Functions (Admin SDK) gelesen/geschrieben - niemand sonst,
+      // auch nicht der eigene Nutzer, hat direkten Zugriff auf die Tokens.
+      allow read, write: if false;
+    }
+
+    match /calendarStatus/{uid} {
+      // Oeffentlich sichtbarer Verbindungsstatus (ohne die eigentlichen
+      // Tokens) - der eigene Nutzer darf nur LESEN, geschrieben wird das nur
+      // von den Cloud Functions.
+      allow read: if isAuth() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
     match /fcmTokens/{token} {
       // Geräte-Token für Push-Benachrichtigungen. Gelesen werden sie
       // ausschließlich von den Cloud Functions (Admin SDK, umgeht Rules).
