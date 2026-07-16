@@ -8214,16 +8214,19 @@ initTheme();
 async function ladeHeutigeTermine() {
   try {
     if (!currentUser || !currentUser._kalenderAktiv) return;
+    // FIX: nur nach lehrerUid filtern (einzelnes Gleichheits-Feld, automatisch
+    // indiziert) und Datum/Buchungsstatus im Browser filtern - genau das
+    // Muster, das kalender.html selbst überall für 'slots' verwendet. Eine
+    // kombinierte Firestore-Abfrage (Gleichheit + Zeitspanne) hätte einen
+    // eigenen Composite-Index gebraucht, der hier nicht existiert.
     const heuteStart = new Date(); heuteStart.setHours(0,0,0,0);
     const heuteEnd   = new Date(); heuteEnd.setHours(23,59,59,999);
-    const q = query(collection(db,'slots'),
-      where('lehrerUid','==',currentUser.uid),
-      where('startTime','>=',heuteStart),
-      where('startTime','<=',heuteEnd));
-    const snap = await getDocs(q);
+    const snap = await getDocs(query(collection(db,'slots'), where('lehrerUid','==',currentUser.uid)));
     const termine = snap.docs
       .map(d => ({ id: d.id, ...d.data() }))
-      .filter(t => t.bookedBy && t.startTime)
+      .filter(t => t.bookedBy && t.startTime &&
+        t.startTime.toMillis() >= heuteStart.getTime() &&
+        t.startTime.toMillis() <= heuteEnd.getTime())
       .sort((a,b) => a.startTime.toMillis() - b.startTime.toMillis());
     renderHeutigeTermine(termine);
   } catch(e) { console.warn('ladeHeutigeTermine:', e.code || e.message); }
