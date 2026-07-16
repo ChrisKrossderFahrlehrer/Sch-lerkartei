@@ -5771,10 +5771,14 @@ window.toggleTheme = () => {
 // Zugangskontrolle macht der Kalender selbst beim Login.
 // ─────────────────────────────────────────
 window.openKalender = () => {
-  // Relativer Pfad → öffnet den Kalender auf DERSELBEN Domain wie die ADK-App.
-  // Dadurch teilt sich die Firebase-Login-Sitzung automatisch (Single Sign-On):
-  // wer in der ADK eingeloggt ist, ist auch im Kalender sofort eingeloggt.
-  window.open('kalender.html', '_blank');
+  // FIX: Im SELBEN Fenster/Tab navigieren statt window.open(_blank).
+  // Grund: Ist die ADK als eigene App vom iPhone-Homescreen installiert,
+  // kann ein per window.open geöffnetes neues Fenster in einen komplett
+  // getrennten Speicherbereich (Safari statt der installierten App-Instanz)
+  // springen - die geteilte Firebase-Anmeldung ging dadurch verloren und der
+  // Fahrlehrer musste sich im Kalender erneut anmelden. Navigation im selben
+  // Fenster bleibt garantiert in derselben App-Instanz -> Sitzung bleibt.
+  window.location.href = 'kalender.html';
 };
 
 // ─────────────────────────────────────────
