@@ -914,6 +914,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 <!-- ══ LIST ══ -->
 <div class="screen" id="screen-list">
   <div class="list-header">
+    <div id="heute-termine-widget" style="display:none;margin-bottom:10px"></div>
     <div class="list-top">
       <div style="flex:1;min-width:0">
         <img src="./icon-192.png?v=3" alt="ADK" style="height:48px;width:48px;border-radius:50%;display:block" onerror="this.style.display='none'">
@@ -3340,6 +3341,7 @@ onAuthStateChanged(auth, async (user) => {
     // Kalender-Button nur zeigen, wenn das Modul freigeschaltet ist
     const kalBtn = document.getElementById('btn-kalender');
     if (kalBtn) kalBtn.style.display = currentUser._kalenderAktiv ? '' : 'none';
+    if (currentUser._kalenderAktiv) { setTimeout(() => ladeHeutigeTermine(), 1500); }
     listenStudents();
     listenFields();
     listenCustomThemen();
@@ -8206,6 +8208,48 @@ updateOnlineStatus();
 
 // Init theme on load
 initTheme();
+
+
+// ══ HEUTE-WIDGET: zeigt heutige bestätigte Kalender-Termine, Klick öffnet den Schüler ══
+async function ladeHeutigeTermine() {
+  try {
+    if (!currentUser || !currentUser._kalenderAktiv) return;
+    const heuteStart = new Date(); heuteStart.setHours(0,0,0,0);
+    const heuteEnd   = new Date(); heuteEnd.setHours(23,59,59,999);
+    const q = query(collection(db,'slots'),
+      where('lehrerUid','==',currentUser.uid),
+      where('startTime','>=',heuteStart),
+      where('startTime','<=',heuteEnd));
+    const snap = await getDocs(q);
+    const termine = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(t => t.bookedBy && t.startTime)
+      .sort((a,b) => a.startTime.toMillis() - b.startTime.toMillis());
+    renderHeutigeTermine(termine);
+  } catch(e) { console.warn('ladeHeutigeTermine:', e.code || e.message); }
+}
+
+function renderHeutigeTermine(termine) {
+  const w = document.getElementById('heute-termine-widget');
+  if (!w) return;
+  if (!termine.length) { w.style.display = 'none'; w.innerHTML = ''; return; }
+  w.style.display = 'block';
+  w.innerHTML = `
+    <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:6px">📅 Heute (${termine.length})</div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      ${termine.map(t => {
+        const st   = getStudent(t.bookedBy);
+        const zeit = t.startTime.toDate().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+        const name = st ? (st.vorname + ' ' + st.nachname) : 'Unbekannter Schüler';
+        return `<div onclick="openDetail('${t.bookedBy}')" style="display:flex;align-items:center;gap:10px;background:var(--surface2,rgba(255,255,255,0.05));border:1px solid var(--border);border-radius:10px;padding:9px 12px;cursor:pointer">
+          <span style="font-weight:700;color:var(--accent);min-width:44px">${zeit}</span>
+          <span style="flex:1;font-size:0.85rem">${escHtml(name)}</span>
+          <span style="color:var(--muted)">›</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
 </script>
 </body>
 </html>
