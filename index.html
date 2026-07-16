@@ -3031,6 +3031,40 @@ function friendlyError(code) {
 // ─────────────────────────────────────────
 // AUTO-MIGRATION: Alte Codes ohne Snapshot reparieren
 // ─────────────────────────────────────────
+async function resyncPortalSnapshotsV2() {
+  // EINMALIGE HEILUNG: Portal-Snapshots (Lernstand/Themen, Fahrstunden,
+  // Sonderfahrten) wurden bis heute nur bei der Code-Erstellung geschrieben.
+  // Alle davor erstellten Codes tragen einen eingefrorenen Stand - betroffene
+  // Schüler sehen ihren Fortschritt nicht. Dieser Lauf erneuert beim nächsten
+  // Lehrer-Login jeden eigenen Code mit frischem Lernstand UND Protokoll.
+  try {
+    if (!currentUser || window.__DEMO) return;
+    const flagKey = `adk_snapshot_resync_${currentUser.uid}_v2`;
+    if (localStorage.getItem(flagKey)) return;
+    if (!students.length) return; // Schülerliste noch nicht geladen -> nächster Login versucht es erneut
+
+    const cs = await getDocs(query(collection(db,'accessCodes'), where('teacherUid','==',currentUser.uid)));
+    let ok = 0, skip = 0;
+    for (const cd of cs.docs) {
+      const data = cd.data();
+      const st = data.studentId ? getStudent(data.studentId) : null;
+      if (!st) { skip++; continue; }
+      try {
+        const upd = { studentSnapshot: buildPortalSnapshot(st, data.code, data.expiresAt) };
+        try {
+          const pSnap = await getDocs(query(collection(db,'protokoll'), where('studentId','==',data.studentId)));
+          const eintraege = pSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          upd.protokollSnapshot = buildPortalProtokoll(eintraege);
+        } catch(pErr) { /* Protokoll optional - Lernstand ist die Hauptsache */ }
+        await dbUpd(doc(db,'accessCodes',cd.id), upd);
+        ok++;
+      } catch(e) { console.warn('[RESYNC v2]', cd.id, e.code || e.message); }
+    }
+    localStorage.setItem(flagKey, String(Date.now()));
+    console.log(`[RESYNC v2] Portal-Snapshots erneuert: ${ok} aktualisiert, ${skip} übersprungen`);
+  } catch(e) { console.warn('resyncPortalSnapshotsV2:', e); }
+}
+
 async function migrateOldAccessCodes() {
   try {
     const migrationKey = `adk_migration_${currentUser.uid}_v1`;
@@ -3354,6 +3388,7 @@ function listenStudents() {
     : query(collection(db, 'students'), where('uid', '==', currentUser.uid));
   unsubSnapshot = onSnapshot(q, (snap) => {
     students = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (!window.__snapResyncKick && students.length) { window.__snapResyncKick = true; setTimeout(resyncPortalSnapshotsV2, 1200); }
     students.sort((a,b) => (a.nachname||'').localeCompare(b.nachname||''));
     renderList();
     if (activeId) renderDetail();
@@ -3590,14 +3625,20 @@ async function saveToFirestore(studentId, data) {
     // aktualisiert – der Schüler sieht die Änderung dank Live-Listener
     // sofort im Portal.
     try {
-      const cq = query(collection(db,'accessCodes'), where('studentId','==',studentId), where('teacherUid','==',currentUser.uid));
-      const cs = await getDocs(cq);
-      if (!cs.empty) {
-        const frisch = { ...(getStudent(studentId) || {}), ...payload, id: studentId };
-        for (const cd of cs.docs) {
-          await dbUpd(doc(db,'accessCodes',cd.id), {
-            studentSnapshot: buildPortalSnapshot(frisch, cd.data().code, cd.data().expiresAt)
-          });
+      // HÄRTUNG: Nur syncen, wenn der Schüler lokal vollständig geladen ist -
+      // sonst würde ein fast leerer Snapshot gute Portal-Daten überschreiben
+      // (Race direkt nach App-Start, bevor die Schülerliste da ist).
+      const lokal = getStudent(studentId);
+      if (lokal) {
+        const cq = query(collection(db,'accessCodes'), where('studentId','==',studentId), where('teacherUid','==',currentUser.uid));
+        const cs = await getDocs(cq);
+        if (!cs.empty) {
+          const frisch = { ...lokal, ...payload, id: studentId };
+          for (const cd of cs.docs) {
+            await dbUpd(doc(db,'accessCodes',cd.id), {
+              studentSnapshot: buildPortalSnapshot(frisch, cd.data().code, cd.data().expiresAt)
+            });
+          }
         }
       }
     } catch(syncErr) { console.warn('Portal-Snapshot-Sync:', syncErr); }
