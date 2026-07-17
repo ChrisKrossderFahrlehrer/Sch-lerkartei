@@ -8235,7 +8235,13 @@ async function ladeHeutigeTermine() {
 function renderHeutigeTermine(termine) {
   const w = document.getElementById('heute-termine-widget');
   if (!w) return;
-  if (!termine.length) { w.style.display = 'none'; w.innerHTML = ''; return; }
+  // FIX: Bei 0 Terminen NICHT mehr komplett ausblenden (sonst nicht von
+  // 'kaputt' unterscheidbar) - stattdessen ein dezenter Hinweis.
+  if (!termine.length) {
+    w.style.display = 'block';
+    w.innerHTML = `<div style="font-size:0.78rem;color:var(--muted);padding:8px 2px">📅 Heute keine bestätigten Termine.</div>`;
+    return;
+  }
   w.style.display = 'block';
   w.innerHTML = `
     <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:6px">📅 Heute (${termine.length})</div>
