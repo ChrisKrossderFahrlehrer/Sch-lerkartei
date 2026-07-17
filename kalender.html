@@ -1720,14 +1720,17 @@ pages['lehrer-buchungen']=async function(el){
     <div class="card" style="margin-bottom:16px"><div class="card-title">⏳ Warteliste</div><div id="booking-warteliste"><div class="spinner"></div></div></div>
     <div class="card" style="margin-bottom:16px"><div class="card-title">✉️ Nachrichten</div><div id="booking-nachrichten"><div class="spinner"></div></div></div>
     <div class="card"><div class="card-title">✅ Bestätigte Buchungen</div><div id="buchungen-list"><div class="spinner"></div></div></div></div>`;
-  renderPushStatus();
-  startCalStatusWatch();
-  await publishMyBookingLink();
-  await renderBookingOnline();
-  await renderBookingRequests();
-  await renderWarteliste();
-  await renderNachrichten();
-  await renderBestaetigteBuchungen();
+  // HAERTUNG: jeder Bereich einzeln abgesichert - schlaegt EINER fehl,
+  // laden die anderen trotzdem normal weiter (vorher: ein Fehler irgendwo
+  // in der Kette liess ALLE Bereiche fuer immer im Lade-Kreis haengen).
+  try { renderPushStatus(); } catch(e) { console.error('renderPushStatus:', e); }
+  try { startCalStatusWatch(); } catch(e) { console.error('startCalStatusWatch:', e); }
+  try { await publishMyBookingLink(); } catch(e) { console.error('publishMyBookingLink:', e); }
+  try { await renderBookingOnline(); } catch(e) { console.error('renderBookingOnline:', e); }
+  try { await renderBookingRequests(); } catch(e) { console.error('renderBookingRequests:', e); }
+  try { await renderWarteliste(); } catch(e) { console.error('renderWarteliste:', e); }
+  try { await renderNachrichten(); } catch(e) { console.error('renderNachrichten:', e); }
+  try { await renderBestaetigteBuchungen(); } catch(e) { console.error('renderBestaetigteBuchungen:', e); }
   const _rbuch=()=>{publishMyBookingLink();renderBookingOnline();renderBookingRequests();renderWarteliste();renderNachrichten();renderBestaetigteBuchungen();};
   liveOn(query(collection(db,'bookingRequests'),where('lehrerUid','==',currentUser.uid)),_rbuch);
   liveOn(query(collection(db,'bookingMessages'),where('lehrerUid','==',currentUser.uid)),_rbuch);
