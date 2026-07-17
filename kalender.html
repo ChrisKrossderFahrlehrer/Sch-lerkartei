@@ -209,7 +209,7 @@ tr:last-child td{border-bottom:none;}
 .booking-card-title{font-family:var(--font-display);font-size:17px;margin-bottom:14px;}
 
 /* ── Toast ── */
-#toast{position:fixed;bottom:22px;right:22px;z-index:10000;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:12px 18px;max-width:300px;transform:translateY(80px);opacity:0;transition:all .3s;font-size:13px;}
+#toast{position:fixed;bottom:22px;right:22px;z-index:10000;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:12px 18px;max-width:300px;transform:translateY(80px);opacity:0;transition:all .3s;font-size:13px;pointer-events:none;}
 #toast.show{transform:translateY(0);opacity:1;}
 #toast.error{border-color:var(--danger);color:var(--danger);}
 #toast.success{border-color:var(--success);color:var(--success);}
@@ -351,7 +351,7 @@ tr:last-child td{border-bottom:none;}
     <div style="display:flex;align-items:center;gap:10px">
       <img src="kalender-logo.png" alt="" class="topbar-logo"><div class="topbar-brand">Kalender</div>
       <span id="topbar-school" class="school-badge" style="display:none">🏫 <span id="topbar-school-name"></span></span>
-      <a href="index.html" style="color:var(--muted);font-size:0.78rem;text-decoration:none;border:1px solid var(--border);padding:4px 10px;border-radius:8px;margin-left:6px">← Zur Kartei</a>
+      <a href="index.html" style="display:flex;align-items:center;gap:6px;color:var(--text);font-size:0.78rem;font-weight:600;text-decoration:none;border:1px solid var(--border);padding:4px 12px 4px 6px;border-radius:20px;margin-left:6px;background:var(--surface2)"><img src="./icon-192.png" alt="" style="height:20px;width:20px;border-radius:50%" onerror="this.style.display='none'">← Zur Kartei</a>
     </div>
     <div class="topbar-right">
       <span class="topbar-role" id="topbar-role">—</span>
