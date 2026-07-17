@@ -8214,20 +8214,36 @@ initTheme();
 async function ladeHeutigeTermine() {
   try {
     if (!currentUser || !currentUser._kalenderAktiv) return;
-    // FIX: nur nach lehrerUid filtern (einzelnes Gleichheits-Feld, automatisch
-    // indiziert) und Datum/Buchungsstatus im Browser filtern - genau das
-    // Muster, das kalender.html selbst überall für 'slots' verwendet. Eine
-    // kombinierte Firestore-Abfrage (Gleichheit + Zeitspanne) hätte einen
-    // eigenen Composite-Index gebraucht, der hier nicht existiert.
     const heuteStart = new Date(); heuteStart.setHours(0,0,0,0);
     const heuteEnd   = new Date(); heuteEnd.setHours(23,59,59,999);
     const snap = await getDocs(query(collection(db,'slots'), where('lehrerUid','==',currentUser.uid)));
     const termine = snap.docs
       .map(d => ({ id: d.id, ...d.data() }))
-      .filter(t => t.bookedBy && t.startTime &&
+      .filter(t => t.bookedBy && t.startTime && t.startTime.toMillis &&
         t.startTime.toMillis() >= heuteStart.getTime() &&
         t.startTime.toMillis() <= heuteEnd.getTime())
       .sort((a,b) => a.startTime.toMillis() - b.startTime.toMillis());
+    console.log(`[HEUTE] Slots gesamt: ${snap.size}, gebucht & heute: ${termine.length}`);
+
+    // FIX: bookedBy zeigt auf die KALENDER-Schülerverwaltung ('schueler'),
+    // nicht auf die ADK-Kartei ('students') - zwei getrennte Namensräume ohne
+    // Verknüpfungsfeld. Namen daher aus 'schueler' laden und die passende
+    // ADK-Kartei per Namens-Abgleich (Vor-+Nachname) finden.
+    const norm = (x) => String(x || '').trim().toLowerCase();
+    const ids = [...new Set(termine.map(t => t.bookedBy))];
+    const kalSchueler = {};
+    await Promise.all(ids.map(async (kid) => {
+      try {
+        const sc = await getDoc(doc(db,'schueler',kid));
+        if (sc.exists()) kalSchueler[kid] = sc.data();
+      } catch(e) { /* Name bleibt Fallback */ }
+    }));
+    for (const t of termine) {
+      const ks = kalSchueler[t.bookedBy];
+      t._name = ks ? `${ks.fname || ''} ${ks.lname || ''}`.trim() : 'Schüler';
+      const adk = ks ? students.find(st => norm(st.vorname) === norm(ks.fname) && norm(st.nachname) === norm(ks.lname)) : null;
+      t._adkId = adk ? adk.id : null;
+    }
     renderHeutigeTermine(termine);
   } catch(e) { console.warn('ladeHeutigeTermine:', e.code || e.message); }
 }
@@ -8248,12 +8264,11 @@ function renderHeutigeTermine(termine) {
   w.innerHTML = `
     <div style="display:flex;gap:8px;overflow-x:auto;padding:2px 0 8px;scrollbar-width:none;-webkit-overflow-scrolling:touch">
       ${termine.map(t => {
-        const st   = getStudent(t.bookedBy);
         const zeit = t.startTime.toDate().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
-        const name = st ? (st.vorname + ' ' + st.nachname) : 'Unbekannter Schüler';
-        return `<div onclick="openDetail('${t.bookedBy}')" style="flex-shrink:0;display:flex;align-items:center;gap:7px;background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.05)), var(--surface2);border:1px solid var(--border);border-radius:20px;padding:7px 13px 7px 11px;cursor:pointer;white-space:nowrap">
+        const click = t._adkId ? `onclick="openDetail('${t._adkId}')"` : `title="Keine passende Kartei gefunden (Name im Kalender und in der ADK müssen übereinstimmen)"`;
+        return `<div ${click} style="flex-shrink:0;display:flex;align-items:center;gap:7px;background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.05)), var(--surface2);border:1px solid var(--border);border-radius:20px;padding:7px 13px 7px 11px;cursor:${'${'}t._adkId ? 'pointer' : 'default'};white-space:nowrap;opacity:${'${'}t._adkId ? '1' : '0.75'}">
           <span style="font-weight:800;color:var(--accent);font-size:0.76rem">${zeit}</span>
-          <span style="font-size:0.76rem;font-weight:600;color:var(--muted)">${escHtml(name)}</span>
+          <span style="font-size:0.76rem;font-weight:600;color:var(--muted)">${escHtml(t._name)}</span>
         </div>`;
       }).join('')}
     </div>`;
