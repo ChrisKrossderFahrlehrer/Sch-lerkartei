@@ -1720,17 +1720,36 @@ pages['lehrer-buchungen']=async function(el){
     <div class="card" style="margin-bottom:16px"><div class="card-title">⏳ Warteliste</div><div id="booking-warteliste"><div class="spinner"></div></div></div>
     <div class="card" style="margin-bottom:16px"><div class="card-title">✉️ Nachrichten</div><div id="booking-nachrichten"><div class="spinner"></div></div></div>
     <div class="card"><div class="card-title">✅ Bestätigte Buchungen</div><div id="buchungen-list"><div class="spinner"></div></div></div></div>`;
-  // HAERTUNG: jeder Bereich einzeln abgesichert - schlaegt EINER fehl,
-  // laden die anderen trotzdem normal weiter (vorher: ein Fehler irgendwo
-  // in der Kette liess ALLE Bereiche fuer immer im Lade-Kreis haengen).
-  try { renderPushStatus(); } catch(e) { console.error('renderPushStatus:', e); }
-  try { startCalStatusWatch(); } catch(e) { console.error('startCalStatusWatch:', e); }
-  try { await publishMyBookingLink(); } catch(e) { console.error('publishMyBookingLink:', e); }
-  try { await renderBookingOnline(); } catch(e) { console.error('renderBookingOnline:', e); }
-  try { await renderBookingRequests(); } catch(e) { console.error('renderBookingRequests:', e); }
-  try { await renderWarteliste(); } catch(e) { console.error('renderWarteliste:', e); }
-  try { await renderNachrichten(); } catch(e) { console.error('renderNachrichten:', e); }
-  try { await renderBestaetigteBuchungen(); } catch(e) { console.error('renderBestaetigteBuchungen:', e); }
+  // HAERTUNG v2: Bereiche laufen jetzt PARALLEL und mit Zeitlimit.
+  // Grund: try/catch faengt nur ABSTUERZE ab - nicht den Fall, dass eine
+  // Firestore-Abfrage NIE zurueckkommt (haengt). In der bisherigen
+  // await-Kette blockierte eine einzige haengende Abfrage ALLE folgenden
+  // Bereiche dauerhaft im Lade-Kreis (genau das beobachtete Symptom).
+  // Jetzt: jeder Bereich unabhaengig; nach 12s Abbruch mit sichtbarer
+  // Meldung statt endlosem Spinner - und die Konsole nennt den Verursacher.
+  const _mitLimit = (p, ms) => Promise.race([
+    Promise.resolve().then(() => p),
+    new Promise((_, rej) => setTimeout(() => rej(new Error('Zeitueberschreitung nach ' + (ms/1000) + 's')), ms))
+  ]);
+  const _ladeBereich = async (name, fn, boxId) => {
+    try { await _mitLimit(fn(), 12000); }
+    catch(e) {
+      console.error('[BUCHUNGEN] ' + name + ':', e);
+      const b = boxId && document.getElementById(boxId);
+      if (b && b.querySelector('.spinner')) {
+        b.innerHTML = '<p class="text-muted">Konnte nicht geladen werden (' + (e.code || e.message || 'Fehler') + ').</p>';
+      }
+    }
+  };
+  try { renderPushStatus(); } catch(e) { console.error('[BUCHUNGEN] renderPushStatus:', e); }
+  try { startCalStatusWatch(); } catch(e) { console.error('[BUCHUNGEN] startCalStatusWatch:', e); }
+  await Promise.allSettled([
+    _ladeBereich('Buchungslink+Online', async () => { await publishMyBookingLink(); await renderBookingOnline(); }, 'booking-online'),
+    _ladeBereich('Anfragen',    renderBookingRequests,      'booking-requests'),
+    _ladeBereich('Warteliste',  renderWarteliste,           'booking-warteliste'),
+    _ladeBereich('Nachrichten', renderNachrichten,          'booking-nachrichten'),
+    _ladeBereich('Bestaetigte', renderBestaetigteBuchungen, 'buchungen-list')
+  ]);
   const _rbuch=()=>{publishMyBookingLink();renderBookingOnline();renderBookingRequests();renderWarteliste();renderNachrichten();renderBestaetigteBuchungen();};
   liveOn(query(collection(db,'bookingRequests'),where('lehrerUid','==',currentUser.uid)),_rbuch);
   liveOn(query(collection(db,'bookingMessages'),where('lehrerUid','==',currentUser.uid)),_rbuch);
