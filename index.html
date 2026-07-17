@@ -8235,25 +8235,25 @@ async function ladeHeutigeTermine() {
 function renderHeutigeTermine(termine) {
   const w = document.getElementById('heute-termine-widget');
   if (!w) return;
-  // FIX: Bei 0 Terminen NICHT mehr komplett ausblenden (sonst nicht von
-  // 'kaputt' unterscheidbar) - stattdessen ein dezenter Hinweis.
+  // FIX: Eine einzige horizontal scrollbare Zeile (genau wie .filter-row) statt
+  // gestapelter Kacheln - dadurch bleibt die Höhe IMMER gleich (eine Zeile),
+  // egal ob 0, 1 oder 10 Termine. Vorher wuchs der Kopfbereich mit jedem
+  // Termin weiter nach unten und quetschte die scrollbare Schülerliste auf
+  // kleinen Bildschirmen komplett weg.
+  w.style.display = 'block';
   if (!termine.length) {
-    w.style.display = 'block';
-    w.innerHTML = `<div style="font-size:0.78rem;color:var(--muted);padding:8px 2px">📅 Heute keine bestätigten Termine.</div>`;
+    w.innerHTML = `<div style="font-size:0.74rem;color:var(--muted);padding:4px 2px 8px">📅 Heute keine bestätigten Termine.</div>`;
     return;
   }
-  w.style.display = 'block';
   w.innerHTML = `
-    <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:6px">📅 Heute (${termine.length})</div>
-    <div style="display:flex;flex-direction:column;gap:6px">
+    <div style="display:flex;gap:8px;overflow-x:auto;padding:2px 0 8px;scrollbar-width:none;-webkit-overflow-scrolling:touch">
       ${termine.map(t => {
         const st   = getStudent(t.bookedBy);
         const zeit = t.startTime.toDate().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
         const name = st ? (st.vorname + ' ' + st.nachname) : 'Unbekannter Schüler';
-        return `<div onclick="openDetail('${t.bookedBy}')" style="display:flex;align-items:center;gap:10px;background:var(--surface2,rgba(255,255,255,0.05));border:1px solid var(--border);border-radius:10px;padding:9px 12px;cursor:pointer">
-          <span style="font-weight:700;color:var(--accent);min-width:44px">${zeit}</span>
-          <span style="flex:1;font-size:0.85rem">${escHtml(name)}</span>
-          <span style="color:var(--muted)">›</span>
+        return `<div onclick="openDetail('${t.bookedBy}')" style="flex-shrink:0;display:flex;align-items:center;gap:7px;background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.05)), var(--surface2);border:1px solid var(--border);border-radius:20px;padding:7px 13px 7px 11px;cursor:pointer;white-space:nowrap">
+          <span style="font-weight:800;color:var(--accent);font-size:0.76rem">${zeit}</span>
+          <span style="font-size:0.76rem;font-weight:600;color:var(--muted)">${escHtml(name)}</span>
         </div>`;
       }).join('')}
     </div>`;
