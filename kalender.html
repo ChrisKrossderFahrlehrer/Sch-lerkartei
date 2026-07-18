@@ -611,11 +611,42 @@ function show(screen){
 window.switchAuthTab=function(tab){
   /* Registrierungs-Tabs entfernt – neue Konten werden in der Haupt-App (ADK) angelegt. */
 };
+// Fake-E-Mail-Umwandlung fuer Bestandskonten - MUSS identisch zur Haupt-App sein.
+function usernameToEmailKal(username) {
+  return username.toLowerCase().trim().replace(/[^a-z0-9.\-]/g,'') + '@fahrschule-kartei.app';
+}
 window.doLogin=async function(){
-  const email=document.getElementById('login-email').value.trim();
+  const eingabe=document.getElementById('login-email').value.trim();
   const pw=document.getElementById('login-pw').value;
-  try{await setPersistence(auth,browserLocalPersistence);await signInWithEmailAndPassword(auth,email,pw);}
-  catch(e){toast('Anmeldung fehlgeschlagen: '+e.message,'error');}
+  if(!eingabe||!pw){toast('Bitte Benutzername/E-Mail und Passwort eingeben.','error');return;}
+  try{await setPersistence(auth,browserLocalPersistence);}catch(e){}
+  // FIX: Gleiche Benutzername-Anmeldung wie die Haupt-App - der Kalender
+  // akzeptierte bisher NUR echte E-Mails, die ADK aber auch Benutzernamen
+  // (z.B. "Chris"). Jetzt: bei einer Eingabe ohne '@' erst die echte E-Mail
+  // aus der usernames-Sammlung holen, dann die interne Fake-E-Mail als
+  // Fallback - genau wie drueben.
+  const versuche=[];
+  if(eingabe.includes('@')){
+    versuche.push(eingabe.toLowerCase());
+  }else{
+    try{
+      const unameLower=eingabe.toLowerCase().trim();
+      const unameDoc=await getDoc(doc(db,'usernames',unameLower));
+      if(unameDoc.exists()&&unameDoc.data().email){versuche.push(unameDoc.data().email.toLowerCase());}
+    }catch(e){/* usernames evtl. nicht lesbar - weiter */}
+    versuche.push(usernameToEmailKal(eingabe));
+  }
+  let letzterFehler=null;
+  for(const mail of versuche){
+    try{await signInWithEmailAndPassword(auth,mail,pw);return;}
+    catch(e){letzterFehler=e;}
+  }
+  const c=letzterFehler?letzterFehler.code:'';
+  if(c==='auth/invalid-credential'||c==='auth/wrong-password'||c==='auth/user-not-found'||c==='auth/invalid-email'){
+    toast('Benutzername/E-Mail oder Passwort falsch. Bitte Schreibweise pruefen.','error');
+  }else{
+    toast('Anmeldung fehlgeschlagen: '+(letzterFehler?letzterFehler.message:'Unbekannter Fehler'),'error');
+  }
 };
 window.doRegisterAdmin=async function(){
   // Registrierung läuft ausschließlich in der Haupt-App (Schülerkartei).
