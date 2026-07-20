@@ -760,8 +760,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
         <p style="color:var(--accent);font-size:.74rem;font-weight:700;margin:8px 0 0">Abo-Software: 14 Tage kostenlos testen · danach ab 9,99 €/Monat · monatlich kündbar</p>
       </div>
 
-      <div id="preis-uebersicht-login" style="max-width:400px;margin:0 auto 18px;background:var(--surface2,rgba(255,255,255,0.04));border:1px solid var(--border);border-radius:14px;padding:14px 16px">
-        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:10px;text-align:center">💳 Preise im Überblick</div>
+      <div id="preis-uebersicht-login" style="max-width:400px;margin:0 auto 18px;background:var(--surface2,rgba(255,255,255,0.04));border:1px solid var(--border);border-radius:14px;overflow:hidden">
+        <div onclick="togglePreisUebersicht()" style="cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;padding:13px 16px;font-family:'Syne',sans-serif;font-weight:800;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text)">
+          <span>💳 Preise anzeigen</span>
+          <span id="preis-chevron" style="transition:transform 0.25s;font-size:0.7rem;color:var(--muted)">▾</span>
+        </div>
+        <div id="preis-inhalt" style="display:none;padding:0 16px 14px">
         <table style="width:100%;border-collapse:collapse;font-size:0.78rem">
           <tr style="color:var(--muted);text-align:left">
             <th style="font-weight:600;padding:3px 4px 6px;text-align:left">Stufe</th>
@@ -775,6 +779,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
           <tr style="border-top:1px solid var(--border)"><td style="padding:5px 4px">Unbegrenzt</td><td style="padding:5px 4px;text-align:right;color:var(--text);font-weight:700">34,99 €</td><td style="padding:5px 4px;text-align:right;color:var(--text);font-weight:700">40,99 €</td></tr>
         </table>
         <div style="font-size:0.68rem;color:var(--muted);margin-top:8px;line-height:1.5">Alle Preise pro Monat, monatlich kündbar. Bei „Unbegrenzt" einmalige Einrichtungsgebühr von 42,99 € (mit Planer 45,99 €). 14 Tage kostenlos testen, keine automatische Abbuchung während der Testphase.</div>
+        </div>
       </div>
 
   <div class="login-box">
@@ -8297,6 +8302,17 @@ function renderHeutigeTermine(termine) {
       }).join('')}
     </div>`;
 }
+
+
+
+window.togglePreisUebersicht = () => {
+  const inhalt = document.getElementById('preis-inhalt');
+  const chevron = document.getElementById('preis-chevron');
+  if (!inhalt) return;
+  const offen = inhalt.style.display !== 'none';
+  inhalt.style.display = offen ? 'none' : 'block';
+  if (chevron) chevron.style.transform = offen ? 'rotate(0deg)' : 'rotate(180deg)';
+};
 
 </script>
 </body>
