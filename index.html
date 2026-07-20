@@ -479,7 +479,7 @@ body.light .student-card { box-shadow:0 3px 0 rgba(16,24,40,0.12), 0 7px 16px rg
 @keyframes undoOut { from{opacity:1;transform:translate(-50%,0)} to{opacity:0;transform:translate(-50%,16px)} }
 
 /* LOADING */
-.loading-screen { position:fixed; inset:0; background:var(--bg); display:flex; align-items:center; justify-content:center; flex-direction:column; gap:16px; z-index:500; }
+.loading-screen { position:fixed; inset:0; background:var(--bg); display:none; align-items:center; justify-content:center; flex-direction:column; gap:16px; z-index:500; }
 .spinner { width:40px; height:40px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
 @keyframes spin { to{transform:rotate(360deg)} }
 .loading-screen p { color:var(--muted); font-size:0.85rem; }
@@ -751,7 +751,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 </div>
 
 <!-- ══ LOGIN ══ -->
-<div class="screen" id="screen-login">
+<div class="screen active" id="screen-login">
       <div style="text-align:center;margin:4px 0 18px">
         <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.6rem;color:var(--accent);letter-spacing:0.02em;margin-bottom:2px">FahrSync</div>
         <h1 style="font-size:1.05rem;font-weight:600;line-height:1.3;margin:0 0 10px;color:var(--text)">Die digitale Kartei für Fahrlehrer</h1>
@@ -1897,12 +1897,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-
-// ⚡ LOADING-SCREEN SOFORT VERSTECKEN (nicht auf Auth warten!)
-setTimeout(() => {
-  const loadingEl = document.getElementById('loading');
-  if (loadingEl) loadingEl.style.display = 'none';
-}, 100);
 
 // ─────────────────────────────────────────
 // KONSTANTEN – MÜSSEN VOR ALLEM ANDEREN DEFINIERT SEIN
