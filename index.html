@@ -3378,13 +3378,12 @@ onAuthStateChanged(auth, async (user) => {
     students = [];
     activeId = null;
     protokollEintraege = [];
+    // AUDIT-FIX: ALLE Ansichten pauschal deaktivieren statt handgepflegter
+    // Einzelliste - die alte Liste vergass dashboard, warte und schueler.
+    // Meldete sich jemand ab (oder lief die Sitzung ab), waehrend eine dieser
+    // drei Ansichten offen war, lagen danach zwei Ansichten uebereinander.
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById('screen-login').classList.add('active');
-    document.getElementById('screen-list').classList.remove('active');
-    document.getElementById('screen-detail').classList.remove('active');
-    document.getElementById('screen-protokoll').classList.remove('active');
-    document.getElementById('screen-help').classList.remove('active');
-    document.getElementById('screen-impressum').classList.remove('active');
-    document.getElementById('screen-chat').classList.remove('active');
     document.getElementById('tutorial-overlay').style.display = 'none';
     const loginUser = document.getElementById('login-username');
     if (loginUser) loginUser.value = '';
