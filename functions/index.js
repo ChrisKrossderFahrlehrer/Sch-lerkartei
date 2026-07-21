@@ -12,7 +12,7 @@ setGlobalOptions({ region: 'europe-west3', maxInstances: 5 });
 // Google-Kalender-Sync: Client-Secret liegt NICHT im Code (Repo ist oeffentlich
 // einsehbar), sondern im Firebase Secret Manager - siehe Deploy-Hinweis.
 const GOOGLE_CLIENT_SECRET = defineSecret('GOOGLE_CLIENT_SECRET');
-const GOOGLE_CLIENT_ID     = '194338111405-jc60sjvvqnp8re2he1g85bf3h3pm15fc.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID     = '140641089306-iovtr6gnoggkg6me8k2tk0c522o4oh0e.apps.googleusercontent.com';
 const GOOGLE_REDIRECT_URI  = 'https://europe-west3-fahrschule-ebc65.cloudfunctions.net/kalenderOAuthCallback';
 const APP_URL              = 'https://fahrsync.de/kalender.html';
 
