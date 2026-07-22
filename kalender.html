@@ -1674,7 +1674,7 @@ window.openDayModal=async function(year,month,day){
   const scm={};scSnap.docs.forEach(d=>{const s=d.data();scm[d.id]=s.fname+' '+s.lname;});
   const slotsHtml=daySlots.length?daySlots.map(d=>{const s=d.data();const pend=!s.bookedBy&&window.__pendingReq&&window.__pendingReq.bySlot[d.id];const sn=s.bookedBy?(scm[s.bookedBy]||'?'):(pend?('⏳ Anfrage: '+pend):null);
     return`<div class="slot-row"><div class="slot-time">${fmtTime(s.startTime)} – ${fmtTime(s.endTime)}</div>
-    <div class="slot-info">${typeBadgeHtml(s.type)}${sn?`<div class="slot-student">👤 ${sn}</div>`:'<div class="slot-student" style="color:var(--success)">Frei</div>'}</div>
+    <div class="slot-info">${typeBadgeHtml(s.type)}${sn?`<div class="slot-student" onclick="oeffneTerminDetail('${d.id}',${year},${month},${day})" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted">👤 ${sn}${s.status==='nichtErschienen'?' ⚠️ Fehlstunde':''} ›</div>`:'<div class="slot-student" style="color:var(--success)">Frei</div>'}</div>
     ${!s.bookedBy?`<div style="display:flex;gap:6px;align-items:center;margin-top:6px;width:100%">
       <select id="man-buch-${d.id}" style="flex:1;min-width:0;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 8px;font-size:0.8rem">
         <option value="">Schüler wählen…</option>
@@ -1716,6 +1716,70 @@ window.manuellBuchen = async function(slotId, schuelerId, year, month, day) {
     console.warn('manuellBuchen', e);
     toast('Fehler beim Zuweisen: ' + (e.code || e.message), 'error');
   }
+};
+// ══ TERMIN-DETAIL: Schueler-Zugriff, Fehlstunde, Stornieren, Fahrstunden-Historie ══
+window.oeffneTerminDetail = async function(slotId, year, month, day) {
+  try {
+    const slotSnap = await getDoc(doc(db, 'slots', slotId));
+    if (!slotSnap.exists()) { toast('Termin nicht mehr vorhanden.', 'error'); return; }
+    const s = slotSnap.data();
+    if (!s.bookedBy) return;
+    const scSnap = await getDoc(doc(db, 'schueler', s.bookedBy));
+    const name = scSnap.exists() ? `${scSnap.data().fname || ''} ${scSnap.data().lname || ''}`.trim() : 'Unbekannter Schüler';
+
+    const histSnap = await getDocs(query(collection(db, 'slots'), where('lehrerUid', '==', currentUser.uid), where('bookedBy', '==', s.bookedBy)));
+    const hist = histSnap.docs.map(hd => hd.data());
+    const gesamt = hist.length;
+    const fehlstunden = hist.filter(h => h.status === 'nichtErschienen').length;
+    const nachTyp = {};
+    hist.forEach(h => { const t = h.type || 'normal'; nachTyp[t] = (nachTyp[t] || 0) + 1; });
+    const typZeilen = Object.entries(nachTyp).map(([t, n]) =>
+      `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)"><span>${typeBadgeHtml(t)}</span><span style="font-weight:700">${n}×</span></div>`
+    ).join('');
+
+    const istFehlstunde = s.status === 'nichtErschienen';
+    const datumTxt = s.startTime.toDate().toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long' });
+    openModal(`
+      <h2 class="modal-title">👤 ${name}</h2>
+      <p class="text-muted" style="margin:-6px 0 14px">${datumTxt} · ${fmtTime(s.startTime)}–${fmtTime(s.endTime)} · ${typeBadgeHtml(s.type)}</p>
+      <div class="card-title">Aktueller Termin</div>
+      <label style="display:flex;align-items:center;gap:8px;margin-bottom:14px;cursor:pointer">
+        <input type="checkbox" ${istFehlstunde ? 'checked' : ''} onchange="toggleFehlstunde('${slotId}',${year},${month},${day})" style="width:18px;height:18px">
+        <span>Nicht erschienen (Fehlstunde)</span>
+      </label>
+      <button class="btn btn-danger" style="width:100%;margin-bottom:18px" onclick="if(confirm('Diesen Termin wirklich stornieren und löschen?'))stornierGebuchtenSlot('${slotId}',${year},${month},${day})">🗑️ Termin stornieren</button>
+      <hr class="divider">
+      <div class="card-title">Bisherige Fahrstunden bei dir</div>
+      <p class="text-muted" style="margin:-4px 0 8px">Gesamt: <strong style="color:var(--text)">${gesamt}</strong>${fehlstunden ? ` · davon ${fehlstunden} Fehlstunde${fehlstunden > 1 ? 'n' : ''}` : ''}</p>
+      ${typZeilen || '<p class="text-muted">Keine weiteren Daten.</p>'}
+    `);
+  } catch (e) { console.warn('oeffneTerminDetail', e); toast('Fehler beim Laden: ' + (e.code || e.message), 'error'); }
+};
+
+window.toggleFehlstunde = async function(slotId, year, month, day) {
+  try {
+    const slotSnap = await getDoc(doc(db, 'slots', slotId));
+    if (!slotSnap.exists()) return;
+    const neu = slotSnap.data().status === 'nichtErschienen' ? null : 'nichtErschienen';
+    await updateDoc(doc(db, 'slots', slotId), { status: neu });
+    toast(neu ? 'Als Fehlstunde markiert.' : 'Markierung entfernt.', 'success');
+    oeffneTerminDetail(slotId, year, month, day);
+  } catch (e) { console.warn('toggleFehlstunde', e); toast('Fehler: ' + (e.code || e.message), 'error'); }
+};
+
+window.stornierGebuchtenSlot = async function(slotId, year, month, day) {
+  try {
+    const slotSnap = await getDoc(doc(db, 'slots', slotId));
+    const bb = slotSnap.exists() ? slotSnap.data().bookedBy : null;
+    await updateDoc(doc(db, 'slots', slotId), { bookedBy: null, bookedAt: null });
+    await deleteDoc(doc(db, 'slots', slotId));
+    try { await publishMyBookingLink(); } catch (e) {}
+    if (bb) { try { await publishStudentBookings(bb); } catch (e) {} }
+    toast('Termin storniert und gelöscht.', 'success');
+    closeModal();
+    try { renderCal(); } catch (e) {}
+    if (typeof year === 'number') { try { openDayModal(year, month, day); } catch (e) {} }
+  } catch (e) { console.warn('stornierGebuchtenSlot', e); toast('Fehler beim Stornieren: ' + (e.code || e.message), 'error'); }
 };
 window.updateEndTime=function(bd){const f=document.getElementById('ns-from'),t=document.getElementById('ns-to'),dEl=document.getElementById('ns-dauer');if(!f||!t||!f.value)return;const dur=dEl?(parseInt(dEl.value)||60):(bd||60);const[h,m]=f.value.split(':').map(Number);const tot=h*60+m+dur;t.value=`${String(Math.floor(tot/60)%24).padStart(2,'0')}:${String(tot%60).padStart(2,'0')}`;};
 window.addSlot=async function(year,month,day){
