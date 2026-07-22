@@ -1675,7 +1675,14 @@ window.openDayModal=async function(year,month,day){
   const slotsHtml=daySlots.length?daySlots.map(d=>{const s=d.data();const pend=!s.bookedBy&&window.__pendingReq&&window.__pendingReq.bySlot[d.id];const sn=s.bookedBy?(scm[s.bookedBy]||'?'):(pend?('⏳ Anfrage: '+pend):null);
     return`<div class="slot-row"><div class="slot-time">${fmtTime(s.startTime)} – ${fmtTime(s.endTime)}</div>
     <div class="slot-info">${typeBadgeHtml(s.type)}${sn?`<div class="slot-student">👤 ${sn}</div>`:'<div class="slot-student" style="color:var(--success)">Frei</div>'}</div>
-    ${!s.bookedBy?`<button class="btn btn-danger btn-sm" onclick="deleteSlot('${d.id}')">Löschen</button>`:''}</div>`;}).join(''):'<p class="text-muted">Keine Slots.</p>';
+    ${!s.bookedBy?`<div style="display:flex;gap:6px;align-items:center;margin-top:6px;width:100%">
+      <select id="man-buch-${d.id}" style="flex:1;min-width:0;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 8px;font-size:0.8rem">
+        <option value="">Schüler wählen…</option>
+        ${Object.entries(scm).map(([sid,name])=>`<option value="${sid}">${name}</option>`).join('')}
+      </select>
+      <button class="btn btn-primary btn-sm" onclick="manuellBuchen('${d.id}',document.getElementById('man-buch-${d.id}').value,${year},${month},${day})">Buchen</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteSlot('${d.id}')">Löschen</button>
+    </div>`:''}</div>`;}).join(''):'<p class="text-muted">Keine Slots.</p>';
   openModal(`<h2 class="modal-title">${dateStr}</h2>
     ${ft?`<div style="background:rgba(212,168,67,.1);border:1px solid rgba(212,168,67,.3);border-radius:7px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:var(--accent)">🎉 Feiertag: ${ft}</div>`:''}
     ${urlaubEntry?`<div style="background:rgba(91,186,122,.1);border:1px solid rgba(91,186,122,.3);border-radius:7px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:#5bba7a">🏖️ Urlaub: ${urlaubEntry.label||'Urlaub'}</div>`:''}
@@ -1696,6 +1703,19 @@ window.openDayModal=async function(year,month,day){
     <div class="field"><label>Typ</label><select id="ns-type">${fahrstundenarten.map(t=>`<option value="${t.id}">${t.label}</option>`).join('')}</select></div>
     <button class="btn btn-primary" onclick="addSlot(${year},${month},${day})">Slot hinzufügen</button>`);
   setTimeout(()=>updateEndTime(blockDauer),50);
+};
+window.manuellBuchen = async function(slotId, schuelerId, year, month, day) {
+  if (!schuelerId) { toast('Bitte zuerst einen Schüler auswählen.', 'error'); return; }
+  try {
+    await updateDoc(doc(db, 'slots', slotId), { bookedBy: schuelerId, bookedAt: serverTimestamp() });
+    toast('Slot manuell zugewiesen!', 'success');
+    closeModal();
+    try { renderCal(); } catch(e) {}
+    if (typeof year === 'number') { try { openDayModal(year, month, day); } catch(e) {} }
+  } catch(e) {
+    console.warn('manuellBuchen', e);
+    toast('Fehler beim Zuweisen: ' + (e.code || e.message), 'error');
+  }
 };
 window.updateEndTime=function(bd){const f=document.getElementById('ns-from'),t=document.getElementById('ns-to'),dEl=document.getElementById('ns-dauer');if(!f||!t||!f.value)return;const dur=dEl?(parseInt(dEl.value)||60):(bd||60);const[h,m]=f.value.split(':').map(Number);const tot=h*60+m+dur;t.value=`${String(Math.floor(tot/60)%24).padStart(2,'0')}:${String(tot%60).padStart(2,'0')}`;};
 window.addSlot=async function(year,month,day){
