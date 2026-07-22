@@ -472,12 +472,17 @@ service cloud.firestore {
                     && resource.data.startTime > request.time + duration.value(48, 'h');
     }
     match /autos/{docId} {
-      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId);
-      allow create:               if kalOwnsSchool(request.resource.data.schoolId);
+      // FIX: Solo-Fahrlehrer (keine Fahrschul-Mitgliedschaft/kalenderUsers-
+      // Zuordnung noetig) konnten hier nie verwalten, da anders als bei
+      // schueler/slots/urlaub/... der Rueckfallweg ueber die eigene lehrerUid
+      // fehlte - kalOwnsSchool() allein greift nur mit korrekter
+      // Fahrschul-Mitgliedschaft.
+      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || resource.data.lehrerUid == request.auth.uid;
+      allow create:               if kalOwnsSchool(request.resource.data.schoolId) || (isRealAccount() && request.resource.data.lehrerUid == request.auth.uid);
     }
     match /globalBlocked/{docId} {
-      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId);
-      allow create:               if kalOwnsSchool(request.resource.data.schoolId);
+      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || resource.data.lehrerUid == request.auth.uid;
+      allow create:               if kalOwnsSchool(request.resource.data.schoolId) || (isRealAccount() && request.resource.data.lehrerUid == request.auth.uid);
     }
     match /urlaub/{docId} {
       allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || resource.data.lehrerUid == request.auth.uid;
