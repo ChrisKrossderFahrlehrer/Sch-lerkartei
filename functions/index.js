@@ -176,8 +176,14 @@ exports.syncSlotToGoogleCalendar = onDocumentUpdated({ document: 'slots/{slotId}
     if (wurdeGebucht) {
       let titel = 'Fahrstunde';
       try {
+        // FIX: 'schueler' (Kalender-eigene Liste) speichert fname/lname,
+        // nicht vorname/nachname (das ist nur in der ADK-Kartei so) -
+        // dadurch blieb der Name im Google-Kalender-Titel bisher leer.
         const scSnap = await admin.firestore().collection('schueler').doc(after.bookedBy).get();
-        if (scSnap.exists) titel = `Fahrstunde – ${(scSnap.data().vorname || '')} ${(scSnap.data().nachname || '')}`.trim();
+        if (scSnap.exists) {
+          const name = `${(scSnap.data().fname || '')} ${(scSnap.data().lname || '')}`.trim();
+          if (name) titel = `Fahrstunde – ${name}`;
+        }
       } catch (e) { /* Titel-Fallback reicht */ }
       const ev = await googleCalendarRequest(after.lehrerUid, secretValue, 'POST', 'events', {
         summary: titel,
