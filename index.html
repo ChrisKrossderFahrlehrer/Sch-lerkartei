@@ -5156,18 +5156,7 @@ window.addProtokollEintrag = async () => {
   try { renderProtokollScreen(); } catch(e) { console.error('renderProtokollScreen:', e); }
 
   // Protokoll-Snapshot in accessCodes aktualisieren (Portal sync)
-  try {
-    const _cq = query(collection(db,'accessCodes'), where('studentId','==',activeId), where('uid','==',currentUser.uid));
-    const _cs = await getDocs(_cq);
-    if (!_cs.empty) {
-      const _proto = buildPortalProtokoll(
-        protokollEintraege
-          .sort((a,b) => (b.createdAt||0)-(a.createdAt||0)).slice(0,50)
-          .map(p => ({...p, fortschritt: p.fortschritt ?? null, stunde: p.stunde||0}))
-      );
-      await dbUpd(doc(db,'accessCodes',_cs.docs[0].id), { protokollSnapshot: _proto, expiresAt: Date.now() + CODE_LAUFZEIT_MS });
-    }
-  } catch(_e) { console.error('ProtokollSnapshot-Update:', _e); }
+  await syncProtokollSnapshot(activeId);
 };
 
 function listenProtokoll(studentId) {
@@ -5186,12 +5175,49 @@ function listenProtokoll(studentId) {
   });
 }
 
+// ══ PORTAL-PROTOKOLL-SYNC ═══════════════════════════════════════════
+// Überträgt das Protokoll eines Schülers in ALLE seine Zugangscodes.
+// Behebt drei Fehler der vorherigen Inline-Fassung:
+//  1) Sie suchte accessCodes über das Feld 'uid' - dieses Feld existiert
+//     dort gar nicht (angelegt wird 'teacherUid'). Die Abfrage lief also
+//     immer leer, das Portal-Protokoll wurde NIE aktualisiert.
+//  2) Sie beschrieb nur docs[0] - hatte ein Schüler mehrere Codes, blieben
+//     die übrigen auf altem Stand.
+//  3) Sie baute den Snapshot aus der lokalen Liste, die der onSnapshot-
+//     Listener asynchron füllt - der gerade gespeicherte Eintrag fehlte
+//     dadurch häufig. Jetzt wird frisch aus Firestore gelesen.
+async function syncProtokollSnapshot(studentId) {
+  try {
+    if (!currentUser || window.__DEMO || !studentId) return;
+    const pSnap = await getDocs(query(collection(db,'protokoll'),
+      where('studentId','==',studentId), where('uid','==',currentUser.uid)));
+    const eintraege = pSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a,b) => (b.createdAt||0)-(a.createdAt||0)).slice(0,50)
+      .map(p => ({ ...p, fortschritt: p.fortschritt ?? null, stunde: p.stunde||0 }));
+    const _proto = buildPortalProtokoll(eintraege);
+    const cs = await getDocs(query(collection(db,'accessCodes'),
+      where('studentId','==',studentId), where('teacherUid','==',currentUser.uid)));
+    let n = 0;
+    for (const cd of cs.docs) {
+      await dbUpd(doc(db,'accessCodes',cd.id), {
+        protokollSnapshot: _proto,
+        expiresAt: Date.now() + CODE_LAUFZEIT_MS
+      });
+      n++;
+    }
+    console.log(`[PROTOKOLL-SYNC] ${eintraege.length} Einträge in ${n} Code(s) übertragen`);
+  } catch(e) { console.error('syncProtokollSnapshot:', e); }
+}
+
 window.deleteProtokollEintrag = async (id) => {
   if (!confirm('Diesen Eintrag löschen?')) return;
   try {
     await dbDel(doc(db, 'protokoll', id));
     toast('Eintrag gelöscht.');
     try { renderProtokollScreen(); } catch(e) { console.error('renderProtokollScreen:', e); }
+    // FIX: Portal-Protokoll auch beim Löschen aktualisieren - gelöschte
+    // Einträge blieben dem Schüler bisher dauerhaft sichtbar.
+    await syncProtokollSnapshot(activeId);
   } catch(e) { console.error('deleteProtokollEintrag:', e); toast('❌ Fehler: ' + e.message); }
 };
 
