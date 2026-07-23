@@ -3063,7 +3063,9 @@ async function resyncPortalSnapshotsV2() {
   // Lehrer-Login jeden eigenen Code mit frischem Lernstand UND Protokoll.
   try {
     if (!currentUser || window.__DEMO) return;
-    const flagKey = `adk_snapshot_resync_${currentUser.uid}_v2`;
+    // v3: v2 lief zwar, der Protokoll-Teil war aber wegen der abgewiesenen
+    // Abfrage wirkungslos - deshalb einmalig erneut durchlaufen lassen.
+    const flagKey = `adk_snapshot_resync_${currentUser.uid}_v3`;
     if (localStorage.getItem(flagKey)) return;
     if (!students.length) return; // Schülerliste noch nicht geladen -> nächster Login versucht es erneut
 
@@ -3088,10 +3090,10 @@ async function resyncPortalSnapshotsV2() {
         } catch(pErr) { /* Protokoll optional - Lernstand ist die Hauptsache */ }
         await dbUpd(doc(db,'accessCodes',cd.id), upd);
         ok++;
-      } catch(e) { console.warn('[RESYNC v2]', cd.id, e.code || e.message); }
+      } catch(e) { console.warn('[RESYNC v3]', cd.id, e.code || e.message); }
     }
     localStorage.setItem(flagKey, String(Date.now()));
-    console.log(`[RESYNC v2] Portal-Snapshots erneuert: ${ok} aktualisiert, ${skip} übersprungen`);
+    console.log(`[RESYNC v3] Portal-Snapshots erneuert: ${ok} aktualisiert, ${skip} übersprungen`);
   } catch(e) { console.warn('resyncPortalSnapshotsV2:', e); }
 }
 
