@@ -3076,8 +3076,14 @@ async function resyncPortalSnapshotsV2() {
       try {
         const upd = { studentSnapshot: buildPortalSnapshot(st, data.code, data.expiresAt) };
         try {
-          const pSnap = await getDocs(query(collection(db,'protokoll'), where('studentId','==',data.studentId)));
-          const eintraege = pSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          // FIX: uid-Filter fehlte - eine Abfrage ohne ihn liefert nicht
+          // garantiert nur eigene Dokumente und wird von Firestore komplett
+          // abgewiesen (permission-denied). Der Fehler lief ins stille catch,
+          // deshalb blieb der Protokoll-Teil des Resyncs wirkungslos.
+          const pSnap = await getDocs(query(collection(db,'protokoll'),
+            where('studentId','==',data.studentId), where('uid','==',currentUser.uid)));
+          const eintraege = pSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+            .sort((a,b) => (b.createdAt||0)-(a.createdAt||0)).slice(0, PORTAL_PROTO_MAX);
           upd.protokollSnapshot = buildPortalProtokoll(eintraege);
         } catch(pErr) { /* Protokoll optional - Lernstand ist die Hauptsache */ }
         await dbUpd(doc(db,'accessCodes',cd.id), upd);
@@ -5192,7 +5198,7 @@ async function syncProtokollSnapshot(studentId) {
     const pSnap = await getDocs(query(collection(db,'protokoll'),
       where('studentId','==',studentId), where('uid','==',currentUser.uid)));
     const eintraege = pSnap.docs.map(d => ({ id: d.id, ...d.data() }))
-      .sort((a,b) => (b.createdAt||0)-(a.createdAt||0)).slice(0,50)
+      .sort((a,b) => (b.createdAt||0)-(a.createdAt||0)).slice(0, PORTAL_PROTO_MAX)
       .map(p => ({ ...p, fortschritt: p.fortschritt ?? null, stunde: p.stunde||0 }));
     const _proto = buildPortalProtokoll(eintraege);
     const cs = await getDocs(query(collection(db,'accessCodes'),
@@ -5211,13 +5217,16 @@ async function syncProtokollSnapshot(studentId) {
 
 window.deleteProtokollEintrag = async (id) => {
   if (!confirm('Diesen Eintrag löschen?')) return;
+  // HAERTUNG: Schueler-ID aus dem Eintrag selbst nehmen (activeId als
+  // Rueckfall) - so landet der Portal-Abgleich sicher beim richtigen Schueler.
+  const _sid = (protokollEintraege.find(p => p.id === id) || {}).studentId || activeId;
   try {
     await dbDel(doc(db, 'protokoll', id));
     toast('Eintrag gelöscht.');
     try { renderProtokollScreen(); } catch(e) { console.error('renderProtokollScreen:', e); }
     // FIX: Portal-Protokoll auch beim Löschen aktualisieren - gelöschte
     // Einträge blieben dem Schüler bisher dauerhaft sichtbar.
-    await syncProtokollSnapshot(activeId);
+    await syncProtokollSnapshot(_sid);
   } catch(e) { console.error('deleteProtokollEintrag:', e); toast('❌ Fehler: ' + e.message); }
 };
 
@@ -6416,6 +6425,10 @@ window.openCodeModal = async () => {
 
 // Code-Gültigkeit: 1 Jahr — wird bei jedem Fahrlehrer-Kontakt automatisch verlängert
 const CODE_LAUFZEIT_MS = 365*24*60*60*1000;
+// Einheitliche Obergrenze fuer das Portal-Protokoll an ALLEN Schreibstellen
+// (vorher: Code-Erstellung unbegrenzt, laufender Sync 50 - dadurch
+// verschwanden bei vielen Eintraegen welche, sobald einmal gespeichert wurde).
+const PORTAL_PROTO_MAX = 100;
 
 window.generateCode = async () => {
   const code = generateCodeStr();
@@ -6436,7 +6449,8 @@ window.generateCode = async () => {
       where('uid','==',currentUser.uid)
     );
     const pSnap = await getDocs(pq);
-    const protokollSnapshot = pSnap.docs.map(d=>({id:d.id,...d.data()}));
+    const protokollSnapshot = pSnap.docs.map(d=>({id:d.id,...d.data()}))
+      .sort((a,b) => (b.createdAt||0)-(a.createdAt||0)).slice(0, PORTAL_PROTO_MAX);
 
     // Kompletten Schüler-Snapshot im Code-Dokument speichern
     // → Schüler braucht keinen Login und keine direkte Firestore-Berechtigung
