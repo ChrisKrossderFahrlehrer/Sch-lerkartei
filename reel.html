@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="FahrSync Reel">
+<meta name="theme-color" content="#04060a">
+<title>FahrSync – Reel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --nacht:#070a0f;
+    --flaeche:#0f151f;
+    --flaeche-2:#141c29;
+    --signal:#ffd454;
+    --weiss:#eef3f8;
+    --grau:#78859a;
+    --grau-2:#4b566a;
+    --linie:#212c3c;
+    --gruen:#3fb950;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#04060a;min-height:100vh;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:18px;padding:20px;
+    font-family:'Manrope',-apple-system,sans-serif;color:var(--grau)}
+
+  .stage{position:relative;width:540px;height:960px;flex-shrink:0;overflow:hidden;
+    transform-origin:top center;
+    background:radial-gradient(ellipse 80% 50% at 50% 0%, #131c29 0%, var(--nacht) 60%), var(--nacht)}
+
+  /* Fahrbahn – ruhig, nur Andeutung */
+  .bahn{position:absolute;left:50%;bottom:-8%;width:300%;height:52%;margin-left:-150%;pointer-events:none;
+    background-image:linear-gradient(rgba(255,212,84,.10) 1px,transparent 1px),
+                     linear-gradient(90deg,rgba(255,212,84,.10) 1px,transparent 1px);
+    background-size:92px 92px;
+    transform:perspective(420px) rotateX(76deg);transform-origin:bottom center;
+    animation:bahn 2.6s linear infinite;
+    -webkit-mask-image:linear-gradient(to top,#000 4%,transparent 72%);
+            mask-image:linear-gradient(to top,#000 4%,transparent 72%)}
+  @keyframes bahn{to{background-position:0 92px,0 0}}
+
+  /* Kopfzeile: die Uhr trägt die Geschichte */
+  .kopf{position:absolute;top:38px;left:44px;right:44px;z-index:5;
+    display:flex;justify-content:space-between;align-items:center;
+    font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:500;
+    letter-spacing:.2em;color:var(--grau-2)}
+  .uhr{color:var(--weiss);font-weight:700;letter-spacing:.1em;font-size:13px;transition:color .4s}
+  .uhr.hell{color:var(--signal)}
+  .naht{position:absolute;top:70px;left:44px;right:44px;height:1px;background:var(--linie);z-index:5}
+
+  .fuss{position:absolute;bottom:38px;left:44px;right:44px;z-index:5;height:2px;
+    background:var(--linie);overflow:hidden}
+  .fuss i{display:block;height:100%;width:0;background:var(--signal)}
+
+  /* Szenen */
+  .scene{position:absolute;inset:0;z-index:2;padding:118px 44px 92px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;opacity:0;visibility:hidden}
+  .scene.active{opacity:1;visibility:visible}
+
+  .marke-zeile{font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:500;
+    letter-spacing:.26em;text-transform:uppercase;color:var(--signal);margin-bottom:20px;opacity:.9}
+
+  h1{font-family:'Syne',sans-serif;font-size:60px;font-weight:800;line-height:1.04;
+    letter-spacing:-.028em;color:var(--weiss)}
+  h2{font-family:'Syne',sans-serif;font-size:44px;font-weight:800;line-height:1.08;
+    letter-spacing:-.025em;color:var(--weiss)}
+  .gelb{color:var(--signal)}
+  .lead{font-size:19px;font-weight:600;line-height:1.5;color:var(--grau);margin-top:20px;max-width:372px}
+
+  .up{opacity:0;transform:translateY(24px)}
+  .active .up{animation:up .58s cubic-bezier(.2,.75,.25,1) forwards}
+  @keyframes up{to{opacity:1;transform:none}}
+  .in{opacity:0;transform:scale(.95)}
+  .active .in{animation:zoom .5s cubic-bezier(.2,.75,.25,1) forwards}
+  @keyframes zoom{to{opacity:1;transform:none}}
+  .d1{animation-delay:.10s}.d2{animation-delay:.24s}.d3{animation-delay:.40s}
+  .d4{animation-delay:.56s}.d5{animation-delay:.72s}.d6{animation-delay:.88s}
+
+  /* 1 · der Abend */
+  .stapel{position:relative;width:200px;height:132px;margin-bottom:40px}
+  .bogen{position:absolute;left:0;top:0;width:138px;height:132px;background:var(--flaeche);
+    border:1px solid var(--linie);border-radius:5px;transform-origin:bottom left}
+  .bogen::after{content:'';position:absolute;left:16px;right:16px;top:22px;height:1px;background:var(--linie);
+    box-shadow:0 16px 0 var(--linie),0 32px 0 var(--linie),0 48px 0 var(--linie),0 64px 0 var(--linie),0 80px 0 var(--linie)}
+  .active .s1{animation:k1 1.7s .3s cubic-bezier(.3,.7,.3,1) both}
+  .active .s2{animation:k2 1.7s .42s cubic-bezier(.3,.7,.3,1) both}
+  .active .s3{animation:k3 1.7s .54s cubic-bezier(.3,.7,.3,1) both}
+  @keyframes k1{from{transform:none}to{transform:rotate(-11deg) translate(-12px,4px)}}
+  @keyframes k2{from{transform:none}to{transform:rotate(5deg) translate(26px,2px)}}
+  @keyframes k3{from{transform:none}to{transform:rotate(17deg) translate(52px,8px)}}
+
+  /* 2 · Marke */
+  .wortmarke{font-family:'Syne',sans-serif;font-size:60px;font-weight:800;color:var(--signal);
+    letter-spacing:-.03em;white-space:nowrap}
+  .regel{width:0;height:2px;background:var(--signal);margin:22px auto 0}
+  .active .regel{animation:regel .8s .35s cubic-bezier(.2,.8,.2,1) forwards}
+  @keyframes regel{to{width:180px}}
+
+  /* 3 · Protokollkarte */
+  .karte{width:100%;max-width:392px;background:var(--flaeche);border:1px solid var(--linie);
+    border-radius:14px;padding:24px 24px 20px;text-align:left;
+    box-shadow:0 30px 70px rgba(0,0,0,.6)}
+  .k-kopf{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px}
+  .k-name{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--weiss)}
+  .k-meta{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--grau-2);letter-spacing:.08em}
+  .sterne{font-size:15px;color:var(--signal);letter-spacing:3px;margin:6px 0 14px}
+  .punkte{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px}
+  .punkt{font-size:12px;font-weight:700;color:var(--grau);background:var(--flaeche-2);
+    border:1px solid var(--linie);border-radius:6px;padding:6px 10px}
+  .sigfeld{border-top:1px solid var(--linie);padding-top:12px}
+  .siglabel{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.2em;
+    text-transform:uppercase;color:var(--grau-2)}
+  .sig svg{width:100%;height:72px;display:block;margin-top:2px}
+  .sig path{fill:none;stroke:var(--weiss);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;
+    stroke-dasharray:760;stroke-dashoffset:760}
+  .active .sig path{animation:schreiben 1.8s .5s cubic-bezier(.45,0,.5,1) forwards}
+  @keyframes schreiben{to{stroke-dashoffset:0}}
+  .quittung{display:flex;align-items:center;gap:8px;margin-top:20px;
+    font-size:15.5px;font-weight:700;color:var(--gruen);opacity:0;transform:translateY(8px)}
+  .active .quittung{animation:up .45s 2.35s cubic-bezier(.2,.8,.2,1) forwards}
+  .haken{width:18px;height:18px;flex-shrink:0}
+  .haken path{fill:none;stroke:var(--gruen);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;
+    stroke-dasharray:26;stroke-dashoffset:26}
+  .active .haken path{animation:haken .4s 2.5s forwards}
+  @keyframes haken{to{stroke-dashoffset:0}}
+
+  /* 4 · Fortschrittsring */
+  .ring-feld{position:relative;width:230px;height:230px;margin:6px 0 4px}
+  .ring-feld svg{width:100%;height:100%;transform:rotate(-90deg)}
+  .ring-bg{fill:none;stroke:var(--flaeche-2);stroke-width:11}
+  .ring-vg{fill:none;stroke:var(--signal);stroke-width:11;stroke-linecap:round;
+    stroke-dasharray:596;stroke-dashoffset:596}
+  .active .ring-vg{animation:ring 1.7s .45s cubic-bezier(.25,.8,.3,1) forwards}
+  @keyframes ring{to{stroke-dashoffset:131}}
+  .ring-mitte{position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center}
+  .ring-zahl{font-family:'Syne',sans-serif;font-size:52px;font-weight:800;color:var(--weiss);line-height:1}
+  .ring-txt{font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.2em;
+    color:var(--grau-2);margin-top:7px}
+  .pflicht{display:flex;flex-direction:column;gap:9px;width:100%;max-width:340px;margin-top:26px}
+  .pf{display:flex;align-items:center;gap:12px}
+  .pf-name{font-size:13.5px;font-weight:600;color:var(--grau);width:96px;text-align:left;flex-shrink:0}
+  .pf-bar{flex:1;height:7px;border-radius:99px;background:var(--flaeche-2);overflow:hidden}
+  .pf-bar i{display:block;height:100%;width:0;border-radius:99px;background:var(--signal)}
+  .pf-zahl{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--grau-2);width:42px;text-align:right}
+  .active .pf1 i{animation:b1 1s .9s cubic-bezier(.25,.8,.3,1) forwards}
+  .active .pf2 i{animation:b2 1s 1.05s cubic-bezier(.25,.8,.3,1) forwards}
+  .active .pf3 i{animation:b3 1s 1.2s cubic-bezier(.25,.8,.3,1) forwards}
+  @keyframes b1{to{width:100%}} @keyframes b2{to{width:75%}} @keyframes b3{to{width:67%}}
+
+  /* 5 · Kalenderwoche */
+  .woche{width:100%;max-width:392px;background:var(--flaeche);border:1px solid var(--linie);
+    border-radius:14px;padding:18px 16px 16px;box-shadow:0 30px 70px rgba(0,0,0,.6)}
+  .w-kopf{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-bottom:9px}
+  .w-kopf span{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--grau-2)}
+  .w-netz{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}
+  .zelle{height:34px;border-radius:6px;background:var(--flaeche-2);border:1px solid var(--linie)}
+  .zelle.belegt{background:rgba(255,212,84,.12);border-color:rgba(255,212,84,.3)}
+  .zelle.neu{opacity:0;transform:scale(.7);background:var(--signal);border-color:var(--signal)}
+  .active .zelle.neu{animation:zoom .45s 1.5s cubic-bezier(.3,1.4,.5,1) forwards}
+  .sync{display:flex;align-items:center;justify-content:center;gap:9px;margin-top:22px;
+    font-size:14.5px;font-weight:700;color:var(--weiss);opacity:0}
+  .active .sync{animation:up .5s 2.1s cubic-bezier(.2,.8,.2,1) forwards}
+  .sync b{color:var(--signal);font-weight:800}
+
+  /* 6 · Klammer */
+  .gross-zeit{font-family:'Syne',sans-serif;font-size:96px;font-weight:800;color:var(--signal);
+    letter-spacing:-.04em;line-height:1}
+
+  /* 7 · Abschluss */
+  .domain{font-family:'Syne',sans-serif;font-size:40px;font-weight:800;color:var(--signal);
+    white-space:nowrap;margin-top:10px;letter-spacing:-.015em}
+  .preis{font-size:17.5px;font-weight:800;color:var(--weiss);margin-top:18px}
+  .klein{font-size:14px;font-weight:600;color:var(--grau-2);margin-top:6px}
+  .siegel{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:22px}
+  .siegel span{font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.1em;
+    color:var(--grau-2);border:1px solid var(--linie);border-radius:99px;padding:7px 13px}
+
+  /* Steuerung */
+  .bedien{display:flex;align-items:center;gap:14px}
+  button{font-family:'Manrope',sans-serif;font-size:14px;font-weight:800;background:var(--signal);
+    color:#0d1117;border:none;padding:12px 24px;border-radius:99px;cursor:pointer}
+  button.geist{background:transparent;color:var(--grau);border:1px solid var(--linie)}
+  button:focus-visible{outline:3px solid var(--signal);outline-offset:3px}
+  .hinweis{font-size:12.5px;font-weight:600;color:#3f4859;text-align:center;max-width:540px;line-height:1.55}
+  .zeit{font-family:'JetBrains Mono',monospace;font-size:12px;color:#3f4859}
+  .startdeck{position:absolute;inset:0;z-index:9;background:rgba(4,6,10,.92);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
+  .startdeck p{font-size:15px;font-weight:600;color:var(--grau)}
+  .startdeck.weg{display:none}
+
+  /* Buehne wird per JS auf den Bildschirm skaliert */
+  .buehne-huelle{position:relative;flex-shrink:0}
+  body.klein{gap:0;padding:0;justify-content:center}
+  body.klein .bedien,body.klein .hinweis{display:none}
+  html,body{overflow:hidden;overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
+</style>
+</head>
+<body>
+
+<div class="buehne-huelle" id="huelle">
+<div class="stage" id="stage">
+  <div class="bahn"></div>
+  <div class="kopf"><span>FAHRSYNC</span><span class="uhr" id="uhr">18:41</span></div>
+  <div class="naht"></div>
+  <div class="fuss"><i id="fortschritt"></i></div>
+
+  <!-- 1 -->
+  <div class="scene" data-scene="1">
+    <div class="stapel">
+      <div class="bogen s3"></div><div class="bogen s2"></div><div class="bogen s1"></div>
+    </div>
+    <h1 class="up d1">Letzte Stunde<br>gefahren.</h1>
+    <p class="lead up d3">Und dann sitzt du noch eine halbe Stunde<br>am Schreibtisch und trägst nach.</p>
+  </div>
+
+  <!-- 2 -->
+  <div class="scene" data-scene="2">
+    <div class="wortmarke in">FahrSync</div>
+    <div class="regel"></div>
+    <p class="lead up d3">Die digitale Kartei für Fahrlehrer</p>
+  </div>
+
+  <!-- 3 -->
+  <div class="scene" data-scene="3">
+    <div class="marke-zeile up">Noch im Auto</div>
+    <div class="karte in d1">
+      <div class="k-kopf">
+        <span class="k-name">Lena M.</span>
+        <span class="k-meta">KL. B · 14. STD</span>
+      </div>
+      <div class="sterne">★★★★☆</div>
+      <div class="punkte">
+        <span class="punkt">Überland</span>
+        <span class="punkt">Kreisverkehr</span>
+        <span class="punkt">Schulterblick</span>
+      </div>
+      <div class="sigfeld">
+        <div class="siglabel">Unterschrift Schüler</div>
+        <div class="sig">
+          <svg viewBox="0 0 336 72" aria-hidden="true">
+            <path d="M12 54 C38 16,50 10,56 26 C62 42,50 58,42 54 C34 50,42 30,64 26
+                     C86 22,94 44,110 44 C126 44,130 22,144 20 C158 18,156 46,172 46
+                     C188 46,190 18,206 18 C222 18,218 50,238 46 C260 42,266 26,298 30
+                     C314 32,320 38,328 34"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+    <div class="quittung">
+      <svg class="haken" viewBox="0 0 24 24"><path d="M4 12.5 L9.5 18 L20 6"/></svg>
+      Eingetragen, bevor der Motor aus ist
+    </div>
+  </div>
+
+  <!-- 4 -->
+  <div class="scene" data-scene="4">
+    <div class="marke-zeile up">Was Lena sieht</div>
+    <div class="ring-feld in d1">
+      <svg viewBox="0 0 210 210" aria-hidden="true">
+        <circle class="ring-bg" cx="105" cy="105" r="95"/>
+        <circle class="ring-vg" cx="105" cy="105" r="95"/>
+      </svg>
+      <div class="ring-mitte">
+        <span class="ring-zahl">78%</span>
+        <span class="ring-txt">AUSBILDUNGSSTAND</span>
+      </div>
+    </div>
+    <div class="pflicht">
+      <div class="pf pf1"><span class="pf-name">Überland</span><span class="pf-bar"><i></i></span><span class="pf-zahl">5/5</span></div>
+      <div class="pf pf2"><span class="pf-name">Autobahn</span><span class="pf-bar"><i></i></span><span class="pf-zahl">3/4</span></div>
+      <div class="pf pf3"><span class="pf-name">Nachtfahrt</span><span class="pf-bar"><i></i></span><span class="pf-zahl">2/3</span></div>
+    </div>
+  </div>
+
+  <!-- 5 -->
+  <div class="scene" data-scene="5">
+    <div class="marke-zeile up">Termine</div>
+    <h2 class="up d1">Schüler buchen<br>selbst.</h2>
+    <div class="woche in d3" style="margin-top:26px">
+      <div class="w-kopf"><span>MO</span><span>DI</span><span>MI</span><span>DO</span><span>FR</span></div>
+      <div class="w-netz">
+        <div class="zelle belegt"></div><div class="zelle"></div><div class="zelle belegt"></div><div class="zelle"></div><div class="zelle belegt"></div>
+        <div class="zelle"></div><div class="zelle belegt"></div><div class="zelle"></div><div class="zelle neu"></div><div class="zelle"></div>
+        <div class="zelle belegt"></div><div class="zelle"></div><div class="zelle belegt"></div><div class="zelle"></div><div class="zelle"></div>
+      </div>
+    </div>
+    <div class="sync">Landet direkt in deinem <b>Google&nbsp;Kalender</b></div>
+  </div>
+
+  <!-- 6 -->
+  <div class="scene" data-scene="6">
+    <div class="gross-zeit in">18:42</div>
+    <h2 class="up d2" style="margin-top:24px">Feierabend.</h2>
+    <p class="lead up d3">Kein Nachtragen. Kein Papierstapel.<br>Der Nachweis ist fertig.</p>
+  </div>
+
+  <!-- 7 -->
+  <div class="scene" data-scene="7">
+    <h2 class="up">14 Tage testen.<br>Ohne Zahlungs&shy;daten.</h2>
+    <div class="domain up d2">fahrsync.de</div>
+    <div class="preis up d3">Danach ab 9,99 € im Monat</div>
+    <div class="klein up d3">Monatlich kündbar</div>
+    <div class="siegel up d4"><span>SERVER FRANKFURT</span><span>DSGVO-KONFORM</span></div>
+  </div>
+
+  <div class="startdeck" id="startdeck">
+    <button id="start">▶ Abspielen</button>
+    <p>Aufnahme starten, dann hier klicken</p>
+  </div>
+</div>
+</div>
+
+<div class="bedien">
+  <button class="geist" id="neu">Von vorn</button>
+  <span class="zeit" id="zeitEl">0,0 s</span>
+</div>
+<p class="hinweis">
+  Aufnehmen: QuickTime → Ablage → Neue Bildschirmaufnahme → nur den dunklen Bereich wählen.
+  Auf einem Retina-Display ergibt das 1080 × 1920 Pixel – das Format für Reels und Stories.
+</p>
+
+<script>
+  const ablauf = [
+    { nr:1, dauer:4.6, uhr:'18:41', hell:false },
+    { nr:2, dauer:3.0, uhr:'18:41', hell:false },
+    { nr:3, dauer:5.4, uhr:'18:41', hell:false },
+    { nr:4, dauer:4.8, uhr:'18:41', hell:false },
+    { nr:5, dauer:4.6, uhr:'18:41', hell:false },
+    { nr:6, dauer:3.6, uhr:'18:42', hell:true  },
+    { nr:7, dauer:3.6, uhr:'18:42', hell:true  }
+  ];
+  const gesamt = ablauf.reduce((s,x)=>s+x.dauer,0);
+
+  const stage=document.getElementById('stage');
+  const uhr=document.getElementById('uhr');
+  const balken=document.getElementById('fortschritt');
+  const startdeck=document.getElementById('startdeck');
+  const zeitEl=document.getElementById('zeitEl');
+  let timer=[], ticker=null;
+
+  function szeneZeigen(sz){
+    stage.querySelectorAll('.scene').forEach(s=>s.classList.remove('active'));
+    const s=stage.querySelector('[data-scene="'+sz.nr+'"]');
+    if(!s) return;
+    void s.offsetWidth;
+    s.classList.add('active');
+    uhr.textContent=sz.uhr;
+    uhr.classList.toggle('hell', sz.hell);
+  }
+
+  function stopp(){ timer.forEach(clearTimeout); timer=[]; if(ticker){clearInterval(ticker); ticker=null;} }
+
+  function abspielen(){
+    stopp();
+    startdeck.classList.add('weg');
+    balken.style.transition='none'; balken.style.width='0';
+    void balken.offsetWidth;
+    balken.style.transition='width '+gesamt+'s linear';
+    balken.style.width='100%';
+
+    let t=0;
+    ablauf.forEach(sz=>{ timer.push(setTimeout(()=>szeneZeigen(sz), t*1000)); t+=sz.dauer; });
+    timer.push(setTimeout(()=>{
+      stage.querySelectorAll('.scene').forEach(s=>s.classList.remove('active'));
+      startdeck.classList.remove('weg'); stopp();
+      zeitEl.textContent='fertig · '+gesamt.toFixed(1).replace('.',',')+' s';
+    }, gesamt*1000));
+
+    const start=performance.now();
+    ticker=setInterval(()=>{
+      const v=Math.min((performance.now()-start)/1000, gesamt);
+      zeitEl.textContent=v.toFixed(1).replace('.',',')+' s / '+gesamt.toFixed(1).replace('.',',')+' s';
+    },100);
+  }
+  // Buehne formatfuellend skalieren (iPhone, iPad, Desktop)
+  const huelle=document.getElementById('huelle');
+  function skalieren(){
+    const klein = window.innerWidth < 700;
+    document.body.classList.toggle('klein', klein);
+    const platzH = klein ? window.innerHeight : window.innerHeight - 150;
+    const f = Math.min(window.innerWidth/540, platzH/960);
+    stage.style.transform = 'scale('+f+')';
+    stage.style.transformOrigin = 'top left';
+    huelle.style.width  = (540*f)+'px';
+    huelle.style.height = (960*f)+'px';
+  }
+  skalieren();
+  window.addEventListener('resize', skalieren);
+  window.addEventListener('orientationchange', ()=>setTimeout(skalieren,250));
+
+  document.getElementById('start').addEventListener('click', abspielen);
+  document.getElementById('neu').addEventListener('click', abspielen);
+</script>
+</body>
+</html>
