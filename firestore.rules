@@ -323,8 +323,12 @@ service cloud.firestore {
     // ACCESS CODES (für Schüler-Zugangscodes)
     // ══════════════════════════════════════════════════════
     match /accessCodes/{docId} {
-      allow get:  if true;
-      allow list: if isAuth() && userDocExists();
+      allow get:  if true;   // Schueler loest seinen Code ein (Code = Dokument-Kennung)
+      // SICHERHEIT: Auflisten nur noch der EIGENEN Codes. Vorher konnte jeder
+      // angemeldete Fahrlehrer saemtliche Codes aller Fahrschulen auflisten
+      // und damit fremde Schuelernamen, Lernstaende und Chats einsehen.
+      allow list: if isSuperAdmin() ||
+                     (isAuth() && userDocExists() && resource.data.teacherUid == request.auth.uid);
       allow create: if isAuth() && userDocExists();
       allow delete: if isAuth() && userDocExists();
       allow update: if (isAuth() && userDocExists()) ||
