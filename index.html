@@ -3109,8 +3109,10 @@ async function migrateOldAccessCodes() {
     
     console.log('[MIGRATION] Prüfe AccessCodes auf fehlende Snapshots...');
     
-    // Alle Codes laden (keine Where-Clause wegen fehlender Felder in alten Codes)
-    const snapshot = await getDocs(collection(db, 'accessCodes'));
+    // SICHERHEIT: nur noch eigene Codes laden (vorher wurden ALLE Codes
+    // aller Fahrschulen gelesen und erst lokal gefiltert).
+    const snapshot = await getDocs(query(collection(db, 'accessCodes'),
+      where('teacherUid', '==', currentUser.uid)));
     
     // Nur Codes dieses Users filtern
     const myCodes = snapshot.docs.filter(doc => {
@@ -3518,7 +3520,9 @@ let codeExpiryMap    = {}; // studentId → expiresAt (für ⏰-Warnung)
 
 function listenTeacherBadges() {
   if (unsubBadges) unsubBadges();
-  const q = query(collection(db, 'accessCodes'), where('uid', '==', currentUser.uid));
+  // FIX: accessCodes fuehrt kein Feld 'uid' - die Ueberwachung lief dadurch
+  // immer leer und hat NIE eine ungelesene Schueler-Nachricht gemeldet.
+  const q = query(collection(db, 'accessCodes'), where('teacherUid', '==', currentUser.uid));
   unsubBadges = onSnapshot(q, snap => {
     teacherUnreadMap = {};
     codeExpiryMap    = {};
@@ -4797,7 +4801,7 @@ window.removeLernziel = async (index) => {
 // Lernziele ins accessCode-Dokument synchronisieren (damit Portal sie sieht)
 async function syncLernzieleToPortal(ziele) {
   try {
-    const cq = query(collection(db,'accessCodes'), where('studentId','==',activeId));
+    const cq = query(collection(db,'accessCodes'), where('studentId','==',activeId), where('teacherUid','==',currentUser.uid));
     const cs = await getDocs(cq);
     for (const d of cs.docs) {
       await dbUpd(doc(db,'accessCodes',d.id), { lernziele: ziele });
@@ -5423,7 +5427,7 @@ window.savePruefKommentar = async () => {
 
   // 2. Alle aktiven Codes dieses Schülers sofort aktualisieren
   try {
-    const q = query(collection(db,'accessCodes'), where('studentId','==',activeId));
+    const q = query(collection(db,'accessCodes'), where('studentId','==',activeId), where('teacherUid','==',currentUser.uid));
     const snap = await getDocs(q);
     await Promise.all(snap.docs.map(d =>
       dbUpd(doc(db,'accessCodes',d.id), {
@@ -5441,7 +5445,7 @@ window.savePruefKommentar = async () => {
 // ── Code-Gültigkeit manuell verlängern (Code bleibt gleich!) ──
 window.verlaengereCode = async () => {
   try {
-    const q    = query(collection(db,'accessCodes'), where('studentId','==',activeId));
+    const q    = query(collection(db,'accessCodes'), where('studentId','==',activeId), where('teacherUid','==',currentUser.uid));
     const snap = await getDocs(q);
     if (snap.empty) { toast('⚠️ Noch kein Code vorhanden'); return; }
     const neuExpiry = Date.now() + CODE_LAUFZEIT_MS;
@@ -5479,7 +5483,7 @@ window.openTeacherChat = async () => {
   document.getElementById('code-modal').classList.remove('open');
   document.getElementById('teacher-chat-modal').classList.add('open');
   try {
-    const q    = query(collection(db,'accessCodes'), where('studentId','==',activeId));
+    const q    = query(collection(db,'accessCodes'), where('studentId','==',activeId), where('teacherUid','==',currentUser.uid));
     const snap = await getDocs(q);
     if (snap.empty) { toast('⚠️ Erst Code generieren!'); return; }
     teacherChatDocId = snap.docs[0].id;
@@ -5554,7 +5558,7 @@ window.openPlanLesson = async () => {
   document.getElementById('inp-plan-ort').value     = '';
   document.getElementById('inp-plan-notiz').value   = '';
   try {
-    const q    = query(collection(db,'accessCodes'), where('studentId','==',activeId));
+    const q    = query(collection(db,'accessCodes'), where('studentId','==',activeId), where('teacherUid','==',currentUser.uid));
     const snap = await getDocs(q);
     if (snap.empty) { toast('⚠️ Erst Code generieren!'); document.getElementById('code-modal').classList.add('open'); return; }
     document.getElementById('plan-lesson-modal').classList.add('open');
@@ -5569,7 +5573,7 @@ window.savePlannedLesson = async () => {
   if (!datum) { toast('Bitte ein Datum wählen.'); return; }
   const newLesson = { id: Date.now().toString(), datum, uhrzeit, ort, notiz, status: 'geplant', createdAt: Date.now() };
   try {
-    const snap = await getDocs(query(collection(db,'accessCodes'), where('studentId','==',activeId)));
+    const snap = await getDocs(query(collection(db,'accessCodes'), where('studentId','==',activeId), where('teacherUid','==',currentUser.uid)));
     if (snap.empty) { toast('⚠️ Code nicht gefunden'); return; }
     const docRef   = snap.docs[0];
     const existing = docRef.data().plannedLessons || [];
@@ -6403,7 +6407,7 @@ window.openCodeModal = async () => {
   document.getElementById('code-valid-until').textContent = '';
   document.getElementById('code-portal-link').style.display = 'none';
   try {
-    const q = query(collection(db,'accessCodes'), where('studentId','==',activeId));
+    const q = query(collection(db,'accessCodes'), where('studentId','==',activeId), where('teacherUid','==',currentUser.uid));
     const snap = await getDocs(q);
     if (!snap.empty) {
       const data = snap.docs[0].data();
@@ -6440,14 +6444,14 @@ window.generateCode = async () => {
 
   try {
     // Alte Codes für diesen Schüler löschen
-    const q = query(collection(db,'accessCodes'), where('studentId','==',activeId));
+    const q = query(collection(db,'accessCodes'), where('studentId','==',activeId), where('teacherUid','==',currentUser.uid));
     const snap = await getDocs(q);
     for (const d of snap.docs) await dbDel(doc(db,'accessCodes',d.id));
 
     // Protokoll laden für Snapshot
     const pq = query(
       collection(db,'protokoll'),
-      where('studentId','==',activeId),
+      where('studentId','==',activeId), where('teacherUid','==',currentUser.uid),
       where('uid','==',currentUser.uid)
     );
     const pSnap = await getDocs(pq);
@@ -7622,7 +7626,7 @@ async function sammleSchuelerDaten() {
   // Protokoll-Einträge dieses Schülers laden
   let protokolle = [];
   try {
-    const pq = query(collection(db,'protokoll'), where('studentId','==',activeId));
+    const pq = query(collection(db,'protokoll'), where('studentId','==',activeId), where('teacherUid','==',currentUser.uid));
     const ps = await getDocs(pq);
     protokolle = ps.docs.map(d => ({ id: d.id, ...d.data() }));
   } catch(e) { console.error('Protokoll-Export:', e); }
@@ -8197,12 +8201,23 @@ async function checkUrlCode() {
   document.getElementById('loading').style.display = 'flex';
 
   try {
-    const q    = query(collection(db,'accessCodes'), where('code','==',code.toUpperCase()));
-    const snap = await getDocs(q);
+    // FIX: Direktzugriff ueber die Dokument-Kennung (= der Code). Nicht
+    // angemeldete Schueler duerfen accessCodes nicht auflisten - der Aufruf
+    // ueber einen Link schlug deshalb bisher immer fehl.
+    const codeId = code.toUpperCase();
+    let codeData = null;
+    const direct = await getDoc(doc(db,'accessCodes', codeId));
+    if (direct.exists()) codeData = direct.data();
+    else {
+      try {
+        const snapF = await getDocs(query(collection(db,'accessCodes'), where('code','==',codeId)));
+        if (!snapF.empty) codeData = snapF.docs[0].data();
+      } catch(_) { /* Auflisten gesperrt - bleibt bei 'ungueltig' */ }
+    }
 
     document.getElementById('loading').style.display = 'none';
 
-    if (snap.empty) {
+    if (!codeData) {
       // Ungültiger Code → zum Schüler-Login
       document.getElementById('screen-login').classList.add('active');
       switchTab('schueler');
@@ -8210,7 +8225,6 @@ async function checkUrlCode() {
       return;
     }
 
-    const codeData = snap.docs[0].data();
     if (codeData.expiresAt < Date.now()) {
       document.getElementById('screen-login').classList.add('active');
       switchTab('schueler');
