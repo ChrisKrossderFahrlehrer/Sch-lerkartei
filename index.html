@@ -2788,6 +2788,7 @@ const PLANS = {
 };
 
 let aboStatus           = 'free';
+let aboWerbefrei        = false;
 let aboMaxLehrerAktuell = 1;
 let selectedTier        = null;
 let planerGewuenscht    = false;
@@ -2801,6 +2802,7 @@ async function loadAboStatus(uid) {
     if (upBtn) upBtn.style.display = 'none';
     return;
   }
+  aboWerbefrei = false;
   try {
     const userDoc = await getDoc(doc(db,'users',uid));
     if (!userDoc.exists()) { showBanner(); return; }
@@ -2828,6 +2830,7 @@ async function loadAboStatus(uid) {
       } catch(e) { console.warn('Fahrschul-Abo nicht ladbar:', e); }
     }
     aboStatus = src.abo || 'free';
+    aboWerbefrei = !!src.werbefrei;
     // BESTANDSSCHUTZ: Alle Konten, die VOR dem PayPal-Start registriert wurden,
     // nutzen die App dauerhaft kostenlos in vollem Umfang (kein Banner, keine
     // Einladungs-Grenze). Freiwilliges Upgrade (z.B. fuer den Planer) bleibt moeglich.
@@ -2841,7 +2844,7 @@ async function loadAboStatus(uid) {
         : (aboStatus === 'bestand' ? null : 1);
   } catch(e) { console.error('Abo-Check:', e); }
   // werbefrei: SuperAdmin-Geschenkkonten bleiben trotz 'free' ohne Werbebanner
-  (aboStatus === 'free' && !src.werbefrei) ? showBanner() : hideBanner();
+  (aboStatus === 'free' && !aboWerbefrei) ? showBanner() : hideBanner();
   updateAboUI();
 }
 
