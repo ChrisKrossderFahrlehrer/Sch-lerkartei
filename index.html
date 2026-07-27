@@ -2840,7 +2840,8 @@ async function loadAboStatus(uid) {
         ? src.aboMaxLehrer
         : (aboStatus === 'bestand' ? null : 1);
   } catch(e) { console.error('Abo-Check:', e); }
-  aboStatus === 'free' ? showBanner() : hideBanner();
+  // werbefrei: SuperAdmin-Geschenkkonten bleiben trotz 'free' ohne Werbebanner
+  (aboStatus === 'free' && !src.werbefrei) ? showBanner() : hideBanner();
   updateAboUI();
 }
 
