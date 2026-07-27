@@ -594,6 +594,39 @@ html { overscroll-behavior-y: contain; }
   </div>
 </div>
 
+<!-- Kostenloses eigenstaendiges Fahrlehrer-Konto (SuperAdmin-Geschenk) -->
+<div class="modal-overlay" id="modal-add-frei-lehrer" onclick="closeModals(event)">
+  <div class="modal-sheet">
+    <div class="modal-title">🎁 Kostenloses Konto anlegen</div>
+    <p style="font-size:0.78rem;color:var(--muted);margin:-6px 0 14px">Eigenständiger Fahrlehrer, sofort aktiv, ohne Zahlungspflicht und ohne Werbebanner.</p>
+    <div class="form-group">
+      <label class="form-label">Vorname</label>
+      <input class="form-input" id="inp-fgl-vn" placeholder="z.B. Max" autocomplete="given-name">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Nachname</label>
+      <input class="form-input" id="inp-fgl-nn" placeholder="z.B. Mustermann" autocomplete="family-name">
+    </div>
+    <div class="form-group">
+      <label class="form-label">E-Mail (= Login)</label>
+      <input class="form-input" id="inp-fgl-email" type="email" placeholder="max@beispiel.de" autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Benutzername</label>
+      <input class="form-input" id="inp-fgl-uname" placeholder="z.B. maxmustermann" autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Temporäres Passwort</label>
+      <input class="form-input" id="inp-fgl-pw" type="password" placeholder="Min. 8 Zeichen" autocomplete="new-password">
+    </div>
+    <div class="error-msg" id="fgl-error"></div>
+    <div style="display:flex;gap:10px;margin-top:4px">
+      <button class="btn-secondary" style="margin:0" onclick="document.getElementById('modal-add-frei-lehrer').classList.remove('open')">Abbrechen</button>
+      <button class="btn-main" onclick="doAddFreiLehrer()">Anlegen ✓</button>
+    </div>
+  </div>
+</div>
+
 <!-- Fahrschule Detail (SuperAdmin) -->
 <div class="modal-overlay" id="modal-fs-detail" onclick="closeModals(event)">
   <div class="modal-sheet">
@@ -1311,12 +1344,13 @@ async function renderAbos() {
           Fahrschulen (${alle.length})
         </div>
         ${rowsHTML || '<div style="text-align:center;padding:32px;color:var(--muted)">Keine Fahrschulen</div>'}
-        ${einzelLehrer.length ? `
-          <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin:20px 0 10px">
+        <div style="margin:20px 0 10px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em">
             Einzelne Fahrlehrer (${einzelLehrer.length})
           </div>
-          ${lehrerKarten}
-        ` : ''}
+          <button class="btn-main" style="width:auto;margin:0;padding:7px 12px;font-size:0.72rem;white-space:nowrap" onclick="openAddFreiLehrerModal()">➕ Kostenloses Konto</button>
+        </div>
+        ${einzelLehrer.length ? lehrerKarten : '<div style="text-align:center;padding:20px;color:var(--muted);font-size:0.82rem">Noch keine eigenständigen Fahrlehrer.</div>'}
         <div style="padding:20px 0;font-size:0.7rem;color:var(--muted);text-align:center">
           Pro Monat: 9,99 € · Pro Jahr: 79 € (6,58 €/Monat)
         </div>
@@ -2334,6 +2368,80 @@ window.doAddLehrer = async () => {
   }
   document.getElementById('modal-add-lehrer').classList.remove('open');
   toast(`✓ ${vn} ${nn} als Fahrlehrer angelegt`);
+  if (btn) { btn.disabled = false; btn.textContent = 'Anlegen ✓'; }
+};
+
+// ── SUPERADMIN: kostenloses, sofort aktives Solo-Konto anlegen ──
+// Nutzt dasselbe bewaehrte Muster wie doAddLehrer() (Konto erstellen, dann
+// kontrolliert abmelden statt die eigene Sitzung live zu ersetzen - ein
+// Firebase-Client kann keine fremde Sitzung parallel offen halten).
+window.openAddFreiLehrerModal = () => {
+  ['inp-fgl-vn','inp-fgl-nn','inp-fgl-email','inp-fgl-uname','inp-fgl-pw'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  document.getElementById('fgl-error').textContent = '';
+  document.getElementById('modal-add-frei-lehrer').classList.add('open');
+  setTimeout(() => document.getElementById('inp-fgl-vn').focus(), 150);
+};
+
+window.doAddFreiLehrer = async () => {
+  const vn    = document.getElementById('inp-fgl-vn').value.trim();
+  const nn    = document.getElementById('inp-fgl-nn').value.trim();
+  const email = document.getElementById('inp-fgl-email').value.trim();
+  const uname = document.getElementById('inp-fgl-uname').value.trim().toLowerCase();
+  const pw    = document.getElementById('inp-fgl-pw').value;
+  const errEl = document.getElementById('fgl-error');
+  errEl.textContent = '';
+
+  if (!vn||!nn||!email||!uname||!pw) { errEl.textContent = 'Bitte alle Felder ausfüllen.'; return; }
+  if (pw.length < 8) { errEl.textContent = 'Passwort mind. 8 Zeichen.'; return; }
+  if (!/^[a-z0-9._-]{3,30}$/.test(uname)) { errEl.textContent = 'Benutzername: 3-30 Zeichen, nur a-z 0-9 . _ -'; return; }
+
+  const btn = document.querySelector('#modal-add-frei-lehrer .btn-main');
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+
+  try {
+    const unameDoc = await getDoc(doc(db, 'usernames', uname));
+    if (unameDoc.exists()) { errEl.textContent = 'Dieser Benutzername ist bereits vergeben.'; if(btn){btn.disabled=false;btn.textContent='Anlegen ✓';} return; }
+
+    const adminUser = auth.currentUser;
+    const cred = await createUserWithEmailAndPassword(auth, email, pw);
+    await updateProfile(cred.user, { displayName: `${vn} ${nn}` });
+
+    const now = Date.now();
+    await setDoc(doc(db, 'usernames', uname), { username: uname, email, uid: cred.user.uid, createdAt: now });
+    await setDoc(doc(db, 'users', cred.user.uid), {
+      uid: cred.user.uid, username: uname, email, name: `${vn} ${nn}`,
+      vorname: vn, nachname: nn,
+      fahrschuleId: cred.user.uid,   // eigenstaendig
+      fahrschuleName: null,
+      rolle: 'fahrlehrer',
+      typ: 'fahrlehrer',
+      status: 'aktiv',              // sofort freigeschaltet, kein Warte-Bildschirm
+      createdAt: now,
+      datenschutzAkzeptiert: true,
+      datenschutzAkzeptiertAm: now,
+      abo: 'free',                  // keine Zahlungspflicht, nie automatisch gesperrt
+      werbefrei: true,              // keine Werbebanner trotz 'free'
+      nacherstellt: true,           // vom SuperAdmin angelegt, kein Warte-Screen
+      angelegtVonSuperAdmin: true,
+    });
+
+    await signOut(auth);
+    await signInWithEmailAndPassword(auth, adminUser.email, '_wird_neu_geladen_');
+  } catch(e) {
+    if (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
+      document.getElementById('modal-add-frei-lehrer').classList.remove('open');
+      toast(`✓ ${vn} ${nn} kostenlos angelegt – bitte neu anmelden`);
+      setTimeout(() => doLogout(), 2000);
+      return;
+    }
+    if (btn) { btn.disabled = false; btn.textContent = 'Anlegen ✓'; }
+    errEl.textContent = friendlyError(e.code);
+    return;
+  }
+  document.getElementById('modal-add-frei-lehrer').classList.remove('open');
+  toast(`✓ ${vn} ${nn} kostenlos angelegt und sofort aktiv`);
   if (btn) { btn.disabled = false; btn.textContent = 'Anlegen ✓'; }
 };
 
