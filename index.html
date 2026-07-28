@@ -3367,6 +3367,15 @@ onAuthStateChanged(auth, async (user) => {
       }
     } catch(e) { /* offline – weiter */ }
 
+    // ── ERST-LOGIN: vom SuperAdmin angelegte Konten muessen zuerst ein
+    // eigenes Passwort setzen (temporaeres verfaellt), optional E-Mail.
+    try {
+      const pDoc = await getDoc(doc(db, 'users', user.uid));
+      if (pDoc.exists() && pDoc.data().erstLoginAusstehend === true) {
+        document.getElementById('erstlogin-modal').style.display = 'flex';
+      }
+    } catch(e) { /* offline - Dialog kommt beim naechsten Login */ }
+
     document.getElementById('screen-login').classList.remove('active');
     document.getElementById('screen-warte').classList.remove('active');
     document.getElementById('screen-list').classList.add('active');
@@ -8367,6 +8376,64 @@ window.togglePreisUebersicht = () => {
   if (chevron) chevron.style.transform = offen ? 'rotate(0deg)' : 'rotate(180deg)';
 };
 
+
+
+window.erstLoginAbschliessen = async () => {
+  const pw1 = document.getElementById('el-pw1').value;
+  const pw2 = document.getElementById('el-pw2').value;
+  const mail = document.getElementById('el-email').value.trim();
+  const errEl = document.getElementById('el-error');
+  const btn = document.getElementById('el-btn');
+  errEl.textContent = '';
+  if (pw1.length < 8) { errEl.textContent = 'Passwort mindestens 8 Zeichen.'; return; }
+  if (pw1 !== pw2) { errEl.textContent = 'Passwörter stimmen nicht überein.'; return; }
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    await updatePassword(currentUser, pw1);
+    if (mail) {
+      try {
+        await verifyBeforeUpdateEmail(currentUser, mail);
+        await dbUpd(doc(db, 'users', currentUser.uid), { emailPending: mail, emailPendingSince: Date.now() });
+        const profDoc = await getDoc(doc(db, 'users', currentUser.uid));
+        const uname = profDoc.exists() ? profDoc.data().username : null;
+        if (uname) await dbSet(doc(db, 'usernames', uname), { username: uname, email: mail, uid: currentUser.uid, updatedAt: Date.now() }, { merge: true });
+        toast('Bestätigungs-E-Mail an ' + mail + ' gesendet.');
+      } catch(mailErr) {
+        console.warn('Erst-Login E-Mail:', mailErr);
+        toast('E-Mail konnte nicht gesetzt werden – bitte später im Profil nachtragen.');
+      }
+    }
+    await dbUpd(doc(db, 'users', currentUser.uid), { erstLoginAusstehend: false });
+    document.getElementById('erstlogin-modal').style.display = 'none';
+    toast('✓ Passwort gespeichert – viel Erfolg!');
+  } catch(e) {
+    console.warn('erstLoginAbschliessen:', e);
+    btn.disabled = false; btn.textContent = 'Speichern & loslegen ✓';
+    if (e.code === 'auth/requires-recent-login') {
+      errEl.textContent = 'Sitzung zu alt – bitte einmal ab- und wieder anmelden.';
+    } else if (e.code === 'auth/weak-password') {
+      errEl.textContent = 'Passwort zu schwach – bitte ein stärkeres wählen.';
+    } else {
+      errEl.textContent = 'Fehler: ' + (e.code || e.message);
+    }
+  }
+};
+
 </script>
+<!-- ERST-LOGIN: Passwort setzen (+ optional echte E-Mail) - nicht wegklickbar -->
+<div id="erstlogin-modal" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(5,8,12,.92);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
+  <div style="width:100%;max-width:420px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:26px 24px">
+    <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.15rem;margin-bottom:6px">👋 Willkommen bei FahrSync!</div>
+    <p style="font-size:0.82rem;color:var(--muted);line-height:1.55;margin:0 0 18px">Dein Konto wurde für dich angelegt. Bitte lege jetzt dein eigenes Passwort fest – das temporäre Passwort verfällt damit.</p>
+    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--muted);margin-bottom:4px">Neues Passwort (min. 8 Zeichen)</label>
+    <input type="password" id="el-pw1" autocomplete="new-password" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:11px 12px;font-size:0.9rem;margin-bottom:12px">
+    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--muted);margin-bottom:4px">Neues Passwort wiederholen</label>
+    <input type="password" id="el-pw2" autocomplete="new-password" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:11px 12px;font-size:0.9rem;margin-bottom:12px">
+    <label style="display:block;font-size:0.72rem;font-weight:700;color:var(--muted);margin-bottom:4px">Deine E-Mail (optional, für Passwort-Vergessen)</label>
+    <input type="email" id="el-email" autocomplete="email" placeholder="Kannst du auch später im Profil nachtragen" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:11px 12px;font-size:0.9rem;margin-bottom:6px">
+    <div id="el-error" style="color:var(--danger,#f85149);font-size:0.78rem;min-height:18px;margin:6px 0"></div>
+    <button onclick="erstLoginAbschliessen()" id="el-btn" style="width:100%;background:var(--accent);border:none;border-radius:10px;color:#0d1117;font-weight:800;font-size:0.9rem;padding:13px;cursor:pointer">Speichern & loslegen ✓</button>
+  </div>
+</div>
 </body>
 </html>
