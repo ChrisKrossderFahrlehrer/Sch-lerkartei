@@ -608,8 +608,8 @@ html { overscroll-behavior-y: contain; }
       <input class="form-input" id="inp-fgl-nn" placeholder="z.B. Mustermann" autocomplete="family-name">
     </div>
     <div class="form-group">
-      <label class="form-label">E-Mail (= Login)</label>
-      <input class="form-input" id="inp-fgl-email" type="email" placeholder="max@beispiel.de" autocomplete="email">
+      <label class="form-label">E-Mail (optional – trägt er sonst beim ersten Login selbst nach)</label>
+      <input class="form-input" id="inp-fgl-email" type="email" placeholder="Leer lassen = Login nur per Benutzername" autocomplete="email">
     </div>
     <div class="form-group">
       <label class="form-label">Benutzername</label>
@@ -2393,7 +2393,7 @@ window.doAddFreiLehrer = async () => {
   const errEl = document.getElementById('fgl-error');
   errEl.textContent = '';
 
-  if (!vn||!nn||!email||!uname||!pw) { errEl.textContent = 'Bitte alle Felder ausfüllen.'; return; }
+  if (!vn||!nn||!uname||!pw) { errEl.textContent = 'Bitte alle Felder außer E-Mail ausfüllen.'; return; }
   if (pw.length < 8) { errEl.textContent = 'Passwort mind. 8 Zeichen.'; return; }
   if (!/^[a-z0-9._-]{3,30}$/.test(uname)) { errEl.textContent = 'Benutzername: 3-30 Zeichen, nur a-z 0-9 . _ -'; return; }
 
@@ -2405,13 +2405,16 @@ window.doAddFreiLehrer = async () => {
     if (unameDoc.exists()) { errEl.textContent = 'Dieser Benutzername ist bereits vergeben.'; if(btn){btn.disabled=false;btn.textContent='Anlegen ✓';} return; }
 
     const adminUser = auth.currentUser;
-    const cred = await createUserWithEmailAndPassword(auth, email, pw);
+    // Ohne E-Mail: interne Ersatz-Adresse aus dem Benutzernamen - exakt dasselbe
+    // Muster wie die Haupt-App (Login per Benutzername findet sie als Fallback).
+    const loginEmail = email || (uname.replace(/[^a-z0-9.\-]/g,'') + '@fahrschule-kartei.app');
+    const cred = await createUserWithEmailAndPassword(auth, loginEmail, pw);
     await updateProfile(cred.user, { displayName: `${vn} ${nn}` });
 
     const now = Date.now();
-    await setDoc(doc(db, 'usernames', uname), { username: uname, email, uid: cred.user.uid, createdAt: now });
+    await setDoc(doc(db, 'usernames', uname), { username: uname, email: loginEmail, uid: cred.user.uid, createdAt: now });
     await setDoc(doc(db, 'users', cred.user.uid), {
-      uid: cred.user.uid, username: uname, email, name: `${vn} ${nn}`,
+      uid: cred.user.uid, username: uname, email: loginEmail, name: `${vn} ${nn}`,
       vorname: vn, nachname: nn,
       fahrschuleId: cred.user.uid,   // eigenstaendig
       fahrschuleName: null,
@@ -2425,6 +2428,7 @@ window.doAddFreiLehrer = async () => {
       werbefrei: true,              // keine Werbebanner trotz 'free'
       nacherstellt: true,           // vom SuperAdmin angelegt, kein Warte-Screen
       angelegtVonSuperAdmin: true,
+      erstLoginAusstehend: true,   // erzwingt beim ersten Login: neues Passwort (+ optional echte E-Mail)
     });
 
     await signOut(auth);
