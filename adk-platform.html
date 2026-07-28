@@ -1083,6 +1083,11 @@ async function renderAnalytics() {
   try {
     // Aggregierte Daten laden – KEIN Zugriff auf Schülernamen!
     const aktiveFahrschulen = fahrschulen.filter(f => f.status === 'aktiv');
+    // FIX: Eigenstaendige Fahrlehrer (kein fahrschulen-Dokument, eigene
+    // fahrschuleId == eigene uid) fehlten hier komplett - bestand der
+    // Kundenstamm ueberwiegend aus Solo-Konten, zeigte das Dashboard
+    // dadurch ueberall 0.
+    const soloFahrlehrer = (alleFahrlehrer || []).filter(l => !l.fahrschuleName && l.status === 'aktiv');
 
     // Schüler-Zahlen pro Fahrschule (nur Anzahl, kein Name)
     const fsStats = await Promise.all(aktiveFahrschulen.map(async fs => {
@@ -1115,17 +1120,47 @@ async function renderAnalytics() {
       };
     }));
 
-    // Gesamtzahlen
+    // Solo-Fahrlehrer bekommen dieselbe Statistik-Form wie eine Fahrschule -
+    // ihre eigene uid dient als fahrschuleId (siehe Kontoanlage).
+    const soloStats = await Promise.all(soloFahrlehrer.map(async l => {
+      const [schuelerSnap, protokollSnap] = await Promise.all([
+        getDocs(query(collection(db,'students'), where('fahrschuleId','==',l.id))),
+        getDocs(query(collection(db,'protokoll'), where('fahrschuleId','==',l.id))),
+      ]);
+      const schueler = schuelerSnap.docs.map(d => d.data());
+      return {
+        id: l.id, name: l.name || 'Fahrlehrer', stadt: 'Eigenständig',
+        registriert: l.createdAt,
+        anzahlSchueler:  schuelerSnap.size,
+        anzahlAktiv:     schueler.filter(s => !s.archiviert).length,
+        anzahlArchiviert:schueler.filter(s => s.archiviert).length,
+        anzahlLehrer:    1,
+        anzahlProtokolle:protokollSnap.size,
+        klassenVerteilung: {
+          B:  schueler.filter(s => ['B','B-Auto','B197'].includes(s.klasse||'B')).length,
+          BE: schueler.filter(s => s.klasse === 'BE').length,
+          A:  schueler.filter(s => s.klasse === 'A').length,
+        },
+        letzteAktivitaet: protokollSnap.docs.reduce((max, d) => {
+          const t = d.data().createdAt || 0;
+          return t > max ? t : max;
+        }, 0),
+      };
+    }));
+    const alleStats = [...fsStats, ...soloStats];
+
+    // Gesamtzahlen (Fahrschulen UND eigenstaendige Fahrlehrer zusammen)
     const gesamt = {
       fahrschulen:  fsStats.length,
-      schueler:     fsStats.reduce((s,f) => s + f.anzahlSchueler, 0),
-      aktiveSchueler: fsStats.reduce((s,f) => s + f.anzahlAktiv, 0),
-      protokolle:   fsStats.reduce((s,f) => s + f.anzahlProtokolle, 0),
-      lehrer:       fsStats.reduce((s,f) => s + f.anzahlLehrer, 0),
+      soloLehrer:   soloStats.length,
+      schueler:     alleStats.reduce((s,f) => s + f.anzahlSchueler, 0),
+      aktiveSchueler: alleStats.reduce((s,f) => s + f.anzahlAktiv, 0),
+      protokolle:   alleStats.reduce((s,f) => s + f.anzahlProtokolle, 0),
+      lehrer:       fsStats.reduce((s,f) => s + f.anzahlLehrer, 0) + soloStats.length,
     };
 
     // Aktivitäts-Score (Protokolle / Schüler)
-    fsStats.sort((a,b) => (b.anzahlProtokolle / Math.max(b.anzahlSchueler,1)) - (a.anzahlProtokolle / Math.max(a.anzahlSchueler,1)));
+    alleStats.sort((a,b) => (b.anzahlProtokolle / Math.max(b.anzahlSchueler,1)) - (a.anzahlProtokolle / Math.max(a.anzahlSchueler,1)));
 
     const aktivLabel = (letzte) => {
       if (!letzte) return '<span style="color:var(--muted)">Keine</span>';
@@ -1141,7 +1176,8 @@ async function renderAnalytics() {
       <div class="section-hd">📊 Plattform-Übersicht</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 16px 16px">
         <div class="kpi"><div class="kpi-val" style="color:var(--accent)">${gesamt.fahrschulen}</div><div class="kpi-lbl">Fahrschulen</div></div>
-        <div class="kpi"><div class="kpi-val" style="color:var(--blue)">${gesamt.lehrer}</div><div class="kpi-lbl">Fahrlehrer</div></div>
+        <div class="kpi"><div class="kpi-val" style="color:#58a6ff">${gesamt.soloLehrer}</div><div class="kpi-lbl">Solo-Fahrlehrer</div></div>
+        <div class="kpi"><div class="kpi-val" style="color:var(--blue)">${gesamt.lehrer}</div><div class="kpi-lbl">Fahrlehrer gesamt</div></div>
         <div class="kpi"><div class="kpi-val" style="color:var(--accent2)">${gesamt.aktiveSchueler}</div><div class="kpi-lbl">Aktive Schüler</div></div>
         <div class="kpi"><div class="kpi-val" style="color:var(--purple)">${gesamt.protokolle}</div><div class="kpi-lbl">Protokoll-Einträge</div></div>
       </div>
@@ -1170,12 +1206,12 @@ async function renderAnalytics() {
       </div>
 
       <!-- Pro-Fahrschule Tabelle -->
-      <div class="section-hd">🏫 Aktivität pro Fahrschule</div>
+      <div class="section-hd">🏫 Aktivität pro Fahrschule &amp; Solo-Fahrlehrer</div>
       <div style="margin:0 16px 8px;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden">
         <div style="display:grid;grid-template-columns:1fr auto auto auto auto;gap:0;font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--border);background:var(--surface2)">
           <span>Fahrschule</span><span style="text-align:center">Lehrer</span><span style="text-align:center">Schüler</span><span style="text-align:center">Protokolle</span><span style="text-align:center">Aktiv</span>
         </div>
-        ${fsStats.map(fs => `
+        ${alleStats.map(fs => `
           <div style="display:grid;grid-template-columns:1fr auto auto auto auto;gap:0;padding:10px 12px;border-bottom:1px solid var(--border);font-size:0.82rem;align-items:center">
             <div>
               <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px">${escHtml(fs.name)}</div>
