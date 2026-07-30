@@ -146,6 +146,15 @@ input, textarea, select { font-size: max(16px, 0.88rem); }
 }
 
 /* ── TABLET (768px – 1023px) ── */
+/* Breite Handys (z.B. iPhone Pro Max, viele Android-Phablets) bleiben unter
+   768px, hatten bisher aber GAR keine Begrenzung - Inhalt streckte sich
+   randlos auf die volle Geraetebreite, wodurch Knoepfe/Karten dort klobiger
+   wirkten als auf kleineren Handys. Jetzt bekommt auch dieser Bereich eine
+   sanfte, mittig zentrierte Obergrenze - kleine/normale Handys (<=414px)
+   sind davon unberuehrt. */
+@media (min-width: 415px) and (max-width: 767px) {
+  body { max-width: 415px; margin: 0 auto; }
+}
 @media (min-width: 768px) {
   body { max-width: 768px; margin: 0 auto; }
   .header { padding: 16px 24px; }
