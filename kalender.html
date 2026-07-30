@@ -255,13 +255,16 @@ tr:last-child td{border-bottom:none;}
   .topbar{padding:0 14px;height:50px;}
   .topbar-user{display:none;}
   .layout{flex-direction:column;}
-  .sidebar{width:100%;min-height:unset;border-right:none;border-top:1px solid var(--border);padding:6px 6px env(safe-area-inset-bottom);position:fixed;bottom:0;left:0;right:0;z-index:99;display:flex;flex-direction:row;overflow-x:auto;gap:2px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
-  .sidebar::-webkit-scrollbar{display:none;}
-  .sidebar::before,.sidebar::after{position:fixed;bottom:0;height:calc(47px + env(safe-area-inset-bottom));width:30px;z-index:100;pointer-events:none;display:flex;align-items:center;font-size:22px;font-weight:700;color:var(--accent,#F5C518);opacity:0;transition:opacity .18s;padding-bottom:env(safe-area-inset-bottom);}
-  .sidebar::before{content:'‹';left:0;justify-content:flex-start;padding-left:5px;background:linear-gradient(to right,var(--surface) 45%,transparent);}
-  .sidebar::after{content:'›';right:0;justify-content:flex-end;padding-right:5px;background:linear-gradient(to left,var(--surface) 45%,transparent);}
-  .sidebar.more-left::before{opacity:.95;}
-  .sidebar.more-right::after{opacity:.95;}
+  .mobile-nav-bar{display:none;}
+  @media(max-width:768px){ .mobile-nav-bar{display:flex;align-items:center;padding:8px 14px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:60;} }
+  .mobile-nav-toggle{display:flex;align-items:center;gap:9px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 16px;color:var(--text);font-size:14px;font-weight:700;cursor:pointer;width:100%;justify-content:center;}
+  .layout{position:relative;}
+  .sidebar{width:100%;min-height:unset;border-right:none;border-top:1px solid var(--border);padding:8px;position:fixed;left:0;right:0;top:97px;bottom:auto;max-height:calc(100vh - 110px);z-index:99;display:none;flex-direction:column;gap:2px;overflow-y:auto;box-shadow:0 16px 40px rgba(0,0,0,.4);}
+  .sidebar.mobile-open{display:flex;}
+  .sidebar-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:98;}
+  .sidebar-backdrop.mobile-open{display:block;}
+  .nav-item{width:100%;text-align:left;padding:12px 14px;font-size:14px;}
+  ._entfernt{opacity:.95;}
   .nav-section{display:none;}
   .nav-item{flex-direction:column;gap:3px;padding:5px 4px;min-width:52px;max-width:66px;font-size:9px;text-align:center;border-radius:8px;white-space:nowrap;flex:0 0 auto;}
   .nav-label{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -288,7 +291,7 @@ tr:last-child td{border-bottom:none;}
   #booking-screen{padding:16px 10px 90px;}
   .booking-card{padding:16px 12px;}
 }
-@media(max-width:380px){.nav-item{font-size:8px;padding:5px 2px;}.nav-icon{font-size:16px;}}
+
 
 /* Schüler-Buchungskalender */
 .bcal-viewtoggle{display:flex;gap:5px;margin-bottom:14px;background:var(--surface2);padding:4px;border-radius:11px;}
@@ -359,8 +362,14 @@ tr:last-child td{border-bottom:none;}
       <button class="btn btn-secondary btn-sm" onclick="doLogout()">Abmelden</button>
     </div>
   </div>
+  <div class="mobile-nav-bar" id="mobile-nav-bar">
+    <button class="mobile-nav-toggle" id="mobile-nav-toggle" onclick="toggleMobileNav()">
+      <span>☰</span><span id="mobile-nav-current">Menü</span>
+    </button>
+  </div>
   <div class="layout">
     <div class="sidebar" id="sidebar"></div>
+    <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="toggleMobileNav(false)"></div>
     <div class="main" id="main-content"></div>
   </div>
   <footer class="app-footer">
@@ -794,6 +803,7 @@ function buildSidebar(){
     {id:'lehrer-profil',icon:'⚙️',label:'Einstellungen'},
   ];
   const items=currentRole==='superadmin'?saNav:currentRole==='admin'?adminNav:lehrerNav;
+  window.__navItems=items;
   nav.innerHTML=items.map(i=>`<button class="nav-item" id="nav-${i.id}" onclick="navigate('${i.id}')"><span class="nav-icon">${i.icon}</span><span class="nav-label">${i.label}</span></button>`).join('');
   if(!nav.__hintsBound){nav.__hintsBound=true;nav.addEventListener('scroll',updateNavHints,{passive:true});}
   setTimeout(updateNavHints,60);
@@ -819,10 +829,25 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 setInterval(__checkForUpdate,240000);
 setTimeout(__checkForUpdate,15000);
 
+// Kompaktes Mobil-Menue: auf/zuklappen + aktuellen Reiter im Knopf anzeigen -
+// ersetzt die vorherige horizontal scrollende Leiste, die bei 8-10 Punkten
+// auf kleinen Displays bis auf 8px Schrift schrumpfen musste.
+window.toggleMobileNav=function(force){
+  const sb=document.getElementById('sidebar');
+  const bd=document.getElementById('sidebar-backdrop');
+  const open = typeof force==='boolean' ? force : !sb.classList.contains('mobile-open');
+  sb.classList.toggle('mobile-open', open);
+  bd.classList.toggle('mobile-open', open);
+};
+
 window.navigate=function(page){
   __pageUnsub.forEach(u=>{try{u();}catch(e){}});__pageUnsub=[];
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const btn=document.getElementById('nav-'+page);if(btn)btn.classList.add('active');
+  const gefunden=(window.__navItems||[]).find(i=>i.id===page);
+  const lbl=document.getElementById('mobile-nav-current');
+  if(lbl && gefunden) lbl.textContent=gefunden.icon+' '+gefunden.label;
+  toggleMobileNav(false);
   const main=document.getElementById('main-content');
   if(pages[page])pages[page](main);else main.innerHTML='';
   setTimeout(injectTableLabels,300);
