@@ -643,6 +643,16 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
         <span style="font-size:0.82rem"><b>📅 Planer (Kalender) dazubuchen</b><br><span style="color:var(--muted);font-size:0.72rem">Termine, Fahrstunden-Buchung &amp; Kalender-Sync</span></span>
       </label>
 
+      <div style="border-top:1px solid var(--border);padding-top:14px;margin-bottom:14px">
+        <div style="font-size:0.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">Rechnungsadresse</div>
+        <input id="rg-strasse" placeholder="Straße und Hausnummer" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:10px 12px;font-size:0.85rem;margin-bottom:8px">
+        <div style="display:flex;gap:8px">
+          <input id="rg-plz" placeholder="PLZ" style="width:90px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:10px 12px;font-size:0.85rem">
+          <input id="rg-ort" placeholder="Ort" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:10px 12px;font-size:0.85rem">
+        </div>
+        <div style="font-size:0.68rem;color:var(--muted);margin-top:6px">Wird für deine Rechnung benötigt (§ 14 UStG).</div>
+      </div>
+
       <div style="text-align:center;margin-bottom:14px">
         <div id="tier-price-value" style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.6rem;color:var(--accent)">–</div>
         <div id="tier-price-sub" style="font-size:0.7rem;color:var(--muted)">pro Monat</div>
@@ -1422,6 +1432,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');startTutorial()" style="background:var(--surface2);margin-bottom:8px">🎓 Tutorial nochmal anzeigen</button>
     <button class="btn-sheet-cancel" onclick="exportAlleDaten()" style="background:var(--surface2);margin-bottom:8px">💾 Alle Daten exportieren (Backup)</button>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openImpressum()" style="background:var(--surface2);margin-bottom:12px">📄 Impressum</button>
+    <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openMeineRechnungen()" style="background:var(--surface2);margin-bottom:8px">🧾 Meine Rechnungen</button>
     <button class="btn-sheet-cancel" id="btn-invite-settings" style="display:none;background:var(--surface2);margin-bottom:8px" onclick="document.getElementById('settings-modal').classList.remove('open');openInviteModal()">👥 Fahrlehrer einladen</button>
     <button class="btn-sheet-cancel" id="btn-abo-settings" style="display:none;background:var(--surface2);margin-bottom:8px" onclick="document.getElementById('settings-modal').classList.remove('open');document.getElementById('abo-verwalten-modal').classList.add('open')">💳 Abo verwalten &amp; kündigen</button>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open')">Schließen</button>
@@ -1882,6 +1893,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
 import { signInAnonymously, getAuth, setPersistence, browserLocalPersistence, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider, verifyBeforeUpdateEmail } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, enableIndexedDbPersistence, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, getDocs, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
@@ -1897,6 +1909,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const fns = getFunctions(app, 'europe-west3');
 
 // ─────────────────────────────────────────
 // KONSTANTEN – MÜSSEN VOR ALLEM ANDEREN DEFINIERT SEIN
@@ -2899,11 +2912,17 @@ function updateAboUI() {
 }
 
 // ─ Upgrade Modal ────────────────────────
+['rg-strasse','rg-plz','rg-ort'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('blur', () => { if (paypalRendered || document.getElementById('upgrade-modal').classList.contains('open')) rerenderPaypal(); });
+});
+
 window.openUpgradeModal = () => {
   if (!ABO_ENABLED) { toast('💳 Abo-Funktion kommt bald'); return; }
   if (!window.__billingOwner) { toast('ℹ️ Nur der Fahrschul-Inhaber kann das Abo verwalten.'); return; }
   document.getElementById('upgrade-modal').classList.add('open');
   renderTierCards();
+  ladeRechnungsadresse();
   if (!paypalRendered) initPayPal();
 };
 
@@ -2991,6 +3010,16 @@ function initPayPal() {
 function renderPayPalButtons() {
   const p = PLANS[selectedTier];
   if (!p) return;
+  const strasse = document.getElementById('rg-strasse').value.trim();
+  const plz = document.getElementById('rg-plz').value.trim();
+  const ort = document.getElementById('rg-ort').value.trim();
+  const container = document.getElementById('paypal-button-container');
+  if (!strasse || !plz || !ort) {
+    container.innerHTML = '<div style="text-align:center;padding:10px;color:var(--muted);font-size:0.78rem">Bitte zuerst die Rechnungsadresse oben ausfüllen.</div>';
+    paypalRendered = false;
+    return;
+  }
+  container.innerHTML = '';
   const planId = planerGewuenscht ? p.idPlaner : p.id;
   paypal.Buttons({
     style: { shape:'rect', color:'gold', layout:'vertical', label:'subscribe' },
@@ -3028,6 +3057,17 @@ async function activateAbo(subscriptionId, planId) {
     toast(planerGewuenscht
       ? '🎉 Zahlung erfolgreich! Kartei sofort aktiv - der Kalender wird in Kürze freigeschaltet.'
       : '🎉 Zahlung erfolgreich! Dein Abo ist aktiv.');
+
+    try {
+      await speichereRechnungsadresseWennVollstaendig();
+      const fn = httpsCallable(fns, 'erstelleRechnung');
+      const res = await fn({ plan: selectedTier, planer: planerGewuenscht });
+      if (res.data && res.data.nummer) {
+        toast('🧾 Rechnung ' + res.data.nummer + ' erstellt (unter Einstellungen → Meine Rechnungen).');
+      }
+    } catch(rechErr) {
+      console.warn('Rechnungserzeugung:', rechErr);
+    }
   } catch(e) {
     toast('Fehler bei Aktivierung: ' + e.message);
   }
@@ -8419,6 +8459,76 @@ window.erstLoginAbschliessen = async () => {
   }
 };
 
+
+
+// ══ RECHNUNGSADRESSE + RECHNUNGEN ═══════════════════════════════════
+async function ladeRechnungsadresse() {
+  if (!window.__billingDocRef) return;
+  try {
+    const d = await getDoc(doc(db, window.__billingDocRef.coll, window.__billingDocRef.id));
+    const b = d.exists() ? d.data() : {};
+    document.getElementById('rg-strasse').value = b.rechnungsStrasse || '';
+    document.getElementById('rg-plz').value = b.rechnungsPlz || '';
+    document.getElementById('rg-ort').value = b.rechnungsOrt || '';
+  } catch(e) { console.warn('ladeRechnungsadresse:', e); }
+}
+
+async function speichereRechnungsadresseWennVollstaendig() {
+  if (!window.__billingDocRef) return false;
+  const strasse = document.getElementById('rg-strasse').value.trim();
+  const plz = document.getElementById('rg-plz').value.trim();
+  const ort = document.getElementById('rg-ort').value.trim();
+  if (!strasse || !plz || !ort) return false;
+  try {
+    await dbUpd(doc(db, window.__billingDocRef.coll, window.__billingDocRef.id), {
+      rechnungsStrasse: strasse, rechnungsPlz: plz, rechnungsOrt: ort
+    });
+  } catch(e) { console.warn('Rechnungsadresse speichern:', e); }
+  return true;
+}
+
+window.openMeineRechnungen = async function() {
+  document.getElementById('rechnungen-modal').classList.add('open');
+  const box = document.getElementById('rechnungen-liste');
+  box.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Lädt…</div>';
+  try {
+    const snap = await getDocs(query(collection(db,'rechnungen'), where('empfaengerId','==',currentUser.uid)));
+    const liste = snap.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => (b.erstelltAm||0)-(a.erstelltAm||0));
+    if (!liste.length) { box.innerHTML = '<p style="text-align:center;color:var(--muted);padding:16px">Noch keine Rechnungen vorhanden.</p>'; return; }
+    box.innerHTML = liste.map(r => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 4px;border-bottom:1px solid var(--border)">
+        <div>
+          <div style="font-weight:700;font-size:0.86rem">Rechnung ${r.nummer}</div>
+          <div style="font-size:0.72rem;color:var(--muted)">${r.datum} · ${(r.betrag||0).toFixed(2).replace('.',',')} €</div>
+        </div>
+        <button class="btn-sheet-cancel" style="width:auto;margin:0;padding:7px 12px;font-size:0.75rem" onclick="ladePdfHerunter('${r.id}')">PDF öffnen</button>
+      </div>`).join('');
+  } catch(e) {
+    console.warn('openMeineRechnungen:', e);
+    box.innerHTML = '<p style="text-align:center;color:var(--danger);padding:16px">Fehler beim Laden.</p>';
+  }
+};
+
+window.ladePdfHerunter = async function(rechnungId) {
+  try {
+    const d = await getDoc(doc(db, 'rechnungen', rechnungId));
+    if (!d.exists()) return;
+    const b64 = d.data().pdfBase64;
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const blob = new Blob([bytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `Rechnung-${d.data().nummer}.pdf`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  } catch(e) {
+    console.warn('ladePdfHerunter:', e);
+    toast('Fehler beim Öffnen der Rechnung.');
+  }
+};
+
 </script>
 <!-- ERST-LOGIN: Passwort setzen (+ optional echte E-Mail) - nicht wegklickbar -->
 <div id="erstlogin-modal" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(5,8,12,.92);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
@@ -8433,6 +8543,16 @@ window.erstLoginAbschliessen = async () => {
     <input type="email" id="el-email" autocomplete="email" placeholder="Kannst du auch später im Profil nachtragen" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:11px 12px;font-size:0.9rem;margin-bottom:6px">
     <div id="el-error" style="color:var(--danger,#f85149);font-size:0.78rem;min-height:18px;margin:6px 0"></div>
     <button onclick="erstLoginAbschliessen()" id="el-btn" style="width:100%;background:var(--accent);border:none;border-radius:10px;color:#0d1117;font-weight:800;font-size:0.9rem;padding:13px;cursor:pointer">Speichern & loslegen ✓</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="rechnungen-modal" onclick="closeModal(event)">
+  <div class="modal-sheet">
+    <div class="sheet-title">🧾 Meine Rechnungen</div>
+    <div id="rechnungen-liste" style="max-height:60vh;overflow-y:auto">
+      <div style="text-align:center;padding:24px;color:var(--muted)">Lädt…</div>
+    </div>
+    <button class="btn-sheet-cancel" onclick="document.getElementById('rechnungen-modal').classList.remove('open')" style="margin-top:12px">Schließen</button>
   </div>
 </div>
 </body>
