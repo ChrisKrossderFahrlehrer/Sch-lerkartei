@@ -373,6 +373,16 @@ service cloud.firestore {
     // Öffentlich lesbar, damit Login per Benutzername funktioniert.
     // Enthält KEINE sensiblen Daten (nur username, email, uid).
     // ══════════════════════════════════════════════════════
+    match /rechnungen/{docId} {
+      // Nur lesbar fuer den Rechnungsempfaenger selbst oder den SuperAdmin.
+      // Geschrieben wird ausschliesslich serverseitig per Cloud Function
+      // (Admin SDK umgeht diese Regeln ohnehin) - kein Client darf je
+      // eine eigene Rechnung erzeugen oder veraendern.
+      allow read:  if isSuperAdmin() ||
+                      (isAuth() && resource.data.empfaengerId == request.auth.uid);
+      allow write: if false;
+    }
+
     match /usernames/{uname} {
       // get() für den Login-Lookup (Benutzername ist Doc-ID) ist erlaubt.
       // list() ist gesperrt → niemand kann alle Benutzernamen+uids abgreifen
