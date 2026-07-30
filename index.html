@@ -964,8 +964,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
           style="display:none;background:var(--accent);border:none;border-radius:8px;
                  color:#0d1117;font-size:0.68rem;font-weight:800;padding:5px 9px;cursor:pointer;
                  white-space:nowrap">⭐ Pro</button>
-        <button class="btn-icon-sm" onclick="toggleTheme()" id="theme-btn" title="Design wechseln" aria-label="Design wechseln">☀️</button>
-        <button class="btn-icon-sm" onclick="openDashboard()" title="Übersicht" id="btn-dashboard" aria-label="Übersicht öffnen">📊</button>
         <button class="btn-icon-sm" onclick="openKalender()" title="Kalender" id="btn-kalender" aria-label="Kalender öffnen" style="display:none">📅</button>
         <button class="btn-icon-sm" onclick="openSettings()" title="Einstellungen" id="btn-settings-header" aria-label="Einstellungen öffnen">⚙️</button>
         <button class="btn-icon-sm" onclick="doLogout()" id="user-btn" title="Abmelden" aria-label="Abmelden">⏻</button>
@@ -1428,6 +1426,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 
     <button class="btn-main" onclick="changePassword()" style="margin-bottom:12px">Passwort ändern ✓</button>
     <div style="height:1px;background:var(--border);margin:0 0 16px"></div>
+    <button class="btn-sheet-cancel" onclick="toggleTheme()" id="theme-btn-menu" style="background:var(--surface2);margin-bottom:8px">☀️ Design wechseln (hell/dunkel)</button>
+    <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openDashboard()" style="background:var(--surface2);margin-bottom:8px">📊 Übersicht / Statistik</button>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openHelp()" style="background:var(--surface2);margin-bottom:8px">❓ Hilfe & Funktionsübersicht</button>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');startTutorial()" style="background:var(--surface2);margin-bottom:8px">🎓 Tutorial nochmal anzeigen</button>
     <button class="btn-sheet-cancel" onclick="exportAlleDaten()" style="background:var(--surface2);margin-bottom:8px">💾 Alle Daten exportieren (Backup)</button>
@@ -5866,20 +5866,22 @@ window.closeModal = (e) => {
 // ─────────────────────────────────────────
 // THEME TOGGLE
 // ─────────────────────────────────────────
+function themeBtnLabel(istHell) {
+  return istHell ? '🌙 Design wechseln (hell/dunkel)' : '☀️ Design wechseln (hell/dunkel)';
+}
 function initTheme() {
   const saved = localStorage.getItem('fs_theme') || 'dark';
-  if (saved === 'light') {
-    document.body.classList.add('light');
-    const btn = document.getElementById('theme-btn');
-    if (btn) btn.textContent = '🌙';
-  }
+  const isLight = saved === 'light';
+  if (isLight) document.body.classList.add('light');
+  const btn = document.getElementById('theme-btn-menu');
+  if (btn) btn.textContent = themeBtnLabel(isLight);
 }
 
 window.toggleTheme = () => {
   const isLight = document.body.classList.toggle('light');
   localStorage.setItem('fs_theme', isLight ? 'light' : 'dark');
-  const btn = document.getElementById('theme-btn');
-  if (btn) btn.textContent = isLight ? '🌙' : '☀️';
+  const btn = document.getElementById('theme-btn-menu');
+  if (btn) btn.textContent = themeBtnLabel(isLight);
 };
 
 // ─────────────────────────────────────────
