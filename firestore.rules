@@ -385,10 +385,13 @@ service cloud.firestore {
 
     match /usernames/{uname} {
       // get() für den Login-Lookup (Benutzername ist Doc-ID) ist erlaubt.
-      // list() ist gesperrt → niemand kann alle Benutzernamen+uids abgreifen
-      // (Schutz vor Enumeration / DSGVO).
+      // SICHERHEIT/DSGVO-FIX: Der alte Kommentar behauptete, list() sei
+      // gesperrt - die Regel darunter erlaubte es aber jedem Angemeldeten
+      // (auch anonymen Schüler-Sitzungen): alle Benutzernamen samt
+      // E-Mail-Adressen aller Kunden waren abfragbar. Jetzt wirklich zu;
+      // keine App-Funktion nutzt diese Abfrage.
       allow get:    if true;
-      allow list:   if isAuth();
+      allow list:   if isSuperAdmin();
       allow create: if isAuth() && request.resource.data.uid == request.auth.uid;
       allow update: if isAuth() && resource.data.uid == request.auth.uid;
       allow delete: if isAuth() && resource.data.uid == request.auth.uid;
