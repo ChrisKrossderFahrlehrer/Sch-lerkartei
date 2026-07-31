@@ -1684,6 +1684,10 @@ async function renderSuperAdminEinst() {
         <input class="form-input" id="sa-imp-email" type="email" value="${imp.email||'kontakt@fahrsync.de'}" placeholder="kontakt@fahrsync.de">
       </div>
       <div class="form-group">
+        <label class="form-label">PLZ</label>
+        <input class="form-input" id="sa-imp-plz" value="${imp.plz||''}" placeholder="z.B. 12345">
+      </div>
+      <div class="form-group">
         <label class="form-label">Stadt / Land</label>
         <input class="form-input" id="sa-imp-ort" value="${imp.ort||'Deutschland'}" placeholder="z.B. Berlin, Deutschland">
       </div>
@@ -1859,6 +1863,7 @@ window.savePlatformImpressum = async () => {
       name:      document.getElementById('sa-imp-name').value.trim(),
       web:       document.getElementById('sa-imp-web').value.trim(),
       email:     document.getElementById('sa-imp-email').value.trim(),
+      plz:       document.getElementById('sa-imp-plz').value.trim(),
       ort:       document.getElementById('sa-imp-ort').value.trim(),
       strasse:   document.getElementById('sa-imp-strasse').value.trim(),
       instagram: document.getElementById('sa-imp-instagram').value.trim(),
