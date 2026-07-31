@@ -184,9 +184,15 @@ function baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel, betra
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    doc.fontSize(9).fillColor('#555').text(
-      `${steller.name} · ${steller.strasse} · ${steller.plz} ${steller.ort}`, { align: 'left' }
-    );
+    // Absenderzeile aus den tatsaechlich gefuellten Feldern bauen - vorher
+    // erzeugten leere Felder (v.a. die nie befuellte PLZ) Luecken wie
+    // "Name ·  ·  Ort" auf der Rechnung.
+    const stellerZeile = [
+      steller.name,
+      steller.strasse,
+      [steller.plz, steller.ort].filter(Boolean).join(' ')
+    ].map(t => String(t || '').trim()).filter(Boolean).join(' · ');
+    doc.fontSize(9).fillColor('#555').text(stellerZeile, { align: 'left' });
     doc.moveDown(2);
 
     doc.fontSize(11).fillColor('#000').text(empfaenger.name);
@@ -274,7 +280,8 @@ exports.erstelleRechnung = onCall(async (request) => {
   const steller = {
     name: platImp.name || 'Chriskoo',
     strasse: platImp.strasse || '',
-    plz: '', ort: platImp.ort || 'Deutschland',
+    plz: platImp.plz || '',
+    ort: platImp.ort || '',
     email: platImp.email || 'kontakt@fahrsync.de',
     web: platImp.web || 'fahrsync.de',
   };
