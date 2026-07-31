@@ -8399,22 +8399,37 @@ async function checkUrlCode() {
 
 // ── SERVICE WORKER REGISTRIERUNG + AUTO-UPDATE ──────────────
 if ('serviceWorker' in navigator) {
+  let swReg = null;
+
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js')
       .then(reg => {
         console.log('Service Worker aktiv – Offline-Modus bereit');
-        // Stündlich nach Updates suchen (zusätzlich zum Browser-Standard)
+        swReg = reg;
         setInterval(() => reg.update().catch(()=>{}), 60 * 60 * 1000);
       })
       .catch(err => console.log('Service Worker Fehler:', err));
 
-    // Neuer SW hat übernommen → Seite EINMAL neu laden (holt frisches HTML)
     let swReloaded = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (swReloaded) return; // Schutz vor Reload-Schleife
+      if (swReloaded) return;
       swReloaded = true;
       window.location.reload();
     });
+  });
+
+  // WICHTIG: Als Home-Bildschirm-App (v.a. iOS) wird die Seite meist nur kurz
+  // in den Hintergrund gelegt statt komplett neu geladen - dabei griff
+  // bisher NUR die stuendliche Pruefung, nicht sofort beim Zurueckkehren.
+  // Deshalb zusaetzlich bei jedem Sichtbar-Werden sofort pruefen, damit
+  // niemand mehr manuell Cache loeschen oder das Icon neu anlegen muss.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && swReg) {
+      swReg.update().catch(() => {});
+    }
+  });
+  window.addEventListener('pageshow', (e) => {
+    if (e.persisted && swReg) swReg.update().catch(() => {});
   });
 }
 
