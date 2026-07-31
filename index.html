@@ -1529,11 +1529,22 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     <div class="card" style="display:flex;gap:16px;align-items:center;padding:16px">
       <svg width="64" height="64" viewBox="0 0 100 100" style="flex-shrink:0">
         <rect x="3" y="3" width="94" height="94" fill="#0033A0"/>
-        <rect x="14" y="52" width="72" height="34" fill="#fff"/>
-        <polygon points="50,22 20,52 80,52" fill="#fff"/>
-        <circle cx="66" cy="66" r="7" fill="#0033A0"/>
-        <rect x="55" y="60" width="18" height="12" fill="#0033A0"/>
-        <circle cx="30" cy="70" r="6" fill="#C6141E"/>
+        <!-- Haus mit Strasse (links) -->
+        <polygon points="16,38 27,29 38,38" fill="#fff"/>
+        <rect x="18" y="38" width="18" height="16" fill="#fff"/>
+        <rect x="10" y="56" width="30" height="8" fill="#fff"/>
+        <!-- Auto (rechts oben) -->
+        <path d="M62 34 h20 a4,4 0 0 1 4,4 v6 h-28 v-6 a4,4 0 0 1 4,-4 z" fill="#fff"/>
+        <rect x="58" y="44" width="34" height="7" rx="2" fill="#fff"/>
+        <circle cx="66" cy="52" r="4" fill="#0033A0" stroke="#fff" stroke-width="2"/>
+        <circle cx="84" cy="52" r="4" fill="#0033A0" stroke="#fff" stroke-width="2"/>
+        <!-- Erwachsener (Mitte) -->
+        <circle cx="45" cy="66" r="5" fill="#fff"/>
+        <path d="M45 71 v14 M45 76 l-7,6 M45 76 l7,3 M45 85 l-5,9 M45 85 l5,9" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <!-- Kind mit Ball (rechts unten) -->
+        <circle cx="66" cy="70" r="4" fill="#fff"/>
+        <path d="M66 74 v10 M66 78 l-5,4 M66 78 l5,2 M66 84 l-4,7 M66 84 l6,6" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        <circle cx="80" cy="92" r="4" fill="#fff"/>
       </svg>
       <div>
         <div style="font-weight:700;font-size:0.95rem;margin-bottom:3px">Verkehrsberuhigter Bereich – Zeichen 325.1</div>
@@ -1544,27 +1555,27 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 
     <div class="card" style="display:flex;gap:16px;align-items:center;padding:16px">
       <svg width="64" height="64" viewBox="0 0 100 100" style="flex-shrink:0">
-        <rect x="18" y="18" width="64" height="64" fill="#FFD400" stroke="#000" stroke-width="3" transform="rotate(45 50 50)"/>
-        <path d="M20 50 H55 V25" fill="none" stroke="#000" stroke-width="7"/>
-        <polygon points="55,17 65,25 55,33" fill="#000"/>
+        <rect x="18" y="18" width="64" height="64" fill="#FFD400" stroke="#fff" stroke-width="7" transform="rotate(45 50 50)"/>
+        <rect x="18" y="18" width="64" height="64" fill="none" stroke="#000" stroke-width="1.5" transform="rotate(45 50 50)"/>
       </svg>
       <div>
-        <div style="font-weight:700;font-size:0.95rem;margin-bottom:3px">Abknickende Vorfahrt – Zeichen 306</div>
+        <div style="font-weight:700;font-size:0.95rem;margin-bottom:3px">Vorfahrtstraße – Zeichen 306</div>
         <a href="https://www.gesetze-im-internet.de/stvo_2013/anlage_3.html" target="_blank" rel="noopener" style="font-size:0.68rem;color:var(--accent);text-decoration:underline;display:inline-block;margin-bottom:4px">Amtliche Quelle: StVO-Anlage ↗</a>
-        <div style="font-size:0.8rem;color:var(--muted);line-height:1.4">Die Vorfahrtstraße ändert die Richtung. Fahrtrichtung dem Verlauf anpassen (Lenkrad drehen), Vorfahrt bleibt trotzdem bestehen.</div>
+        <div style="font-size:0.8rem;color:var(--muted);line-height:1.4">Kennzeichnet eine Straße mit durchgehender Vorfahrt gegenüber allen einmündenden Straßen, bis das Ende (Zeichen 307) oder ein „Vorfahrt gewähren"/Stop-Schild die Vorfahrt aufhebt.</div>
       </div>
     </div>
 
     <div class="card" style="display:flex;gap:16px;align-items:center;padding:16px">
-      <svg width="64" height="64" viewBox="0 0 100 100" style="flex-shrink:0">
-        <rect x="18" y="18" width="64" height="64" fill="#fff" stroke="#000" stroke-width="3" transform="rotate(45 50 50)"/>
-        <path d="M50 25 V75 M25 50 H75" stroke="#FFD400" stroke-width="9"/>
-        <path d="M50 25 V75 M25 50 H75" stroke="#000" stroke-width="3"/>
+      <svg width="64" height="70" viewBox="0 0 100 110" style="flex-shrink:0">
+        <rect x="18" y="5" width="64" height="64" fill="#FFD400" stroke="#fff" stroke-width="7" transform="rotate(45 50 37)"/>
+        <rect x="18" y="5" width="64" height="64" fill="none" stroke="#000" stroke-width="1.5" transform="rotate(45 50 37)"/>
+        <rect x="12" y="82" width="76" height="24" fill="#fff" stroke="#000" stroke-width="2"/>
+        <path d="M24 100 V90 H50 V78" fill="none" stroke="#000" stroke-width="6"/>
       </svg>
       <div>
-        <div style="font-weight:700;font-size:0.95rem;margin-bottom:3px">Vorfahrt – Zeichen 306a / Vorfahrtstraße</div>
+        <div style="font-weight:700;font-size:0.95rem;margin-bottom:3px">Abknickende Vorfahrt (Zeichen 306 + Zusatzzeichen)</div>
         <a href="https://www.gesetze-im-internet.de/stvo_2013/anlage_3.html" target="_blank" rel="noopener" style="font-size:0.68rem;color:var(--accent);text-decoration:underline;display:inline-block;margin-bottom:4px">Amtliche Quelle: StVO-Anlage ↗</a>
-        <div style="font-size:0.8rem;color:var(--muted);line-height:1.4">Kennzeichnet den Verlauf einer Straße mit Vorfahrt gegenüber allen einmündenden Straßen.</div>
+        <div style="font-size:0.8rem;color:var(--muted);line-height:1.4">Kein eigenständiges Zeichen: Das weiße Zusatzschild unter Zeichen 306 zeigt, dass die Vorfahrtstraße hier abknickt. Fahrtrichtung dem Verlauf anpassen, Vorfahrt bleibt bestehen.</div>
       </div>
     </div>
 
