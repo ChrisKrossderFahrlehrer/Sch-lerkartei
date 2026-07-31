@@ -5248,7 +5248,7 @@ function renderCustomFields(s) {
   const rows = customFields.map(f => {
     const checked = (s.customFields || {})[f.id] || false;
     return `<div class="custom-field-row" onclick="toggleCustomField('${f.id}')">
-      <div class="custom-checkbox${checked?' checked':''}>${checked?'✓':''}</div>
+      <div class="custom-checkbox${checked?' checked':''}">${checked?'✓':''}</div>
       <div class="custom-field-name">${f.name}</div>
       <button class="btn-delete-field" onclick="event.stopPropagation();deleteCustomField('${f.id}')">🗑</button>
     </div>`;
