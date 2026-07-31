@@ -879,7 +879,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
         <label onclick="toggleRegConsent()" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;user-select:none">
           <div class="custom-checkbox" id="reg-consent-box" style="flex-shrink:0;margin-top:1px"></div>
           <span style="font-size:0.78rem;line-height:1.5;color:var(--muted)">
-            Ich habe die <a onclick="event.stopPropagation();zeigeDatenschutzModal()" style="color:var(--accent);text-decoration:underline;cursor:pointer">Datenschutzerklärung</a> gelesen und stimme der Verarbeitung meiner Daten gemäß DSGVO zu.
+            Ich habe die <a onclick="event.stopPropagation();zeigeDatenschutzModal()" style="color:var(--accent);text-decoration:underline;cursor:pointer">Datenschutzerklärung</a> und die <a href="agb.html" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--accent);text-decoration:underline;cursor:pointer">AGB</a> gelesen und akzeptiere diese. Ich bestätige, das Angebot als Unternehmer i.S.d. § 14 BGB (Fahrschule/Fahrlehrer in gewerblicher oder selbständiger Tätigkeit) zu nutzen, nicht als Verbraucher.
           </span>
         </label>
       </div>
@@ -2574,7 +2574,9 @@ window.doRegister = async () => {
         status:       'ausstehend',
         createdAt:    Date.now(),
         datenschutzAkzeptiert: true,
-        datenschutzAkzeptiertAm: Date.now()
+        datenschutzAkzeptiertAm: Date.now(),
+        agbAkzeptiert: true,
+        unternehmerBestaetigt: true
       });
       sendRegistrationNotification({ name, email, username, typ: 'Fahrschule', code });
 
@@ -2589,7 +2591,9 @@ window.doRegister = async () => {
         status:          'ausstehend',
         createdAt:       Date.now(),
         datenschutzAkzeptiert: true,
-        datenschutzAkzeptiertAm: Date.now()
+        datenschutzAkzeptiertAm: Date.now(),
+        agbAkzeptiert: true,
+        unternehmerBestaetigt: true
       };
       // Wenn einer Fahrschule beigetreten wird: Code mitgeben, damit die
       // Firestore-Regel prüfen kann, dass der Code wirklich zu dieser Schule
