@@ -4494,7 +4494,27 @@ function renderDetail() {
   const STUFEN = ['🔴','🟠','🟡','🟢','⭐'];
   const STUFEN_NAME = ['Nicht gezeigt','Gezeigt','Ausreichend','Beherrscht','Sehr sicher'];
 
-  const themenHTML = ADK.map(gruppe => {
+  const VZ_GRUPPE_NAME = '🚦 Verkehrszeichen';
+  const vzGruppe = ADK.find(g => g.gruppe === VZ_GRUPPE_NAME);
+  const vzHTML = !vzGruppe ? '<div style="color:var(--muted);font-size:0.82rem;text-align:center;padding:20px">Keine Verkehrszeichen hinterlegt.</div>' : (() => {
+    const done = vzGruppe.items.filter(t => ((s.themen||{})[t]||0) >= 4).length;
+    const pct = vzGruppe.items.length ? Math.round(done/vzGruppe.items.length*100) : 0;
+    const rows = vzGruppe.items.map(t => {
+      const val = (s.themen||{})[t]||0;
+      return `<div class="thema-row">
+        <div class="thema-name">${t}</div>
+        <div class="thema-dots">
+          ${STUFEN.map((em,i)=>{const v=i+1;return `<button class="dot-btn${val===v?' active-'+v:''}" title="${STUFEN_NAME[i]}" onclick="setThema('${t.replace(/'/g,"\\'")}',${val===v?0:v})">${em}</button>`;}).join('')}
+        </div>
+      </div>`;
+    }).join('');
+    return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="font-size:0.8rem;font-weight:700;color:var(--text)">🚦 Verkehrszeichen</div>
+        <div style="font-size:0.7rem;color:${pct===100?'var(--accent2)':'var(--muted)'}">${done}/${vzGruppe.items.length}</div>
+      </div>${rows}`;
+  })();
+
+  const themenHTML = ADK.filter(g => g.gruppe !== VZ_GRUPPE_NAME).map(gruppe => {
     const standardItems = gruppe.items.map(t => {
       const val = (s.themen||{})[t]||0;
       return `<div class="thema-row">
@@ -4666,6 +4686,12 @@ function renderDetail() {
                  font-family:'Manrope',sans-serif;font-weight:${aktiverLernTab==='adk'?'700':'600'};font-size:0.82rem;cursor:pointer">
           📚 ADK
         </button>
+        <button id="tab-btn-vz" onclick="switchLernTab('vz')"
+          style="flex:1;padding:12px 8px;background:${aktiverLernTab==='vz'?'var(--surface2)':'none'};border:none;
+                 border-bottom:2px solid ${aktiverLernTab==='vz'?'var(--accent)':'transparent'};color:${aktiverLernTab==='vz'?'var(--text)':'var(--muted)'};
+                 font-family:'Manrope',sans-serif;font-weight:${aktiverLernTab==='vz'?'700':'600'};font-size:0.82rem;cursor:pointer">
+          🚦 Zeichen
+        </button>
         <button id="tab-btn-eigen" onclick="switchLernTab('eigen')"
           style="flex:1;padding:12px 8px;background:${aktiverLernTab==='eigen'?'var(--surface2)':'none'};border:none;
                  border-bottom:2px solid ${aktiverLernTab==='eigen'?'var(--accent)':'transparent'};color:${aktiverLernTab==='eigen'?'var(--text)':'var(--muted)'};
@@ -4686,6 +4712,14 @@ function renderDetail() {
           <span>🟢 Beherrscht</span><span>⭐ Sehr sicher</span>
         </div>
         <div class="themen-list">${themenHTML}</div>
+      </div>
+
+      <!-- TAB: VERKEHRSZEICHEN -->
+      <div id="tab-vz" style="padding:14px;display:${aktiverLernTab==='vz'?'block':'none'}">
+        <div style="font-size:0.75rem;color:var(--muted);margin-bottom:10px;line-height:1.5">
+          Markiere, wie sicher ${s.vorname||'der Schüler'} die einzelnen Zeichen beherrscht.
+        </div>
+        <div class="themen-list">${vzHTML}</div>
       </div>
 
       <!-- TAB 2: EIGENE KATEGORIEN -->
@@ -6778,26 +6812,22 @@ function renderEigenTab(s, myCustomThemen) {
 
 window.switchLernTab = (tab) => {
   aktiverLernTab = tab; // State merken — überlebt Re-Render
-  const isAdk   = tab === 'adk';
-  const tabAdk  = document.getElementById('tab-adk');
-  const tabEigen= document.getElementById('tab-eigen');
-  const btnAdk  = document.getElementById('tab-btn-adk');
-  const btnEigen= document.getElementById('tab-btn-eigen');
-  if (!tabAdk || !tabEigen) return;
-  tabAdk.style.display   = isAdk ? 'block' : 'none';
-  tabEigen.style.display = isAdk ? 'none'  : 'block';
-  if (btnAdk)  {
-    btnAdk.style.borderBottomColor = isAdk ? 'var(--accent)' : 'transparent';
-    btnAdk.style.background        = isAdk ? 'var(--surface2)' : 'none';
-    btnAdk.style.color             = isAdk ? 'var(--text)' : 'var(--muted)';
-    btnAdk.style.fontWeight        = isAdk ? '700' : '600';
-  }
-  if (btnEigen) {
-    btnEigen.style.borderBottomColor = !isAdk ? 'var(--accent)' : 'transparent';
-    btnEigen.style.background        = !isAdk ? 'var(--surface2)' : 'none';
-    btnEigen.style.color             = !isAdk ? 'var(--text)' : 'var(--muted)';
-    btnEigen.style.fontWeight        = !isAdk ? '700' : '600';
-  }
+  // Drei Reiter: ADK / Verkehrszeichen / Eigene
+  const panels = { adk:'tab-adk', vz:'tab-vz', eigen:'tab-eigen' };
+  const buttons= { adk:'tab-btn-adk', vz:'tab-btn-vz', eigen:'tab-btn-eigen' };
+  if (!document.getElementById(panels.adk)) return;
+  Object.keys(panels).forEach(k => {
+    const el = document.getElementById(panels[k]);
+    if (el) el.style.display = (k === tab) ? 'block' : 'none';
+    const btn = document.getElementById(buttons[k]);
+    if (btn) {
+      const aktiv = (k === tab);
+      btn.style.borderBottomColor = aktiv ? 'var(--accent)' : 'transparent';
+      btn.style.background        = aktiv ? 'var(--surface2)' : 'none';
+      btn.style.color             = aktiv ? 'var(--text)' : 'var(--muted)';
+      btn.style.fontWeight        = aktiv ? '700' : '600';
+    }
+  });
 };
 
 window.setEigenScope = (scope) => {
