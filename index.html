@@ -2072,14 +2072,13 @@ const ADK_THEMEN = [
   {
     gruppe: '🚦 Verkehrszeichen',
     items: [
-      'Stop-Schild (206)',
+      'Vorfahrtstraße (306)',
       'Vorfahrt gewähren (205)',
-      'Vorfahrtstraße & abknickende Vorfahrt (306)',
+      'Stop (206)',
+      'Einmalige Vorfahrt (301)',
+      'Abknickende Vorfahrt (306 + Zusatzzeichen)',
       'Einbahnstraße (220)',
       'Verkehrsberuhigter Bereich (325.1)',
-      'Gefahrzeichen allgemein (Kurve, Kreuzung, Kinder etc.)',
-      'Vorschriftzeichen allgemein (Gebote/Verbote)',
-      'Richtzeichen allgemein (Parken, Autobahn, Hinweise)',
     ]
   },
   {
@@ -2182,14 +2181,13 @@ const ADK_THEMEN_A = [
   {
     gruppe: '🚦 Verkehrszeichen',
     items: [
-      'Stop-Schild (206)',
+      'Vorfahrtstraße (306)',
       'Vorfahrt gewähren (205)',
-      'Vorfahrtstraße & abknickende Vorfahrt (306)',
+      'Stop (206)',
+      'Einmalige Vorfahrt (301)',
+      'Abknickende Vorfahrt (306 + Zusatzzeichen)',
       'Einbahnstraße (220)',
       'Verkehrsberuhigter Bereich (325.1)',
-      'Gefahrzeichen allgemein (Kurve, Kreuzung, Kinder etc.)',
-      'Vorschriftzeichen allgemein (Gebote/Verbote)',
-      'Richtzeichen allgemein (Parken, Autobahn, Hinweise)',
     ]
   },
   {
@@ -2258,14 +2256,13 @@ const ADK_THEMEN_BE = [
   {
     gruppe: '🚦 Verkehrszeichen',
     items: [
-      'Stop-Schild (206)',
+      'Vorfahrtstraße (306)',
       'Vorfahrt gewähren (205)',
-      'Vorfahrtstraße & abknickende Vorfahrt (306)',
+      'Stop (206)',
+      'Einmalige Vorfahrt (301)',
+      'Abknickende Vorfahrt (306 + Zusatzzeichen)',
       'Einbahnstraße (220)',
       'Verkehrsberuhigter Bereich (325.1)',
-      'Gefahrzeichen allgemein (Kurve, Kreuzung, Kinder etc.)',
-      'Vorschriftzeichen allgemein (Gebote/Verbote)',
-      'Richtzeichen allgemein (Parken, Autobahn, Hinweise)',
     ]
   },
   {
@@ -4498,14 +4495,13 @@ function renderDetail() {
   const vzGruppe = ADK.find(g => g.gruppe === VZ_GRUPPE_NAME);
   // Bild zu jedem Verkehrszeichen-Thema (Dateien liegen unter /verkehrszeichen/)
   const VZ_BILDER = {
-    'Stop-Schild (206)': 'zeichen-206-stop.png',
+    'Vorfahrtstraße (306)': 'zeichen-306-vorfahrtstrasse.png',
     'Vorfahrt gewähren (205)': 'zeichen-205-vorfahrt-gewaehren.png',
-    'Vorfahrtstraße & abknickende Vorfahrt (306)': 'zeichen-306-vorfahrtstrasse.png',
+    'Stop (206)': 'zeichen-206-stop.png',
+    'Einmalige Vorfahrt (301)': 'zeichen-301-vorfahrt.png',
+    'Abknickende Vorfahrt (306 + Zusatzzeichen)': 'zusatz-abknickende-vorfahrt.png',
     'Einbahnstraße (220)': 'zeichen-220-einbahnstrasse.png',
     'Verkehrsberuhigter Bereich (325.1)': 'zeichen-325-1-verkehrsberuhigt.png',
-    'Gefahrzeichen allgemein (Kurve, Kreuzung, Kinder etc.)': 'zeichen-301-vorfahrt.png',
-    'Vorschriftzeichen allgemein (Gebote/Verbote)': 'zeichen-205-vorfahrt-gewaehren.png',
-    'Richtzeichen allgemein (Parken, Autobahn, Hinweise)': 'zeichen-306-vorfahrtstrasse.png',
   };
 
   const vzHTML = !vzGruppe ? '<div style="color:var(--muted);font-size:0.82rem;text-align:center;padding:20px">Keine Verkehrszeichen hinterlegt.</div>' : (() => {
