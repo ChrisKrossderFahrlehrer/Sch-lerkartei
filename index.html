@@ -4496,13 +4496,32 @@ function renderDetail() {
 
   const VZ_GRUPPE_NAME = '🚦 Verkehrszeichen';
   const vzGruppe = ADK.find(g => g.gruppe === VZ_GRUPPE_NAME);
+  // Bild zu jedem Verkehrszeichen-Thema (Dateien liegen unter /verkehrszeichen/)
+  const VZ_BILDER = {
+    'Stop-Schild (206)': 'zeichen-206-stop.png',
+    'Vorfahrt gewähren (205)': 'zeichen-205-vorfahrt-gewaehren.png',
+    'Vorfahrtstraße & abknickende Vorfahrt (306)': 'zeichen-306-vorfahrtstrasse.png',
+    'Einbahnstraße (220)': 'zeichen-220-einbahnstrasse.png',
+    'Verkehrsberuhigter Bereich (325.1)': 'zeichen-325-1-verkehrsberuhigt.png',
+    'Gefahrzeichen allgemein (Kurve, Kreuzung, Kinder etc.)': 'zeichen-301-vorfahrt.png',
+    'Vorschriftzeichen allgemein (Gebote/Verbote)': 'zeichen-205-vorfahrt-gewaehren.png',
+    'Richtzeichen allgemein (Parken, Autobahn, Hinweise)': 'zeichen-306-vorfahrtstrasse.png',
+  };
+
   const vzHTML = !vzGruppe ? '<div style="color:var(--muted);font-size:0.82rem;text-align:center;padding:20px">Keine Verkehrszeichen hinterlegt.</div>' : (() => {
     const done = vzGruppe.items.filter(t => ((s.themen||{})[t]||0) >= 4).length;
     const pct = vzGruppe.items.length ? Math.round(done/vzGruppe.items.length*100) : 0;
     const rows = vzGruppe.items.map(t => {
       const val = (s.themen||{})[t]||0;
-      return `<div class="thema-row">
-        <div class="thema-name">${t}</div>
+      const bild = VZ_BILDER[t];
+      const bildHTML = bild
+        ? `<img src="./verkehrszeichen/${bild}" alt="" style="width:38px;height:38px;object-fit:contain;flex-shrink:0" loading="lazy">`
+        : '<div style="width:38px;flex-shrink:0"></div>';
+      return `<div class="thema-row" style="align-items:center">
+        <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">
+          ${bildHTML}
+          <div class="thema-name" style="min-width:0">${t}</div>
+        </div>
         <div class="thema-dots">
           ${STUFEN.map((em,i)=>{const v=i+1;return `<button class="dot-btn${val===v?' active-'+v:''}" title="${STUFEN_NAME[i]}" onclick="setThema('${t.replace(/'/g,"\\'")}',${val===v?0:v})">${em}</button>`;}).join('')}
         </div>
