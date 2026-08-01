@@ -4485,7 +4485,9 @@ function renderDetail() {
     </div>`;
   }).join('');
 
-  const myCustomThemen = customThemen.filter(t => t.scope === 'all' || t.scope === activeId);
+  const myCustomThemen = customThemen.filter(t => (t.scope === 'all' || t.scope === activeId) && t.typ !== 'vz');
+  // Eigene Verkehrszeichen (Katalog) - gelten immer fuer alle Schueler des Fahrlehrers
+  const myVzZeichen = customThemen.filter(t => t.typ === 'vz');
   const customThemenOhneKat = myCustomThemen.filter(t => !t.kategorie);
 
   const STUFEN = ['🔴','🟠','🟡','🟢','⭐'];
@@ -4523,10 +4525,31 @@ function renderDetail() {
         </div>
       </div>`;
     }).join('');
+    // Eigene Zeichen aus dem Katalog des Fahrlehrers anhaengen
+    const eigenRows = myVzZeichen.map(z => {
+      const val = (s.customThemen||{})[z.id]||0;
+      const bildHTML = z.bild
+        ? `<img src="${z.bild}" alt="" style="width:38px;height:38px;object-fit:contain;flex-shrink:0">`
+        : '<div style="width:38px;flex-shrink:0;text-align:center;font-size:1.3rem">🚧</div>';
+      return `<div class="thema-row" style="align-items:center">
+        <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">
+          ${bildHTML}
+          <div class="thema-name" style="min-width:0">${z.name}</div>
+        </div>
+        <div class="thema-dots">
+          ${STUFEN.map((em,i)=>{const v=i+1;return `<button class="dot-btn${val===v?' active-'+v:''}" title="${STUFEN_NAME[i]}" onclick="setCustomThema('${z.id}',${val===v?0:v})">${em}</button>`;}).join('')}
+          <button class="dot-btn" title="Zeichen löschen" onclick="deleteVzZeichen('${z.id}')" style="opacity:.5">🗑️</button>
+        </div>
+      </div>`;
+    }).join('');
+
+    const gesamt = vzGruppe.items.length + myVzZeichen.length;
+    const gesamtDone = done + myVzZeichen.filter(z => ((s.customThemen||{})[z.id]||0) >= 4).length;
     return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
         <div style="font-size:0.8rem;font-weight:700;color:var(--text)">🚦 Verkehrszeichen</div>
-        <div style="font-size:0.7rem;color:${pct===100?'var(--accent2)':'var(--muted)'}">${done}/${vzGruppe.items.length}</div>
-      </div>${rows}`;
+        <div style="font-size:0.7rem;color:${gesamtDone===gesamt?'var(--accent2)':'var(--muted)'}">${gesamtDone}/${gesamt}</div>
+      </div>${rows}${eigenRows}
+      <button class="btn-sheet-cancel" onclick="openVzKatalog()" style="background:var(--surface2);margin-top:12px">➕ Eigenes Zeichen hinzufügen</button>`;
   })();
 
   const themenHTML = ADK.filter(g => g.gruppe !== VZ_GRUPPE_NAME).map(gruppe => {
@@ -8738,6 +8761,84 @@ window.closeVerkehrszeichen = () => {
   document.getElementById('screen-list').classList.add('active');
 };
 
+
+
+// ══ EIGENE VERKEHRSZEICHEN (Katalog) ═════════════════════════════════
+let vzBildDaten = null;   // verkleinertes Bild als Data-URL
+
+window.openVzKatalog = () => {
+  vzBildDaten = null;
+  document.getElementById('inp-vz-name').value = '';
+  document.getElementById('inp-vz-bild').value = '';
+  document.getElementById('vz-bild-vorschau').innerHTML = '';
+  document.getElementById('vz-katalog-error').textContent = '';
+  document.getElementById('vz-katalog-modal').classList.add('open');
+  setTimeout(() => document.getElementById('inp-vz-name').focus(), 150);
+};
+
+// Bild im Browser auf 140px verkleinern - Firestore-Dokumente sind auf 1 MB
+// begrenzt, ein Handy-Foto waere um ein Vielfaches zu gross.
+window.vzBildGewaehlt = (ev) => {
+  const datei = ev.target.files && ev.target.files[0];
+  const errEl = document.getElementById('vz-katalog-error');
+  errEl.textContent = '';
+  if (!datei) { vzBildDaten = null; return; }
+  if (!datei.type.startsWith('image/')) { errEl.textContent = 'Bitte eine Bilddatei wählen.'; return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const max = 140;
+      const skal = Math.min(max / img.width, max / img.height, 1);
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * skal);
+      c.height = Math.round(img.height * skal);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      vzBildDaten = c.toDataURL('image/png');
+      document.getElementById('vz-bild-vorschau').innerHTML =
+        `<img src="${vzBildDaten}" style="width:70px;height:70px;object-fit:contain;background:#fff;border-radius:8px;padding:4px">`;
+    };
+    img.onerror = () => { errEl.textContent = 'Bild konnte nicht gelesen werden.'; };
+    img.src = e.target.result;
+  };
+  reader.onerror = () => { errEl.textContent = 'Datei konnte nicht gelesen werden.'; };
+  reader.readAsDataURL(datei);
+};
+
+window.addVzZeichen = async () => {
+  const name = document.getElementById('inp-vz-name').value.trim();
+  const errEl = document.getElementById('vz-katalog-error');
+  errEl.textContent = '';
+  if (!name) { errEl.textContent = 'Bitte eine Bezeichnung eingeben.'; return; }
+  if (vzBildDaten && vzBildDaten.length > 700000) { errEl.textContent = 'Bild ist zu groß – bitte ein kleineres wählen.'; return; }
+  const btn = document.querySelector('#vz-katalog-modal .btn-main');
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    await dbAdd(collection(db, 'customThemen'), {
+      uid: currentUser.uid,
+      name,
+      typ: 'vz',            // kennzeichnet: gehoert in den Verkehrszeichen-Reiter
+      scope: 'all',         // eigene Zeichen gelten fuer alle Schueler
+      bild: vzBildDaten || null,
+      createdAt: Date.now()
+    });
+    document.getElementById('vz-katalog-modal').classList.remove('open');
+    toast(`Zeichen „${name}" hinzugefügt ✓`);
+  } catch(e) {
+    console.warn('addVzZeichen:', e);
+    errEl.textContent = 'Fehler beim Speichern.';
+  }
+  if (btn) { btn.disabled = false; btn.textContent = 'Hinzufügen ✓'; }
+};
+
+window.deleteVzZeichen = async (id) => {
+  if (!confirm('Dieses Zeichen bei allen Schülern entfernen?')) return;
+  try {
+    await dbDel(doc(db, 'customThemen', id));
+    toast('Zeichen entfernt.');
+  } catch(e) { console.warn('deleteVzZeichen:', e); toast('Fehler beim Löschen.'); }
+};
+
 </script>
 <!-- ERST-LOGIN: Passwort setzen (+ optional echte E-Mail) - nicht wegklickbar -->
 <div id="erstlogin-modal" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(5,8,12,.92);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
@@ -8752,6 +8853,31 @@ window.closeVerkehrszeichen = () => {
     <input type="email" id="el-email" autocomplete="email" placeholder="Kannst du auch später im Profil nachtragen" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:11px 12px;font-size:0.9rem;margin-bottom:6px">
     <div id="el-error" style="color:var(--danger,#f85149);font-size:0.78rem;min-height:18px;margin:6px 0"></div>
     <button onclick="erstLoginAbschliessen()" id="el-btn" style="width:100%;background:var(--accent);border:none;border-radius:10px;color:#0d1117;font-weight:800;font-size:0.9rem;padding:13px;cursor:pointer">Speichern & loslegen ✓</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="vz-katalog-modal" onclick="closeModal(event)">
+  <div class="modal-sheet">
+    <div class="sheet-title">🚦 Eigenes Verkehrszeichen</div>
+    <p style="font-size:0.78rem;color:var(--muted);margin:-6px 0 14px;line-height:1.5">
+      Das Zeichen erscheint danach bei <b>allen</b> deinen Schülern im Zeichen-Reiter.
+    </p>
+    <div class="form-group">
+      <label class="form-label">Bezeichnung</label>
+      <input class="form-input" id="inp-vz-name" placeholder="z.B. Überholverbot">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Bild des Schildes</label>
+      <input type="file" accept="image/*" id="inp-vz-bild" onchange="vzBildGewaehlt(event)"
+        style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:10px;font-size:0.82rem">
+      <div id="vz-bild-vorschau" style="margin-top:10px;text-align:center"></div>
+      <div style="font-size:0.68rem;color:var(--muted);margin-top:6px">Wird automatisch verkleinert. Verwende nur Bilder, die du nutzen darfst – amtliche Verkehrszeichen sind gemeinfrei.</div>
+    </div>
+    <div class="error-msg" id="vz-katalog-error"></div>
+    <div style="display:flex;gap:10px;margin-top:4px">
+      <button class="btn-secondary" style="margin:0" onclick="document.getElementById('vz-katalog-modal').classList.remove('open')">Abbrechen</button>
+      <button class="btn-main" onclick="addVzZeichen()">Hinzufügen ✓</button>
+    </div>
   </div>
 </div>
 
