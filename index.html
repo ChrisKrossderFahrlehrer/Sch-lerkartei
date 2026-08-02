@@ -4502,16 +4502,6 @@ function renderDetail() {
 
   const VZ_GRUPPE_NAME = '🚦 Verkehrszeichen';
   const vzGruppe = ADK.find(g => g.gruppe === VZ_GRUPPE_NAME);
-  // Bild zu jedem Verkehrszeichen-Thema (Dateien liegen unter /verkehrszeichen/)
-  const VZ_BILDER = {
-    'Vorfahrtstraße': 'zeichen-306-vorfahrtstrasse.png',
-    'Vorfahrt gewähren': 'zeichen-205-vorfahrt-gewaehren.png',
-    'Stop': 'zeichen-206-stop.png',
-    'Einmalige Vorfahrt': 'zeichen-301-vorfahrt.png',
-    'Abknickende Vorfahrt': 'zusatz-abknickende-vorfahrt.png',
-    'Einbahnstraße': 'zeichen-220-einbahnstrasse.png',
-    'Verkehrsberuhigter Bereich': 'zeichen-325-1-verkehrsberuhigt.png',
-  };
 
   const vzHTML = !vzGruppe ? '<div style="color:var(--muted);font-size:0.82rem;text-align:center;padding:20px">Keine Verkehrszeichen hinterlegt.</div>' : (() => {
     const done = vzGruppe.items.filter(t => ((s.themen||{})[t]||0) >= 4).length;
@@ -6636,6 +6626,44 @@ function generateCodeStr() {
 // ── DATENSCHUTZ: minimierte Daten fürs Schüler-Portal ──
 // Nur was der Schüler sehen MUSS. Keine internen Notizen, kein Geburtsdatum,
 // keine Fahrlehrer-Kommentare. Reduziert den Schaden, falls ein Code leakt.
+// Bild zu jedem Standard-Verkehrszeichen (Dateien unter /verkehrszeichen/).
+// Global, weil sowohl die Fahrlehrer-Ansicht als auch der Portal-Snapshot
+// dieselbe Zuordnung brauchen.
+const VZ_BILDER = {
+  'Vorfahrtstraße': 'zeichen-306-vorfahrtstrasse.png',
+  'Vorfahrt gewähren': 'zeichen-205-vorfahrt-gewaehren.png',
+  'Stop': 'zeichen-206-stop.png',
+  'Einmalige Vorfahrt': 'zeichen-301-vorfahrt.png',
+  'Abknickende Vorfahrt': 'zusatz-abknickende-vorfahrt.png',
+  'Einbahnstraße': 'zeichen-220-einbahnstrasse.png',
+  'Verkehrsberuhigter Bereich': 'zeichen-325-1-verkehrsberuhigt.png',
+};
+
+// Verkehrszeichen fuer das Schueler-Portal aufbereiten: Standard-Zeichen aus
+// dem Lehrplan plus die vom Fahrlehrer ergaenzten Katalog-/Eigen-Zeichen.
+// Der Snapshot bekommt eine fertige Liste, damit das Portal keinen Zugriff
+// auf die customThemen-Sammlung des Fahrlehrers braucht (Datensparsamkeit).
+function buildPortalVerkehrszeichen(s) {
+  const liste = [];
+  try {
+    const kl = (s.klasse || 'B');
+    const plan = kl === 'A' ? ADK_THEMEN_A : kl === 'BE' ? ADK_THEMEN_BE : ADK_THEMEN;
+    const grp = plan.find(g => g.gruppe === '🚦 Verkehrszeichen');
+    if (grp) {
+      grp.items.forEach(name => {
+        liste.push({ n: name, b: VZ_BILDER[name] ? './verkehrszeichen/' + VZ_BILDER[name] : null, w: (s.themen||{})[name] || 0 });
+      });
+    }
+    (customThemen || []).filter(t => t.typ === 'vz').forEach(z => {
+      let bild = null;
+      if (z.katalogBild) bild = './verkehrszeichen-katalog/' + z.katalogBild;
+      else if (z.bild && z.bild.length < 25000) bild = z.bild;  // kleine eigene Bilder direkt mitgeben
+      liste.push({ n: z.name, b: bild, w: (s.customThemen||{})[z.id] || 0 });
+    });
+  } catch(e) { console.warn('buildPortalVerkehrszeichen:', e); }
+  return liste;
+}
+
 function buildPortalSnapshot(s, code, expiresAt) {
   return {
     id:                s.id || null,
@@ -6648,6 +6676,7 @@ function buildPortalSnapshot(s, code, expiresAt) {
     zielStunden:       s.zielStunden || 30,
     sonderfahrten:     s.sonderfahrten || {},
     themen:            s.themen || {},
+    verkehrszeichen:   buildPortalVerkehrszeichen(s),
     schaltstunden:     s.schaltstunden || 0,
     zielSchaltstunden: s.zielSchaltstunden || 10,
     testfahrtBestanden:s.testfahrtBestanden || false,
