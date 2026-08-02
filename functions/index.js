@@ -198,6 +198,7 @@ function baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel, betra
     doc.fontSize(11).fillColor('#000').text(empfaenger.name);
     doc.text(empfaenger.strasse);
     doc.text(`${empfaenger.plz} ${empfaenger.ort}`);
+    if (empfaenger.land) doc.text(empfaenger.land);
     doc.moveDown(2);
 
     doc.fontSize(18).fillColor('#000').text(`Rechnung Nr. ${nummer}`, { align: 'left' });
@@ -285,9 +286,11 @@ exports.erstelleRechnung = onCall(async (request) => {
     email: platImp.email || 'kontakt@fahrsync.de',
     web: platImp.web || 'fahrsync.de',
   };
+  const LAENDER = { DE: '', AT: 'Österreich', CH: 'Schweiz', XX: '' };
   const empfaenger = {
     name: b.name || userData.name || 'Kunde',
     strasse: b.rechnungsStrasse, plz: b.rechnungsPlz, ort: b.rechnungsOrt,
+    land: LAENDER[b.rechnungsLand || 'DE'] || '',
   };
   const datum = new Date().toLocaleDateString('de-DE');
 
