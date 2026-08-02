@@ -640,8 +640,40 @@ function renderDashboard() {
         ${renderSonderfahrtenMini(s)}
       </div>
 
+      ${renderVerkehrszeichenCard(s)}
+
       ${renderLernzieleCard()}
 
+    </div>`;
+}
+
+// Verkehrszeichen, die der Fahrlehrer mit dem Schueler geuebt hat.
+// Daten kommen fertig aus dem Portal-Snapshot (Name, Bild, Bewertung 0-5).
+function renderVerkehrszeichenCard(s) {
+  const zeichen = s.verkehrszeichen || [];
+  if (!zeichen.length) return '';
+  const STUFEN = ['⚪','🔴','🟠','🟡','🟢','⭐'];
+  const STUFEN_NAME = ['noch nicht besprochen','gezeigt','geübt','ausreichend','beherrscht','sehr sicher'];
+  const sicher = zeichen.filter(z => (z.w || 0) >= 4).length;
+  const besprochen = zeichen.filter(z => (z.w || 0) > 0).length;
+
+  const zeilen = zeichen.map(z => {
+    const w = z.w || 0;
+    const bild = z.b
+      ? `<img src="${z.b}" alt="" style="width:34px;height:34px;object-fit:contain;flex-shrink:0" loading="lazy">`
+      : '<div style="width:34px;flex-shrink:0;text-align:center;font-size:1.1rem">🚧</div>';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);opacity:${w>0?'1':'0.5'}">
+        ${bild}
+        <div style="flex:1;min-width:0;font-size:0.82rem">${z.n}</div>
+        <div style="font-size:0.72rem;color:var(--muted);white-space:nowrap">${STUFEN[w]||'⚪'} ${STUFEN_NAME[w]||''}</div>
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="card">
+      <div class="card-title">🚦 Verkehrszeichen <span style="font-size:0.75rem;color:var(--muted);font-weight:400">(${sicher} von ${zeichen.length} sicher)</span></div>
+      <div style="font-size:0.72rem;color:var(--muted);margin:-2px 0 8px">${besprochen} Zeichen habt ihr schon besprochen.</div>
+      ${zeilen}
     </div>`;
 }
 
