@@ -652,8 +652,10 @@ function renderDashboard() {
 function renderVerkehrszeichenCard(s) {
   const zeichen = s.verkehrszeichen || [];
   if (!zeichen.length) return '';
+  // Muss exakt zur Skala der Fahrlehrer-Ansicht passen (Wert 1..5),
+  // sonst liest der Schueler etwas anderes als der Fahrlehrer eingestellt hat.
   const STUFEN = ['⚪','🔴','🟠','🟡','🟢','⭐'];
-  const STUFEN_NAME = ['noch nicht besprochen','gezeigt','geübt','ausreichend','beherrscht','sehr sicher'];
+  const STUFEN_NAME = ['noch nicht bewertet','nicht gezeigt','gezeigt','ausreichend','beherrscht','sehr sicher'];
   const sicher = zeichen.filter(z => (z.w || 0) >= 4).length;
   const besprochen = zeichen.filter(z => (z.w || 0) > 0).length;
 
