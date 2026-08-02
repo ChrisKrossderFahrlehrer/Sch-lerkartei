@@ -659,6 +659,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
           <input id="rg-plz" placeholder="PLZ" style="width:90px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:10px 12px;font-size:0.85rem">
           <input id="rg-ort" placeholder="Ort" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:10px 12px;font-size:0.85rem">
         </div>
+        <select id="rg-land" onchange="landGewechselt()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:10px 12px;font-size:0.85rem;margin-top:8px">
+          <option value="DE" selected>Deutschland</option>
+          <option value="AT">Österreich</option>
+          <option value="CH">Schweiz</option>
+          <option value="XX">anderes Land</option>
+        </select>
+        <div id="rg-land-hinweis" style="display:none;font-size:0.7rem;color:var(--accent);background:rgba(240,180,41,0.08);border:1px solid var(--accent);border-radius:8px;padding:8px 10px;margin-top:8px;line-height:1.5"></div>
         <div style="font-size:0.68rem;color:var(--muted);margin-top:6px">Wird für deine Rechnung benötigt (§ 14 UStG).</div>
       </div>
 
@@ -8695,6 +8702,8 @@ async function ladeRechnungsadresse() {
     document.getElementById('rg-strasse').value = b.rechnungsStrasse || '';
     document.getElementById('rg-plz').value = b.rechnungsPlz || '';
     document.getElementById('rg-ort').value = b.rechnungsOrt || '';
+    document.getElementById('rg-land').value = b.rechnungsLand || 'DE';
+    landGewechselt();
   } catch(e) { console.warn('ladeRechnungsadresse:', e); }
 }
 
@@ -8706,7 +8715,8 @@ async function speichereRechnungsadresseWennVollstaendig() {
   if (!strasse || !plz || !ort) return false;
   try {
     await dbUpd(doc(db, window.__billingDocRef.coll, window.__billingDocRef.id), {
-      rechnungsStrasse: strasse, rechnungsPlz: plz, rechnungsOrt: ort
+      rechnungsStrasse: strasse, rechnungsPlz: plz, rechnungsOrt: ort,
+      rechnungsLand: (document.getElementById('rg-land') || {}).value || 'DE'
     });
   } catch(e) { console.warn('Rechnungsadresse speichern:', e); }
   return true;
@@ -9005,6 +9015,24 @@ window.katalogZeichenAdd = async (datei) => {
     toast(`„${name}" hinzugefügt ✓`);
     setTimeout(renderKatalog, 400);
   } catch(e) { console.warn('katalogZeichenAdd:', e); toast('Fehler beim Hinzufügen.'); }
+};
+
+
+
+// Zielmarkt-Hinweis bei der Rechnungsadresse. Wichtig: Das Angebot wird
+// NICHT technisch gesperrt - die EU-Geoblocking-Verordnung untersagt es,
+// Kunden aus dem EWR den Zugang oder Vertragsschluss zu verwehren. Der
+// Hinweis informiert nur sachlich ueber den Zuschnitt des Produkts.
+window.landGewechselt = () => {
+  const sel = document.getElementById('rg-land');
+  const box = document.getElementById('rg-land-hinweis');
+  if (!sel || !box) return;
+  const land = sel.value;
+  if (land === 'DE') { box.style.display = 'none'; box.textContent = ''; return; }
+  box.style.display = 'block';
+  box.innerHTML = land === 'CH'
+    ? 'Hinweis: FahrSync ist auf die Fahrschulausbildung nach deutschem Recht zugeschnitten (StVO, deutsche Führerscheinklassen). Für die Schweiz können wir keinen Vertrag anbieten.'
+    : 'Hinweis: FahrSync bildet die Fahrschulausbildung nach deutschem Recht ab (StVO, deutsche Führerscheinklassen, amtlicher Ausbildungsrahmenplan). Außerhalb Deutschlands ist die Software dafür nicht geeignet – Sprache und Support sind ausschließlich deutsch.';
 };
 
 </script>
