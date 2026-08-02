@@ -4528,8 +4528,9 @@ function renderDetail() {
     // Eigene Zeichen aus dem Katalog des Fahrlehrers anhaengen
     const eigenRows = myVzZeichen.map(z => {
       const val = (s.customThemen||{})[z.id]||0;
-      const bildHTML = z.bild
-        ? `<img src="${z.bild}" alt="" style="width:38px;height:38px;object-fit:contain;flex-shrink:0">`
+      const bildQuelle = z.katalogBild ? `./verkehrszeichen-katalog/${z.katalogBild}` : z.bild;
+      const bildHTML = bildQuelle
+        ? `<img src="${bildQuelle}" alt="" style="width:38px;height:38px;object-fit:contain;flex-shrink:0" loading="lazy">`
         : '<div style="width:38px;flex-shrink:0;text-align:center;font-size:1.3rem">🚧</div>';
       return `<div class="thema-row" style="align-items:center">
         <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">
@@ -4549,7 +4550,10 @@ function renderDetail() {
         <div style="font-size:0.8rem;font-weight:700;color:var(--text)">🚦 Verkehrszeichen</div>
         <div style="font-size:0.7rem;color:${gesamtDone===gesamt?'var(--accent2)':'var(--muted)'}">${gesamtDone}/${gesamt}</div>
       </div>${rows}${eigenRows}
-      <button class="btn-sheet-cancel" onclick="openVzKatalog()" style="background:var(--surface2);margin-top:12px">➕ Eigenes Zeichen hinzufügen</button>`;
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn-sheet-cancel" onclick="openZeichenKatalog()" style="background:var(--surface2);margin:0;flex:1">📖 Aus Katalog wählen</button>
+        <button class="btn-sheet-cancel" onclick="openVzKatalog()" style="background:var(--surface2);margin:0;flex:1">➕ Eigenes Bild</button>
+      </div>`;
   })();
 
   const themenHTML = ADK.filter(g => g.gruppe !== VZ_GRUPPE_NAME).map(gruppe => {
@@ -8839,6 +8843,130 @@ window.deleteVzZeichen = async (id) => {
   } catch(e) { console.warn('deleteVzZeichen:', e); toast('Fehler beim Löschen.'); }
 };
 
+
+
+// ══ VERKEHRSZEICHEN-KATALOG (amtliche Zeichen zum Auswaehlen) ════════
+const ZEICHEN_KATALOG = {
+    '101':'Gefahrstelle',
+    '102':'Kreuzung – Vorfahrt von rechts',
+    '103-10':'Kurve (links)',
+    '103-20':'Kurve (rechts)',
+    '105-10':'Doppelkurve (zunächst links)',
+    '108-10':'Gefälle',
+    '110-10':'Steigung',
+    '112':'Unebene Fahrbahn',
+    '114':'Schleudergefahr',
+    '117-10':'Seitenwind',
+    '120':'Verengte Fahrbahn',
+    '121-10':'Einseitig verengte Fahrbahn',
+    '123':'Baustelle',
+    '124':'Stau',
+    '131':'Ampel',
+    '133-10':'Fußgänger',
+    '136-10':'Kinder',
+    '138-10':'Radverkehr',
+    '142-10':'Wildwechsel',
+    '151':'Bahnübergang',
+    '201-50':'Andreaskreuz',
+    '205':'Vorfahrt gewähren',
+    '206':'Stop',
+    '208':'Vorrang des Gegenverkehrs',
+    '209-10':'Vorgeschriebene Fahrtrichtung rechts',
+    '211-10':'Hier rechts',
+    '214-10':'Geradeaus oder rechts',
+    '215':'Kreisverkehr',
+    '220-10':'Einbahnstraße',
+    '222-10':'Vorbeifahrt rechts',
+    '237':'Radweg',
+    '239':'Gehweg',
+    '240':'Gemeinsamer Geh- und Radweg',
+    '241-30':'Getrennter Geh- und Radweg',
+    '242_1':'Fußgängerzone',
+    '244_1':'Fahrradstraße',
+    '250':'Verbot für Fahrzeuge aller Art',
+    '251':'Verbot für Kraftwagen',
+    '253':'Verbot für LKW',
+    '254':'Verbot für Radverkehr',
+    '259':'Verbot für Fußgänger',
+    '260':'Verbot für Krafträder und Kraftwagen',
+    '262':'Tatsächliche Masse',
+    '264-2':'Höchstbreite',
+    '265':'Höchsthöhe',
+    '266':'Höchstlänge',
+    '267':'Verbot der Einfahrt',
+    '268':'Schneeketten vorgeschrieben',
+    '272':'Wendeverbot',
+    '274-50':'Zulässige Höchstgeschwindigkeit',
+    '274_1':'Beginn Tempo-30-Zone',
+    '274_2':'Ende Tempo-30-Zone',
+    '276':'Überholverbot',
+    '277':'Überholverbot für LKW',
+    '278-50':'Ende der Höchstgeschwindigkeit',
+    '280':'Ende des Überholverbots',
+    '282':'Ende sämtlicher Streckenverbote',
+    '283':'Absolutes Haltverbot',
+    '286':'Eingeschränktes Haltverbot',
+    '290_1':'Beginn Haltverbotszone',
+    '301':'Einmalige Vorfahrt',
+    '306':'Vorfahrtstraße',
+    '307':'Ende der Vorfahrtstraße',
+    '308':'Vorrang vor Gegenverkehr',
+    '310':'Ortstafel',
+    '311':'Ortsende',
+    '314':'Parken',
+    '315-55':'Parken auf Gehwegen',
+    '325_1':'Verkehrsberuhigter Bereich',
+    '325_2':'Ende verkehrsberuhigter Bereich',
+    '330_1':'Autobahn',
+    '330_2':'Ende der Autobahn',
+    '331_1':'Kraftfahrstraße',
+    '331_2':'Ende der Kraftfahrstraße',
+    '350-10':'Fußgängerüberweg',
+    '354':'Wasserschutzgebiet'
+};
+
+window.openZeichenKatalog = () => {
+  document.getElementById('kat-suche').value = '';
+  document.getElementById('zeichen-katalog-modal').classList.add('open');
+  renderKatalog();
+};
+
+window.renderKatalog = () => {
+  const such = (document.getElementById('kat-suche').value || '').toLowerCase().trim();
+  const schonDa = new Set(customThemen.filter(t => t.typ === 'vz' && t.katalogBild).map(t => t.katalogBild));
+  const treffer = Object.entries(ZEICHEN_KATALOG)
+    .filter(([datei, name]) => !such || name.toLowerCase().includes(such) || datei.includes(such));
+  const box = document.getElementById('kat-liste');
+  if (!treffer.length) { box.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:20px;font-size:0.85rem">Nichts gefunden.</div>'; return; }
+  box.innerHTML = treffer.map(([datei, name]) => {
+    const drin = schonDa.has(datei + '.jpg');
+    return `<div onclick="${drin ? '' : `katalogZeichenAdd('${datei}')`}"
+      style="background:var(--surface2);border:1px solid ${drin?'var(--accent2)':'var(--border)'};border-radius:10px;padding:8px 6px;text-align:center;cursor:${drin?'default':'pointer'};opacity:${drin?'0.55':'1'}">
+      <img src="./verkehrszeichen-katalog/${datei}.jpg" alt="" style="width:46px;height:46px;object-fit:contain" loading="lazy">
+      <div style="font-size:0.62rem;color:var(--muted);margin-top:4px;line-height:1.25">${name}</div>
+      ${drin ? '<div style="font-size:0.6rem;color:var(--accent2);margin-top:2px">✓ drin</div>' : ''}
+    </div>`;
+  }).join('');
+};
+
+window.katalogZeichenAdd = async (datei) => {
+  const name = ZEICHEN_KATALOG[datei];
+  if (!name) return;
+  try {
+    await dbAdd(collection(db, 'customThemen'), {
+      uid: currentUser.uid,
+      name,
+      typ: 'vz',
+      scope: 'all',
+      katalogBild: datei + '.jpg',
+      bild: null,
+      createdAt: Date.now()
+    });
+    toast(`„${name}" hinzugefügt ✓`);
+    setTimeout(renderKatalog, 400);
+  } catch(e) { console.warn('katalogZeichenAdd:', e); toast('Fehler beim Hinzufügen.'); }
+};
+
 </script>
 <!-- ERST-LOGIN: Passwort setzen (+ optional echte E-Mail) - nicht wegklickbar -->
 <div id="erstlogin-modal" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(5,8,12,.92);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
@@ -8853,6 +8981,19 @@ window.deleteVzZeichen = async (id) => {
     <input type="email" id="el-email" autocomplete="email" placeholder="Kannst du auch später im Profil nachtragen" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:11px 12px;font-size:0.9rem;margin-bottom:6px">
     <div id="el-error" style="color:var(--danger,#f85149);font-size:0.78rem;min-height:18px;margin:6px 0"></div>
     <button onclick="erstLoginAbschliessen()" id="el-btn" style="width:100%;background:var(--accent);border:none;border-radius:10px;color:#0d1117;font-weight:800;font-size:0.9rem;padding:13px;cursor:pointer">Speichern & loslegen ✓</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="zeichen-katalog-modal" onclick="closeModal(event)">
+  <div class="modal-sheet">
+    <div class="sheet-title">📖 Verkehrszeichen-Katalog</div>
+    <input id="kat-suche" oninput="renderKatalog()" placeholder="Suchen, z.B. Halt, Tempo, Parken…"
+      style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:11px 12px;font-size:0.88rem;margin-bottom:10px">
+    <div id="kat-liste" style="max-height:52vh;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px"></div>
+    <div style="font-size:0.66rem;color:var(--muted);margin-top:10px;line-height:1.5">
+      Amtliche Verkehrszeichen (Quelle: Bundesanstalt für Straßenwesen), gemeinfrei nach § 5 UrhG.
+    </div>
+    <button class="btn-sheet-cancel" onclick="document.getElementById('zeichen-katalog-modal').classList.remove('open')" style="margin-top:10px">Fertig</button>
   </div>
 </div>
 
