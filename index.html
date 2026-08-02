@@ -8847,83 +8847,106 @@ window.deleteVzZeichen = async (id) => {
 
 // ══ VERKEHRSZEICHEN-KATALOG (amtliche Zeichen zum Auswaehlen) ════════
 const ZEICHEN_KATALOG = {
-    '101':'Gefahrstelle',
-    '102':'Kreuzung – Vorfahrt von rechts',
-    '103-10':'Kurve (links)',
-    '103-20':'Kurve (rechts)',
-    '105-10':'Doppelkurve (zunächst links)',
-    '108-10':'Gefälle',
-    '110-10':'Steigung',
-    '112':'Unebene Fahrbahn',
-    '114':'Schleudergefahr',
-    '117-10':'Seitenwind',
-    '120':'Verengte Fahrbahn',
-    '121-10':'Einseitig verengte Fahrbahn',
-    '123':'Baustelle',
-    '124':'Stau',
-    '131':'Ampel',
-    '133-10':'Fußgänger',
-    '136-10':'Kinder',
-    '138-10':'Radverkehr',
-    '142-10':'Wildwechsel',
-    '151':'Bahnübergang',
-    '201-50':'Andreaskreuz',
-    '205':'Vorfahrt gewähren',
-    '206':'Stop',
-    '208':'Vorrang des Gegenverkehrs',
-    '209-10':'Vorgeschriebene Fahrtrichtung rechts',
-    '211-10':'Hier rechts',
-    '214-10':'Geradeaus oder rechts',
-    '215':'Kreisverkehr',
-    '220-10':'Einbahnstraße',
-    '222-10':'Vorbeifahrt rechts',
-    '237':'Radweg',
-    '239':'Gehweg',
-    '240':'Gemeinsamer Geh- und Radweg',
-    '241-30':'Getrennter Geh- und Radweg',
-    '242_1':'Fußgängerzone',
-    '244_1':'Fahrradstraße',
-    '250':'Verbot für Fahrzeuge aller Art',
-    '251':'Verbot für Kraftwagen',
-    '253':'Verbot für LKW',
-    '254':'Verbot für Radverkehr',
-    '259':'Verbot für Fußgänger',
-    '260':'Verbot für Krafträder und Kraftwagen',
-    '262':'Tatsächliche Masse',
-    '264-2':'Höchstbreite',
-    '265':'Höchsthöhe',
-    '266':'Höchstlänge',
-    '267':'Verbot der Einfahrt',
-    '268':'Schneeketten vorgeschrieben',
-    '272':'Wendeverbot',
-    '274-50':'Zulässige Höchstgeschwindigkeit',
-    '274_1':'Beginn Tempo-30-Zone',
-    '274_2':'Ende Tempo-30-Zone',
-    '276':'Überholverbot',
-    '277':'Überholverbot für LKW',
-    '278-50':'Ende der Höchstgeschwindigkeit',
-    '280':'Ende des Überholverbots',
-    '282':'Ende sämtlicher Streckenverbote',
-    '283':'Absolutes Haltverbot',
-    '286':'Eingeschränktes Haltverbot',
-    '290_1':'Beginn Haltverbotszone',
-    '301':'Einmalige Vorfahrt',
-    '306':'Vorfahrtstraße',
-    '307':'Ende der Vorfahrtstraße',
-    '308':'Vorrang vor Gegenverkehr',
-    '310':'Ortstafel',
-    '311':'Ortsende',
-    '314':'Parken',
-    '315-55':'Parken auf Gehwegen',
-    '325_1':'Verkehrsberuhigter Bereich',
-    '325_2':'Ende verkehrsberuhigter Bereich',
-    '330_1':'Autobahn',
-    '330_2':'Ende der Autobahn',
-    '331_1':'Kraftfahrstraße',
-    '331_2':'Ende der Kraftfahrstraße',
-    '350-10':'Fußgängerüberweg',
-    '354':'Wasserschutzgebiet'
+    '201-50':['Andreaskreuz','vorfahrt'],
+    '205':['Vorfahrt gewähren','vorfahrt'],
+    '206':['Stop','vorfahrt'],
+    '208':['Vorrang des Gegenverkehrs','vorfahrt'],
+    '101':['Gefahrstelle','gefahr'],
+    '102':['Kreuzung – Vorfahrt von rechts','gefahr'],
+    '103-10':['Kurve (links)','gefahr'],
+    '103-20':['Kurve (rechts)','gefahr'],
+    '105-10':['Doppelkurve (zunächst links)','gefahr'],
+    '108-10':['Gefälle','gefahr'],
+    '110-10':['Steigung','gefahr'],
+    '112':['Unebene Fahrbahn','gefahr'],
+    '114':['Schleudergefahr','gefahr'],
+    '117-10':['Seitenwind','gefahr'],
+    '120':['Verengte Fahrbahn','gefahr'],
+    '121-10':['Einseitig verengte Fahrbahn','gefahr'],
+    '123':['Baustelle','gefahr'],
+    '124':['Stau','gefahr'],
+    '131':['Ampel','gefahr'],
+    '133-10':['Fußgänger','gefahr'],
+    '136-10':['Kinder','gefahr'],
+    '138-10':['Radverkehr','gefahr'],
+    '142-10':['Wildwechsel','gefahr'],
+    '151':['Bahnübergang','gefahr'],
+    '209-10':['Vorgeschriebene Fahrtrichtung rechts','gebot'],
+    '211-10':['Hier rechts','gebot'],
+    '214-10':['Geradeaus oder rechts','gebot'],
+    '215':['Kreisverkehr','gebot'],
+    '220-10':['Einbahnstraße','gebot'],
+    '222-10':['Vorbeifahrt rechts','gebot'],
+    '237':['Radweg','gebot'],
+    '239':['Gehweg','gebot'],
+    '240':['Gemeinsamer Geh- und Radweg','gebot'],
+    '241-30':['Getrennter Geh- und Radweg','gebot'],
+    '242_1':['Fußgängerzone','gebot'],
+    '244_1':['Fahrradstraße','gebot'],
+    '250':['Verbot für Fahrzeuge aller Art','verbot'],
+    '251':['Verbot für Kraftwagen','verbot'],
+    '253':['Verbot für LKW','verbot'],
+    '254':['Verbot für Radverkehr','verbot'],
+    '259':['Verbot für Fußgänger','verbot'],
+    '260':['Verbot für Krafträder und Kraftwagen','verbot'],
+    '262':['Tatsächliche Masse','verbot'],
+    '264-2':['Höchstbreite','verbot'],
+    '265':['Höchsthöhe','verbot'],
+    '266':['Höchstlänge','verbot'],
+    '267':['Verbot der Einfahrt','verbot'],
+    '268':['Schneeketten vorgeschrieben','verbot'],
+    '272':['Wendeverbot','verbot'],
+    '274-50':['Zulässige Höchstgeschwindigkeit','verbot'],
+    '274_1':['Beginn Tempo-30-Zone','verbot'],
+    '274_2':['Ende Tempo-30-Zone','verbot'],
+    '276':['Überholverbot','verbot'],
+    '277':['Überholverbot für LKW','verbot'],
+    '278-50':['Ende der Höchstgeschwindigkeit','verbot'],
+    '280':['Ende des Überholverbots','verbot'],
+    '282':['Ende sämtlicher Streckenverbote','verbot'],
+    '283':['Absolutes Haltverbot','verbot'],
+    '286':['Eingeschränktes Haltverbot','verbot'],
+    '290_1':['Beginn Haltverbotszone','verbot'],
+    '301':['Einmalige Vorfahrt','richt'],
+    '306':['Vorfahrtstraße','richt'],
+    '307':['Ende der Vorfahrtstraße','richt'],
+    '308':['Vorrang vor Gegenverkehr','richt'],
+    '310':['Ortstafel','richt'],
+    '311':['Ortsende','richt'],
+    '314':['Parken','richt'],
+    '315-55':['Parken auf Gehwegen','richt'],
+    '325_1':['Verkehrsberuhigter Bereich','richt'],
+    '325_2':['Ende verkehrsberuhigter Bereich','richt'],
+    '330_1':['Autobahn','richt'],
+    '330_2':['Ende der Autobahn','richt'],
+    '331_1':['Kraftfahrstraße','richt'],
+    '331_2':['Ende der Kraftfahrstraße','richt'],
+    '350-10':['Fußgängerüberweg','richt'],
+    '354':['Wasserschutzgebiet','richt'],
+    '405':['Autobahn-Knotenpunkt','wegweiser'],
+    '406-50':['Knotenpunktstafel Autobahn','wegweiser'],
+    '410':['Wegweiser zur Autobahn','wegweiser'],
+    '415-10':['Vorwegweiser Bundesstraße','wegweiser'],
+    '418-10':['Vorwegweiser außerorts','wegweiser'],
+    '430-10':['Vorwegweiser zur Autobahn','wegweiser'],
+    '434-50':['Wegweisertafel Landstraße','wegweiser'],
+    '437':['Straßennamensschild','wegweiser'],
+    '438':['Vorwegweiser Landstraße','wegweiser'],
+    '439':['Wegweiser Landstraße','wegweiser'],
+    '440':['Vorwegweiser Autobahn','wegweiser'],
+    '441':['Wegweiser Autobahn','wegweiser'],
+    '442-10':['Vorwegweiser für bestimmte Verkehrsarten','wegweiser'],
+    '448':['Ausfahrttafel Autobahn','wegweiser'],
+    '449':['Ankündigungstafel Autobahn','wegweiser'],
+    '453':['Entfernungstafel Autobahn','wegweiser'],
+    '454-10':['Umleitungswegweiser','wegweiser']
 };
+
+const KAT_GRUPPEN = [
+  ['alle','Alle'], ['vorfahrt','Vorfahrt & Halt'], ['gefahr','Gefahrzeichen'],
+  ['gebot','Gebotszeichen'], ['verbot','Verbotszeichen'], ['richt','Richtzeichen'], ['wegweiser','Wegweiser']
+];
+let katAktiveGruppe = 'alle';
 
 window.openZeichenKatalog = () => {
   document.getElementById('kat-suche').value = '';
@@ -8931,14 +8954,30 @@ window.openZeichenKatalog = () => {
   renderKatalog();
 };
 
+window.katSetzeGruppe = (g) => { katAktiveGruppe = g; renderKatalog(); };
+
 window.renderKatalog = () => {
   const such = (document.getElementById('kat-suche').value || '').toLowerCase().trim();
   const schonDa = new Set(customThemen.filter(t => t.typ === 'vz' && t.katalogBild).map(t => t.katalogBild));
-  const treffer = Object.entries(ZEICHEN_KATALOG)
-    .filter(([datei, name]) => !such || name.toLowerCase().includes(such) || datei.includes(such));
+
+  // Kategorie-Reiter (Einteilung nach StVO-Anlagen)
+  const reiter = KAT_GRUPPEN.map(([k, label]) => {
+    const anzahl = k === 'alle' ? Object.keys(ZEICHEN_KATALOG).length
+                                : Object.values(ZEICHEN_KATALOG).filter(v => v[1] === k).length;
+    const aktiv = katAktiveGruppe === k;
+    return `<button onclick="katSetzeGruppe('${k}')" style="flex-shrink:0;padding:6px 11px;border-radius:8px;border:1px solid ${aktiv?'var(--accent)':'var(--border)'};background:${aktiv?'var(--accent)':'var(--surface2)'};color:${aktiv?'#0d1117':'var(--muted)'};font-size:0.7rem;font-weight:${aktiv?'800':'600'};cursor:pointer;white-space:nowrap">${label} ${anzahl}</button>`;
+  }).join('');
+  document.getElementById('kat-reiter').innerHTML = reiter;
+
+  const treffer = Object.entries(ZEICHEN_KATALOG).filter(([datei, v]) => {
+    const [name, kat] = v;
+    if (katAktiveGruppe !== 'alle' && kat !== katAktiveGruppe) return false;
+    return !such || name.toLowerCase().includes(such) || datei.includes(such);
+  });
   const box = document.getElementById('kat-liste');
   if (!treffer.length) { box.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:20px;font-size:0.85rem">Nichts gefunden.</div>'; return; }
-  box.innerHTML = treffer.map(([datei, name]) => {
+  box.innerHTML = treffer.map(([datei, v]) => {
+    const name = v[0];
     const drin = schonDa.has(datei + '.jpg');
     return `<div onclick="${drin ? '' : `katalogZeichenAdd('${datei}')`}"
       style="background:var(--surface2);border:1px solid ${drin?'var(--accent2)':'var(--border)'};border-radius:10px;padding:8px 6px;text-align:center;cursor:${drin?'default':'pointer'};opacity:${drin?'0.55':'1'}">
@@ -8950,8 +8989,9 @@ window.renderKatalog = () => {
 };
 
 window.katalogZeichenAdd = async (datei) => {
-  const name = ZEICHEN_KATALOG[datei];
-  if (!name) return;
+  const eintrag = ZEICHEN_KATALOG[datei];
+  if (!eintrag) return;
+  const name = eintrag[0];
   try {
     await dbAdd(collection(db, 'customThemen'), {
       uid: currentUser.uid,
@@ -8989,9 +9029,11 @@ window.katalogZeichenAdd = async (datei) => {
     <div class="sheet-title">📖 Verkehrszeichen-Katalog</div>
     <input id="kat-suche" oninput="renderKatalog()" placeholder="Suchen, z.B. Halt, Tempo, Parken…"
       style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:11px 12px;font-size:0.88rem;margin-bottom:10px">
-    <div id="kat-liste" style="max-height:52vh;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px"></div>
+    <div id="kat-reiter" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:8px;-webkit-overflow-scrolling:touch"></div>
+    <div id="kat-liste" style="max-height:46vh;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px"></div>
     <div style="font-size:0.66rem;color:var(--muted);margin-top:10px;line-height:1.5">
       Amtliche Verkehrszeichen (Quelle: Bundesanstalt für Straßenwesen), gemeinfrei nach § 5 UrhG.
+      Einteilung nach StVO: Gefahrzeichen (Anlage 1), Vorschriftzeichen (Anlage 2 – Warte-/Haltgebote, Gebote, Verbote), Richtzeichen und Wegweisung (Anlage 3).
     </div>
     <button class="btn-sheet-cancel" onclick="document.getElementById('zeichen-katalog-modal').classList.remove('open')" style="margin-top:10px">Fertig</button>
   </div>
