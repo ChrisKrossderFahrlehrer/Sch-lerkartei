@@ -9071,8 +9071,7 @@ window.landGewechselt = () => {
 // Cloud Function wie eine echte PayPal-Zahlung auf - ohne Geld zu bewegen,
 // damit Rechnungserstellung getestet werden kann.
 window.testRechnungErzeugen = async () => {
-  if (!currentUser || currentUser.email !== 'chriskoo@mail.de') return;
-  if (!confirm('Test-Rechnung mit Tarif "Solo" erzeugen? Es wird kein Geld bewegt.')) return;
+  if (!confirm('Test-Rechnung mit Tarif "Solo" erzeugen fuer ' + (currentUser ? currentUser.email : '?') + '? Es wird kein Geld bewegt.')) return;
   try {
     await speichereRechnungsadresseWennVollstaendig();
     const fn = httpsCallable(fns, 'erstelleRechnung');
