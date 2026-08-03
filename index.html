@@ -8683,9 +8683,11 @@ function renderHeutigeTermine(termine) {
 
 window.preiseAnzeigenUndScrollen = () => {
   const inhalt = document.getElementById('preis-inhalt');
-  if (inhalt && inhalt.style.display === 'none') togglePreisUebersicht();
+  const warZu = inhalt && inhalt.style.display === 'none';
+  if (warZu) togglePreisUebersicht();
   const ziel = document.getElementById('preis-uebersicht-login');
-  if (ziel) ziel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (!ziel) return;
+  setTimeout(() => ziel.scrollIntoView({ behavior: 'smooth', block: 'start' }), warZu ? 60 : 0);
 };
 
 window.togglePreisUebersicht = () => {
