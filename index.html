@@ -1443,7 +1443,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     <button class="btn-main" onclick="changePassword()" style="margin-bottom:12px">Passwort ändern ✓</button>
     <div style="height:1px;background:var(--border);margin:0 0 16px"></div>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openVerkehrszeichen()" style="background:var(--surface2);margin-bottom:8px">🚦 Verkehrszeichen</button>
-    <button class="btn-sheet-cancel" id="btn-test-rechnung" onclick="testRechnungErzeugen()" style="background:var(--surface2);margin-bottom:8px;display:none">🧪 Test-Rechnung erzeugen</button>
+    <button class="btn-sheet-cancel" id="btn-test-rechnung" onclick="testRechnungErzeugen()" style="background:var(--surface2);margin-bottom:8px">🧪 Test-Rechnung erzeugen</button>
     <button class="btn-sheet-cancel" onclick="toggleTheme()" id="theme-btn-menu" style="background:var(--surface2);margin-bottom:8px">☀️ Design wechseln (hell/dunkel)</button>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openDashboard()" style="background:var(--surface2);margin-bottom:8px">📊 Übersicht / Statistik</button>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openHelp()" style="background:var(--surface2);margin-bottom:8px">❓ Hilfe & Funktionsübersicht</button>
@@ -6341,8 +6341,6 @@ function downloadBlob(blob, filename) {
 }
 
 window.openSettings = async () => {
-  const btnTestRechnung = document.getElementById('btn-test-rechnung');
-  if (btnTestRechnung) btnTestRechnung.style.display = (currentUser && currentUser.email === 'chriskoo@mail.de') ? 'block' : 'none';
   document.getElementById('inp-pw-alt').value = '';
   document.getElementById('inp-pw-neu').value = '';
   document.getElementById('inp-pw-neu2').value = '';
