@@ -912,6 +912,16 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
   <div style="text-align:center;margin-top:20px;padding-bottom:8px;font-size:0.72rem;color:var(--muted);opacity:0.75">
     © 2026 ChrisKross der Fahrlehrer
   </div>
+
+  <div style="text-align:center;font-size:0.72rem;color:var(--muted);padding:10px 4px 0">
+    <a onclick="preiseAnzeigenUndScrollen()" style="color:var(--muted);text-decoration:underline;cursor:pointer">Preise</a>
+    <span> · </span>
+    <a onclick="event.preventDefault();zeigeDatenschutzModal()" style="color:var(--muted);text-decoration:underline;cursor:pointer">Datenschutz</a>
+    <span> · </span>
+    <a href="agb.html" target="_blank" rel="noopener" style="color:var(--muted);text-decoration:underline">AGB</a>
+    <span> · </span>
+    <a href="impressum.html" target="_blank" rel="noopener" style="color:var(--muted);text-decoration:underline">Impressum</a>
+  </div>
 </div>
 
 <!-- ══ DATENSCHUTZ MODAL (vor Login lesbar) ══ -->
@@ -962,7 +972,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       <strong style="color:var(--text)">11. Zahlungsdienstleister (PayPal)</strong><br>
       Für kostenpflichtige Abonnements erfolgt die Zahlungsabwicklung über PayPal (Europe) S.à r.l. et Cie, S.C.A., 22–24 Boulevard Royal, L-2449 Luxemburg. Die für die Zahlung erforderlichen Daten werden direkt bei PayPal erhoben und verarbeitet; ergänzend gelten die Datenschutzhinweise von PayPal. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung). Diese App speichert keine Zahlungsdaten, sondern lediglich den Abo-Status und die PayPal-Abonnement-Kennung.<br><br>
 
-      <span style="font-size:0.72rem;color:var(--muted)">Diese Datenschutzerklärung dient als Grundlage und sollte für den produktiven Einsatz rechtlich geprüft werden.</span>
     </div>
     <button class="btn-sheet-cancel" onclick="document.getElementById('datenschutz-modal').classList.remove('open')" style="margin-top:16px">Schließen</button>
   </div>
@@ -8670,6 +8679,13 @@ function renderHeutigeTermine(termine) {
 }
 
 
+
+window.preiseAnzeigenUndScrollen = () => {
+  const inhalt = document.getElementById('preis-inhalt');
+  if (inhalt && inhalt.style.display === 'none') togglePreisUebersicht();
+  const ziel = document.getElementById('preis-uebersicht-login');
+  if (ziel) ziel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
 
 window.togglePreisUebersicht = () => {
   const inhalt = document.getElementById('preis-inhalt');
