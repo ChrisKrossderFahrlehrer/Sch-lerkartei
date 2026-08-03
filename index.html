@@ -2008,6 +2008,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const fns = getFunctions(app, 'europe-west3');
+setPersistence(auth, browserLocalPersistence).catch(e => console.warn('Persistenz beim Start:', e));
 
 // ─────────────────────────────────────────
 // KONSTANTEN – MÜSSEN VOR ALLEM ANDEREN DEFINIERT SEIN
