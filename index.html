@@ -1443,6 +1443,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     <button class="btn-main" onclick="changePassword()" style="margin-bottom:12px">Passwort ändern ✓</button>
     <div style="height:1px;background:var(--border);margin:0 0 16px"></div>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openVerkehrszeichen()" style="background:var(--surface2);margin-bottom:8px">🚦 Verkehrszeichen</button>
+    <button class="btn-sheet-cancel" id="btn-test-rechnung" onclick="testRechnungErzeugen()" style="background:var(--surface2);margin-bottom:8px;display:none">🧪 Test-Rechnung erzeugen</button>
     <button class="btn-sheet-cancel" onclick="toggleTheme()" id="theme-btn-menu" style="background:var(--surface2);margin-bottom:8px">☀️ Design wechseln (hell/dunkel)</button>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openDashboard()" style="background:var(--surface2);margin-bottom:8px">📊 Übersicht / Statistik</button>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openHelp()" style="background:var(--surface2);margin-bottom:8px">❓ Hilfe & Funktionsübersicht</button>
@@ -6340,6 +6341,8 @@ function downloadBlob(blob, filename) {
 }
 
 window.openSettings = async () => {
+  const btnTestRechnung = document.getElementById('btn-test-rechnung');
+  if (btnTestRechnung) btnTestRechnung.style.display = (currentUser && currentUser.email === 'chriskoo@mail.de') ? 'block' : 'none';
   document.getElementById('inp-pw-alt').value = '';
   document.getElementById('inp-pw-neu').value = '';
   document.getElementById('inp-pw-neu2').value = '';
@@ -9062,6 +9065,29 @@ window.landGewechselt = () => {
   box.innerHTML = land === 'CH'
     ? 'Hinweis: FahrSync ist auf die Fahrschulausbildung nach deutschem Recht zugeschnitten (StVO, deutsche Führerscheinklassen). Für die Schweiz können wir keinen Vertrag anbieten.'
     : 'Hinweis: FahrSync bildet die Fahrschulausbildung nach deutschem Recht ab (StVO, deutsche Führerscheinklassen, amtlicher Ausbildungsrahmenplan). Außerhalb Deutschlands ist die Software dafür nicht geeignet – Sprache und Support sind ausschließlich deutsch.';
+};
+
+
+
+// Nur fuer chriskoo@mail.de sichtbar (siehe openSettings). Ruft dieselbe
+// Cloud Function wie eine echte PayPal-Zahlung auf - ohne Geld zu bewegen,
+// damit Rechnungserstellung getestet werden kann.
+window.testRechnungErzeugen = async () => {
+  if (!currentUser || currentUser.email !== 'chriskoo@mail.de') return;
+  if (!confirm('Test-Rechnung mit Tarif "Solo" erzeugen? Es wird kein Geld bewegt.')) return;
+  try {
+    await speichereRechnungsadresseWennVollstaendig();
+    const fn = httpsCallable(fns, 'erstelleRechnung');
+    const res = await fn({ plan: 'solo', planer: false });
+    if (res.data && res.data.nummer) {
+      toast('🧾 Test-Rechnung ' + res.data.nummer + ' erstellt (Einstellungen → Meine Rechnungen)');
+    } else {
+      toast('Aufruf ok, aber keine Nummer erhalten.');
+    }
+  } catch(e) {
+    console.warn('testRechnungErzeugen:', e);
+    toast('Fehler: ' + (e.message || 'unbekannt') + (e.message && e.message.includes('Rechnungsadresse') ? ' - bitte zuerst unter Meine Rechnungen die Adresse ausfüllen.' : ''));
+  }
 };
 
 </script>
