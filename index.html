@@ -666,6 +666,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
           <option value="XX">anderes Land</option>
         </select>
         <div id="rg-land-hinweis" style="display:none;font-size:0.7rem;color:var(--accent);background:rgba(240,180,41,0.08);border:1px solid var(--accent);border-radius:8px;padding:8px 10px;margin-top:8px;line-height:1.5"></div>
+        <button class="btn-sheet-cancel" onclick="rgAdresseSpeichernKlick()" style="background:var(--surface2);margin-top:10px">💾 Adresse speichern</button>
+        <div id="rg-speichern-status" style="font-size:0.72rem;margin-top:6px;min-height:1em"></div>
         <div style="font-size:0.68rem;color:var(--muted);margin-top:6px">Wird für deine Rechnung benötigt (§ 14 UStG).</div>
       </div>
 
@@ -9084,6 +9086,26 @@ window.testRechnungErzeugen = async () => {
   } catch(e) {
     console.warn('testRechnungErzeugen:', e);
     toast('Fehler: ' + (e.message || 'unbekannt') + (e.message && e.message.includes('Rechnungsadresse') ? ' - bitte zuerst unter Meine Rechnungen die Adresse ausfüllen.' : ''));
+  }
+};
+
+
+
+// Eigenstaendiger Speichern-Knopf fuer die Rechnungsadresse, unabhaengig
+// vom Tarif-Abschluss. Nutzt dieselbe Speicherfunktion, die auch beim
+// echten Kauf laeuft, gibt aber - anders als bisher - eine sichtbare
+// Rueckmeldung, ob es geklappt hat.
+window.rgAdresseSpeichernKlick = async () => {
+  const statusEl = document.getElementById('rg-speichern-status');
+  statusEl.style.color = 'var(--muted)';
+  statusEl.textContent = 'Speichere…';
+  const ok = await speichereRechnungsadresseWennVollstaendig();
+  if (ok) {
+    statusEl.style.color = 'var(--accent2)';
+    statusEl.textContent = '✓ Gespeichert.';
+  } else {
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = 'Bitte Straße, PLZ und Ort ausfüllen.';
   }
 };
 
