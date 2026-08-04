@@ -689,13 +689,22 @@ onAuthStateChanged(auth,async user=>{
   let snap=null;
   try { snap=await getDoc(doc(db,'kalenderUsers',user.uid)); } catch(e){ console.warn('kalenderUsers lesen:',e); }
 
-  if(user.email===SUPER_ADMIN_EMAIL){
+  const __kalParams = new URLSearchParams(window.location.search);
+  const __kalNormal = __kalParams.get('normal') === '1';
+  if(user.email===SUPER_ADMIN_EMAIL && !__kalNormal){
     currentRole='superadmin';
     currentProfile=(snap&&snap.exists())?snap.data():{fname:'Super',lname:'Admin',role:'superadmin'};
     if(!snap||!snap.exists()){
       try{ await setDoc(doc(db,'kalenderUsers',user.uid),{uid:user.uid,email:user.email,fname:'Super',lname:'Admin',role:'superadmin',approved:true,createdAt:serverTimestamp()}); }
       catch(e){ console.warn('kalenderUsers superadmin anlegen:',e); }
     }
+  }else if(user.email===SUPER_ADMIN_EMAIL && __kalNormal){
+    // Notausgang: SuperAdmin sieht sich selbst als eigenstaendigen Fahrlehrer,
+    // damit er die normale Kalender-Ansicht samt Google-Verbindung testen kann.
+    currentRole='lehrer';
+    currentSchoolId=user.uid;
+    istEinzelLehrer=true;
+    currentProfile=(snap&&snap.exists())?snap.data():{fname:'Chris',lname:'',role:'lehrer'};
   }else{
     // ── ZUGANGSENTSCHEIDUNG rein auf ADK-Basis ──
     let adkUser=null;
