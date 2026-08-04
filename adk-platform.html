@@ -1955,6 +1955,7 @@ function renderSuperadmin() {
           +'<div class="list-name">'+fs.name+'</div>'
           +'<div class="list-sub">'+(fs.inhaber||'')+' · '+(fs.stadt||'')+' · '+created+'</div>'
           +'<div class="list-sub" style="color:var(--muted)">'+(fs.email||'')+'</div>'
+          +'<div class="list-sub" style="color:var(--blue)">👥 '+alleFahrlehrer.filter(function(l){return l.fahrschuleId===fs.id;}).length+' Lehrer</div>'
           +actionBtns
           +'</div>'
           +(fs.status!=='ausstehend' ? statusBadge : '')
@@ -1982,6 +1983,17 @@ window.openFsDetail = (fsId) => {
         <div><span style="color:var(--muted)">Registriert:</span> ${new Date(fs.createdAt).toLocaleDateString('de-DE')}</div>
         <div><span style="color:var(--muted)">Status:</span> <strong style="color:${fs.status==='aktiv'?'var(--accent2)':fs.status==='gesperrt'?'var(--danger)':'var(--accent)'}">${fs.status}</strong></div>
       </div>
+    </div>
+    <div style="margin-bottom:16px">
+      <div style="font-size:0.72rem;color:var(--muted);font-weight:700;margin-bottom:6px;text-transform:uppercase">👥 Fahrlehrer bei dieser Fahrschule</div>
+      ${(function(){
+        const lehrer = alleFahrlehrer.filter(l => l.fahrschuleId === fs.id);
+        if (!lehrer.length) return '<div style="font-size:0.82rem;color:var(--muted);padding:6px 0">Noch kein Fahrlehrer registriert.</div>';
+        return lehrer.map(l => {
+          const badge = l.status==='aktiv' ? '✅' : l.status==='gesperrt' ? '🚫' : '⏳';
+          return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:0.85rem"><span>'+escHtml(l.name||'?')+'</span><span>'+badge+'</span></div>';
+        }).join('');
+      })()}
     </div>
     <div style="display:flex;flex-direction:column;gap:8px">
       ${fs.status !== 'aktiv'    ? `<button class="btn-main" onclick="setFsStatus('${fs.id}','aktiv')">✅ Fahrschule freischalten</button>` : ''}
