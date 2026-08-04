@@ -3456,7 +3456,9 @@ onAuthStateChanged(auth, async (user) => {
         // Sichtbarkeit des Buttons – die echte Zugangskontrolle macht der Kalender.
         currentUser._kalenderAktiv = false;
         try {
-          if (profil.kalenderAktiv === true) {
+          if (user.email === 'chriskoo@mail.de') {
+            currentUser._kalenderAktiv = true;
+          } else if (profil.kalenderAktiv === true) {
             currentUser._kalenderAktiv = true;
           } else if (profil.fahrschuleId) {
             const fsSnap = await getDoc(doc(db, 'fahrschulen', profil.fahrschuleId));
