@@ -690,7 +690,8 @@ onAuthStateChanged(auth,async user=>{
   try { snap=await getDoc(doc(db,'kalenderUsers',user.uid)); } catch(e){ console.warn('kalenderUsers lesen:',e); }
 
   const __kalParams = new URLSearchParams(window.location.search);
-  const __kalNormal = __kalParams.get('normal') === '1';
+  if (__kalParams.get('normal') === '1') { localStorage.setItem('fs_kal_normal', '1'); }
+  const __kalNormal = localStorage.getItem('fs_kal_normal') === '1';
   if(user.email===SUPER_ADMIN_EMAIL && !__kalNormal){
     currentRole='superadmin';
     currentProfile=(snap&&snap.exists())?snap.data():{fname:'Super',lname:'Admin',role:'superadmin'};
