@@ -1688,13 +1688,20 @@ window.openDayModal=async function(year,month,day){
   const date=new Date(year,month,day);
   const dateStr=date.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
   const ft=getFeiertageName(date,currentSchool?.bundesland||currentProfile?.bundesland);
-  const [sSnap,bSnap,gbSnap,profSnap,uSnap]=await Promise.all([
+  let sSnap,bSnap,gbSnap,profSnap,uSnap;
+  try {
+    [sSnap,bSnap,gbSnap,profSnap,uSnap] = await Promise.all([
     getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid))),
     getDocs(query(collection(db,'blocked'),where('lehrerUid','==',currentUser.uid),where('year','==',year),where('month','==',month),where('day','==',day))),
     getDocs(query(collection(db,'globalBlocked'),where('schoolId','==',currentSchoolId),where('year','==',year),where('month','==',month),where('day','==',day))),
     getDoc(doc(db,'kalenderUsers',currentUser.uid)),
     getDocs(query(collection(db,'urlaub'),where('lehrerUid','==',currentUser.uid))),
   ]);
+  } catch(e) {
+    console.warn('openDayModal Daten laden:', e);
+    toast('Fehler beim Laden des Tages. Bitte erneut versuchen.', 'error');
+    return;
+  }
   const blockDauer=profSnap.exists()?(profSnap.data().blockDauer||60):60;
   const urlaubEntry=urlaubCoversDate(uSnap.docs.map(d=>({id:d.id,...d.data()})),date);
   const daySlots=sSnap.docs.filter(d=>{const dt=d.data().startTime.toDate();return dt.getFullYear()===year&&dt.getMonth()===month&&dt.getDate()===day;});
