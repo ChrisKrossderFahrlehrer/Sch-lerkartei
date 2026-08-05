@@ -8311,16 +8311,43 @@ window.closeChat = () => {
 // FIX(Audit): onclick="loadChatMessages()" im Chat lief ins Leere, da Modul-
 // Funktionen nicht global sind. Wrapper exponiert die gehoistete Funktion.
 window.loadChatMessages = () => loadChatMessages();
+// FIX: Der Fahrlehrer-Chat las aus einer eigenen Sammlung 'chat', waehrend
+// der Schueler seine Nachrichten ins Feld 'messages' seines Zugangscode-
+// Dokuments schreibt (accessCodes) - dieselbe Quelle, aus der auch das
+// Ungelesen-Symbol zaehlt. Beide Seiten schrieben also aneinander vorbei:
+// Das Symbol erschien korrekt, das Chatfenster blieb leer, und Antworten
+// des Fahrlehrers erreichten den Schueler nie. Jetzt nutzen beide Seiten
+// dieselbe Quelle.
 function loadChatMessages() {
   if (unsubChat) unsubChat();
   const messagesEl = document.getElementById('chat-messages');
   const q = query(
-    collection(db, 'chat'),
+    collection(db, 'accessCodes'),
     where('studentId', '==', chatStudentId),
-    orderBy('createdAt', 'asc')
+    where('teacherUid', '==', currentUser.uid)
   );
   unsubChat = onSnapshot(q, snap => {
-    const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Neuesten Code des Schuelers nehmen (aeltere, abgelaufene ignorieren)
+    let codeDoc = null;
+    snap.docs.forEach(d => {
+      const dd = d.data();
+      if (!codeDoc || (dd.createdAt || 0) > (codeDoc.createdAt || 0)) codeDoc = { _id: d.id, ...dd };
+    });
+    window.__chatCodeDocId = codeDoc ? codeDoc._id : null;
+    const msgs = (codeDoc && Array.isArray(codeDoc.messages) ? codeDoc.messages : [])
+      .slice()
+      .sort((a,b) => (a.timestamp||0) - (b.timestamp||0))
+      .map(m => ({
+        text: m.text,
+        createdAt: m.timestamp,
+        senderUid: m.sender === 'fahrlehrer' ? currentUser.uid : null
+      }));
+
+    // Gelesen-Zeitpunkt setzen, damit das Ungelesen-Symbol verschwindet
+    if (codeDoc && msgs.length) {
+      dbUpd(doc(db, 'accessCodes', codeDoc._id), { teacherLastRead: Date.now() })
+        .catch(e => console.warn('teacherLastRead:', e));
+    }
     if (msgs.length === 0) {
       messagesEl.innerHTML = `
         <div style="text-align:center;padding:40px 20px;color:var(--muted)">
@@ -8347,12 +8374,11 @@ function loadChatMessages() {
     }).join('');
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }, err => {
-    if (err.code === 'failed-precondition') {
-      messagesEl.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);font-size:0.8rem">
-        ⚠️ Index wird erstellt… kurz warten und neu laden.<br>
-        <button onclick="loadChatMessages()" style="margin-top:8px;padding:6px 14px;background:var(--accent);border:none;border-radius:8px;cursor:pointer;font-size:0.8rem">🔄 Neu laden</button>
-      </div>`;
-    }
+    console.warn('loadChatMessages:', err);
+    messagesEl.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);font-size:0.8rem">
+      ⚠️ Chat konnte nicht geladen werden.<br>
+      <button onclick="loadChatMessages()" style="margin-top:8px;padding:6px 14px;background:var(--accent);border:none;border-radius:8px;cursor:pointer;font-size:0.8rem">🔄 Neu laden</button>
+    </div>`;
   });
 }
 
@@ -8362,18 +8388,22 @@ window.sendChatMessage = async () => {
   if (!text) return;
   inp.value = '';
   inp.style.height = '42px';
+  // Schreibt in dasselbe Feld, aus dem der Schueler liest (Format wie im
+  // Portal: id/text/sender/senderName/timestamp), letzte 50 behalten.
+  const codeDocId = window.__chatCodeDocId;
+  if (!codeDocId) { toast('Kein aktiver Zugangscode für diesen Schüler.'); inp.value = text; return; }
   try {
-    await dbAdd(collection(db, 'chat'), {
-      studentId:   chatStudentId,
-      fahrschuleId: currentUser._fahrschuleId || currentUser.uid,
-      senderUid:   currentUser.uid,
-      senderName:  currentUser.displayName || 'Fahrlehrer',
-      senderRolle: 'fahrlehrer',
+    const snap = await getDoc(doc(db, 'accessCodes', codeDocId));
+    const bestehende = (snap.exists() && Array.isArray(snap.data().messages)) ? snap.data().messages : [];
+    const neue = [...bestehende, {
+      id:         Date.now().toString(),
       text,
-      gelesen:     false,
-      createdAt:   Date.now(),
-    });
-  } catch(e) { toast('Fehler beim Senden.'); inp.value = text; }
+      sender:     'fahrlehrer',
+      senderName: currentUser.displayName || 'Fahrlehrer',
+      timestamp:  Date.now()
+    }].slice(-50);
+    await dbUpd(doc(db, 'accessCodes', codeDocId), { messages: neue, teacherLastRead: Date.now() });
+  } catch(e) { console.warn('sendChatMessage:', e); toast('Fehler beim Senden.'); inp.value = text; }
 };
 
 // Chat beim Logout aufräumen
