@@ -7050,10 +7050,9 @@ window.doSchuelerLogin = async () => {
     inp.focus();
     return;
   }
-
   errEl.textContent = '';
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById('loading').style.display = 'flex';
+  window.location.href = './schueler-portal.html?code=' + encodeURIComponent(code);
+  return;
 
   // Alten Listener aufräumen
   if (unsubSchuelerCode) { unsubSchuelerCode(); unsubSchuelerCode = null; }
