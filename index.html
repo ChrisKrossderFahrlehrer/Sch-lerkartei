@@ -1993,7 +1993,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
 import { signInAnonymously, getAuth, setPersistence, browserLocalPersistence, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider, verifyBeforeUpdateEmail } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, enableIndexedDbPersistence, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, getDocs, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, enableIndexedDbPersistence, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, getDocs, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD490kLzTOq3h3VdQ9ZqWZd_aXcDRfxBOs",
@@ -6076,6 +6076,26 @@ window.addStudent = async () => {
       schaltstunden: 0, testfahrtBestanden: false,
       createdAt: Date.now()
     });
+
+    // Automatische Weitergabe an den Kalender: derselbe Schueler wird
+    // zusaetzlich in dessen eigener 'schueler'-Sammlung angelegt, damit er
+    // dort sofort buchbar ist und nicht doppelt eingetragen werden muss.
+    // Bewusst KEINE Verschmelzung der beiden Datenmodelle (zu riskant,
+    // Dutzende Code-Stellen erwarten je eigene Feldnamen) - nur Weitergabe.
+    // Eigener try/catch: scheitert der Kalender-Eintrag (z.B. Modul nicht
+    // gebucht), bleibt das ADK-Anlegen davon unberuehrt.
+    // maxFahrstunden/maxAktiveTermine 0 = unbegrenzt (Kalender-Konvention).
+    try {
+      await dbAdd(collection(db,'schueler'),{
+        fname: vn, lname: nn,
+        email: '', tel: '',
+        lehrerUid: currentUser.uid,
+        maxFahrstunden: 0, maxAktiveTermine: 0, bookedCount: 0,
+        schoolId: currentUser._fahrschuleId || currentUser.uid,
+        createdAt: serverTimestamp()
+      });
+    } catch(kalErr) { console.warn('Kalender-Weitergabe:', kalErr); }
+
     document.getElementById('add-modal').classList.remove('open');
     toast(`${vn} ${nn} (Klasse ${newStudentKlasse}) angelegt ✓`);
   } catch(e) { toast('Fehler beim Anlegen.'); }
