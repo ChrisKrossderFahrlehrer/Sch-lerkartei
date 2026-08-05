@@ -8318,22 +8318,38 @@ window.loadChatMessages = () => loadChatMessages();
 // Das Symbol erschien korrekt, das Chatfenster blieb leer, und Antworten
 // des Fahrlehrers erreichten den Schueler nie. Jetzt nutzen beide Seiten
 // dieselbe Quelle.
-function loadChatMessages() {
+async function loadChatMessages() {
   if (unsubChat) unsubChat();
   const messagesEl = document.getElementById('chat-messages');
-  const q = query(
-    collection(db, 'accessCodes'),
-    where('studentId', '==', chatStudentId),
-    where('teacherUid', '==', currentUser.uid)
-  );
-  unsubChat = onSnapshot(q, snap => {
-    // Neuesten Code des Schuelers nehmen (aeltere, abgelaufene ignorieren)
-    let codeDoc = null;
-    snap.docs.forEach(d => {
+
+  // Code-Dokument des Schuelers einmalig ermitteln
+  let codeDocId = null;
+  try {
+    const snapQ = await getDocs(query(
+      collection(db, 'accessCodes'),
+      where('studentId', '==', chatStudentId),
+      where('teacherUid', '==', currentUser.uid)
+    ));
+    let neuester = null;
+    snapQ.docs.forEach(d => {
       const dd = d.data();
-      if (!codeDoc || (dd.createdAt || 0) > (codeDoc.createdAt || 0)) codeDoc = { _id: d.id, ...dd };
+      if (!neuester || (dd.createdAt || 0) > (neuester.createdAt || 0)) neuester = { _id: d.id, ...dd };
     });
-    window.__chatCodeDocId = codeDoc ? codeDoc._id : null;
+    codeDocId = neuester ? neuester._id : null;
+  } catch(e) { console.warn('Chat-Code ermitteln:', e); }
+
+  window.__chatCodeDocId = codeDocId;
+  if (!codeDocId) {
+    messagesEl.innerHTML = `<div style="text-align:center;padding:40px 20px;color:var(--muted)">
+      <div style="font-size:2rem;margin-bottom:8px">💬</div>
+      <div style="font-size:0.82rem">Für diesen Schüler gibt es noch keinen Zugangscode.<br>Erst einen Code erzeugen, dann ist der Chat möglich.</div>
+    </div>`;
+    return;
+  }
+
+  unsubChat = onSnapshot(doc(db, 'accessCodes', codeDocId), snap => {
+    const codeDoc = snap.exists() ? { _id: snap.id, ...snap.data() } : null;
+    window.__chatMessages = (codeDoc && Array.isArray(codeDoc.messages)) ? codeDoc.messages : [];
     const msgs = (codeDoc && Array.isArray(codeDoc.messages) ? codeDoc.messages : [])
       .slice()
       .sort((a,b) => (a.timestamp||0) - (b.timestamp||0))
@@ -8393,8 +8409,7 @@ window.sendChatMessage = async () => {
   const codeDocId = window.__chatCodeDocId;
   if (!codeDocId) { toast('Kein aktiver Zugangscode für diesen Schüler.'); inp.value = text; return; }
   try {
-    const snap = await getDoc(doc(db, 'accessCodes', codeDocId));
-    const bestehende = (snap.exists() && Array.isArray(snap.data().messages)) ? snap.data().messages : [];
+    const bestehende = Array.isArray(window.__chatMessages) ? window.__chatMessages : [];
     const neue = [...bestehende, {
       id:         Date.now().toString(),
       text,
