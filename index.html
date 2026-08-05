@@ -1608,6 +1608,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       <div class="header-title" id="chat-header-name">Chat</div>
       <div class="header-sub">Nachricht an Schüler</div>
     </div>
+    <button class="btn-icon-sm" onclick="chatLeeren()" title="Chatverlauf löschen" aria-label="Chatverlauf löschen">🗑️</button>
   </div>
   <div id="chat-messages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px">
     <div style="text-align:center;padding:40px 20px;color:var(--muted)">
@@ -9193,6 +9194,21 @@ window.rgAdresseSpeichernKlick = async () => {
     statusEl.style.color = 'var(--danger)';
     statusEl.textContent = 'Bitte Straße, PLZ und Ort ausfüllen.';
   }
+};
+
+
+
+// Chatverlauf eines Schuelers loeschen. Wirkt fuer BEIDE Seiten, da
+// Fahrlehrer und Schueler dieselbe Quelle nutzen - deshalb doppelte
+// Rueckfrage. Nuetzlich auch bei Loeschverlangen nach DSGVO.
+window.chatLeeren = async () => {
+  const codeDocId = window.__chatCodeDocId;
+  if (!codeDocId) { toast('Kein Chat vorhanden.'); return; }
+  if (!confirm('Kompletten Chatverlauf mit diesem Schüler löschen?\n\nDie Nachrichten verschwinden auch beim Schüler und lassen sich nicht wiederherstellen.')) return;
+  try {
+    await dbUpd(doc(db, 'accessCodes', codeDocId), { messages: [], teacherLastRead: Date.now() });
+    toast('Chatverlauf gelöscht.');
+  } catch(e) { console.warn('chatLeeren:', e); toast('Fehler beim Löschen.'); }
 };
 
 </script>
