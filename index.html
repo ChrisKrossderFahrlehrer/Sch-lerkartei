@@ -1065,6 +1065,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
   <div class="modal-sheet">
     <div class="sheet-title">⚙️ Optionen</div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+      <button onclick="document.getElementById('options-modal').classList.remove('open');openNameAendern()" class="klasse-choice-btn">
+        <div style="font-weight:700">✏️ Name ändern</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">Vor- und Nachname korrigieren</div>
+      </button>
       <button onclick="document.getElementById('options-modal').classList.remove('open');exportPDF()" class="klasse-choice-btn">
         <div style="font-weight:700">📋 Ausbildungsnachweis als PDF</div>
         <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">ADK-Stand, Pflichtfahrten & Protokoll exportieren</div>
@@ -1955,6 +1959,26 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     <div class="sheet-actions">
       <button class="btn-sheet-cancel" onclick="document.getElementById('b197-settings-modal').classList.remove('open')">Abbrechen</button>
       <button class="btn-sheet-ok" onclick="saveB197Ziel()">Speichern ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- NAME ÄNDERN MODAL -->
+<div class="modal-overlay" id="name-aendern-modal" onclick="closeModal(event)">
+  <div class="modal-sheet">
+    <div class="sheet-title">✏️ Name ändern</div>
+    <div class="form-group">
+      <label class="form-label">Vorname</label>
+      <input class="form-input" id="inp-name-vorname" type="text" autocapitalize="words">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Nachname</label>
+      <input class="form-input" id="inp-name-nachname" type="text" autocapitalize="words">
+    </div>
+    <div class="error-msg" id="name-aendern-error"></div>
+    <div style="display:flex;gap:10px;margin-top:4px">
+      <button class="btn-secondary" style="margin:0" onclick="document.getElementById('name-aendern-modal').classList.remove('open')">Abbrechen</button>
+      <button class="btn-main" onclick="saveNameAendern()">Speichern ✓</button>
     </div>
   </div>
 </div>
@@ -9209,6 +9233,57 @@ window.chatLeeren = async () => {
     await dbUpd(doc(db, 'accessCodes', codeDocId), { messages: [], teacherLastRead: Date.now() });
     toast('Chatverlauf gelöscht.');
   } catch(e) { console.warn('chatLeeren:', e); toast('Fehler beim Löschen.'); }
+};
+
+
+
+// Namen eines Schuelers korrigieren. Aktualisiert zusaetzlich den
+// Portal-Schnappschuss (Schueler sieht seinen Namen dort) und den
+// zugehoerigen Kalender-Eintrag, damit die Schreibweise ueberall gleich
+// bleibt - sonst haette man denselben Schueler unter zwei Namen.
+window.openNameAendern = () => {
+  const s = getStudent(activeId);
+  if (!s) return;
+  document.getElementById('inp-name-vorname').value  = s.vorname || '';
+  document.getElementById('inp-name-nachname').value = s.nachname || '';
+  document.getElementById('name-aendern-error').textContent = '';
+  document.getElementById('name-aendern-modal').classList.add('open');
+  setTimeout(() => document.getElementById('inp-name-vorname').focus(), 150);
+};
+
+window.saveNameAendern = async () => {
+  const vn = document.getElementById('inp-name-vorname').value.trim();
+  const nn = document.getElementById('inp-name-nachname').value.trim();
+  const errEl = document.getElementById('name-aendern-error');
+  errEl.textContent = '';
+  if (!vn || !nn) { errEl.textContent = 'Bitte Vor- und Nachname eingeben.'; return; }
+  const s = getStudent(activeId);
+  if (!s) return;
+  const alterVn = s.vorname, alterNn = s.nachname;
+  try {
+    await saveToFirestore(activeId, { vorname: vn, nachname: nn });
+
+    // Kalender-Eintrag desselben Schuelers mitziehen (best effort)
+    try {
+      const kalSnap = await getDocs(query(
+        collection(db, 'schueler'),
+        where('lehrerUid', '==', currentUser.uid),
+        where('fname', '==', alterVn),
+        where('lname', '==', alterNn)
+      ));
+      for (const d of kalSnap.docs) {
+        await dbUpd(doc(db, 'schueler', d.id), { fname: vn, lname: nn });
+      }
+    } catch(kalErr) { console.warn('Kalender-Name mitziehen:', kalErr); }
+
+    document.getElementById('name-aendern-modal').classList.remove('open');
+    toast(`Name geändert: ${vn} ${nn} ✓`);
+    renderDetail();
+    renderList();
+  } catch(e) {
+    console.warn('saveNameAendern:', e);
+    errEl.textContent = 'Fehler beim Speichern.';
+  }
 };
 
 </script>
