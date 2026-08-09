@@ -12,6 +12,13 @@ setGlobalOptions({ region: 'europe-west3', maxInstances: 5 });
 // Google-Kalender-Sync: Client-Secret liegt NICHT im Code (Repo ist oeffentlich
 // einsehbar), sondern im Firebase Secret Manager - siehe Deploy-Hinweis.
 const GOOGLE_CLIENT_SECRET = defineSecret('GOOGLE_CLIENT_SECRET');
+
+// PayPal-Webhook: Zugangsdaten liegen NICHT im Code (Repo ist oeffentlich),
+// sondern im Firebase Secret Manager. PAYPAL_WEBHOOK_ID kommt aus dem
+// PayPal-Entwicklerportal beim Anlegen des Webhooks (siehe Deploy-Hinweis).
+const PAYPAL_CLIENT_ID     = defineSecret('PAYPAL_CLIENT_ID');
+const PAYPAL_CLIENT_SECRET = defineSecret('PAYPAL_CLIENT_SECRET');
+const PAYPAL_WEBHOOK_ID    = defineSecret('PAYPAL_WEBHOOK_ID');
 const GOOGLE_CLIENT_ID     = '140641089306-iovtr6gnoggkg6me8k2tk0c522o4oh0e.apps.googleusercontent.com';
 const GOOGLE_REDIRECT_URI  = 'https://europe-west3-fahrschule-ebc65.cloudfunctions.net/kalenderOAuthCallback';
 const APP_URL              = 'https://fahrsync.de/kalender.html';
@@ -345,3 +352,152 @@ exports.syncSlotToGoogleCalendar = onDocumentUpdated({ document: 'slots/{slotId}
     }
   } catch (e) { console.warn('syncSlotToGoogleCalendar', e.message); }
 });
+
+
+// ═══════════════════════════════════════════════════════════════════
+// PAYPAL WEBHOOK - server-zu-server, unabhaengig vom Browser
+//
+// Bisher lief die Abo-Aktivierung UND Rechnungserzeugung ausschliesslich
+// im Browser (onApprove-Callback von PayPal). Das hatte zwei Probleme:
+//  1) Sicherheit: Der Aufruf liess sich theoretisch auch ohne echte
+//     Zahlung aus der Browser-Konsole heraus auslösen.
+//  2) Wiederkehrende Zahlungen: Bei der monatlichen Verlaengerung ist
+//     niemand im Browser eingeloggt, der onApprove-Callback feuert nie
+//     wieder - es entstand also nie eine Folge-Rechnung.
+//
+// Dieser Webhook loest beides: PayPal ruft ihn bei JEDER erfolgreichen
+// Zahlung (Erst- UND Folgezahlung) direkt server-seitig auf. Die Signatur
+// wird geprueft, damit niemand gefaelschte Anfragen schicken kann.
+// ═══════════════════════════════════════════════════════════════════
+
+async function paypalAccessToken(clientId, clientSecret) {
+  const resp = await fetch('https://api-m.paypal.com/v1/oauth2/token', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64'),
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: 'grant_type=client_credentials',
+  });
+  const data = await resp.json();
+  if (!data.access_token) throw new Error('PayPal-Zugriffstoken nicht erhalten');
+  return data.access_token;
+}
+
+exports.paypalWebhook = onRequest(
+  { secrets: [PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, PAYPAL_WEBHOOK_ID] },
+  async (req, res) => {
+    try {
+      const clientId     = PAYPAL_CLIENT_ID.value();
+      const clientSecret = PAYPAL_CLIENT_SECRET.value();
+      const webhookId    = PAYPAL_WEBHOOK_ID.value();
+
+      // 1) Signatur pruefen - bestaetigt, dass die Anfrage wirklich von
+      // PayPal kommt und nicht gefaelscht ist.
+      const accessToken = await paypalAccessToken(clientId, clientSecret);
+      const verifyResp = await fetch('https://api-m.paypal.com/v1/notifications/verify-webhook-signature', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          auth_algo:         req.headers['paypal-auth-algo'],
+          cert_url:          req.headers['paypal-cert-url'],
+          transmission_id:   req.headers['paypal-transmission-id'],
+          transmission_sig:  req.headers['paypal-transmission-sig'],
+          transmission_time: req.headers['paypal-transmission-time'],
+          webhook_id:        webhookId,
+          webhook_event:     req.body,
+        }),
+      });
+      const verifyData = await verifyResp.json();
+      if (verifyData.verification_status !== 'SUCCESS') {
+        console.warn('paypalWebhook: Signatur ungueltig', verifyData);
+        res.status(400).send('invalid signature');
+        return;
+      }
+
+      const event = req.body || {};
+
+      // ── Erfolgreiche Zahlung (Erst- ODER Folgezahlung) ──
+      if (event.event_type === 'PAYMENT.SALE.COMPLETED') {
+        const resource = event.resource || {};
+        const subscriptionId = resource.billing_agreement_id;
+        const saleId = resource.id;
+        const betragBezahlt = parseFloat((resource.amount || {}).total || '0');
+
+        if (!subscriptionId || !saleId) { res.status(200).send('ok - kein Abo-Bezug'); return; }
+
+        // Idempotenz: PayPal kann denselben Webhook mehrfach zustellen -
+        // pro Zahlung darf nur eine Rechnung entstehen.
+        const bereits = await admin.firestore().collection('rechnungen')
+          .where('paypalSaleId', '==', saleId).limit(1).get();
+        if (!bereits.empty) { res.status(200).send('ok - bereits verarbeitet'); return; }
+
+        // Zugehoerige Fahrschule/Nutzer anhand der Subscription-ID finden
+        let billingColl = null, billingId = null, billingData = null;
+        for (const coll of ['fahrschulen', 'users']) {
+          const snap = await admin.firestore().collection(coll)
+            .where('aboSubscriptionId', '==', subscriptionId).limit(1).get();
+          if (!snap.empty) {
+            billingColl = coll; billingId = snap.docs[0].id; billingData = snap.docs[0].data();
+            break;
+          }
+        }
+        if (!billingColl) {
+          console.warn('paypalWebhook: keine Fahrschule/Nutzer zu Subscription', subscriptionId);
+          res.status(200).send('ok - kein Treffer'); return;
+        }
+
+        const planInfo = RECHNUNG_PLANS[billingData.abo];
+        if (!planInfo) { res.status(200).send('ok - unbekannter Tarif'); return; }
+        if (!billingData.rechnungsStrasse || !billingData.rechnungsPlz || !billingData.rechnungsOrt) {
+          console.warn('paypalWebhook: Rechnungsadresse fehlt fuer', billingColl, billingId);
+          res.status(200).send('ok - keine Rechnungsadresse hinterlegt'); return;
+        }
+
+        const counterRef = admin.firestore().doc('platform/rechnungszaehler');
+        const nummer = await admin.firestore().runTransaction(async (tx) => {
+          const c = await tx.get(counterRef);
+          const jahr = new Date().getFullYear();
+          const bisher = c.exists ? (c.data().naechsteNummer || 1) : 1;
+          tx.set(counterRef, { naechsteNummer: bisher + 1 }, { merge: true });
+          return `${jahr}-${String(bisher).padStart(5, '0')}`;
+        });
+
+        const platDoc = await admin.firestore().doc('platform/impressum').get();
+        const platImp = platDoc.exists ? platDoc.data() : {};
+        const steller = {
+          name: platImp.name || 'Chriskoo', strasse: platImp.strasse || '',
+          plz: platImp.plz || '', ort: platImp.ort || '',
+          email: platImp.email || 'kontakt@fahrsync.de', web: platImp.web || 'fahrsync.de',
+        };
+        const LAENDER = { DE: '', AT: 'Österreich', CH: 'Schweiz', XX: '' };
+        const empfaenger = {
+          name: billingData.name || 'Kunde',
+          strasse: billingData.rechnungsStrasse, plz: billingData.rechnungsPlz, ort: billingData.rechnungsOrt,
+          land: LAENDER[billingData.rechnungsLand || 'DE'] || '',
+        };
+        const datum = new Date().toLocaleDateString('de-DE');
+        const betrag = betragBezahlt || (billingData.aboPlaner ? planInfo.pricePlaner : planInfo.price);
+        const pdfBuffer = await baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel: planInfo.label, betrag });
+
+        await admin.firestore().collection('rechnungen').add({
+          nummer, empfaengerId: billingId, empfaengerName: empfaenger.name,
+          plan: billingData.abo, planer: !!billingData.aboPlaner, betrag, datum,
+          erstelltAm: Date.now(),
+          pdfBase64: pdfBuffer.toString('base64'),
+          paypalSaleId: saleId, paypalSubscriptionId: subscriptionId,
+        });
+        await admin.firestore().doc(`${billingColl}/${billingId}`).update({ aboLetzteZahlungAm: Date.now() });
+        console.log('paypalWebhook: Rechnung', nummer, 'erzeugt fuer', billingColl, billingId);
+      }
+
+      res.status(200).send('ok');
+    } catch (e) {
+      console.error('paypalWebhook Fehler:', e);
+      // 200 statt 500: verhindert, dass PayPal denselben (evtl. defekten)
+      // Event minutenlang wiederholt zustellt, waehrend der Fehler im Log
+      // trotzdem sichtbar bleibt.
+      res.status(200).send('error geloggt');
+    }
+  }
+);
