@@ -98,25 +98,50 @@
     <li style="margin-bottom:10px"><strong>Nachweis- und Kontrollrechte:</strong> Der Auftragsverarbeiter stellt dem Verantwortlichen alle erforderlichen Informationen zum Nachweis der Einhaltung der in Art. 28 DSGVO niedergelegten Pflichten zur Verfügung und ermöglicht Überprüfungen – einschließlich Inspektionen – die vom Verantwortlichen oder einem von ihm beauftragten Prüfer durchgeführt werden, und trägt zu diesen bei.</li>
   </ol>
 
-  <h2>§ 7 Haftung</h2>
+  <h2>§ 7 Drittlandübermittlungen</h2>
+  <p style="font-size:0.88rem">
+    Eine Übermittlung personenbezogener Daten in Länder außerhalb der Europäischen Union und des Europäischen Wirtschaftsraums (Drittländer) findet im Rahmen der bestimmungsgemäßen Nutzung grundsätzlich nicht statt. Die Datenverarbeitung erfolgt bei dem in Anlage 2 genannten Hauptauftragnehmer ausschließlich in einem Rechenzentrum innerhalb der Europäischen Union (Region europe-west3, Frankfurt am Main). Soweit im Einzelfall dennoch Verarbeitungsschritte außerhalb der EU/des EWR stattfinden (z.B. konzerninterne Wartungszugriffe des Cloud-Anbieters), ist dies über die EU-Standardvertragsklauseln nach Art. 46 Abs. 2 lit. c DSGVO abgesichert.
+  </p>
+
+  <h2>§ 8 Meldung von Datenschutzverletzungen</h2>
+  <p style="font-size:0.88rem">
+    Der Auftragsverarbeiter meldet dem Verantwortlichen eine Verletzung des Schutzes personenbezogener Daten (Art. 4 Nr. 12 DSGVO) unverzüglich, in der Regel innerhalb von 48 Stunden nach Bekanntwerden, nachdem der Auftragsverarbeiter selbst Kenntnis davon erlangt hat. Die Meldung enthält, soweit zu diesem Zeitpunkt bekannt, die Art der Verletzung, die betroffenen Datenkategorien und Personengruppen (ggf. ungefähre Angaben), die absehbaren Folgen sowie die bereits ergriffenen oder vorgeschlagenen Maßnahmen. Die Beurteilung, ob eine Meldung an die Aufsichtsbehörde (Art. 33 DSGVO) oder eine Benachrichtigung betroffener Personen (Art. 34 DSGVO) erforderlich ist, obliegt dem Verantwortlichen; der Auftragsverarbeiter unterstützt ihn hierbei nach besten Kräften.
+  </p>
+
+  <h2>§ 9 Unterstützung bei Datenschutz-Folgenabschätzung</h2>
+  <p style="font-size:0.88rem">
+    Soweit der Verantwortliche zur Durchführung einer Datenschutz-Folgenabschätzung (Art. 35 DSGVO) oder zu einer vorherigen Konsultation der Aufsichtsbehörde (Art. 36 DSGVO) verpflichtet ist, stellt der Auftragsverarbeiter die dafür erforderlichen, ihm vorliegenden Informationen zur Verfügung, insbesondere zu den in Anlage 1 beschriebenen technischen und organisatorischen Maßnahmen.
+  </p>
+
+  <h2>§ 10 Laufzeit und Beendigung</h2>
+  <p style="font-size:0.88rem">
+    Dieser Vertrag ist an die Laufzeit des Hauptvertrags gebunden (§ 1) und kann nicht gesondert von diesem gekündigt werden. Mit Beendigung des Hauptvertrags gelten die Löschungspflichten aus § 6 Nr. 7.
+  </p>
+
+  <h2>§ 11 Haftung</h2>
   <p style="font-size:0.88rem">
     Für die Haftung gelten die gesetzlichen Regelungen, insbesondere Art. 82 DSGVO. Im Innenverhältnis haften die Parteien nur für Schäden, die sie durch Verletzung der ihnen nach diesem Vertrag oder der DSGVO obliegenden Pflichten schuldhaft verursacht haben.
   </p>
 
   <h2>Anlage 1 – Technische und organisatorische Maßnahmen (Art. 32 DSGVO)</h2>
   <ul>
-    <li><strong>Vertraulichkeit:</strong> Zugriff auf Daten ausschließlich über individuelle, passwortgeschützte Fahrlehrer-Konten (Firebase Authentication); Schülerzugriff nur über zeitlich begrenzte, individuelle Zugangscodes ohne Möglichkeit des Zugriffs auf Daten anderer Fahrschulen (Mandantentrennung über serverseitige Sicherheitsregeln)</li>
-    <li><strong>Übertragung:</strong> Verschlüsselte Datenübertragung ausschließlich über HTTPS/TLS</li>
+    <li><strong>Zutrittskontrolle:</strong> Eigene Serverräume werden nicht betrieben; die physische Zutrittskontrolle zu den Rechenzentren obliegt dem Unterauftragsverarbeiter Google (siehe dessen Sicherheitsnachweise, u.a. ISO 27001)</li>
+    <li><strong>Zugangskontrolle:</strong> Zugriff auf Daten ausschließlich über individuelle, passwortgeschützte Fahrlehrer-Konten (Firebase Authentication); Schülerzugriff nur über zeitlich begrenzte, individuelle Zugangscodes</li>
+    <li><strong>Zugriffskontrolle / Mandantentrennung:</strong> Serverseitige Sicherheitsregeln stellen pro Datensatz sicher, dass ausschließlich der zugeordnete Fahrlehrer bzw. die zugeordnete Fahrschule zugreifen kann; ein Zugriff auf Daten anderer Fahrschulen ist technisch ausgeschlossen</li>
+    <li><strong>Weitergabekontrolle:</strong> Verschlüsselte Datenübertragung ausschließlich über HTTPS/TLS</li>
     <li><strong>Speicherort:</strong> Datenspeicherung bei Google Cloud/Firebase in der Region europe-west3 (Frankfurt am Main, Deutschland)</li>
-    <li><strong>Integrität:</strong> Serverseitige Zugriffsregeln (Firestore Security Rules), die pro Datensatz prüfen, ob der zugreifende Nutzer berechtigt ist</li>
-    <li><strong>Verfügbarkeit:</strong> Betrieb auf der Infrastruktur von Google Cloud/Firebase mit deren Redundanz- und Backup-Mechanismen</li>
     <li><strong>Eingabekontrolle:</strong> Änderungen an Schülerdaten sind ausschließlich dem jeweils zugeordneten Fahrlehrer möglich; Bewertungen und Notizen sind dem eingebenden Konto zugeordnet</li>
+    <li><strong>Verfügbarkeit:</strong> Betrieb auf der Infrastruktur von Google Cloud/Firebase mit deren Redundanz- und Backup-Mechanismen</li>
+    <li><strong>Trennung nach Zweck:</strong> Test- und Entwicklungsumgebungen verwenden keine echten Kundendaten</li>
+    <li><strong>Schwachstellenmanagement:</strong> Zeitnahes Einspielen sicherheitsrelevanter Aktualisierungen der eingesetzten Software-Bibliotheken</li>
+    <li><strong>Verfahren im Sicherheitsvorfall:</strong> Internes Verfahren zur Erkennung, Eindämmung und Meldung von Datenschutzverletzungen gemäß § 8 dieses Vertrags</li>
+    <li><strong>Überprüfung:</strong> Regelmäßige Überprüfung und Aktualisierung dieser Maßnahmen im Rahmen der Weiterentwicklung der Software</li>
   </ul>
 
   <h2>Anlage 2 – Genehmigte Unterauftragsverarbeiter</h2>
   <table>
     <tr><th>Unternehmen</th><th>Leistung</th><th>Ort der Verarbeitung</th></tr>
-    <tr><td>Google Ireland Limited (Google Cloud / Firebase)</td><td>Hosting, Datenbank, Authentifizierung</td><td>europe-west3 (Frankfurt), abgesichert über EU-Standardvertragsklauseln gem. Art. 46 DSGVO für etwaige Verarbeitungsschritte außerhalb der EU</td></tr>
+    <tr><td>Google Ireland Limited (Google Cloud / Firebase)</td><td>Hosting, Datenbank, Authentifizierung</td><td>europe-west3 (Frankfurt) – siehe § 7 zu etwaigen Drittlandbezügen</td></tr>
     <tr><td>IONOS SE, Elgendorfer Str. 57, 56410 Montabaur</td><td>Versand von System- und Benachrichtigungs-E-Mails</td><td>Deutschland</td></tr>
     <tr><td>EmailJS</td><td>Versand von Benachrichtigungs-E-Mails bei Neuregistrierung</td><td>siehe Anbieter-Datenschutzerklärung</td></tr>
   </table>
