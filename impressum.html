@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Impressum – FahrSync</title>
+<link rel="canonical" href="https://fahrsync.de/impressum.html">
+<meta name="description" content="Impressum von FahrSync – Angaben gemäß § 5 DDG.">
+<style>
+  :root { --bg:#0d1117; --surface:#161b22; --border:#30363d; --text:#e6edf3; --muted:#8b949e; --accent:#ffd454; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; line-height:1.6; }
+  .wrap { max-width:640px; margin:0 auto; padding:32px 20px 60px; }
+  h1 { font-size:1.5rem; margin-bottom:4px; }
+  .sub { color:var(--muted); font-size:0.85rem; margin-bottom:28px; }
+  .block { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:18px 20px; margin-bottom:16px; }
+  .block h2 { font-size:0.95rem; margin:0 0 10px; }
+  .block p { margin:0; font-size:0.92rem; }
+  a { color:var(--accent); text-decoration:none; }
+  .back { display:inline-block; margin-bottom:20px; color:var(--muted); font-size:0.85rem; }
+  #imp-loading { color:var(--muted); font-size:0.85rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="./">← Zur Startseite</a>
+  <h1>Impressum</h1>
+  <div class="sub">Angaben gemäß § 5 DDG</div>
+  <div id="imp-content"><div id="imp-loading">Lädt…</div></div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD490kLzTOq3h3VdQ9ZqWZd_aXcDRfxBOs",
+  authDomain: "fahrschule-ebc65.firebaseapp.com",
+  projectId: "fahrschule-ebc65",
+  storageBucket: "fahrschule-ebc65.firebasestorage.app",
+  messagingSenderId: "684907919421",
+  appId: "1:684907919421:web:placeholder"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+try {
+  const snap = await getDoc(doc(db, 'platform', 'impressum'));
+  const d = snap.exists() ? snap.data() : {};
+  const name    = d.name    || 'Chriskoo';
+  const inhaber = d.inhaber || '';
+  const strasse = d.strasse || '';
+  const plz     = d.plz     || '';
+  const ort     = d.ort     || 'Deutschland';
+  const tel     = d.tel     || '';
+  const email   = d.email   || 'kontakt@fahrsync.de';
+  const web     = d.web     || 'fahrsync.de';
+
+  document.getElementById('imp-content').innerHTML = `
+    <div class="block">
+      <h2>👤 Verantwortlich</h2>
+      <p>
+        <strong>${name}</strong><br>
+        ${inhaber ? inhaber + '<br>' : ''}
+        ${strasse ? strasse + '<br>' : ''}
+        ${(plz || ort) ? (plz + ' ' + ort).trim() : ''}
+      </p>
+    </div>
+    <div class="block">
+      <h2>📱 Kontakt</h2>
+      <p>
+        ${tel   ? '📞 ' + tel + '<br>' : ''}
+        ${email ? '✉️ <a href="mailto:'+email+'">'+email+'</a><br>' : ''}
+        ${web   ? '🌐 <a href="https://'+web+'">'+web+'</a>' : ''}
+      </p>
+    </div>
+    <div class="block">
+      <h2>🔒 Datenschutz</h2>
+      <p>Informationen zur Verarbeitung personenbezogener Daten findest du in unserer <a href="./datenschutz.html">Datenschutzerklärung</a>.</p>
+    </div>
+    <div class="block">
+      <h2>⚖️ Haftungshinweis</h2>
+      <p style="color:var(--muted);font-size:0.85rem">Trotz sorgfältiger inhaltlicher Kontrolle übernehmen wir keine Haftung für die Inhalte externer Links. Für den Inhalt der verlinkten Seiten sind ausschließlich deren Betreiber verantwortlich.</p>
+    </div>
+  `;
+} catch(e) {
+  document.getElementById('imp-content').innerHTML = '<div class="block"><p style="color:var(--muted)">Impressum konnte nicht geladen werden. Bitte versuche es später erneut.</p></div>';
+  console.error('Impressum laden:', e);
+}
+</script>
+</body>
+</html>
