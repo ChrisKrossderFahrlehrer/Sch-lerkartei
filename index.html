@@ -7806,6 +7806,7 @@ window.openImpressum = async () => {
   const name    = platImp.name    || 'Chriskoo';
   const inhaber = platImp.inhaber || '';
   const strasse = platImp.strasse || '';
+  const plz     = platImp.plz    || '';
   const ort     = platImp.ort    || 'Deutschland';
   const tel     = platImp.tel || '';
   const email   = platImp.email  || 'kontakt@fahrsync.de';
@@ -7830,7 +7831,7 @@ window.openImpressum = async () => {
           <strong>${name}</strong><br>
           ${inhaber ? inhaber + '<br>' : ''}
           ${strasse ? strasse + '<br>' : ''}
-          ${ort || ''}
+          ${(plz || ort) ? (plz + ' ' + ort).trim() : ''}
         </div>
       </div>
     </div>
