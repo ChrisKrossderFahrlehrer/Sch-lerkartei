@@ -1034,6 +1034,11 @@ function renderLehrer() {
       + '<div onclick="toggleKalenderLehrer(\''+l.id+'\', '+(l.kalenderAktiv ? 'false' : 'true')+')" style="width:46px;height:26px;border-radius:13px;background:'+(l.kalenderAktiv ? 'var(--accent2)' : 'var(--border)')+';position:relative;cursor:pointer;flex-shrink:0">'
       + '<div style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:3px;left:'+(l.kalenderAktiv ? '23px' : '3px')+';transition:left .15s"></div></div>'
       + '</div>';
+    const proZeile = '<div onclick="event.stopPropagation()" style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">'
+      + '<div><div style="font-size:0.8rem;font-weight:600">⭐ Pro freischalten</div><div style="font-size:0.66rem;color:var(--muted)">'+(l.werbefrei ? 'Kostenlos freigeschaltet' : 'Nicht freigeschaltet')+'</div></div>'
+      + '<div onclick="toggleProLehrer(\''+l.id+'\', '+(l.werbefrei ? 'false' : 'true')+')" style="width:46px;height:26px;border-radius:13px;background:'+(l.werbefrei ? 'var(--accent2)' : 'var(--border)')+';position:relative;cursor:pointer;flex-shrink:0">'
+      + '<div style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:3px;left:'+(l.werbefrei ? '23px' : '3px')+';transition:left .15s"></div></div>'
+      + '</div>';
     const loeschBtn = '<div style="margin-top:8px">'
       + '<button id="btn-del-lehrer-'+l.id+'" data-armed="0" onclick="deleteLehrerComplete(\''+l.id+'\',\''+(name||'Fahrlehrer').replace(/'/g,'')+'\')" style="width:100%;background:transparent;border:1px solid var(--danger);color:var(--danger);border-radius:8px;padding:7px;font-size:0.74rem;font-weight:700;cursor:pointer">🗑️ Löschen</button>'
       + '</div>';
@@ -1045,6 +1050,7 @@ function renderLehrer() {
       + '<div class="list-sub" style="color:var(--muted)">Registriert: '+datum+'</div>'
       + aktionen
       + kalenderZeile
+      + proZeile
       + loeschBtn
       + '</div>'
       + (l.status!=='ausstehend' ? statusBadge : '')
@@ -2539,6 +2545,16 @@ window.toggleKalenderLehrer = async (id, aktivieren) => {
     toast(aktivieren ? '📅 Kalender-Modul freigeschaltet' : '📅 Kalender-Modul deaktiviert');
     renderLehrer();
   } catch(e) { console.warn('toggleKalenderLehrer:', e); toast('Fehler beim Umschalten.'); }
+};
+
+
+
+window.toggleProLehrer = async (id, aktivieren) => {
+  try {
+    await updateDoc(doc(db, 'users', id), { werbefrei: aktivieren });
+    toast(aktivieren ? '⭐ Pro kostenlos freigeschaltet' : '⭐ Pro-Freischaltung entfernt');
+    renderLehrer();
+  } catch(e) { console.warn('toggleProLehrer:', e); toast('Fehler beim Umschalten.'); }
 };
 
 </script>
