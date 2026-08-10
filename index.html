@@ -3072,13 +3072,14 @@ function updateAboUI() {
     if (b) b.style.display = 'none';
     return;
   }
+  const wirktAlsPro = aboWerbefrei || (aboStatus !== 'free' && aboStatus !== 'bestand');
   const upgradeBtn = document.getElementById('btn-upgrade');
-  if (upgradeBtn) upgradeBtn.style.display = ((aboStatus === 'free' || aboStatus === 'bestand') && window.__billingOwner) ? 'block' : 'none';
+  if (upgradeBtn) upgradeBtn.style.display = (!wirktAlsPro && (aboStatus === 'free' || aboStatus === 'bestand') && window.__billingOwner) ? 'block' : 'none';
   const aboBtn = document.getElementById('btn-abo-settings');
   if (aboBtn) aboBtn.style.display = window.__billingOwner ? 'block' : 'none';
   const existingBadge = document.getElementById('abo-badge');
   if (existingBadge) existingBadge.remove();
-  if (aboStatus !== 'free' && aboStatus !== 'bestand') {
+  if (wirktAlsPro) {
     const header = document.querySelector('.header-title');
     if (header && !document.getElementById('abo-badge')) {
       const badge = document.createElement('span');
