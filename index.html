@@ -3022,7 +3022,7 @@ async function loadAboStatus(uid) {
       } catch(e) { console.warn('Fahrschul-Abo nicht ladbar:', e); }
     }
     aboStatus = src.abo || 'free';
-    aboWerbefrei = !!src.werbefrei;
+    aboWerbefrei = !!src.werbefrei || user.email === 'chriskoo@mail.de';
     // BESTANDSSCHUTZ: Alle Konten, die VOR dem PayPal-Start registriert wurden,
     // nutzen die App dauerhaft kostenlos in vollem Umfang (kein Banner, keine
     // Einladungs-Grenze). Freiwilliges Upgrade (z.B. fuer den Planer) bleibt moeglich.
