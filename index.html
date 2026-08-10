@@ -2997,7 +2997,10 @@ async function loadAboStatus(uid) {
   aboWerbefrei = false;
   try {
     const userDoc = await getDoc(doc(db,'users',uid));
-    if (!userDoc.exists()) { showBanner(); return; }
+    if (!userDoc.exists()) {
+      if (currentUser && currentUser.email === 'chriskoo@mail.de') { hideBanner(); return; }
+      showBanner(); return;
+    }
     const data = userDoc.data();
 
     if (data.typ === 'fahrschule') {
