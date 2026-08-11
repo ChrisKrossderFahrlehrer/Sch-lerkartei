@@ -100,6 +100,36 @@ body.light {
   --shadow-md: 0 6px 20px rgba(16,24,40,0.10);
   --shadow-lift: 0 14px 32px rgba(16,24,40,0.15);
 }
+
+/* Stil "Verkehrszeichen" - waermeres, gesaettigteres Schild-Gelb,
+   angelehnt an amtliche StVO-Farben. Wirkt zusammen mit hell ODER dunkel. */
+.style-strasse {
+  --accent: #f4c430;
+  --accent2: #2f7a3d;
+  --danger: #d1352b;
+  --blue: #1e5bb8;
+  --radius: 10px;
+}
+.style-strasse.light { --surface: #fdfcf7; --surface2: #f7f3e6; }
+
+/* Stil "Modern" - kuehler, mehr Tiefe/Weichzeichnung, groesserer Radius,
+   dezentes Leuchten hinter dem Akzent. */
+.style-modern {
+  --bg: #0b0d12;
+  --surface: #14171f;
+  --surface2: #1a1e28;
+  --border: #262b36;
+  --radius: 18px;
+  --shadow-md: 0 10px 30px rgba(0,0,0,0.38), 0 0 0 1px rgba(255,255,255,0.03) inset;
+}
+.style-modern.light { --bg: #f7f8fb; --surface: #ffffff; --surface2: #f1f3f8; --radius: 18px; }
+.style-modern .card, .style-modern .list-item, .style-modern .modal-sheet, .style-modern .preview-tile {
+  background: linear-gradient(165deg, var(--surface2), var(--surface));
+  box-shadow: var(--shadow-md);
+}
+.style-modern .btn-main, .style-modern .fab, .style-modern .preview-dot.active {
+  box-shadow: 0 0 22px -4px color-mix(in srgb, var(--accent) 55%, transparent);
+}
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 html,body { height:100%; overflow:hidden; -webkit-text-size-adjust:100%; text-size-adjust:100%; }
 body { font-family:'Manrope',sans-serif; background:var(--bg); color:var(--text); display:flex; flex-direction:column; }
@@ -1461,6 +1491,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openVerkehrszeichen()" style="background:var(--surface2);margin-bottom:8px">🚦 Verkehrszeichen</button>
     <button class="btn-sheet-cancel" id="btn-test-rechnung" onclick="testRechnungErzeugen()" style="background:var(--surface2);margin-bottom:8px">🧪 Test-Rechnung erzeugen</button>
     <button class="btn-sheet-cancel" onclick="toggleTheme()" id="theme-btn-menu" style="background:var(--surface2);margin-bottom:8px">☀️ Design wechseln (hell/dunkel)</button>
+    <button class="btn-sheet-cancel" onclick="openStilAuswahl()" style="background:var(--surface2);margin-bottom:8px">🎨 Design-Stil wählen</button>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openDashboard()" style="background:var(--surface2);margin-bottom:8px">📊 Übersicht / Statistik</button>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openHelp()" style="background:var(--surface2);margin-bottom:8px">❓ Hilfe & Funktionsübersicht</button>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');startTutorial()" style="background:var(--surface2);margin-bottom:8px">🎓 Tutorial nochmal anzeigen</button>
@@ -1980,6 +2011,18 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       <button class="btn-secondary" style="margin:0" onclick="document.getElementById('name-aendern-modal').classList.remove('open')">Abbrechen</button>
       <button class="btn-main" onclick="saveNameAendern()">Speichern ✓</button>
     </div>
+  </div>
+</div>
+
+<!-- DESIGN-STIL AUSWAHL -->
+<div class="modal-overlay" id="stil-modal" onclick="closeModal(event)">
+  <div class="modal-sheet" style="max-width:420px">
+    <div class="sheet-title">🎨 Design-Stil wählen</div>
+    <p style="font-size:0.78rem;color:var(--muted);margin:-6px 0 16px;line-height:1.5">
+      Wirkt zusammen mit Hell/Dunkel. Jeder in eurer Fahrschule stellt das für sich selbst ein.
+    </p>
+    <div id="stil-liste" style="display:flex;flex-direction:column;gap:12px"></div>
+    <button class="btn-sheet-cancel" onclick="document.getElementById('stil-modal').classList.remove('open')" style="margin-top:16px">Fertig</button>
   </div>
 </div>
 
@@ -9291,6 +9334,53 @@ window.saveNameAendern = async () => {
     errEl.textContent = 'Fehler beim Speichern.';
   }
 };
+
+
+
+// ══ DESIGN-STIL AUSWAHL ═══════════════════════════════════════════
+// Nutzt dasselbe Prinzip wie Hell/Dunkel (Klasse auf <body> + localStorage),
+// nur mit mehreren benannten Stilen statt nur zwei. Jede Vorschau-Kachel
+// traegt dieselbe Klasse wie spaeter <body> - dieselben CSS-Variablen
+// gelten dadurch schon in der Vorschau, ganz ohne Sonderfall-Code.
+const STILE = [
+  { id: '',              name: 'Standard',       beschreibung: 'Der bisherige Look, unveraendert.' },
+  { id: 'style-strasse', name: 'Verkehrszeichen', beschreibung: 'Waermeres Schild-Gelb, eckigere Formen.' },
+  { id: 'style-modern',  name: 'Modern',          beschreibung: 'Weicher, mehr Tiefe, dezentes Leuchten.' },
+];
+
+function previewKachel(stil) {
+  const aktiv = (localStorage.getItem('fs_stil') || '') === stil.id;
+  return `<div class="${stil.id}" onclick="waehleStil('${stil.id}')" style="cursor:pointer;border:2px solid ${aktiv ? 'var(--accent)' : 'var(--border)'};border-radius:14px;padding:14px;display:flex;align-items:center;gap:14px;background:var(--bg)">
+    <div class="preview-tile" style="width:64px;height:56px;flex-shrink:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;gap:5px">
+      <div class="preview-dot active" style="width:16px;height:16px;border-radius:${stil.id==='style-strasse' ? '3px' : '50%'};background:var(--accent)"></div>
+      <div style="width:20px;height:5px;border-radius:3px;background:var(--border)"></div>
+    </div>
+    <div style="flex:1">
+      <div style="font-weight:700;font-size:0.88rem;color:var(--text)">${stil.name}${aktiv ? ' ✓' : ''}</div>
+      <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">${stil.beschreibung}</div>
+    </div>
+  </div>`;
+}
+
+window.openStilAuswahl = () => {
+  document.getElementById('stil-liste').innerHTML = STILE.map(previewKachel).join('');
+  document.getElementById('stil-modal').classList.add('open');
+};
+
+window.waehleStil = (id) => {
+  document.body.classList.remove('style-strasse', 'style-modern');
+  if (id) document.body.classList.add(id);
+  localStorage.setItem('fs_stil', id);
+  document.getElementById('stil-liste').innerHTML = STILE.map(previewKachel).join('');
+  toast('Design aktualisiert ✓');
+};
+
+// Beim Laden der Seite den gespeicherten Stil anwenden (analog zum
+// bestehenden Hell/Dunkel-Verhalten weiter unten im Code).
+(() => {
+  const gespeicherterStil = localStorage.getItem('fs_stil');
+  if (gespeicherterStil) document.body.classList.add(gespeicherterStil);
+})();
 
 </script>
 <!-- ERST-LOGIN: Passwort setzen (+ optional echte E-Mail) - nicht wegklickbar -->
