@@ -3042,6 +3042,8 @@ async function loadAboStatus(uid) {
 
 function showBanner() {
   document.getElementById('ad-banner').style.display = 'block';
+  const fab = document.querySelector('.fab');
+  if (fab) fab.style.bottom = 'calc(var(--safe-bottom) + 24px + 44px)';
   loadWerbeBanner();
 }
 let __werbungLoaded = false;
@@ -3065,6 +3067,8 @@ async function loadWerbeBanner() {
 }
 function hideBanner() {
   document.getElementById('ad-banner').style.display = 'none';
+  const fab = document.querySelector('.fab');
+  if (fab) fab.style.bottom = '';
 }
 function updateAboUI() {
   if (!ABO_ENABLED) {
