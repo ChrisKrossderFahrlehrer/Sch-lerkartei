@@ -104,31 +104,50 @@ body.light {
 /* Stil "Verkehrszeichen" - waermeres, gesaettigteres Schild-Gelb,
    angelehnt an amtliche StVO-Farben. Wirkt zusammen mit hell ODER dunkel. */
 .style-strasse {
-  --accent: #f4c430;
-  --accent2: #2f7a3d;
-  --danger: #d1352b;
-  --blue: #1e5bb8;
-  --radius: 10px;
+  --accent: #ffc700;
+  --accent2: #1f7a34;
+  --danger: #c81e1e;
+  --blue: #0f4fa8;
+  --border: #4a4638;
+  --radius: 4px;
 }
-.style-strasse.light { --surface: #fdfcf7; --surface2: #f7f3e6; }
+.style-strasse.light { --surface: #fffef8; --surface2: #fbf3d4; --border: #2a2a2a; }
+.style-strasse .card, .style-strasse .list-item, .style-strasse .modal-sheet, .style-strasse .preview-tile {
+  border-width: 2px;
+  border-color: #2a2a2a;
+}
+.style-strasse.light .card, .style-strasse.light .list-item, .style-strasse.light .modal-sheet, .style-strasse.light .preview-tile {
+  border-color: #1a1a1a;
+}
+.style-strasse .btn-main, .style-strasse .fab {
+  border-radius: 4px;
+  box-shadow: 0 3px 0 #2a2a2a;
+}
 
-/* Stil "Modern" - kuehler, mehr Tiefe/Weichzeichnung, groesserer Radius,
-   dezentes Leuchten hinter dem Akzent. */
+/* Stil "Modern" - bewusst eigene Akzentfarbe (nicht das Marken-Gold),
+   sehr grosser Radius, deutliches Leuchten - soll sich klar anders
+   anfuehlen als Standard, nicht nur "Standard mit Schatten". */
 .style-modern {
-  --bg: #0b0d12;
-  --surface: #14171f;
-  --surface2: #1a1e28;
-  --border: #262b36;
-  --radius: 18px;
-  --shadow-md: 0 10px 30px rgba(0,0,0,0.38), 0 0 0 1px rgba(255,255,255,0.03) inset;
+  --bg: #0a0714;
+  --surface: #171226;
+  --surface2: #1f1832;
+  --border: #322a4a;
+  --accent: #b57cff;
+  --accent2: #3fd9a0;
+  --blue: #7ea8ff;
+  --radius: 26px;
+  --shadow-md: 0 14px 40px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.04) inset;
 }
-.style-modern.light { --bg: #f7f8fb; --surface: #ffffff; --surface2: #f1f3f8; --radius: 18px; }
+.style-modern.light { --bg: #f6f4fb; --surface: #ffffff; --surface2: #eee9f9; --border: #e0d8f5; --radius: 26px; }
 .style-modern .card, .style-modern .list-item, .style-modern .modal-sheet, .style-modern .preview-tile {
   background: linear-gradient(165deg, var(--surface2), var(--surface));
   box-shadow: var(--shadow-md);
 }
 .style-modern .btn-main, .style-modern .fab, .style-modern .preview-dot.active {
-  box-shadow: 0 0 22px -4px color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow: 0 0 34px -2px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+.style-modern .list-avatar, .style-modern .preview-tile {
+  border-radius: 50% !important;
 }
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 html,body { height:100%; overflow:hidden; -webkit-text-size-adjust:100%; text-size-adjust:100%; }
