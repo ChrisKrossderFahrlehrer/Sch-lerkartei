@@ -9404,16 +9404,21 @@ window.saveNameAendern = async () => {
   try {
     await saveToFirestore(activeId, { vorname: vn, nachname: nn });
 
-    // Kalender-Eintrag desselben Schuelers mitziehen (best effort)
+    // Kalender-Eintrag desselben Schuelers mitziehen (best effort).
+    // Bewusst NUR nach lehrerUid filtern und den Namen anschliessend in
+    // JavaScript vergleichen: eine Abfrage ueber mehrere Felder braeuchte
+    // einen zusammengesetzten Firestore-Index und scheiterte sonst still.
     try {
+      const norm = (x) => String(x || '').trim().toLowerCase();
       const kalSnap = await getDocs(query(
         collection(db, 'schueler'),
-        where('lehrerUid', '==', currentUser.uid),
-        where('fname', '==', alterVn),
-        where('lname', '==', alterNn)
+        where('lehrerUid', '==', currentUser.uid)
       ));
       for (const d of kalSnap.docs) {
-        await dbUpd(doc(db, 'schueler', d.id), { fname: vn, lname: nn });
+        const k = d.data();
+        if (norm(k.fname) === norm(alterVn) && norm(k.lname) === norm(alterNn)) {
+          await dbUpd(doc(db, 'schueler', d.id), { fname: vn, lname: nn });
+        }
       }
     } catch(kalErr) { console.warn('Kalender-Name mitziehen:', kalErr); }
 
