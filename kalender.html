@@ -876,7 +876,7 @@ function updateReqBadge(n){
 }
 function startGlobalRequestWatch(){
   if (__reqUnsubGlobal || !currentUser) return;
-  if (!document.getElementById('nav-lehrer-buchungen')) return; // nur Lehrer-Ansicht
+  if (currentRole !== 'lehrer') return; // nur Lehrer-Ansicht
   try {
     __reqUnsubGlobal = onSnapshot(
       query(collection(db,'bookingRequests'), where('lehrerUid','==',currentUser.uid)),
