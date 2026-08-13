@@ -1356,7 +1356,14 @@ pages['admin-fuhrpark']=async function(el){
 };
 async function renderAutoList(){
   const el=document.getElementById('auto-list');if(!el)return;
-  const snap=await getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId)));
+  let snap;
+  try {
+    snap=await getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId)));
+  } catch(e) {
+    console.warn('renderAutoList', e);
+    el.innerHTML='<p class="text-muted">Fahrzeuge konnten nicht geladen werden ('+(e.code||e.message||'Fehler')+').</p>';
+    return;
+  }
   if(snap.empty){el.innerHTML='<p class="text-muted">Noch keine Fahrzeuge.</p>';return;}
   el.innerHTML=snap.docs.map(d=>{const a=d.data();return`<div class="auto-card">
     <div class="auto-icon">🚗</div><div class="auto-info"><div class="auto-name">${a.modell}</div><div class="auto-detail">${a.farbe?a.farbe+' · ':''}${a.notiz||''}</div></div>
@@ -1369,7 +1376,12 @@ window.addAuto=async function(){
   const modell=document.getElementById('ac-modell').value.trim();
   const kennzeichen=document.getElementById('ac-kennzeichen').value.trim().toUpperCase();
   if(!modell||!kennzeichen)return toast('Modell und Kennzeichen erforderlich.','error');
-  await addDoc(collection(db,'autos'),{modell,kennzeichen,farbe:document.getElementById('ac-farbe').value.trim(),notiz:document.getElementById('ac-notiz').value.trim(),schoolId:currentSchoolId,createdAt:serverTimestamp()});
+  try {
+    await addDoc(collection(db,'autos'),{modell,kennzeichen,farbe:document.getElementById('ac-farbe').value.trim(),notiz:document.getElementById('ac-notiz').value.trim(),schoolId:currentSchoolId,lehrerUid:currentUser.uid,createdAt:serverTimestamp()});
+  } catch(e) {
+    console.warn('addAuto', e);
+    return toast('Fahrzeug konnte nicht gespeichert werden ('+(e.code||e.message||'Fehler')+').','error');
+  }
   toast('Auto hinzugefügt!','success');
   ['ac-modell','ac-kennzeichen','ac-farbe','ac-notiz'].forEach(id=>document.getElementById(id).value='');
   await renderAutoList();
