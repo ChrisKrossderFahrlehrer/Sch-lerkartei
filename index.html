@@ -2080,7 +2080,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
 import { signInAnonymously, getAuth, setPersistence, browserLocalPersistence, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider, verifyBeforeUpdateEmail } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, enableIndexedDbPersistence, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, getDocs, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, enableIndexedDbPersistence, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, getDocs, getDoc, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD490kLzTOq3h3VdQ9ZqWZd_aXcDRfxBOs",
@@ -5935,13 +5935,82 @@ window.openPlanLesson = async () => {
   } catch(e) { toast('Fehler: ' + e.message); }
 };
 
+// ══ BRÜCKE ADK → KALENDER ════════════════════════════════════════
+// Eine in der ADK geplante Fahrstunde landete bisher AUSSCHLIESSLICH im
+// Schüler-Portal (accessCodes.plannedLessons). Der Fahrlehrer selbst sah
+// sie nirgends: weder im Kalender noch im Heute-Widget der ADK - beide
+// lesen aus der Sammlung 'slots', in die nie etwas geschrieben wurde.
+// Genau das war die Kundenmeldung "die Schüler sehen die Fahrstunde,
+// nur ich nicht". Diese Funktion legt zusätzlich den echten Kalender-
+// Termin an. Der Termin wird direkt als GEBUCHT eingetragen, damit die
+// Zeit nicht versehentlich als freier Slot buchbar bleibt.
+async function legeKalenderTerminAn(datum, uhrzeit) {
+  if (window.__DEMO) return null;
+  const s = getStudent(activeId);
+  if (!s) return null;
+  const schoolId = currentUser._fahrschuleId || currentUser.uid;
+  const norm = (x) => String(x || '').trim().toLowerCase();
+
+  // Kalender führt Schüler in einem EIGENEN Namensraum ('schueler') ohne
+  // Verknüpfungsfeld zur ADK-Kartei - Zuordnung daher über den Namen,
+  // wie auch im Heute-Widget. Fehlt der Schüler dort noch (Altbestand vor
+  // der automatischen Weitergabe), wird er hier angelegt.
+  let kalId = null;
+  try {
+    const kSnap = await getDocs(query(collection(db,'schueler'), where('lehrerUid','==',currentUser.uid)));
+    const treffer = kSnap.docs.find(d => {
+      const k = d.data();
+      return norm(k.fname) === norm(s.vorname) && norm(k.lname) === norm(s.nachname);
+    });
+    if (treffer) kalId = treffer.id;
+  } catch(e) { console.warn('Kalender-Schüler suchen:', e); }
+
+  if (!kalId) {
+    const neu = await dbAdd(collection(db,'schueler'), {
+      fname: s.vorname || '', lname: s.nachname || '',
+      email: '', tel: '',
+      lehrerUid: currentUser.uid,
+      maxFahrstunden: 0, maxAktiveTermine: 0, bookedCount: 0,
+      schoolId, createdAt: serverTimestamp()
+    });
+    kalId = neu && neu.id ? neu.id : null;
+  }
+  if (!kalId) return null;
+
+  const [jahr, monat, tag] = datum.split('-').map(Number);
+  const [std, min]         = uhrzeit.split(':').map(Number);
+  const start = new Date(jahr, monat - 1, tag, std, min);
+  const ende  = new Date(start.getTime() + 45 * 60 * 1000); // Standard-Fahrstunde 45 Min
+
+  const slot = await dbAdd(collection(db,'slots'), {
+    lehrerUid: currentUser.uid,
+    type:      'normal',
+    startTime: Timestamp.fromDate(start),
+    endTime:   Timestamp.fromDate(ende),
+    bookedBy:  kalId,
+    bookedAt:  Date.now(),
+    schoolId,
+    createdAt: serverTimestamp()
+  });
+  return slot && slot.id ? slot.id : null;
+}
+
 window.savePlannedLesson = async () => {
   const datum   = document.getElementById('inp-plan-datum').value;
   const uhrzeit = document.getElementById('inp-plan-uhrzeit').value;
   const ort     = document.getElementById('inp-plan-ort').value.trim();
   const notiz   = document.getElementById('inp-plan-notiz').value.trim();
   if (!datum) { toast('Bitte ein Datum wählen.'); return; }
-  const newLesson = { id: Date.now().toString(), datum, uhrzeit, ort, notiz, status: 'geplant', createdAt: Date.now() };
+
+  // Kalender-Termin zuerst (bester Versuch) - schlägt er fehl, wird die
+  // Fahrstunde trotzdem geplant, nur eben ohne Kalender-Eintrag.
+  let slotId = null;
+  if (uhrzeit) {
+    try { slotId = await legeKalenderTerminAn(datum, uhrzeit); }
+    catch(e) { console.warn('Kalender-Termin anlegen:', e); }
+  }
+
+  const newLesson = { id: Date.now().toString(), datum, uhrzeit, ort, notiz, status: 'geplant', createdAt: Date.now(), slotId };
   try {
     const snap = await getDocs(query(collection(db,'accessCodes'), where('studentId','==',activeId), where('teacherUid','==',currentUser.uid)));
     if (snap.empty) { toast('⚠️ Code nicht gefunden'); return; }
@@ -5949,7 +6018,11 @@ window.savePlannedLesson = async () => {
     const existing = docRef.data().plannedLessons || [];
     await dbUpd(doc(db,'accessCodes',docRef.id), { plannedLessons: [...existing, newLesson], expiresAt: Date.now() + CODE_LAUFZEIT_MS });
     document.getElementById('plan-lesson-modal').classList.remove('open');
-    toast(`📅 Fahrstunde am ${datum.split('-').reverse().join('.')} geplant`);
+    const tag = datum.split('-').reverse().join('.');
+    if (!uhrzeit)      toast(`📅 Fahrstunde am ${tag} geplant (ohne Uhrzeit – erscheint nicht im Kalender)`);
+    else if (!slotId)  toast(`📅 Fahrstunde am ${tag} geplant (Kalender-Eintrag nicht möglich)`);
+    else               toast(`📅 Fahrstunde am ${tag} geplant – auch im Kalender eingetragen ✓`);
+    try { ladeHeutigeTermine(); } catch(e) {}
   } catch(e) { toast('Fehler: ' + e.message); }
 };
 
