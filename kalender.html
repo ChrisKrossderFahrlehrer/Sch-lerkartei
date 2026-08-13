@@ -1839,13 +1839,18 @@ window.addSlot=async function(year,month,day){
   const[fh,fm]=from.split(':').map(Number);const tot=fh*60+fm+bd;
   const st=Timestamp.fromDate(new Date(year,month,day,fh,fm));
   const et=Timestamp.fromDate(new Date(year,month,day,Math.floor(tot/60)%24,tot%60));
-  await addDoc(collection(db,'slots'),{lehrerUid:currentUser.uid,type,startTime:st,endTime:et,bookedBy:null,schoolId:currentSchoolId,createdAt:serverTimestamp()});
+  try{
+    await addDoc(collection(db,'slots'),{lehrerUid:currentUser.uid,type,startTime:st,endTime:et,bookedBy:null,schoolId:currentSchoolId,createdAt:serverTimestamp()});
+  }catch(e){
+    console.warn('addSlot',e);
+    return toast('Slot konnte nicht gespeichert werden ('+(e.code||e.message||'Fehler')+').','error');
+  }
   try{await publishMyBookingLink();}catch(e){}
   toast('Slot hinzugefügt!','success');closeModal();renderCal();
 };
-window.deleteSlot=async function(id){let _bb=null;try{const s=await getDoc(doc(db,'slots',id));if(s.exists())_bb=s.data().bookedBy||null;}catch(e){}await deleteDoc(doc(db,'slots',id));try{await publishMyBookingLink();}catch(e){}if(_bb){try{await publishStudentBookings(_bb);}catch(e){}}toast('Gelöscht.','success');closeModal();renderCal();};
-window.blockDay=async function(year,month,day){await addDoc(collection(db,'blocked'),{lehrerUid:currentUser.uid,year,month,day});toast('Gesperrt.','success');closeModal();renderCal();};
-window.unblockDay=async function(id){await deleteDoc(doc(db,'blocked',id));toast('Entsperrt.','success');closeModal();renderCal();};
+window.deleteSlot=async function(id){let _bb=null;try{const s=await getDoc(doc(db,'slots',id));if(s.exists())_bb=s.data().bookedBy||null;}catch(e){}try{await deleteDoc(doc(db,'slots',id));}catch(e){console.warn('deleteSlot',e);return toast('Slot konnte nicht gelöscht werden ('+(e.code||e.message||'Fehler')+').','error');}try{await publishMyBookingLink();}catch(e){}if(_bb){try{await publishStudentBookings(_bb);}catch(e){}}toast('Gelöscht.','success');closeModal();renderCal();};
+window.blockDay=async function(year,month,day){try{await addDoc(collection(db,'blocked'),{lehrerUid:currentUser.uid,year,month,day});}catch(e){console.warn('blockDay',e);return toast('Tag konnte nicht gesperrt werden ('+(e.code||e.message||'Fehler')+').','error');}toast('Gesperrt.','success');closeModal();renderCal();};
+window.unblockDay=async function(id){try{await deleteDoc(doc(db,'blocked',id));}catch(e){console.warn('unblockDay',e);return toast('Tag konnte nicht entsperrt werden ('+(e.code||e.message||'Fehler')+').','error');}toast('Entsperrt.','success');closeModal();renderCal();};
 
 // ════════════════════════════════
 // LEHRER – SLOTS LISTE
