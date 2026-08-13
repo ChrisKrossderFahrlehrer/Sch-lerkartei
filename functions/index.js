@@ -244,6 +244,18 @@ exports.erstelleRechnung = onCall(async (request) => {
   const auth = request.auth;
   if (!auth) throw new HttpsError('unauthenticated', 'Bitte anmelden.');
   const uid = auth.uid;
+
+  // SuperAdmin-Pruefung: entweder per E-Mail, oder per Firestore-Rolle -
+  // dieselben zwei Wege, die auch die Firestore-Regeln selbst nutzen.
+  const istSuperAdminEmail = auth.token.email === 'chriskoo@mail.de';
+  let istSuperAdminRolle = false;
+  if (!istSuperAdminEmail) {
+    const eigenesDoc = await admin.firestore().doc(`users/${uid}`).get();
+    istSuperAdminRolle = eigenesDoc.exists && eigenesDoc.data().rolle === 'superadmin';
+  }
+  if (!istSuperAdminEmail && !istSuperAdminRolle) {
+    throw new HttpsError('permission-denied', 'Echte Rechnungen entstehen automatisch bei der Zahlung. Diese Funktion ist nur fuer Testzwecke.');
+  }
   const { plan, planer } = request.data || {};
   if (!plan || !RECHNUNG_PLANS[plan]) {
     throw new HttpsError('invalid-argument', 'Unbekannter Tarif.');
