@@ -252,10 +252,7 @@ service cloud.firestore {
       allow read:   if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
       allow create: if isRealAccount() &&
                        request.resource.data.uid == request.auth.uid;
-      allow update: if isAuth() && (
-                       docBelongsToUser(resource.data) ||
-                       request.resource.data.uid == request.auth.uid
-                     );
+      allow update: if isAuth() && docBelongsToUser(resource.data);
       allow delete: if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
     }
 
