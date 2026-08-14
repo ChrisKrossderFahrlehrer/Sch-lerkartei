@@ -1,3 +1,4 @@
+// Neu-Bereitstellung erzwungen (13.08.2026): Sicherheitsfix erstelleRechnung (nur SuperAdmin)
 // Node.js-Laufzeit auf 22 umgestellt (11.08.2026) - dieser Kommentar erzwingt ein echtes Neu-Bereitstellen
 // FahrSync Push-Benachrichtigungen (Cloud Functions v2, Region Frankfurt)
 // Sendet data-only Nachrichten – der Service Worker zeigt sie an
