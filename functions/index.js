@@ -86,6 +86,32 @@ exports.pushNeueNachricht = onDocumentCreated('bookingMessages/{id}', async (eve
 // beide Seiten kappen die Liste auf 50 Eintraege, ab dann bliebe die
 // Laenge gleich und ein Laengenvergleich wuerde neue Nachrichten uebersehen.
 // ══════════════════════════════════════════════════════════════════
+// Geraete-Token eines Fahrschuelers werden ueber die Code-Kennung
+// gefunden (der Schueler hat kein eigenes Konto, nur eine anonyme Sitzung).
+async function pushToSchueler(codeId, title, body) {
+  const snap = await admin.firestore().collection('fcmTokens')
+    .where('codeId', '==', codeId).get();
+  if (snap.empty) return;
+  const tokens = snap.docs.map(d => d.id);
+  const res = await admin.messaging().sendEachForMulticast({
+    tokens,
+    data: { title, body, link: 'https://fahrsync.de/schueler-portal.html' },
+    webpush: { headers: { Urgency: 'high', TTL: '86400' } }
+  });
+  const dels = [];
+  res.responses.forEach((r, i) => {
+    if (!r.success) {
+      const c = (r.error && r.error.code) || '';
+      if (c.includes('registration-token-not-registered') ||
+          c.includes('invalid-registration-token') ||
+          c.includes('invalid-argument')) {
+        dels.push(admin.firestore().collection('fcmTokens').doc(tokens[i]).delete());
+      }
+    }
+  });
+  await Promise.all(dels);
+}
+
 exports.pushNeueChatNachricht = onDocumentUpdated('accessCodes/{codeId}', async (event) => {
   try {
     const before = (event.data && event.data.before && event.data.before.data()) || {};
@@ -99,18 +125,26 @@ exports.pushNeueChatNachricht = onDocumentUpdated('accessCodes/{codeId}', async 
     const letzteNach = nach[nach.length - 1];
     if (letzteVor && letzteNach && letzteVor.id === letzteNach.id) return; // nichts Neues
 
-    // Nur Schueler -> Fahrlehrer: der Schueler selbst hat kein Konto und
-    // damit auch kein Push-Token, in die Gegenrichtung ist Push derzeit
-    // technisch nicht moeglich.
-    if (!letzteNach || letzteNach.sender !== 'schueler') return;
-    if (!after.teacherUid) return;
+    if (!letzteNach) return;
+    const text = String(letzteNach.text || '').slice(0, 90);
 
-    await pushToLehrer(
-      after.teacherUid,
-      `✉️ ${letzteNach.senderName || 'Fahrschüler'}: Neue Nachricht`,
-      String(letzteNach.text || '').slice(0, 90),
-      'https://fahrsync.de/'
-    );
+    if (letzteNach.sender === 'schueler') {
+      // Schueler -> Fahrlehrer
+      if (!after.teacherUid) return;
+      await pushToLehrer(
+        after.teacherUid,
+        `✉️ ${letzteNach.senderName || 'Fahrschüler'}: Neue Nachricht`,
+        text,
+        'https://fahrsync.de/'
+      );
+    } else if (letzteNach.sender === 'fahrlehrer') {
+      // Fahrlehrer -> Schueler (Token ueber die Code-Kennung)
+      await pushToSchueler(
+        event.params.codeId,
+        `✉️ ${letzteNach.senderName || 'Dein Fahrlehrer'}: Neue Nachricht`,
+        text
+      );
+    }
   } catch (e) {
     console.error('pushNeueChatNachricht:', e);
   }
