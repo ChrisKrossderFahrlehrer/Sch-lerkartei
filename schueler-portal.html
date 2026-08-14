@@ -249,6 +249,11 @@ html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--tex
 .lehrer-kommentar-header { font-weight:700; color:var(--accent2); font-size:0.88rem; margin-bottom:6px; }
 .lehrer-kommentar-text { font-size:0.88rem; line-height:1.55; white-space:pre-wrap; }
 </style>
+<link rel="manifest" href="./manifest-portal.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Meine Akte">
+<link rel="apple-touch-icon" href="./icon-192.png?v=3">
 </head>
 <body>
 <h1 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">ADK Schüler-Portal – Deine Ausbildung im Blick</h1>
@@ -294,6 +299,7 @@ html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--tex
       <div class="portal-header-sub" id="header-klasse"></div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
+      <button onclick="portalPushAktivieren()" id="btn-portal-push" aria-label="Benachrichtigungen aktivieren" title="Benachrichtigungen aktivieren" style="background:none;border:1px solid var(--border);color:var(--muted);width:30px;height:30px;border-radius:8px;font-size:0.9rem;cursor:pointer">🔔</button>
       <button onclick="portalHelp()" aria-label="Hilfe" style="background:none;border:1px solid var(--border);color:var(--muted);width:30px;height:30px;border-radius:8px;font-size:0.9rem;cursor:pointer">❓</button>
       <button onclick="doLogout()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:5px 10px;border-radius:8px;font-size:0.72rem;cursor:pointer">Abmelden</button>
     </div>
@@ -356,6 +362,8 @@ html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--tex
 
 <script type="module">
 import { initializeApp }    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getMessaging, getToken, isSupported } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js';
 import { getFirestore, collection, doc, getDoc, getDocs, onSnapshot,
          query, where, updateDoc }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
@@ -392,7 +400,7 @@ setTimeout(() => {
     doLogin();
     return;
   }
-  const saved = sessionStorage.getItem('adk_portal_code_doc');
+  const saved = localStorage.getItem('adk_portal_code_doc') || sessionStorage.getItem('adk_portal_code_doc');
   if (saved) {
     const { docId, code } = JSON.parse(saved);
     startLiveSession(docId, code);
@@ -440,6 +448,7 @@ window.doLogin = async () => {
     }
 
     sessionStorage.setItem('adk_portal_code_doc', JSON.stringify({ docId: docRef.id, code }));
+    try { localStorage.setItem('adk_portal_code_doc', JSON.stringify({ docId: docRef.id, code })); } catch(e) {}
     startLiveSession(docRef.id, code);
 
   } catch(e) {
@@ -454,6 +463,7 @@ window.portalHelp = () => { document.getElementById('portal-help-overlay').style
 window.doLogout = () => {
   if (unsubLive) { unsubLive(); unsubLive = null; }
   sessionStorage.removeItem('adk_portal_code_doc');
+  try { localStorage.removeItem('adk_portal_code_doc'); } catch(e) {}
   codeDocId = null; codeData = null;
   document.getElementById('screen-app').classList.remove('active');
   document.getElementById('screen-login').classList.add('active');
@@ -989,6 +999,62 @@ function portalToast(msg) {
 }
 
 window.portalToast = portalToast;
+
+
+
+// ══ BENACHRICHTIGUNGEN FUER FAHRSCHUELER ═════════════════════════
+// Bisher konnte das Portal ueberhaupt keine Benachrichtigungen empfangen:
+// kein Service Worker, keine Anmeldung, keine Messaging-Anbindung. Ein
+// Schueler sah neue Nachrichten des Fahrlehrers nur, wenn er das Portal
+// von sich aus oeffnete.
+//
+// Der Schueler hat kein eigenes Konto - fuer das Geraete-Token wird
+// deshalb eine anonyme Anmeldung genutzt (die Sicherheitsregeln fuer
+// fcmTokens verlangen lediglich, dass die hinterlegte Kennung zur
+// angemeldeten Sitzung passt). Das Token wird zusaetzlich mit der
+// Code-Kennung gespeichert, damit die Serverfunktion den richtigen
+// Schueler findet.
+const VAPID_PORTAL = 'BC3nJw39xCFsrFABpreUA0YwSYasdaLhkfG0a_bEExB2Fp2qV8M1X1ZdwgRMXfv0l_8HG1jsR7jCRkx-vK-7Gdo';
+
+// Service Worker registrieren (Voraussetzung fuer Benachrichtigungen)
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(e => console.warn('SW:', e));
+}
+
+window.portalPushAktivieren = async () => {
+  try {
+    if (!codeDocId) { portalToast('Bitte zuerst anmelden.'); return; }
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+      portalToast('Dein Gerät unterstützt keine Benachrichtigungen.'); return;
+    }
+    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    if (isIOS && window.navigator.standalone !== true) {
+      portalToast('iPhone: Tippe unten auf „Teilen" → „Zum Home-Bildschirm", öffne die Akte von dort und versuche es dann erneut.');
+      return;
+    }
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { portalToast('Benachrichtigungen wurden nicht erlaubt.'); return; }
+    const supported = await isSupported().catch(() => false);
+    if (!supported) { portalToast('Dieser Browser unterstützt keine Benachrichtigungen.'); return; }
+
+    const cred = await signInAnonymously(getAuth());
+    const reg  = await navigator.serviceWorker.ready;
+    const tok  = await getToken(getMessaging(), { vapidKey: VAPID_PORTAL, serviceWorkerRegistration: reg });
+    if (!tok) { portalToast('Kein Token erhalten – bitte erneut versuchen.'); return; }
+
+    await setDoc(doc(db, 'fcmTokens', tok), {
+      uid:       cred.user.uid,
+      codeId:    codeDocId,
+      rolle:     'schueler',
+      ua:        navigator.userAgent.slice(0, 120),
+      createdAt: Date.now()
+    });
+    portalToast('🔔 Benachrichtigungen aktiviert!');
+  } catch (e) {
+    console.warn('portalPushAktivieren:', e);
+    portalToast('Aktivierung fehlgeschlagen (' + (e.code || e.message || 'Fehler') + ').');
+  }
+};
 
 </script>
 </body>
