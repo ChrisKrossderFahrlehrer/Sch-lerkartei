@@ -73,6 +73,49 @@ exports.pushNeueNachricht = onDocumentCreated('bookingMessages/{id}', async (eve
     (m.text || '').slice(0, 90));
 });
 
+// ══════════════════════════════════════════════════════════════════
+// PUSH FUER DEN ADK-SCHUELERCHAT
+//
+// Der bestehende pushNeueNachricht horcht auf 'bookingMessages' - das ist
+// AUSSCHLIESSLICH der Buchungs-Chat im Kalender. Der eigentliche Chat
+// zwischen Fahrlehrer und Fahrschueler laeuft dagegen ueber das Feld
+// 'messages' im accessCodes-Dokument. Fuer diesen Chat gab es deshalb noch
+// NIE eine Benachrichtigung - genau die Kundenmeldung.
+//
+// Erkennung ueber die ID der letzten Nachricht statt ueber die Laenge:
+// beide Seiten kappen die Liste auf 50 Eintraege, ab dann bliebe die
+// Laenge gleich und ein Laengenvergleich wuerde neue Nachrichten uebersehen.
+// ══════════════════════════════════════════════════════════════════
+exports.pushNeueChatNachricht = onDocumentUpdated('accessCodes/{codeId}', async (event) => {
+  try {
+    const before = (event.data && event.data.before && event.data.before.data()) || {};
+    const after  = (event.data && event.data.after  && event.data.after.data())  || {};
+
+    const vor  = Array.isArray(before.messages) ? before.messages : [];
+    const nach = Array.isArray(after.messages)  ? after.messages  : [];
+    if (!nach.length) return;
+
+    const letzteVor  = vor.length ? vor[vor.length - 1] : null;
+    const letzteNach = nach[nach.length - 1];
+    if (letzteVor && letzteNach && letzteVor.id === letzteNach.id) return; // nichts Neues
+
+    // Nur Schueler -> Fahrlehrer: der Schueler selbst hat kein Konto und
+    // damit auch kein Push-Token, in die Gegenrichtung ist Push derzeit
+    // technisch nicht moeglich.
+    if (!letzteNach || letzteNach.sender !== 'schueler') return;
+    if (!after.teacherUid) return;
+
+    await pushToLehrer(
+      after.teacherUid,
+      `✉️ ${letzteNach.senderName || 'Fahrschüler'}: Neue Nachricht`,
+      String(letzteNach.text || '').slice(0, 90),
+      'https://fahrsync.de/'
+    );
+  } catch (e) {
+    console.error('pushNeueChatNachricht:', e);
+  }
+});
+
 // ══════════ GOOGLE-KALENDER-SYNC (Phase 1: Fahrlehrer, FahrSync -> Google) ══════════
 
 async function refreshAccessTokenIfNeeded(uid, secretValue) {
