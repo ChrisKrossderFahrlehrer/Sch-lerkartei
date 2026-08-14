@@ -1511,6 +1511,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     <button class="btn-sheet-cancel" id="btn-test-rechnung" onclick="testRechnungErzeugen()" style="background:var(--surface2);margin-bottom:8px">🧪 Test-Rechnung erzeugen</button>
     <button class="btn-sheet-cancel" onclick="toggleTheme()" id="theme-btn-menu" style="background:var(--surface2);margin-bottom:8px">☀️ Design wechseln (hell/dunkel)</button>
     <button class="btn-sheet-cancel" onclick="openStilAuswahl()" style="background:var(--surface2);margin-bottom:8px">🎨 Design-Stil wählen</button>
+    <button class="btn-sheet-cancel" onclick="aktivierePushADK()" id="btn-push-adk" style="background:var(--surface2);margin-bottom:8px">🔔 Benachrichtigungen aktivieren</button>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openDashboard()" style="background:var(--surface2);margin-bottom:8px">📊 Übersicht / Statistik</button>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openHelp()" style="background:var(--surface2);margin-bottom:8px">❓ Hilfe & Funktionsübersicht</button>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');startTutorial()" style="background:var(--surface2);margin-bottom:8px">🎓 Tutorial nochmal anzeigen</button>
@@ -2081,6 +2082,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
 import { signInAnonymously, getAuth, setPersistence, browserLocalPersistence, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider, verifyBeforeUpdateEmail } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, enableIndexedDbPersistence, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, getDocs, getDoc, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD490kLzTOq3h3VdQ9ZqWZd_aXcDRfxBOs",
@@ -9478,6 +9480,47 @@ window.waehleStil = (id) => {
   const gespeicherterStil = localStorage.getItem('fs_stil');
   if (gespeicherterStil) document.body.classList.add(gespeicherterStil);
 })();
+
+
+
+// ══ PUSH-BENACHRICHTIGUNGEN (ADK) ═══════════════════════════════
+// Die ADK hatte bisher UEBERHAUPT KEINE Push-Anbindung - Token wurden
+// ausschliesslich im Kalender registriert. Ein Fahrlehrer, der nur die
+// Kartei nutzt, hatte damit nie ein Token und konnte grundsaetzlich keine
+// Benachrichtigung empfangen, egal was serverseitig ausgeloest wurde.
+const VAPID_PUBLIC_KEY_ADK = 'BC3nJw39xCFsrFABpreUA0YwSYasdaLhkfG0a_bEExB2Fp2qV8M1X1ZdwgRMXfv0l_8HG1jsR7jCRkx-vK-7Gdo';
+
+window.aktivierePushADK = async () => {
+  try {
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+      toast('Benachrichtigungen werden auf diesem Gerät nicht unterstützt.'); return;
+    }
+    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    if (isIOS && window.navigator.standalone !== true) {
+      toast('iPhone: Bitte zuerst „Zum Home-Bildschirm hinzufügen" und dort erneut versuchen.'); return;
+    }
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { toast('Benachrichtigungen wurden nicht erlaubt.'); return; }
+    const supported = await isSupported().catch(() => false);
+    if (!supported) { toast('Dieser Browser unterstützt keine Benachrichtigungen.'); return; }
+    const reg = await navigator.serviceWorker.ready;
+    const messaging = getMessaging();
+    const tok = await getToken(messaging, { vapidKey: VAPID_PUBLIC_KEY_ADK, serviceWorkerRegistration: reg });
+    if (!tok) { toast('Kein Token erhalten – bitte erneut versuchen.'); return; }
+    await dbSet(doc(db, 'fcmTokens', tok), { uid: currentUser.uid, ua: navigator.userAgent.slice(0, 120), createdAt: Date.now() });
+    localStorage.setItem('fs_push_adk', '1');
+    try {
+      onMessage(messaging, p => {
+        const d = (p && p.data) || {};
+        toast((d.title ? d.title + ' – ' : '') + (d.body || 'Neue Mitteilung'));
+      });
+    } catch(e) {}
+    toast('🔔 Benachrichtigungen aktiviert ✓');
+  } catch(e) {
+    console.warn('aktivierePushADK:', e);
+    toast('Aktivierung fehlgeschlagen (' + (e.code || e.message || 'Fehler') + ').');
+  }
+};
 
 </script>
 <!-- ERST-LOGIN: Passwort setzen (+ optional echte E-Mail) - nicht wegklickbar -->
