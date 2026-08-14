@@ -2,7 +2,7 @@
 // HTML kommt IMMER frisch vom Server → kein Cache-Löschen mehr nötig!
 // Cache dient nur als Offline-Fallback.
 
-const CACHE_NAME = 'adk-v144';
+const CACHE_NAME = 'adk-v145';
 
 // ── FCM Push: Hintergrund-Benachrichtigungen (data-only → wir zeigen selbst an) ──
 try {
@@ -29,8 +29,14 @@ try {
   self.addEventListener('notificationclick', (e) => {
     e.notification.close();
     const link = (e.notification.data && e.notification.data.link) || '/kalender.html';
+    let zielPfad = '/';
+    try { zielPfad = new URL(link, self.location.origin).pathname; } catch (err) {}
     e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
-      for (const c of list) { if (c.url.includes('kalender') && 'focus' in c) return c.focus(); }
+      for (const c of list) {
+        try {
+          if (new URL(c.url).pathname === zielPfad && 'focus' in c) return c.focus();
+        } catch (err) {}
+      }
       return clients.openWindow(link);
     }));
   });
