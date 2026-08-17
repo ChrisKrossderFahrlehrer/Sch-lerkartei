@@ -411,6 +411,17 @@ body.light .student-card { box-shadow:0 3px 0 rgba(16,24,40,0.12), 0 7px 16px rg
 .badge-blue  { background:rgba(88,166,255,0.15); color:var(--blue); }
 .badge-gray  { background:var(--surface2); color:var(--muted); }
 
+.skeleton-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:16px;
+  padding:14px 15px; margin-bottom:11px; display:flex; align-items:center; gap:12px;
+}
+.skeleton-block {
+  border-radius:6px; background:linear-gradient(90deg, var(--surface2) 25%, var(--border) 50%, var(--surface2) 75%);
+  background-size:200% 100%; animation:skeleton-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-shimmer { 0% { background-position:200% 0; } 100% { background-position:-200% 0; } }
+@media (prefers-reduced-motion: reduce) { .skeleton-block { animation:none; } }
+
 .empty-state { text-align:center; padding:60px 24px; color:var(--muted); }
 .empty-state .ei { font-size:3rem; margin-bottom:12px; }
 .empty-state p { font-size:0.9rem; line-height:1.6; }
@@ -1078,8 +1089,28 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
   </div>
   <div id="abc-bar" class="abc-bar" style="display:none"></div>
   <div class="student-scroll" id="student-list">
-    <div class="empty-state"><div class="ei">🚗</div><p>Noch keine Schüler angelegt.</p></div>
+    <div class="empty-state" id="initial-empty-state"><div class="ei">🚗</div><p>Noch keine Schüler angelegt.</p></div>
   </div>
+  <script>
+    // Beta-Schalter wird VOR jedem anderen Skript gelesen (aehnlich der
+    // Design-Stil-Wahl), damit die Skelette schon beim allerersten Rendern
+    // stehen, nicht erst nachtraeglich nachgeschoben werden.
+    if (localStorage.getItem('fs_beta_dashboard') === '1') {
+      var __sk = document.getElementById('initial-empty-state');
+      if (__sk) {
+        var __karten = '';
+        for (var __i = 0; __i < 4; __i++) {
+          __karten += '<div class="skeleton-card">'
+            + '<div class="skeleton-block" style="width:40px;height:40px;border-radius:50%;flex-shrink:0"></div>'
+            + '<div style="flex:1;display:flex;flex-direction:column;gap:7px">'
+            + '<div class="skeleton-block" style="width:55%;height:13px"></div>'
+            + '<div class="skeleton-block" style="width:80%;height:10px"></div>'
+            + '</div></div>';
+        }
+        __sk.outerHTML = __karten;
+      }
+    }
+  </script>
   <!-- FAB -->
   <button class="fab" id="fab-add" onclick="openAddModal()" title="Neuen Schüler anlegen">+</button>
 </div>
@@ -1515,6 +1546,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     <button class="btn-sheet-cancel" id="btn-test-rechnung" onclick="testRechnungErzeugen()" style="background:var(--surface2);margin-bottom:8px">🧪 Test-Rechnung erzeugen</button>
     <button class="btn-sheet-cancel" onclick="toggleTheme()" id="theme-btn-menu" style="background:var(--surface2);margin-bottom:8px">☀️ Design wechseln (hell/dunkel)</button>
     <button class="btn-sheet-cancel" onclick="openStilAuswahl()" style="background:var(--surface2);margin-bottom:8px">🎨 Design-Stil wählen</button>
+    <button class="btn-sheet-cancel" onclick="toggleBetaDashboard()" id="btn-beta-dashboard" style="background:var(--surface2);margin-bottom:8px">🧪 Beta: Neues Dashboard-Design</button>
     <button class="btn-sheet-cancel" onclick="aktivierePushADK()" id="btn-push-adk" style="background:var(--surface2);margin-bottom:4px">🔔 Benachrichtigungen aktivieren</button>
     <div style="font-size:0.68rem;color:var(--muted);padding:0 4px 12px;line-height:1.4">📱 iPhone: Safari → „Teilen" → „Zum Home-Bildschirm" → App von dort öffnen, erst dann aktivieren möglich.</div>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openDashboard()" style="background:var(--surface2);margin-bottom:8px">📊 Übersicht / Statistik</button>
@@ -6295,6 +6327,7 @@ function initTheme() {
   if (isLight) document.body.classList.add('light');
   const btn = document.getElementById('theme-btn-menu');
   if (btn) btn.textContent = themeBtnLabel(isLight);
+  aktualisiereBetaKnopf();
 }
 
 window.toggleTheme = () => {
@@ -9529,6 +9562,34 @@ window.aktivierePushADK = async () => {
     toast('Aktivierung fehlgeschlagen (' + (e.code || e.message || 'Fehler') + ').');
   }
 };
+
+
+
+// ══ BETA: NEUES DASHBOARD-DESIGN ═════════════════════════════════
+// Eigener, unabhaengiger Schalter (nicht der Design-Stil von neulich) -
+// deckt strukturelle Verbesserungen ab, nicht nur Farben: Lade-Skelette
+// statt des sofortigen "Noch keine Schueler"-Aufblitzens. Fortschritts-Ring
+// und Leerzustaende gehoeren inhaltlich zum selben "neuen Dashboard-Gefuehl"
+// dazu, laufen technisch aber ohnehin schon fuer alle - der Schalter
+// aendert dort sichtbar nichts, weil es dort kein "alt" mehr gibt.
+window.toggleBetaDashboard = () => {
+  const aktiv = localStorage.getItem('fs_beta_dashboard') === '1';
+  if (aktiv) {
+    localStorage.removeItem('fs_beta_dashboard');
+    toast('Beta-Dashboard deaktiviert – lädt neu…');
+  } else {
+    localStorage.setItem('fs_beta_dashboard', '1');
+    toast('🧪 Beta-Dashboard aktiviert – lädt neu…');
+  }
+  setTimeout(() => location.reload(), 700);
+};
+
+function aktualisiereBetaKnopf() {
+  const btn = document.getElementById('btn-beta-dashboard');
+  if (!btn) return;
+  const aktiv = localStorage.getItem('fs_beta_dashboard') === '1';
+  btn.textContent = aktiv ? '🧪 Beta: Neues Dashboard-Design ✓ aktiv' : '🧪 Beta: Neues Dashboard-Design';
+}
 
 </script>
 <!-- ERST-LOGIN: Passwort setzen (+ optional echte E-Mail) - nicht wegklickbar -->
