@@ -1152,6 +1152,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
         <div style="font-weight:700">🔑 Zugangscode für Schüler</div>
         <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">Code generieren damit Schüler eigene Akte sehen kann</div>
       </button>
+      <button onclick="document.getElementById('options-modal').classList.remove('open');openPlanLesson()" class="klasse-choice-btn">
+        <div style="font-weight:700">📅 Fahrstunde planen</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">Termin direkt eintragen, ohne über den Zugangscode zu gehen</div>
+      </button>
       <button onclick="document.getElementById('options-modal').classList.remove('open');openTransferModal()" class="klasse-choice-btn">
         <div style="font-weight:700">🔄 Schüler übertragen</div>
         <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">An Kollegen weitergeben</div>
