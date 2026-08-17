@@ -292,6 +292,9 @@ html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--tex
 <!-- ════ HAUPT-APP (nach Login) ════ -->
 <div class="screen" id="screen-app">
 
+  <div id="ios-push-hinweis" style="display:none;background:var(--surface2);border-bottom:1px solid var(--border);padding:9px 16px;font-size:0.74rem;color:var(--muted);text-align:center;line-height:1.4">
+    📱 Für Benachrichtigungen: Safari → „Teilen" → „Zum Home-Bildschirm" → App von dort erneut öffnen.
+  </div>
   <!-- Header -->
   <div class="portal-header">
     <div>
@@ -1020,6 +1023,13 @@ const VAPID_PORTAL = 'BC3nJw39xCFsrFABpreUA0YwSYasdaLhkfG0a_bEExB2Fp2qV8M1X1Zdwg
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(e => console.warn('SW:', e));
 }
+(() => {
+  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+  if (isIOS && window.navigator.standalone !== true) {
+    const el = document.getElementById('ios-push-hinweis');
+    if (el) el.style.display = 'block';
+  }
+})();
 
 window.portalPushAktivieren = async () => {
   try {
