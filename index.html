@@ -6020,6 +6020,7 @@ window.savePlannedLesson = async () => {
     const existing = docRef.data().plannedLessons || [];
     await dbUpd(doc(db,'accessCodes',docRef.id), { plannedLessons: [...existing, newLesson], expiresAt: Date.now() + CODE_LAUFZEIT_MS });
     document.getElementById('plan-lesson-modal').classList.remove('open');
+    document.getElementById('code-modal').classList.add('open');
     const tag = datum.split('-').reverse().join('.');
     if (!uhrzeit)      toast(`📅 Fahrstunde am ${tag} geplant (ohne Uhrzeit – erscheint nicht im Kalender)`);
     else if (!slotId)  toast(`📅 Fahrstunde am ${tag} geplant (Kalender-Eintrag nicht möglich)`);
