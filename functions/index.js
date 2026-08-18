@@ -236,10 +236,22 @@ exports.kalenderOAuthCallback = onRequest({ secrets: [GOOGLE_CLIENT_SECRET] }, a
 
 // Verbindung trennen (vom Client aufrufbar)
 exports.trennKalenderVerbindung = onCall({ region: 'europe-west3' }, async (reqCtx) => {
-  if (!reqCtx.auth) throw new Error('Nicht angemeldet.');
+  if (!reqCtx.auth) {
+    throw new HttpsError('unauthenticated', 'Bitte zuerst anmelden.');
+  }
   const uid = reqCtx.auth.uid;
-  await admin.firestore().collection('calendarTokens').doc(uid).delete().catch(() => {});
-  await admin.firestore().collection('calendarStatus').doc(uid).set({ connected: false }, { merge: true });
+  try {
+    await admin.firestore().collection('calendarTokens').doc(uid).delete();
+  } catch (e) {
+    console.warn('trennKalenderVerbindung: Token loeschen fehlgeschlagen', e);
+  }
+  try {
+    await admin.firestore().collection('calendarStatus').doc(uid)
+      .set({ connected: false, getrenntAm: Date.now() }, { merge: true });
+  } catch (e) {
+    console.error('trennKalenderVerbindung: Status setzen fehlgeschlagen', e);
+    throw new HttpsError('internal', 'Status konnte nicht gesetzt werden: ' + (e.message || String(e)));
+  }
   return { ok: true };
 });
 
