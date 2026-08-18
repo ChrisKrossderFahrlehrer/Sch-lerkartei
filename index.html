@@ -411,6 +411,36 @@ body.light .student-card { box-shadow:0 3px 0 rgba(16,24,40,0.12), 0 7px 16px rg
 .badge-blue  { background:rgba(88,166,255,0.15); color:var(--blue); }
 .badge-gray  { background:var(--surface2); color:var(--muted); }
 
+/* ══ BETA-DASHBOARD: sichtbar andere Gestaltung ══════════════════
+   Der Schalter aenderte bisher praktisch nichts Sichtbares: Lade-Skelette
+   blitzen wegen des lokalen Zwischenspeichers nur Millisekunden auf, Ring
+   und Leerzustaende liefen ohnehin fuer alle. Diese Regeln machen den
+   Unterschied tatsaechlich erlebbar - groesserer Fortschritts-Ring,
+   Statistik als Kacheln, luftigere Karten. */
+body.beta-dash .stats-row {
+  display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 9px;
+  padding: 12px 16px 14px;
+}
+body.beta-dash .stat-chip {
+  background: linear-gradient(165deg, var(--surface2), var(--surface));
+  border-radius: 16px; padding: 13px 12px; gap: 4px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.22);
+  align-items: flex-start; text-align: left;
+}
+body.beta-dash .stat-chip:first-child { padding: 15px 14px; }
+body.beta-dash .stat-chip:first-child .stat-val { font-size: 1.75rem; }
+body.beta-dash .stat-val { font-size: 1.3rem; line-height: 1.1; }
+body.beta-dash .stat-lbl { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.05em; }
+
+body.beta-dash .progress-ring-wrap { width: 54px; height: 54px; }
+body.beta-dash .ring-label { font-size: 0.74rem; }
+body.beta-dash .ring-bg, body.beta-dash .ring-fill { stroke-width: 4; }
+
+body.beta-dash .student-card {
+  border-radius: 20px; padding: 17px 16px; margin-bottom: 13px; gap: 14px;
+}
+body.beta-dash .badge { font-size: 0.66rem; padding: 3px 9px; }
+
 .skeleton-card {
   background:var(--surface); border:1px solid var(--border); border-radius:16px;
   padding:14px 15px; margin-bottom:11px; display:flex; align-items:center; gap:12px;
@@ -9533,6 +9563,7 @@ window.waehleStil = (id) => {
 (() => {
   const gespeicherterStil = localStorage.getItem('fs_stil');
   if (gespeicherterStil) document.body.classList.add(gespeicherterStil);
+  if (localStorage.getItem('fs_beta_dashboard') === '1') document.body.classList.add('beta-dash');
 })();
 
 
