@@ -869,6 +869,16 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
   <p style="max-width:340px;text-align:center;color:var(--muted);font-size:0.78rem;margin-top:14px;line-height:1.5">FahrSync ist eine webbasierte Verwaltungssoftware für Fahrschulen und Fahrlehrer: Ausbildungsnachweis, Fahrstunden-Protokoll mit Unterschrift, Lernfortschritt jedes Schülers sowie optional ein Termin-Kalender mit Online-Buchung.</p>
 </div>
 
+<!-- Neutraler Lade-Schirm: verdeckt den Login-Bildschirm, solange noch
+     nicht geklaert ist, ob eine gespeicherte Sitzung besteht. Ohne das blitzt
+     bei JEDEM Seitenwechsel (z.B. Rueckkehr vom separaten Kalender) kurz das
+     Login-Formular auf, bevor JS die echte Anmeldung erkennt - wirkt wie ein
+     ungewolltes Ausloggen, obwohl keines stattfindet. Wird direkt in
+     onAuthStateChanged entfernt, sobald die erste echte Antwort da ist. -->
+<div id="auth-resolving-overlay" style="position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;align-items:center;justify-content:center">
+  <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.3rem;color:var(--accent);opacity:0.85">FahrSync</div>
+</div>
+
 <!-- ══ LOGIN ══ -->
 <div class="screen active" id="screen-login">
       <div style="text-align:center;margin:4px 0 18px">
@@ -3579,6 +3589,8 @@ async function migrateOldAccessCodes() {
 }
 
 onAuthStateChanged(auth, async (user) => {
+  const __authOverlay = document.getElementById('auth-resolving-overlay');
+  if (__authOverlay) __authOverlay.remove();
   if (window.__DEMO) return;
   // FIX: Anonyme Schüler-Sessions (Kalender-Sync/Push-Grundlage) dürfen NICHT
   // in die Fahrlehrer-Logik unten fallen - sonst würde die Selbstheilung
