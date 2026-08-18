@@ -6861,10 +6861,23 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.querySele
 // SCHÜLER ZUGANGSCODE
 // ─────────────────────────────────────────
 function generateCodeStr() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 32 Zeichen, kein I/O/0/1
+  // SICHERHEIT: bewusst crypto.getRandomValues() statt Math.random() -
+  // letzteres ist ausdruecklich nicht fuer sicherheitsrelevante Zwecke
+  // gedacht und aus dem Generatorzustand vorhersagbar. Dieser Code ist der
+  // einzige Schutz der gesamten Schuelerakte. 256 ist durch 32 glatt
+  // teilbar, daher entsteht keine Verzerrung der Zeichenverteilung.
   let code = '';
-  for (let i=0; i<6; i++) code += chars[Math.floor(Math.random()*chars.length)];
-  return code;
+  try {
+    const werte = new Uint8Array(6);
+    crypto.getRandomValues(werte);
+    for (let i = 0; i < 6; i++) code += chars[werte[i] % chars.length];
+    return code;
+  } catch (e) {
+    console.warn('crypto.getRandomValues nicht verfuegbar:', e);
+    for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+    return code;
+  }
 }
 
 // ── DATENSCHUTZ: minimierte Daten fürs Schüler-Portal ──
