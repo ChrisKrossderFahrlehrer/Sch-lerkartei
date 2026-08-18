@@ -2147,7 +2147,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
-import { signInAnonymously, getAuth, setPersistence, browserLocalPersistence, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider, verifyBeforeUpdateEmail } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { signInAnonymously, getAuth, setPersistence, browserLocalPersistence, indexedDBLocalPersistence, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider, verifyBeforeUpdateEmail } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, enableIndexedDbPersistence, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, getDocs, getDoc, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
 
@@ -2164,7 +2164,16 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const fns = getFunctions(app, 'europe-west3');
-setPersistence(auth, browserLocalPersistence).catch(e => console.warn('Persistenz beim Start:', e));
+// WICHTIG: Hier wird BEWUSST kein setPersistence() mehr aufgerufen.
+// Bekannter Fehler im Firebase-SDK (firebase-js-sdk #9319): ein Aufruf von
+// setPersistence(browserLocalPersistence) ist NICHT idempotent - er loescht
+// die zuvor gespeicherte Anmeldung. Beim Start aufgerufen bedeutet das:
+// jeder App-Start meldet den Nutzer ab. Auf dem iPhone faellt das besonders
+// auf, weil eine Home-Bildschirm-App bei JEDEM Oeffnen komplett neu startet,
+// waehrend sie am Rechner/Android eher im Speicher bleibt. Genau das war die
+// Ursache des langjaehrigen "iOS meldet mich staendig ab"-Problems.
+// Firebase nutzt von sich aus bereits IndexedDB mit localStorage als
+// Rueckfall - das ist genau das gewuenschte Verhalten.
 
 // ─────────────────────────────────────────
 // KONSTANTEN – MÜSSEN VOR ALLEM ANDEREN DEFINIERT SEIN
@@ -2633,7 +2642,14 @@ window.doLogin = async () => {
   const btn = document.getElementById('btn-login');
   if (!eingabe || !pw) { setAuthError('Bitte Benutzername/E-Mail und Passwort eingeben.'); return; }
   btn.disabled = true; btn.textContent = '…';
-  try { await setPersistence(auth, browserLocalPersistence); } catch(e) { /* Persistenz best effort */ }
+  // IndexedDB bevorzugen: haltbarer als localStorage, das auf iOS als eines
+  // der ersten Dinge geleert wird. Hier unproblematisch, weil direkt danach
+  // ohnehin eine neue Anmeldung erfolgt (anders als beim App-Start).
+  try {
+    await setPersistence(auth, indexedDBLocalPersistence);
+  } catch(e) {
+    try { await setPersistence(auth, browserLocalPersistence); } catch(e2) { /* best effort */ }
+  }
 
   // Mögliche E-Mail-Adressen sammeln, die wir nacheinander probieren
   const versuche = [];
