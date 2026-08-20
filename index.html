@@ -875,7 +875,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
      Login-Formular auf, bevor JS die echte Anmeldung erkennt - wirkt wie ein
      ungewolltes Ausloggen, obwohl keines stattfindet. Wird direkt in
      onAuthStateChanged entfernt, sobald die erste echte Antwort da ist. -->
-<div id="auth-resolving-overlay" style="position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;align-items:center;justify-content:center">
+<div id="auth-resolving-overlay" style="position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px">
+  <img src="./icon-192.png?v=3" alt="FahrSync" style="width:64px;height:64px;object-fit:contain;border-radius:16px">
   <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.3rem;color:var(--accent);opacity:0.85">FahrSync</div>
 </div>
 
