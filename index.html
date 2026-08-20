@@ -879,6 +879,22 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
   <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.3rem;color:var(--accent);opacity:0.85">FahrSync</div>
 </div>
 
+<!-- ══ E-MAIL BESTAETIGEN (nur neu registrierte Konten) ══ -->
+<div class="screen" id="screen-email-verify">
+  <div style="max-width:380px;margin:60px auto 0;text-align:center;padding:0 20px">
+    <div style="font-size:2.6rem;margin-bottom:14px">📧</div>
+    <h2 style="font-family:'Syne',sans-serif;font-weight:800;margin:0 0 10px">Fast geschafft!</h2>
+    <p style="color:var(--muted);font-size:0.88rem;line-height:1.55;margin-bottom:6px">
+      Wir haben eine Bestätigungs-E-Mail an<br><strong id="ev-email" style="color:var(--text)"></strong><br>geschickt.
+      Bitte klicke auf den Link darin, um dein Konto zu aktivieren.
+    </p>
+    <button class="btn btn-primary" style="width:100%;margin-top:20px" onclick="pruefeEmailBestaetigt()" id="btn-ev-check">✓ Ich habe bestätigt – weiter</button>
+    <button class="btn-sheet-cancel" style="width:100%;margin-top:10px" onclick="sendeBestaetigungErneut()" id="btn-ev-resend">E-Mail erneut senden</button>
+    <button class="btn-sheet-cancel" style="width:100%;margin-top:10px;background:transparent" onclick="doLogout()">Abmelden</button>
+    <div id="ev-status" style="margin-top:14px;font-size:0.76rem;color:var(--muted)"></div>
+  </div>
+</div>
+
 <!-- ══ LOGIN ══ -->
 <div class="screen active" id="screen-login">
       <div style="text-align:center;margin:4px 0 18px">
@@ -2157,7 +2173,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
-import { signInAnonymously, getAuth, setPersistence, browserLocalPersistence, indexedDBLocalPersistence, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider, verifyBeforeUpdateEmail } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { signInAnonymously, getAuth, setPersistence, browserLocalPersistence, indexedDBLocalPersistence, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider, verifyBeforeUpdateEmail, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, enableIndexedDbPersistence, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, getDocs, getDoc, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
 
@@ -2772,6 +2788,9 @@ window.doRegister = async () => {
     // Konto mit ECHTER E-Mail anlegen
     const cred = await createUserWithEmailAndPassword(auth, email, pw);
     await updateProfile(cred.user, { displayName: name });
+    // NEU: Bestaetigungs-Mail verschicken. Best effort - schlaegt der Versand
+    // fehl, soll die Registrierung selbst trotzdem nicht abbrechen.
+    try { await sendEmailVerification(cred.user); } catch(everr) { console.warn('sendEmailVerification:', everr); }
 
     // Benutzername → E-Mail-Zuordnung speichern (für Login per Benutzername)
     try {
@@ -2830,7 +2849,8 @@ window.doRegister = async () => {
         datenschutzAkzeptiert: true,
         datenschutzAkzeptiertAm: Date.now(),
         agbAkzeptiert: true,
-        unternehmerBestaetigt: true
+        unternehmerBestaetigt: true,
+        emailVerificationRequired: true
       });
       sendRegistrationNotification({ name, email, username, typ: 'Fahrschule', code });
 
@@ -2847,7 +2867,8 @@ window.doRegister = async () => {
         datenschutzAkzeptiert: true,
         datenschutzAkzeptiertAm: Date.now(),
         agbAkzeptiert: true,
-        unternehmerBestaetigt: true
+        unternehmerBestaetigt: true,
+        emailVerificationRequired: true
       };
       // Wenn einer Fahrschule beigetreten wird: Code mitgeben, damit die
       // Firestore-Regel prüfen kann, dass der Code wirklich zu dieser Schule
@@ -3635,6 +3656,18 @@ onAuthStateChanged(auth, async (user) => {
         }
       } else {
         const profil = profDoc.data();
+
+        // Nur neu registrierte Konten (Flag explizit gesetzt) UND nicht
+        // SuperAdmin UND wirklich noch unbestaetigt -> Bestaetigungs-Bildschirm.
+        const __istSuperAdminFuerEV = user.email === 'chriskoo@mail.de' || profil.rolle === 'superadmin';
+        if (profil.emailVerificationRequired === true && !__istSuperAdminFuerEV) {
+          try { await user.reload(); } catch(e) {}
+          if (!auth.currentUser.emailVerified) {
+            zeigeEmailVerifyBildschirm(user.email);
+            return;
+          }
+        }
+
         currentUser._fahrschuleId = profil.fahrschuleId || null;
         currentUser._rolle        = profil.rolle || 'fahrlehrer';
         currentUser._fsName       = profil.fahrschuleName || '';
@@ -9662,6 +9695,48 @@ function aktualisiereBetaKnopf() {
   const aktiv = localStorage.getItem('fs_beta_dashboard') === '1';
   btn.textContent = aktiv ? '🧪 Beta: Neues Dashboard-Design ✓ aktiv' : '🧪 Beta: Neues Dashboard-Design';
 }
+
+
+
+// ══ E-MAIL-BESTAETIGUNG (nur neu registrierte Konten, siehe onAuthStateChanged) ═══
+function zeigeEmailVerifyBildschirm(email) {
+  document.querySelectorAll('.screen').forEach(s => { s.classList.remove('active'); s.style.display=''; });
+  document.getElementById('screen-email-verify').classList.add('active');
+  const el = document.getElementById('ev-email');
+  if (el) el.textContent = email || '';
+}
+
+window.pruefeEmailBestaetigt = async () => {
+  const btn = document.getElementById('btn-ev-check');
+  const status = document.getElementById('ev-status');
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    await auth.currentUser.reload();
+    if (auth.currentUser.emailVerified) {
+      location.reload(); // sauberster Weg: onAuthStateChanged baut die App neu auf
+    } else {
+      if (status) status.textContent = 'Noch nicht bestätigt – bitte zuerst auf den Link in der E-Mail klicken.';
+    }
+  } catch(e) {
+    if (status) status.textContent = 'Fehler: ' + (e.message || 'unbekannt');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '✓ Ich habe bestätigt – weiter'; }
+  }
+};
+
+window.sendeBestaetigungErneut = async () => {
+  const btn = document.getElementById('btn-ev-resend');
+  const status = document.getElementById('ev-status');
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    await sendEmailVerification(auth.currentUser);
+    if (status) status.textContent = '✓ Erneut gesendet – bitte auch den Spam-Ordner prüfen.';
+  } catch(e) {
+    if (status) status.textContent = 'Senden fehlgeschlagen: ' + (e.code || e.message || 'Fehler');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'E-Mail erneut senden'; }
+  }
+};
 
 </script>
 <!-- ERST-LOGIN: Passwort setzen (+ optional echte E-Mail) - nicht wegklickbar -->
