@@ -2887,6 +2887,14 @@ window.doRegister = async () => {
       });
     }
 
+    // AUDIT-FIX: Nicht auf den asynchronen onAuthStateChanged-Wettlauf mit
+    // der Selbstheilung verlassen (die faelschlich ein Dokument OHNE das
+    // Kennzeichen anlegen koennte, falls sie zuerst zuschlaegt). Nach
+    // erfolgreicher Registrierung steht die Bestaetigungspflicht bereits
+    // zweifelsfrei fest - Bildschirm direkt selbst zeigen.
+    zeigeEmailVerifyBildschirm(email);
+    return;
+
   } catch(e) {
     btn.disabled = false; btn.textContent = 'Konto erstellen';
     if (e.code === 'auth/email-already-in-use') {
