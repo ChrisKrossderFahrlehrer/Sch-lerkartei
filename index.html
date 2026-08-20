@@ -3226,15 +3226,23 @@ async function loadAboStatus(uid) {
   updateAboUI();
 }
 
+function positioniereFabUeberBanner() {
+  const banner = document.getElementById('ad-banner');
+  const fab = document.querySelector('.fab');
+  if (!fab || !banner || banner.style.display === 'none') return;
+  const hoehe = banner.offsetHeight || 44;
+  fab.style.bottom = `calc(var(--safe-bottom) + 24px + ${hoehe}px)`;
+}
 function showBanner() {
   document.getElementById('ad-banner').style.display = 'block';
-  const fab = document.querySelector('.fab');
-  if (fab) fab.style.bottom = 'calc(var(--safe-bottom) + 24px + 44px)';
-  loadWerbeBanner();
+  positioniereFabUeberBanner();
+  loadWerbeBanner().then(() => positioniereFabUeberBanner());
 }
 let __werbungLoaded = false;
 async function loadWerbeBanner() {
   if (__werbungLoaded) return; __werbungLoaded = true;
+  // Rueckgabewert wird von showBanner() genutzt, um die Fab-Position
+  // NACH dem Laden noch einmal an die tatsaechliche Hoehe anzupassen.
   try {
     const d = await getDoc(doc(db, 'platform', 'werbung'));
     if (!d.exists()) return;
