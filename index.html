@@ -5151,7 +5151,7 @@ function renderAdkGruppenChart(s) {
     return { name: g.gruppe, pct: Math.round(avg), farbe: COLORS[gi % COLORS.length] };
   });
 
-  const stufen = ['🔴','🟠','🟡','🟢','⭐'];
+  const stufen = ['<span class="stufe-form s1"></span>','<span class="stufe-form s2"></span>','<span class="stufe-form s3"></span>','<span class="stufe-form s4"></span>','<span class="stufe-form s5"></span>'];
   const stufenLabel = ['Nicht gezeigt','Gezeigt','Ausreichend','Beherrscht','Sehr sicher'];
 
   const bars = gruppen.map(g => {
