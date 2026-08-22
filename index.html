@@ -452,6 +452,29 @@ body.beta-dash .badge { font-size: 0.66rem; padding: 3px 9px; }
 @keyframes skeleton-shimmer { 0% { background-position:200% 0; } 100% { background-position:-200% 0; } }
 @media (prefers-reduced-motion: reduce) { .skeleton-block { animation:none; } }
 
+.kennzeichen-badge {
+  display: inline-flex; align-items: stretch; flex-shrink: 0;
+  background: #f2f0e6; border: 1.5px solid #8a8570; border-radius: 5px;
+  padding: 2px 3px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.4);
+  overflow: hidden;
+}
+.kennzeichen-badge .kz-eu {
+  background: #1e4b9c; color: #fff; font-size: 0.5rem; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 3px; border-radius: 2px 0 0 2px; letter-spacing: -0.02em;
+}
+.kennzeichen-badge .kz-nr {
+  color: #14171c; font-family: 'Manrope', sans-serif; font-weight: 800;
+  font-size: 0.74rem; letter-spacing: 0.02em; padding: 0 6px;
+  display: flex; align-items: center;
+}
+.stufe-form { display:inline-block; width:14px; height:14px; }
+.stufe-form.s1 { border-radius:50%; background:currentColor; opacity:0.55; }
+.stufe-form.s2 { clip-path:polygon(50% 4%,96% 92%,4% 92%); background:currentColor; opacity:0.6; }
+.stufe-form.s3 { clip-path:polygon(50% 4%,96% 92%,4% 92%); background:currentColor; opacity:0.85; }
+.stufe-form.s4 { border-radius:50%; background:currentColor; }
+.stufe-form.s5 { clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%); background:currentColor; }
+
 .empty-state { text-align:center; padding:60px 24px; color:var(--muted); }
 .empty-state .ei { font-size:3rem; margin-bottom:12px; }
 .empty-state p { font-size:0.9rem; line-height:1.6; }
@@ -4145,6 +4168,9 @@ function getStudent(id) { return students.find(s => s.id === id); }
 
 // Schüler-Nummer ermitteln. Hat der Schüler ein gespeichertes schuelerNr-Feld,
 // wird das genutzt. Sonst (Alt-Schüler) wird die Position nach Anlegedatum berechnet.
+function kennzeichenBadge(nr) {
+  return `<span class="kennzeichen-badge"><span class="kz-eu">D</span><span class="kz-nr">FS·${nr}</span></span>`;
+}
 function getSchuelerNr(s) {
   if (s.schuelerNr) return s.schuelerNr;
   // Fallback: Position in nach createdAt sortierter Liste
@@ -4679,7 +4705,7 @@ function renderDetail() {
     <div class="profile-info">
       <div class="profile-name">${escapeHtmlEigen(s.vorname)} ${escapeHtmlEigen(s.nachname)}</div>
       <div class="profile-meta" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-        <span style="font-size:0.72rem;color:var(--muted);font-weight:600">#${getSchuelerNr(s)}</span>
+        ${kennzeichenBadge(getSchuelerNr(s))}
         <span style="background:${badge.color};color:${badge.text};border:1px solid ${badge.border};border-radius:6px;padding:2px 8px;font-size:0.72rem;font-weight:700">${badge.label}</span>
         ${a?'<span style="font-size:0.72rem;color:var(--muted)">'+a+' Jahre</span>':''}
         ${bf17DetailTag}
@@ -4752,7 +4778,7 @@ function renderDetail() {
   const myVzZeichen = customThemen.filter(t => t.typ === 'vz');
   const customThemenOhneKat = myCustomThemen.filter(t => !t.kategorie);
 
-  const STUFEN = ['🔴','🟠','🟡','🟢','⭐'];
+  const STUFEN = ['<span class="stufe-form s1"></span>','<span class="stufe-form s2"></span>','<span class="stufe-form s3"></span>','<span class="stufe-form s4"></span>','<span class="stufe-form s5"></span>'];
   const STUFEN_NAME = ['Nicht gezeigt','Gezeigt','Ausreichend','Beherrscht','Sehr sicher'];
 
   const VZ_GRUPPE_NAME = '🚦 Verkehrszeichen';
@@ -7173,7 +7199,7 @@ let letzteGruppeId = '';     // Dropdown-Auswahl — überlebt Re-Render
 
 // Eine Themen-Zeile rendern
 function renderEigenThemaRow(t, s) {
-  const STUFEN = ['🔴','🟠','🟡','🟢','⭐'];
+  const STUFEN = ['<span class="stufe-form s1"></span>','<span class="stufe-form s2"></span>','<span class="stufe-form s3"></span>','<span class="stufe-form s4"></span>','<span class="stufe-form s5"></span>'];
   const STUFEN_NAME = ['Nicht gezeigt','Gezeigt','Ausreichend','Beherrscht','Sehr sicher'];
   const val  = (s.customThemen||{})[t.id] || 0;
   const done = val >= 4;
