@@ -1,0 +1,31 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Chat-Bilder: dieselbe Zustaendigkeits-Pruefung wie bei den
+    // Firestore-Regeln fuer accessCodes (Chat-Privatsphaere) - nur der
+    // eine zugewiesene Fahrlehrer ODER Zugriff ueber einen noch nicht
+    // abgelaufenen Code (Schueler-Portal, kein eigenes Konto noetig).
+    match /chat-images/{codeId}/{fileName} {
+      function codeDoc() {
+        return firestore.get(/databases/(default)/documents/accessCodes/$(codeId));
+      }
+      function istZustaendigerLehrer() {
+        return request.auth != null
+               && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+               && codeDoc().data.teacherUid == request.auth.uid;
+      }
+      function codeGueltig() {
+        return !('expiresAt' in codeDoc().data)
+               || codeDoc().data.expiresAt > request.time.toMillis();
+      }
+      allow read: if istZustaendigerLehrer() || codeGueltig();
+      allow write: if (istZustaendigerLehrer() || codeGueltig())
+                   && request.resource.size < 8 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+    // Alles andere: standardmaessig gesperrt.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
