@@ -8794,10 +8794,15 @@ async function loadChatMessages() {
         </div>`;
       return;
     }
+    const schuelerGelesenBis = (codeDoc && codeDoc.studentLastRead) || 0;
     messagesEl.innerHTML = msgs.map(msg => {
       const vonFahrlehrer = msg.senderUid === currentUser.uid;
       const zeit = msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit'}) : '';
       const datum = msg.createdAt ? new Date(msg.createdAt).toLocaleDateString('de-DE') : '';
+      const gelesen = vonFahrlehrer && msg.createdAt && schuelerGelesenBis >= msg.createdAt;
+      const haekchen = vonFahrlehrer
+        ? `<span style="margin-left:3px;color:${gelesen ? 'var(--blue)' : 'var(--muted)'}">${gelesen ? '✓✓' : '✓'}</span>`
+        : '';
       return `
         <div style="display:flex;flex-direction:column;align-items:${vonFahrlehrer?'flex-end':'flex-start'};gap:2px">
           <div style="
@@ -8807,7 +8812,7 @@ async function loadChatMessages() {
             font-size:0.88rem;line-height:1.4;word-break:break-word">
             ${(msg.text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
           </div>
-          <div style="font-size:0.65rem;color:var(--muted);padding:0 4px">${datum} ${zeit}</div>
+          <div style="font-size:0.65rem;color:var(--muted);padding:0 4px">${datum} ${zeit}${haekchen}</div>
         </div>`;
     }).join('');
     messagesEl.scrollTop = messagesEl.scrollHeight;
