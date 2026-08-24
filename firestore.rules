@@ -320,27 +320,31 @@ service cloud.firestore {
     // ACCESS CODES (für Schüler-Zugangscodes)
     // ══════════════════════════════════════════════════════
     match /accessCodes/{docId} {
-      // SICHERHEIT: Der Ablauf (expiresAt) wurde bisher AUSSCHLIESSLICH im
-      // Portal-JavaScript geprueft. Wer einen Code kannte - etwa ein
-      // ehemaliger Schueler oder jemand mit einem alten Screenshot - behielt
-      // per direktem Zugriff dauerhaft Lese- und Schreibrechte, auch lange
-      // nach dem Ablauf. Jetzt serverseitig durchgesetzt. Angemeldete
-      // Fahrlehrer bleiben ausgenommen (deren Chat-Ansicht liest dasselbe
-      // Dokument auch nach Ablauf). Dokumente ohne expiresAt-Feld bleiben
-      // zugaenglich, damit Altbestand nicht ploetzlich ausgesperrt wird -
-      // das Feld kann ueber die eingeschraenkte Update-Regel nicht entfernt werden.
-      allow get:  if (isAuth() && userDocExists())
+      // SICHERHEIT (Kundenanforderung: Chat streng privat zwischen genau
+      // einem Schueler und seinem zugewiesenen Fahrlehrer, auch innerhalb
+      // derselben Fahrschule): Die vorherige Fassung liess JEDEN
+      // angemeldeten Fahrlehrer/Admin - unabhaengig von Fahrschule oder
+      // Zustaendigkeit - per direktem Zugriff auf ein Dokument, dessen
+      // Kennung er kannte, lesen/aendern/loeschen. userDocExists() prueft
+      // nur "irgendein echtes Konto", keinerlei Zugehoerigkeit. Jetzt
+      // zusaetzlich resource.data.teacherUid == request.auth.uid verlangt -
+      // nur noch der EINE zustaendige Fahrlehrer (oder SuperAdmin) kommt
+      // rein, kein anderer Fahrlehrer/Admin derselben Fahrschule. Der
+      // bewusste Schueler-Zugang ueber den Code selbst (ohne Konto) bleibt
+      // unveraendert ueber die Ablauf-Bedingungen erhalten.
+      allow get:  if isSuperAdmin()
+                  || (isAuth() && userDocExists() && resource.data.teacherUid == request.auth.uid)
                   || !('expiresAt' in resource.data)
                   || resource.data.expiresAt > request.time.toMillis();
-      // SICHERHEIT: Auflisten nur noch der EIGENEN Codes. Vorher konnte jeder
-      // angemeldete Fahrlehrer saemtliche Codes aller Fahrschulen auflisten
-      // und damit fremde Schuelernamen, Lernstaende und Chats einsehen.
       allow list: if isSuperAdmin() ||
                      (isAuth() && userDocExists() && resource.data.teacherUid == request.auth.uid);
-      allow create: if isAuth() && userDocExists();
-      allow delete: if isAuth() && userDocExists();
-      allow update: if (isAuth() && userDocExists()) ||
-                       (request.resource.data.diff(resource.data)
+      allow create: if isAuth() && userDocExists()
+                    && request.resource.data.teacherUid == request.auth.uid;
+      allow delete: if isSuperAdmin()
+                    || (isAuth() && userDocExists() && resource.data.teacherUid == request.auth.uid);
+      allow update: if isSuperAdmin()
+                    || (isAuth() && userDocExists() && resource.data.teacherUid == request.auth.uid)
+                    || (request.resource.data.diff(resource.data)
                           .affectedKeys()
                           .hasOnly(['messages', 'plannedLessons', 'lernziele'])
                         && (!('expiresAt' in resource.data)
