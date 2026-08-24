@@ -529,6 +529,9 @@ window.switchPortalTab = (tab) => {
   if (tab === 'chat') {
     lastReadMsgTs = Date.now();
     document.getElementById('chat-badge').style.display = 'none';
+    if (codeDocId) {
+      updateDoc(doc(db, 'accessCodes', codeDocId), { studentLastRead: lastReadMsgTs }).catch(e => console.warn('studentLastRead:', e));
+    }
     renderChat();
     setTimeout(() => {
       const msgs = document.getElementById('chat-messages');
