@@ -331,6 +331,8 @@ html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--tex
   <div id="tab-chat" style="display:none;flex:1;flex-direction:column;overflow:hidden">
     <div class="chat-messages" id="chat-messages"></div>
     <div class="chat-input-wrap">
+      <input type="file" id="chat-image-input" accept="image/*" style="display:none" onchange="sendeSchuelerBild(this.files[0])">
+      <button class="chat-send-btn" onclick="document.getElementById('chat-image-input').click()" style="background:var(--surface2);color:var(--text)" title="Foto senden">📷</button>
       <textarea class="chat-input" id="chat-input" rows="1" placeholder="Nachricht…"
         oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"
         onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
@@ -367,6 +369,7 @@ html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--tex
 import { initializeApp }    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getMessaging, getToken, isSupported } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
 import { getFirestore, collection, doc, getDoc, getDocs, onSnapshot,
          query, where, updateDoc }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
@@ -740,9 +743,12 @@ function renderChat() {
     const isFL = m.sender === 'fahrlehrer';
     const time = new Date(m.timestamp).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
     const date = new Date(m.timestamp).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
+    const inhalt = m.imageUrl
+      ? `<img src="${m.imageUrl}" loading="lazy" style="max-width:100%;border-radius:10px;display:block;cursor:pointer" onclick="window.open('${m.imageUrl}','_blank')">`
+      : escHtml(m.text);
     return `<div class="msg-bubble ${m.sender}" style="display:flex;flex-direction:column">
       ${isFL ? `<div style="font-size:0.68rem;color:var(--muted);margin-bottom:3px;font-weight:600">${escHtml(m.senderName||'Fahrlehrer')}</div>` : ''}
-      <div>${escHtml(m.text)}</div>
+      <div>${inhalt}</div>
       <div class="msg-meta">${date} ${time}</div>
     </div>`;
   }).join('');
@@ -1066,6 +1072,53 @@ window.portalPushAktivieren = async () => {
   } catch (e) {
     console.warn('portalPushAktivieren:', e);
     portalToast('Aktivierung fehlgeschlagen (' + (e.code || e.message || 'Fehler') + ').');
+  }
+};
+
+
+// Dieselbe Komprimierungs-Technik wie in der ADK: iPhone-Fotos vor dem
+// Hochladen ueber ein <canvas> auf max. 1600px verkleinert und als JPEG
+// (80% Qualitaet) neu kodiert.
+function komprimiereBildPortal(datei) {
+  return new Promise((resolve, reject) => {
+    const bild = new Image();
+    const url = URL.createObjectURL(datei);
+    bild.onload = () => {
+      URL.revokeObjectURL(url);
+      const MAX = 1600;
+      let { width, height } = bild;
+      if (width > MAX || height > MAX) {
+        const skala = MAX / Math.max(width, height);
+        width = Math.round(width * skala); height = Math.round(height * skala);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(bild, 0, 0, width, height);
+      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Komprimierung fehlgeschlagen')), 'image/jpeg', 0.8);
+    };
+    bild.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Bild konnte nicht gelesen werden')); };
+    bild.src = url;
+  });
+}
+
+window.sendeSchuelerBild = async (datei) => {
+  if (!datei || !codeDocId) return;
+  if (!datei.type.startsWith('image/')) { portalToast('Bitte ein Bild auswählen.'); return; }
+  document.getElementById('chat-image-input').value = '';
+  portalToast('📷 Bild wird gesendet…');
+  try {
+    const blob = await komprimiereBildPortal(datei);
+    const pfad = `chat-images/${codeDocId}/${Date.now()}.jpg`;
+    const storage = getStorage();
+    await uploadBytes(ref(storage, pfad), blob, { contentType: 'image/jpeg' });
+    const url = await getDownloadURL(ref(storage, pfad));
+    const msg = { id: Date.now().toString(), imageUrl: url, sender: 'schueler', senderName: schuelerName, timestamp: Date.now() };
+    const currentMsgs = codeData.messages || [];
+    const newMsgs = [...currentMsgs, msg].slice(-50);
+    await updateDoc(doc(db,'accessCodes',codeDocId), { messages: newMsgs });
+    lastReadMsgTs = Date.now();
+  } catch(e) {
+    portalToast('❌ Fehler: ' + e.message);
   }
 };
 
