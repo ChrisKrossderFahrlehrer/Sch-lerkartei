@@ -288,7 +288,8 @@ function baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel, betra
     const stellerZeile = [
       steller.name,
       steller.strasse,
-      [steller.plz, steller.ort].filter(Boolean).join(' ')
+      [steller.plz, steller.ort].filter(Boolean).join(' '),
+      steller.steuernummer ? `St-Nr. ${steller.steuernummer}` : null
     ].map(t => String(t || '').trim()).filter(Boolean).join(' · ');
     doc.fontSize(9).fillColor('#555').text(stellerZeile, { align: 'left' });
     doc.moveDown(2);
@@ -395,6 +396,9 @@ exports.erstelleRechnung = onCall(async (request) => {
     ort: platImp.ort || '',
     email: platImp.email || 'kontakt@fahrsync.de',
     web: platImp.web || 'fahrsync.de',
+    // Pflichtangabe nach §14 Abs.4 UStG (gilt auch fuer Kleinunternehmer):
+    // Steuernummer, seit 24.08.2026 vom Finanzamt Luckenwalde vorliegend.
+    steuernummer: platImp.steuernummer || '050/240/09485',
   };
   const LAENDER = { DE: '', AT: 'Österreich', CH: 'Schweiz', XX: '' };
   const empfaenger = {
@@ -572,6 +576,7 @@ exports.paypalWebhook = onRequest(
           name: platImp.name || 'Chriskoo', strasse: platImp.strasse || '',
           plz: platImp.plz || '', ort: platImp.ort || '',
           email: platImp.email || 'kontakt@fahrsync.de', web: platImp.web || 'fahrsync.de',
+          steuernummer: platImp.steuernummer || '050/240/09485',
         };
         const LAENDER = { DE: '', AT: 'Österreich', CH: 'Schweiz', XX: '' };
         const empfaenger = {
