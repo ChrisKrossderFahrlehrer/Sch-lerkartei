@@ -1711,6 +1711,14 @@ async function renderSuperAdminEinst() {
         <label class="form-label">Instagram (optional)</label>
         <input class="form-input" id="sa-imp-instagram" value="${imp.instagram||'@ChrisKrossderFahrlehrer'}" placeholder="@username">
       </div>
+      <div class="form-group">
+        <label class="form-label">Steuernummer</label>
+        <input class="form-input" id="sa-imp-steuernummer" value="${imp.steuernummer||'050/240/09485'}" placeholder="z.B. 050/240/09485">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Wirtschafts-Identifikationsnummer</label>
+        <input class="form-input" id="sa-imp-wirtschaftsid" value="${imp.wirtschaftsId||'DE464533862'}" placeholder="z.B. DE464533862">
+      </div>
       <div id="sa-imp-status" style="font-size:0.82rem;min-height:20px;margin-bottom:8px;text-align:center;padding:8px;border-radius:8px"></div>
       <button class="btn-main" onclick="savePlatformImpressum()">💾 Impressum speichern</button>
     </div>
@@ -1879,6 +1887,8 @@ window.savePlatformImpressum = async () => {
       ort:       document.getElementById('sa-imp-ort').value.trim(),
       strasse:   document.getElementById('sa-imp-strasse').value.trim(),
       instagram: document.getElementById('sa-imp-instagram').value.trim(),
+      steuernummer: document.getElementById('sa-imp-steuernummer').value.trim(),
+      wirtschaftsId: document.getElementById('sa-imp-wirtschaftsid').value.trim(),
       geaendertAm: Date.now(),
     };
     await setDoc(doc(db, 'platform', 'impressum'), data, { merge: true });
