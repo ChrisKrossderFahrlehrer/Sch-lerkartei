@@ -1847,6 +1847,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       style="flex:1;resize:none;height:42px;max-height:120px;padding:10px 14px;background:var(--surface2);border:1.5px solid var(--border);border-radius:12px;color:var(--text);font-family:'Manrope',sans-serif;font-size:0.9rem;outline:none;overflow:hidden"
       oninput="this.style.height='42px';this.style.height=Math.min(this.scrollHeight,120)+'px'"
       onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage()}"></textarea>
+    <input type="file" id="chat-image-input" accept="image/*" style="display:none" onchange="sendeChatBild(this.files[0])">
+    <button onclick="document.getElementById('chat-image-input').click()" title="Foto senden" style="width:42px;height:42px;border-radius:12px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);font-size:1.1rem;cursor:pointer;flex-shrink:0">📷</button>
     <button onclick="sendChatMessage()" style="width:42px;height:42px;border-radius:12px;background:var(--accent);border:none;color:#0d1117;font-size:1.2rem;cursor:pointer;flex-shrink:0">➤</button>
   </div>
 </div>
@@ -2266,6 +2268,7 @@ import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/
 import { signInAnonymously, getAuth, setPersistence, browserLocalPersistence, indexedDBLocalPersistence, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider, verifyBeforeUpdateEmail, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, enableIndexedDbPersistence, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, getDocs, getDoc, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD490kLzTOq3h3VdQ9ZqWZd_aXcDRfxBOs",
@@ -8796,21 +8799,25 @@ async function loadChatMessages() {
     }
     const schuelerGelesenBis = (codeDoc && codeDoc.studentLastRead) || 0;
     messagesEl.innerHTML = msgs.map(msg => {
-      const vonFahrlehrer = msg.senderUid === currentUser.uid;
-      const zeit = msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit'}) : '';
-      const datum = msg.createdAt ? new Date(msg.createdAt).toLocaleDateString('de-DE') : '';
-      const gelesen = vonFahrlehrer && msg.createdAt && schuelerGelesenBis >= msg.createdAt;
+      const vonFahrlehrer = msg.senderUid === currentUser.uid || msg.sender === 'fahrlehrer';
+      const zs = msg.createdAt || msg.timestamp;
+      const zeit = zs ? new Date(zs).toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit'}) : '';
+      const datum = zs ? new Date(zs).toLocaleDateString('de-DE') : '';
+      const gelesen = vonFahrlehrer && zs && schuelerGelesenBis >= zs;
       const haekchen = vonFahrlehrer
         ? `<span style="margin-left:3px;color:${gelesen ? 'var(--blue)' : 'var(--muted)'}">${gelesen ? '✓✓' : '✓'}</span>`
         : '';
+      const inhalt = msg.imageUrl
+        ? `<img src="${msg.imageUrl}" loading="lazy" style="max-width:100%;border-radius:12px;display:block;cursor:pointer" onclick="window.open('${msg.imageUrl}','_blank')">`
+        : (msg.text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       return `
         <div style="display:flex;flex-direction:column;align-items:${vonFahrlehrer?'flex-end':'flex-start'};gap:2px">
           <div style="
-            max-width:78%;padding:10px 14px;border-radius:${vonFahrlehrer?'16px 16px 4px 16px':'16px 16px 16px 4px'};
+            max-width:78%;padding:${msg.imageUrl?'6px':'10px 14px'};border-radius:${vonFahrlehrer?'16px 16px 4px 16px':'16px 16px 16px 4px'};
             background:${vonFahrlehrer?'var(--accent)':'var(--surface2)'};
             color:${vonFahrlehrer?'#0d1117':'var(--text)'};
             font-size:0.88rem;line-height:1.4;word-break:break-word">
-            ${(msg.text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+            ${inhalt}
           </div>
           <div style="font-size:0.65rem;color:var(--muted);padding:0 4px">${datum} ${zeit}${haekchen}</div>
         </div>`;
@@ -9891,6 +9898,63 @@ window.waehlePunkteStil = (id) => {
   localStorage.setItem('fs_punkte_stil', id);
   document.getElementById('punkte-stil-liste').innerHTML = PUNKTE_STILE.map(previewPunkteKachel).join('');
   toast('Bewertungspunkte aktualisiert ✓');
+};
+
+
+
+// ══ CHAT-BILDER: Komprimierung + Hochladen ═══════════════════════
+// iPhone-Fotos sind oft 3-8 MB. Vor dem Hochladen wird ueber ein
+// unsichtbares <canvas> verkleinert (max. 1600px lange Kante) und als
+// JPEG mit 80% Qualitaet neu kodiert - sieht auf dem Handy-Bildschirm
+// weiterhin scharf aus, braucht aber nur noch einen Bruchteil des Platzes.
+function komprimiereBild(datei) {
+  return new Promise((resolve, reject) => {
+    const bild = new Image();
+    const url = URL.createObjectURL(datei);
+    bild.onload = () => {
+      URL.revokeObjectURL(url);
+      const MAX = 1600;
+      let { width, height } = bild;
+      if (width > MAX || height > MAX) {
+        const skala = MAX / Math.max(width, height);
+        width = Math.round(width * skala); height = Math.round(height * skala);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(bild, 0, 0, width, height);
+      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Komprimierung fehlgeschlagen')), 'image/jpeg', 0.8);
+    };
+    bild.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Bild konnte nicht gelesen werden')); };
+    bild.src = url;
+  });
+}
+
+window.sendeChatBild = async (datei) => {
+  if (!datei) return;
+  if (!datei.type.startsWith('image/')) { toast('Bitte ein Bild auswählen.'); return; }
+  document.getElementById('chat-image-input').value = '';
+  toast('📷 Bild wird gesendet…');
+  try {
+    const snap = await getDocs(query(collection(db,'accessCodes'), where('studentId','==',activeId), where('teacherUid','==',currentUser.uid)));
+    if (snap.empty) { toast('⚠️ Code nicht gefunden'); return; }
+    const docRef = snap.docs[0];
+    const blob = await komprimiereBild(datei);
+    const pfad = `chat-images/${docRef.id}/${Date.now()}.jpg`;
+    const storage = getStorage();
+    await uploadBytes(ref(storage, pfad), blob, { contentType: 'image/jpeg' });
+    const url = await getDownloadURL(ref(storage, pfad));
+    const s = getStudent(activeId);
+    const neueNachricht = {
+      id: Date.now().toString(), sender: 'fahrlehrer', senderName: currentUser.displayName || 'Fahrlehrer',
+      imageUrl: url, createdAt: Date.now()
+    };
+    const bestehend = docRef.data().messages || [];
+    await dbUpd(doc(db,'accessCodes',docRef.id), { messages: [...bestehend.slice(-49), neueNachricht] });
+    toast('✓ Bild gesendet');
+  } catch(e) {
+    console.warn('sendeChatBild:', e);
+    toast('Fehler beim Senden: ' + (e.message || e.code || 'unbekannt'));
+  }
 };
 
 </script>
