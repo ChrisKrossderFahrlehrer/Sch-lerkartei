@@ -56,6 +56,8 @@ try {
   const tel     = d.tel     || '';
   const email   = d.email   || 'kontakt@fahrsync.de';
   const web     = d.web     || 'fahrsync.de';
+  const steuernr = d.steuernummer  || '050/240/09485';
+  const wIdNr    = d.wirtschaftsId || 'DE464533862';
 
   document.getElementById('imp-content').innerHTML = `
     <div class="block">
@@ -73,6 +75,13 @@ try {
         ${tel   ? '📞 ' + tel + '<br>' : ''}
         ${email ? '✉️ <a href="mailto:'+email+'">'+email+'</a><br>' : ''}
         ${web   ? '🌐 <a href="https://'+web+'">'+web+'</a>' : ''}
+      </p>
+    </div>
+    <div class="block">
+      <h2>🧾 Steuerliche Angaben</h2>
+      <p>
+        Wirtschafts-Identifikationsnummer gem. § 5 DDG: ${wIdNr}<br>
+        Steuernummer: ${steuernr}
       </p>
     </div>
     <div class="block">
