@@ -743,8 +743,9 @@ function renderChat() {
     const isFL = m.sender === 'fahrlehrer';
     const time = new Date(m.timestamp).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
     const date = new Date(m.timestamp).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
-    const inhalt = m.imageUrl
-      ? `<img src="${m.imageUrl}" loading="lazy" style="max-width:100%;border-radius:10px;display:block;cursor:pointer" onclick="window.open('${m.imageUrl}','_blank')">`
+    const bildQuelle = m.imagePath || m.imageUrl;
+    const inhalt = bildQuelle
+      ? `<img data-bildpfad="${m.imagePath || ''}" ${m.imageUrl ? `src="${m.imageUrl}"` : ''} loading="lazy" style="max-width:100%;min-width:120px;min-height:80px;border-radius:10px;display:block;cursor:pointer;background:rgba(0,0,0,0.15)">`
       : escHtml(m.text);
     return `<div class="msg-bubble ${m.sender}" style="display:flex;flex-direction:column">
       ${isFL ? `<div style="font-size:0.68rem;color:var(--muted);margin-bottom:3px;font-weight:600">${escHtml(m.senderName||'Fahrlehrer')}</div>` : ''}
@@ -752,6 +753,22 @@ function renderChat() {
       <div class="msg-meta">${date} ${time}</div>
     </div>`;
   }).join('');
+  // Bild-Adressen erst hier erzeugen (regelgeschuetzt), damit nie eine
+  // dauerhaft oeffentliche Adresse in der Datenbank landet.
+  wrap.querySelectorAll('img[data-bildpfad]').forEach(async (el) => {
+    const pfad = el.getAttribute('data-bildpfad');
+    if (!pfad || el.getAttribute('src')) return;
+    try {
+      const url = await getDownloadURL(ref(getStorage(), pfad));
+      el.src = url;
+      el.onclick = () => window.open(url, '_blank');
+    } catch(e) {
+      console.warn('Bild laden:', e);
+      el.replaceWith(Object.assign(document.createElement('div'), {
+        textContent: '🔒 Bild nicht verfügbar', style: 'font-size:0.78rem;opacity:0.7;padding:6px'
+      }));
+    }
+  });
   setTimeout(() => { wrap.scrollTop = wrap.scrollHeight; }, 30);
 }
 
@@ -1111,8 +1128,10 @@ window.sendeSchuelerBild = async (datei) => {
     const pfad = `chat-images/${codeDocId}/${Date.now()}.jpg`;
     const storage = getStorage();
     await uploadBytes(ref(storage, pfad), blob, { contentType: 'image/jpeg' });
-    const url = await getDownloadURL(ref(storage, pfad));
-    const msg = { id: Date.now().toString(), imageUrl: url, sender: 'schueler', senderName: schuelerName, timestamp: Date.now() };
+    // DATENSCHUTZ: nur den internen Pfad speichern, nie die von
+    // getDownloadURL erzeugte Adresse - die umgeht die Speicher-Regeln
+    // und waere dauerhaft ohne Anmeldung abrufbar.
+    const msg = { id: Date.now().toString(), imagePath: pfad, sender: 'schueler', senderName: schuelerName, timestamp: Date.now() };
     const currentMsgs = codeData.messages || [];
     const newMsgs = [...currentMsgs, msg].slice(-50);
     await updateDoc(doc(db,'accessCodes',codeDocId), { messages: newMsgs });
