@@ -103,25 +103,35 @@ body.light {
 
 /* Stil "Verkehrszeichen" - waermeres, gesaettigteres Schild-Gelb,
    angelehnt an amtliche StVO-Farben. Wirkt zusammen mit hell ODER dunkel. */
+/* Stil "Neubrutalism" (frueher "Verkehrszeichen") - konsequent nach den
+   echten Prinzipien der Stroemung umgebaut: kraeftige, gesaettigte Farben,
+   dicke schwarze Umrandung UND harter (nicht weicher) Versatz-Schatten auf
+   JEDER Karte, nicht nur auf Knoepfen wie zuvor - das war vermutlich der
+   Grund, warum sich der alte Stand nie konsequent genug anfuehlte. */
 .style-strasse {
   --accent: #ffc700;
   --accent2: #1f7a34;
-  --danger: #c81e1e;
-  --blue: #0f4fa8;
-  --border: #4a4638;
-  --radius: 4px;
+  --danger: #d1002b;
+  --blue: #0043ce;
+  --border: #14161a;
+  --radius: 3px;
 }
-.style-strasse.light { --surface: #fffef8; --surface2: #fbf3d4; --border: #2a2a2a; }
-.style-strasse .card, .style-strasse .list-item, .style-strasse .modal-sheet, .style-strasse .preview-tile {
-  border-width: 2px;
-  border-color: #2a2a2a;
-}
-.style-strasse.light .card, .style-strasse.light .list-item, .style-strasse.light .modal-sheet, .style-strasse.light .preview-tile {
-  border-color: #1a1a1a;
+.style-strasse.light { --surface: #fffef8; --surface2: #fbf3d4; --border: #14161a; }
+.style-strasse .card, .style-strasse .list-item, .style-strasse .modal-sheet,
+.style-strasse .preview-tile, .style-strasse .student-card, .style-strasse .tile,
+.style-strasse .stat-chip {
+  border-width: 2.5px !important;
+  border-color: #14161a !important;
+  border-radius: 3px !important;
+  box-shadow: 5px 5px 0 #14161a !important;
 }
 .style-strasse .btn-main, .style-strasse .fab {
-  border-radius: 4px;
-  box-shadow: 0 3px 0 #2a2a2a;
+  border-radius: 3px;
+  border: 2.5px solid #14161a;
+  box-shadow: 4px 4px 0 #14161a;
+}
+.style-strasse .btn-main:active, .style-strasse .fab:active {
+  box-shadow: 1px 1px 0 #14161a; transform: translate(3px, 3px);
 }
 
 /* Stil "Modern" - bewusst eigene Akzentfarbe (nicht das Marken-Gold),
@@ -474,6 +484,49 @@ body.beta-dash .badge { font-size: 0.66rem; padding: 3px 9px; }
 .stufe-form.s3 { clip-path:polygon(50% 4%,96% 92%,4% 92%); background:currentColor; opacity:0.85; }
 .stufe-form.s4 { border-radius:50%; background:currentColor; }
 .stufe-form.s5 { clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%); background:currentColor; }
+.style-neumorph {
+  --bg: #1c1e24;
+  --surface: #1f2128;
+  --surface2: #23252d;
+  --border: #23252d;
+  --accent: #d8b88a;
+  --accent2: #7fae94;
+  --radius: 20px;
+}
+.style-neumorph.light { --bg: #e6e7ec; --surface: #e6e7ec; --surface2: #e0e1e6; --border: #e0e1e6; }
+.style-neumorph .card, .style-neumorph .list-item, .style-neumorph .modal-sheet,
+.style-neumorph .preview-tile, .style-neumorph .student-card, .style-neumorph .tile,
+.style-neumorph .stat-chip {
+  border-width: 0 !important; border-radius: 18px !important;
+  box-shadow: 7px 7px 14px rgba(0,0,0,0.45), -6px -6px 12px rgba(255,255,255,0.03) !important;
+}
+.style-neumorph.light .card, .style-neumorph.light .list-item, .style-neumorph.light .modal-sheet,
+.style-neumorph.light .preview-tile, .style-neumorph.light .student-card, .style-neumorph.light .tile,
+.style-neumorph.light .stat-chip {
+  box-shadow: 7px 7px 14px rgba(163,166,178,0.55), -6px -6px 12px rgba(255,255,255,0.9) !important;
+}
+.style-neumorph .btn-main, .style-neumorph .fab {
+  border-radius: 16px; border: none;
+  box-shadow: 5px 5px 10px rgba(0,0,0,0.4), -4px -4px 8px rgba(255,255,255,0.04);
+}
+.style-neumorph .btn-main:active, .style-neumorph .fab:active {
+  box-shadow: inset 3px 3px 6px rgba(0,0,0,0.4), inset -3px -3px 6px rgba(255,255,255,0.04);
+}
+/* Bewertungspunkte-Stil: eigener, von style-* UNABHAENGIGER Schalter, damit
+   sich z.B. Neumorphism-Karten mit neubrutalistischen Punkten kombinieren
+   lassen. Ueberschreibt gezielt nur .stufe-form. */
+body.punkte-neumorph .stufe-form {
+  border-radius: 50% !important; clip-path: none !important;
+  box-shadow: 2px 2px 4px rgba(0,0,0,0.4), -1px -1px 3px rgba(255,255,255,0.06);
+}
+body.punkte-neumorph .dot-btn.active .stufe-form {
+  box-shadow: inset 2px 2px 4px rgba(0,0,0,0.35), inset -1px -1px 3px rgba(255,255,255,0.08);
+}
+body.punkte-brutal .stufe-form {
+  border-radius: 2px !important; clip-path: none !important;
+  border: 1.5px solid #14161a; background: currentColor;
+  box-shadow: 2px 2px 0 #14161a;
+}
 
 .empty-state { text-align:center; padding:60px 24px; color:var(--muted); }
 .empty-state .ei { font-size:3rem; margin-bottom:12px; }
@@ -1626,6 +1679,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     <button class="btn-sheet-cancel" id="btn-test-rechnung" onclick="testRechnungErzeugen()" style="background:var(--surface2);margin-bottom:8px">🧪 Test-Rechnung erzeugen</button>
     <button class="btn-sheet-cancel" onclick="toggleTheme()" id="theme-btn-menu" style="background:var(--surface2);margin-bottom:8px">☀️ Design wechseln (hell/dunkel)</button>
     <button class="btn-sheet-cancel" onclick="openStilAuswahl()" style="background:var(--surface2);margin-bottom:8px">🎨 Design-Stil wählen</button>
+    <button class="btn-sheet-cancel" onclick="openPunkteStilAuswahl()" style="background:var(--surface2);margin-bottom:8px">⚪ Bewertungspunkte-Stil</button>
     <button class="btn-sheet-cancel" onclick="toggleBetaDashboard()" id="btn-beta-dashboard" style="background:var(--surface2);margin-bottom:8px">🧪 Beta: Neues Dashboard-Design</button>
     <button class="btn-sheet-cancel" onclick="aktivierePushADK()" id="btn-push-adk" style="background:var(--surface2);margin-bottom:4px">🔔 Benachrichtigungen aktivieren</button>
     <div style="font-size:0.68rem;color:var(--muted);padding:0 4px 12px;line-height:1.4">📱 iPhone: Safari → „Teilen" → „Zum Home-Bildschirm" → App von dort öffnen, erst dann aktivieren möglich.</div>
@@ -2160,6 +2214,18 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     </p>
     <div id="stil-liste" style="display:flex;flex-direction:column;gap:12px"></div>
     <button class="btn-sheet-cancel" onclick="document.getElementById('stil-modal').classList.remove('open')" style="margin-top:16px">Fertig</button>
+  </div>
+</div>
+
+<!-- BEWERTUNGSPUNKTE-STIL AUSWAHL -->
+<div class="modal-overlay" id="punkte-stil-modal" onclick="closeModal(event)">
+  <div class="modal-sheet" style="max-width:420px">
+    <div class="sheet-title">⚪ Bewertungspunkte-Stil</div>
+    <p style="font-size:0.78rem;color:var(--muted);margin:-6px 0 16px;line-height:1.5">
+      Unabhängig vom Karten-Design – frei kombinierbar.
+    </p>
+    <div id="punkte-stil-liste" style="display:flex;flex-direction:column;gap:12px"></div>
+    <button class="btn-sheet-cancel" onclick="document.getElementById('punkte-stil-modal').classList.remove(\'open\')" style="margin-top:16px">Fertig</button>
   </div>
 </div>
 
@@ -9630,9 +9696,10 @@ window.saveNameAendern = async () => {
 // traegt dieselbe Klasse wie spaeter <body> - dieselben CSS-Variablen
 // gelten dadurch schon in der Vorschau, ganz ohne Sonderfall-Code.
 const STILE = [
-  { id: '',              name: 'Standard',       beschreibung: 'Der bisherige Look, unveraendert.' },
-  { id: 'style-strasse', name: 'Verkehrszeichen', beschreibung: 'Waermeres Schild-Gelb, eckigere Formen.' },
-  { id: 'style-modern',  name: 'Modern',          beschreibung: 'Weicher, mehr Tiefe, dezentes Leuchten.' },
+  { id: '',              name: 'Standard',      beschreibung: 'Der bisherige Look, unveraendert.' },
+  { id: 'style-strasse', name: 'Neubrutalism',  beschreibung: 'Kraeftige Farben, dicke Kanten, harter Schatten.' },
+  { id: 'style-modern',  name: 'Modern',        beschreibung: 'Glasig, mehr Tiefe, dezentes Leuchten.' },
+  { id: 'style-neumorph',name: 'Neumorphism',   beschreibung: 'Weich, wie aus einem Guss, kaum Kanten.' },
 ];
 
 function previewKachel(stil) {
@@ -9668,6 +9735,8 @@ window.waehleStil = (id) => {
   const gespeicherterStil = localStorage.getItem('fs_stil');
   if (gespeicherterStil) document.body.classList.add(gespeicherterStil);
   if (localStorage.getItem('fs_beta_dashboard') === '1') document.body.classList.add('beta-dash');
+  const gespPunkteStil = localStorage.getItem('fs_punkte_stil');
+  if (gespPunkteStil) document.body.classList.add(gespPunkteStil);
 })();
 
 
@@ -9779,6 +9848,44 @@ window.sendeBestaetigungErneut = async () => {
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'E-Mail erneut senden'; }
   }
+};
+
+
+// ══ BEWERTUNGSPUNKTE-STIL: eigener, unabhaengiger Schalter (Kundenwunsch:
+// mit jedem Karten-Stil frei kombinierbar, z.B. Neumorphism-Karten +
+// neubrutalistische Punkte). Eigener localStorage-Schluessel, eigene
+// body-Klasse (punkte-*), voellig getrennt vom Karten-Stil oben. ══
+const PUNKTE_STILE = [
+  { id: '',                name: 'Standard',     beschreibung: 'Neutrale Formen, wie bisher.' },
+  { id: 'punkte-neumorph', name: 'Neumorphism',  beschreibung: 'Weich, wie eingedrueckt.' },
+  { id: 'punkte-brutal',   name: 'Neubrutalism', beschreibung: 'Kraeftig, mit Kante und Schatten.' },
+];
+
+function previewPunkteKachel(stil) {
+  const aktiv = (localStorage.getItem('fs_punkte_stil') || '') === stil.id;
+  return `<div class="${stil.id}" onclick="waehlePunkteStil('${stil.id}')" style="cursor:pointer;border:2px solid ${aktiv ? 'var(--accent)' : 'var(--border)'};border-radius:14px;padding:14px;display:flex;align-items:center;gap:14px;background:var(--bg)">
+    <div style="display:flex;gap:5px;flex-shrink:0">
+      <span class="stufe-form s2" style="width:18px;height:18px;color:var(--accent)"></span>
+      <span class="stufe-form s4" style="width:18px;height:18px;color:var(--accent)"></span>
+    </div>
+    <div style="flex:1">
+      <div style="font-weight:700;font-size:0.88rem;color:var(--text)">${stil.name}${aktiv ? ' ✓' : ''}</div>
+      <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">${stil.beschreibung}</div>
+    </div>
+  </div>`;
+}
+
+window.openPunkteStilAuswahl = () => {
+  document.getElementById('punkte-stil-liste').innerHTML = PUNKTE_STILE.map(previewPunkteKachel).join('');
+  document.getElementById('punkte-stil-modal').classList.add('open');
+};
+
+window.waehlePunkteStil = (id) => {
+  document.body.classList.remove('punkte-neumorph', 'punkte-brutal');
+  if (id) document.body.classList.add(id);
+  localStorage.setItem('fs_punkte_stil', id);
+  document.getElementById('punkte-stil-liste').innerHTML = PUNKTE_STILE.map(previewPunkteKachel).join('');
+  toast('Bewertungspunkte aktualisiert ✓');
 };
 
 </script>
