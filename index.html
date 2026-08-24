@@ -8807,8 +8807,9 @@ async function loadChatMessages() {
       const haekchen = vonFahrlehrer
         ? `<span style="margin-left:3px;color:${gelesen ? 'var(--blue)' : 'var(--muted)'}">${gelesen ? '✓✓' : '✓'}</span>`
         : '';
-      const inhalt = msg.imageUrl
-        ? `<img src="${msg.imageUrl}" loading="lazy" style="max-width:100%;border-radius:12px;display:block;cursor:pointer" onclick="window.open('${msg.imageUrl}','_blank')">`
+      const bildQuelle = msg.imagePath || msg.imageUrl;
+      const inhalt = bildQuelle
+        ? `<img data-bildpfad="${msg.imagePath || ''}" ${msg.imageUrl ? `src="${msg.imageUrl}"` : ''} loading="lazy" style="max-width:100%;min-width:120px;min-height:80px;border-radius:12px;display:block;cursor:pointer;background:rgba(0,0,0,0.15)">`
         : (msg.text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       return `
         <div style="display:flex;flex-direction:column;align-items:${vonFahrlehrer?'flex-end':'flex-start'};gap:2px">
@@ -8822,6 +8823,24 @@ async function loadChatMessages() {
           <div style="font-size:0.65rem;color:var(--muted);padding:0 4px">${datum} ${zeit}${haekchen}</div>
         </div>`;
     }).join('');
+    // Bild-Adressen erst jetzt erzeugen: getDownloadURL() selbst ist durch
+    // die Speicher-Regeln geschuetzt, nur Berechtigte bekommen ueberhaupt
+    // eine funktionierende Adresse. Die Adresse landet dadurch NIE in der
+    // Datenbank, sondern existiert nur kurzzeitig im geoeffneten Fenster.
+    messagesEl.querySelectorAll('img[data-bildpfad]').forEach(async (el) => {
+      const pfad = el.getAttribute('data-bildpfad');
+      if (!pfad || el.getAttribute('src')) return;
+      try {
+        const url = await getDownloadURL(ref(getStorage(), pfad));
+        el.src = url;
+        el.onclick = () => window.open(url, '_blank');
+      } catch(e) {
+        console.warn('Bild laden:', e);
+        el.replaceWith(Object.assign(document.createElement('div'), {
+          textContent: '🔒 Bild nicht verfügbar', style: 'font-size:0.78rem;opacity:0.7;padding:8px'
+        }));
+      }
+    });
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }, err => {
     console.warn('loadChatMessages:', err);
@@ -9942,11 +9961,9 @@ window.sendeChatBild = async (datei) => {
     const pfad = `chat-images/${docRef.id}/${Date.now()}.jpg`;
     const storage = getStorage();
     await uploadBytes(ref(storage, pfad), blob, { contentType: 'image/jpeg' });
-    const url = await getDownloadURL(ref(storage, pfad));
-    const s = getStudent(activeId);
     const neueNachricht = {
       id: Date.now().toString(), sender: 'fahrlehrer', senderName: currentUser.displayName || 'Fahrlehrer',
-      imageUrl: url, createdAt: Date.now()
+      imagePath: pfad, createdAt: Date.now()
     };
     const bestehend = docRef.data().messages || [];
     await dbUpd(doc(db,'accessCodes',docRef.id), { messages: [...bestehend.slice(-49), neueNachricht] });
