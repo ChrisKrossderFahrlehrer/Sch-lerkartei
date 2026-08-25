@@ -2268,7 +2268,7 @@ import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/
 import { signInAnonymously, getAuth, setPersistence, browserLocalPersistence, indexedDBLocalPersistence, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider, verifyBeforeUpdateEmail, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, enableIndexedDbPersistence, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, getDocs, getDoc, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+import { getStorage, ref, uploadBytes, getDownloadURL, listAll, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD490kLzTOq3h3VdQ9ZqWZd_aXcDRfxBOs",
@@ -6377,18 +6377,22 @@ window.deleteStudent = async () => {
     await dbDel(doc(db,'students',activeId));
     activeId = null;
     goBack();
+    const geloeschteId = backup.id;
     zeigeUndoBalken(`🗑️ ${s.vorname} ${s.nachname} gelöscht`, async () => {
       // Rückgängig: Schüler mit gleicher ID wiederherstellen
       try {
         await dbSet(doc(db,'students',backup.id), backup.data);
         toast('✓ Wiederhergestellt');
       } catch(e) { console.error('undo student:', e); toast('❌ Wiederherstellen fehlgeschlagen'); }
+    }, async () => {
+      // Endgültige Löschung der personenbezogenen Begleitdaten (DSGVO Art. 17)
+      await loescheSchuelerBegleitdaten(geloeschteId);
     });
   } catch(e) { console.error('deleteStudent:', e); toast('❌ Fehler beim Löschen: ' + e.message); }
 };
 
 // ── UNDO-BALKEN: zeigt für 6 Sekunden einen "Rückgängig"-Button ──
-function zeigeUndoBalken(text, undoCallback) {
+function zeigeUndoBalken(text, undoCallback, nachAblaufCallback) {
   // Vorhandenen Balken entfernen
   const alt = document.getElementById('undo-bar');
   if (alt) alt.remove();
@@ -6410,10 +6414,15 @@ function zeigeUndoBalken(text, undoCallback) {
     await undoCallback();
   };
 
-  // Nach 6 Sekunden automatisch ausblenden
+  // Nach Ablauf automatisch ausblenden - und, falls hinterlegt, die
+  // endgueltige Aufraeum-Aktion ausloesen (laeuft NUR, wenn der Nutzer
+  // nicht rueckgaengig gemacht hat).
   undoTimer = setTimeout(() => {
     const b = document.getElementById('undo-bar');
     if (b) { b.style.animation = 'undoOut 0.3s ease forwards'; setTimeout(()=>b.remove(), 300); }
+    if (typeof nachAblaufCallback === 'function') {
+      Promise.resolve(nachAblaufCallback()).catch(e => console.warn('Aufraeumen nach Loeschung:', e));
+    }
   }, 60000);
 }
 
@@ -9973,6 +9982,61 @@ window.sendeChatBild = async (datei) => {
     toast('Fehler beim Senden: ' + (e.message || e.code || 'unbekannt'));
   }
 };
+
+
+
+// ══ VOLLSTAENDIGE LOESCHUNG (DSGVO Art. 17) ══════════════════════
+// Beim Loeschen eines Schuelers wurde bisher nur dessen Karteikarte
+// entfernt. Chatverlauf (inkl. Name), Chat-Fotos, geplante Fahrstunden und
+// Protokolleintraege blieben dauerhaft gespeichert. Diese Funktion raeumt
+// alles Personenbezogene ab - bewusst erst NACH Ablauf der
+// Rueckgaengig-Frist, weil sich diese Loeschung nicht umkehren laesst.
+// Jeder Schritt einzeln abgesichert: scheitert einer, laufen die uebrigen
+// trotzdem weiter, statt alles abzubrechen.
+async function loescheSchuelerBegleitdaten(studentId) {
+  if (!studentId || !currentUser) return;
+
+  // 1) Zugangscodes NUR ERMITTELN, noch nicht loeschen - die Speicher-Regel
+  // fuer die Chat-Fotos schlaegt im Zugangscode-Dokument nach, ob der
+  // Loeschende berechtigt ist. Waere es schon weg, wuerde das Loeschen der
+  // Bilder abgewiesen und sie blieben als Datei-Leichen zurueck.
+  let codeIds = [];
+  let codeDocs = [];
+  try {
+    const snap = await getDocs(query(collection(db,'accessCodes'),
+      where('studentId','==',studentId), where('teacherUid','==',currentUser.uid)));
+    codeIds = snap.docs.map(d => d.id);
+    codeDocs = snap.docs;
+  } catch(e) { console.warn('accessCodes suchen:', e); }
+
+  // 2) ZUERST die Chat-Fotos loeschen, solange die Berechtigung noch prüfbar ist
+  for (const codeId of codeIds) {
+    try {
+      const ordner = ref(getStorage(), `chat-images/${codeId}`);
+      const inhalt = await listAll(ordner);
+      for (const datei of inhalt.items) {
+        await deleteObject(datei).catch(e => console.warn('Bild loeschen:', e));
+      }
+    } catch(e) { console.warn('Bilder auflisten:', e); }
+  }
+
+  // 3) DANACH erst die Zugangscode-Dokumente (Chatverlauf, Name, Planung)
+  for (const d of codeDocs) {
+    try { await dbDel(doc(db,'accessCodes', d.id)); }
+    catch(e) { console.warn('Loeschen accessCode:', e); }
+  }
+
+  // 4) Protokolleintraege
+  try {
+    const pSnap = await getDocs(query(collection(db,'protokoll'),
+      where('studentId','==',studentId), where('uid','==',currentUser.uid)));
+    for (const d of pSnap.docs) {
+      await dbDel(doc(db,'protokoll', d.id));
+    }
+  } catch(e) { console.warn('Loeschen protokoll:', e); }
+
+  console.info('Begleitdaten geloescht fuer', studentId, '- Codes:', codeIds.length);
+}
 
 </script>
 <!-- ERST-LOGIN: Passwort setzen (+ optional echte E-Mail) - nicht wegklickbar -->
