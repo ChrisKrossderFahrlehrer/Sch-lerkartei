@@ -19,9 +19,15 @@ service firebase.storage {
                || codeDoc().data.expiresAt > request.time.toMillis();
       }
       allow read: if istZustaendigerLehrer() || codeGueltig();
-      allow write: if (istZustaendigerLehrer() || codeGueltig())
+      // Hochladen/Ersetzen: Groesse und Dateityp begrenzen.
+      allow create, update: if (istZustaendigerLehrer() || codeGueltig())
                    && request.resource.size < 8 * 1024 * 1024
                    && request.resource.contentType.matches('image/.*');
+      // Loeschen BEWUSST getrennt: beim Loeschen wird keine Datei
+      // mitgeschickt (request.resource ist null), die Groessen- und
+      // Typpruefung oben wuerde deshalb IMMER fehlschlagen und das
+      // DSGVO-Loeschen unmoeglich machen.
+      allow delete: if istZustaendigerLehrer() || codeGueltig();
     }
     // Alles andere: standardmaessig gesperrt.
     match /{allPaths=**} {
