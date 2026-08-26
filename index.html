@@ -3393,12 +3393,12 @@ function updateAboUI() {
   if (el) el.addEventListener('blur', () => { if (paypalRendered || document.getElementById('upgrade-modal').classList.contains('open')) rerenderPaypal(); });
 });
 
-window.openUpgradeModal = () => {
+window.openUpgradeModal = async () => {
   if (!ABO_ENABLED) { toast('💳 Abo-Funktion kommt bald'); return; }
   if (!window.__billingOwner) { toast('ℹ️ Nur der Fahrschul-Inhaber kann das Abo verwalten.'); return; }
   document.getElementById('upgrade-modal').classList.add('open');
   renderTierCards();
-  ladeRechnungsadresse();
+  await ladeRechnungsadresse();
   if (!paypalRendered) initPayPal();
 };
 
