@@ -629,6 +629,30 @@ exports.stripeWebhook = onRequest(
   }
 );
 
+// ══ ADMIN: E-Mail manuell bestaetigen (SuperAdmin-only) ═════════
+// Fuer Testkonten, bei denen die Bestaetigungs-Mail nicht ankommt (Spam-
+// Filter, Zustellverzoegerung). Nutzt die Admin-SDK, die das direkt
+// setzen kann, ohne den eigentlichen Mail-Link zu brauchen.
+exports.adminEmailBestaetigen = onCall(async (request) => {
+  const auth = request.auth;
+  if (!auth) throw new HttpsError('unauthenticated', 'Bitte anmelden.');
+  const istSuperAdminEmail = auth.token.email === 'chriskoo@mail.de';
+  let istSuperAdminRolle = false;
+  if (!istSuperAdminEmail) {
+    const eigenesDoc = await admin.firestore().doc(`users/${auth.uid}`).get();
+    istSuperAdminRolle = eigenesDoc.exists && eigenesDoc.data().rolle === 'superadmin';
+  }
+  if (!istSuperAdminEmail && !istSuperAdminRolle) {
+    throw new HttpsError('permission-denied', 'Nur fuer SuperAdmin.');
+  }
+  const { email } = request.data || {};
+  if (!email) throw new HttpsError('invalid-argument', 'E-Mail fehlt.');
+  const user = await admin.auth().getUserByEmail(email);
+  await admin.auth().updateUser(user.uid, { emailVerified: true });
+  return { success: true, uid: user.uid };
+});
+
+
 
 
 // ═══════════════════════════════════════════════════════════════════
