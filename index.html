@@ -848,10 +848,15 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       <!-- PayPal Button Container (§312j: zwischen Pflichtinfo und Button steht nichts) -->
       <div id="paypal-button-container" style="margin-bottom:12px"></div>
 
+      <div style="text-align:center;color:var(--muted);font-size:0.72rem;margin:4px 0 10px">— oder —</div>
+      <button id="btn-stripe-checkout" onclick="starteStripeCheckout()" class="btn btn-secondary" style="width:100%;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:8px">
+        💳 Kreditkarte / SEPA-Lastschrift
+      </button>
+
       <!-- Hinweis -->
       <div style="font-size:0.68rem;color:var(--muted);text-align:center;line-height:1.5">
-        Sichere Zahlung über PayPal · Jederzeit kündbar<br>
-        Nach Zahlung wird dein Abo automatisch aktiviert
+        Sichere Zahlung über PayPal, Kreditkarte oder SEPA-Lastschrift · Jederzeit kündbar<br>
+        Nach Zahlung wird dein Abo automatisch aktiviert (bei SEPA nach Bestätigung, dauert einige Werktage)
       </div>
     </div>
 
@@ -10037,6 +10042,38 @@ async function loescheSchuelerBegleitdaten(studentId) {
 
   console.info('Begleitdaten geloescht fuer', studentId, '- Codes:', codeIds.length);
 }
+
+
+
+// ══ STRIPE-CHECKOUT (Kreditkarte / SEPA) ═════════════════════════
+window.starteStripeCheckout = async () => {
+  const btn = document.getElementById('btn-stripe-checkout');
+  if (!selectedTier) { toast('Bitte zuerst einen Tarif wählen.'); return; }
+  const strasse = document.getElementById('rg-strasse').value.trim();
+  const plz = document.getElementById('rg-plz').value.trim();
+  const ort = document.getElementById('rg-ort').value.trim();
+  if (!strasse || !plz || !ort) { toast('Bitte zuerst die Rechnungsadresse oben ausfüllen.'); return; }
+  btn.disabled = true; btn.textContent = 'Wird vorbereitet…';
+  try {
+    const fns = getFunctions(app, 'europe-west3');
+    const res = await httpsCallable(fns, 'createStripeCheckoutSession')({ plan: selectedTier, planer: !!planerGewuenscht });
+    window.location.href = res.data.url;
+  } catch(e) {
+    console.warn('starteStripeCheckout:', e);
+    toast('Fehler: ' + (e.message || 'Bitte später erneut versuchen.'));
+    btn.disabled = false; btn.textContent = '💳 Kreditkarte / SEPA-Lastschrift';
+  }
+};
+
+// Rueckkehr von Stripe erkennen und passend informieren
+(() => {
+  const p = new URLSearchParams(location.search);
+  if (p.get('stripe') === 'erfolg') {
+    setTimeout(() => toast('✓ Zahlung eingegangen – dein Abo wird in Kürze aktiviert (bei SEPA nach Bestätigung).'), 800);
+  } else if (p.get('stripe') === 'abgebrochen') {
+    setTimeout(() => toast('Bezahlvorgang abgebrochen.'), 800);
+  }
+})();
 
 </script>
 <!-- ERST-LOGIN: Passwort setzen (+ optional echte E-Mail) - nicht wegklickbar -->
