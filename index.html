@@ -10056,7 +10056,9 @@ window.starteStripeCheckout = async () => {
   btn.disabled = true; btn.textContent = 'Wird vorbereitet…';
   try {
     const fns = getFunctions(app, 'europe-west3');
-    const res = await httpsCallable(fns, 'createStripeCheckoutSession')({ plan: selectedTier, planer: !!planerGewuenscht });
+    const aktuelleParams = new URLSearchParams(window.location.search);
+    const rueckkehrZusatz = aktuelleParams.get('normal') === '1' ? '&normal=1' : '';
+    const res = await httpsCallable(fns, 'createStripeCheckoutSession')({ plan: selectedTier, planer: !!planerGewuenscht, rueckkehrZusatz });
     window.location.href = res.data.url;
   } catch(e) {
     console.warn('starteStripeCheckout:', e);
