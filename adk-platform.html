@@ -1723,6 +1723,16 @@ async function renderSuperAdminEinst() {
       <button class="btn-main" onclick="savePlatformImpressum()">💾 Impressum speichern</button>
     </div>
 
+    <div class="section-hd" style="margin-top:8px">✅ Testkonto: E-Mail manuell bestätigen</div>
+    <div class="card" style="margin-bottom:8px">
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:12px;line-height:1.5">
+        Für Testkonten, bei denen die Bestätigungs-Mail nicht ankommt (Spam-Filter/Verzögerung). Ohne Entwicklertools nutzbar.
+      </div>
+      <input class="form-input" id="ver-email" placeholder="test-adresse@beispiel.de" style="margin-bottom:10px">
+      <div id="ver-status" style="font-size:0.82rem;min-height:20px;margin-bottom:8px;text-align:center;padding:8px;border-radius:8px"></div>
+      <button class="btn-main" onclick="adminEmailManuellBestaetigen()">✅ E-Mail als bestätigt markieren</button>
+    </div>
+
     <div class="section-hd" style="margin-top:8px">📢 Nachricht an alle Fahrschulen</div>
     <div class="card" style="margin-bottom:8px">
       <div style="font-size:0.75rem;color:var(--muted);margin-bottom:14px;line-height:1.5">
@@ -2565,6 +2575,23 @@ window.toggleProLehrer = async (id, aktivieren) => {
     toast(aktivieren ? '⭐ Pro kostenlos freigeschaltet' : '⭐ Pro-Freischaltung entfernt');
     renderLehrer();
   } catch(e) { console.warn('toggleProLehrer:', e); toast('Fehler beim Umschalten.'); }
+};
+
+
+
+window.adminEmailManuellBestaetigen = async () => {
+  const email = document.getElementById('ver-email').value.trim();
+  const statusEl = document.getElementById('ver-status');
+  if (!email) { statusEl.style.color = 'var(--danger)'; statusEl.textContent = 'Bitte E-Mail eingeben.'; return; }
+  statusEl.style.color = 'var(--muted)'; statusEl.textContent = 'Wird bestätigt…';
+  try {
+    const fns = getFunctions(app, 'europe-west3');
+    await httpsCallable(fns, 'adminEmailBestaetigen')({ email });
+    statusEl.style.color = 'var(--accent2)'; statusEl.textContent = '✓ Bestätigt – Konto kann sich jetzt anmelden.';
+  } catch(e) {
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = 'Fehler: ' + (e.message || e.code || 'unbekannt');
+  }
 };
 
 </script>
