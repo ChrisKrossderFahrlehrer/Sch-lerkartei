@@ -516,8 +516,8 @@ exports.createStripeCheckoutSession = onCall({ secrets: [STRIPE_SECRET_KEY] }, a
     }],
     client_reference_id: `${billingColl}:${billingId}`,
     metadata: { plan, planer: planer ? '1' : '0', billingColl, billingId },
-    success_url: 'https://fahrsync.de/index.html?stripe=erfolg',
-    cancel_url:  'https://fahrsync.de/index.html?stripe=abgebrochen',
+    success_url: `https://fahrsync.de/index.html?stripe=erfolg${request.data.rueckkehrZusatz || ''}`,
+    cancel_url:  `https://fahrsync.de/index.html?stripe=abgebrochen${request.data.rueckkehrZusatz || ''}`,
   });
 
   return { url: session.url };
