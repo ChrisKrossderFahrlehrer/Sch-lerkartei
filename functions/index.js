@@ -277,7 +277,7 @@ const RECHNUNG_PLANS = {
   unbegrenzt: { label: 'Fahrschule unbegrenzt',             price: 34.99, pricePlaner: 40.99 },
 };
 
-function baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel, betrag }) {
+function baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel, betrag, zahlungsart }) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 56 });
     const chunks = [];
@@ -326,7 +326,7 @@ function baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel, betra
     doc.moveDown(4);
     doc.fontSize(9).fillColor('#333').text('Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.');
     doc.moveDown(0.5);
-    doc.text('Bezahlt per PayPal – bereits vollständig beglichen.');
+    doc.text(`Bezahlt per ${zahlungsart || 'PayPal'} – bereits vollständig beglichen.`);
     doc.moveDown(2);
     doc.fontSize(8).fillColor('#888').text(`${steller.name} · ${steller.email} · ${steller.web}`, { align: 'left' });
 
@@ -525,7 +525,7 @@ exports.createStripeCheckoutSession = onCall({ secrets: [STRIPE_SECRET_KEY] }, a
 
 // Gemeinsame Aktivierung + Rechnung, genutzt von BEIDEN Webhook-Zweigen
 // (sofortige Kartenzahlung und spaeter bestaetigte SEPA-Lastschrift).
-async function stripeAboAktivierenUndRechnung(session, stripeEventId) {
+async function stripeAboAktivierenUndRechnung(session, stripeEventId, zahlungsart) {
   const { billingColl, billingId, plan, planer } = session.metadata || {};
   if (!billingColl || !billingId || !plan) return;
 
@@ -573,7 +573,7 @@ async function stripeAboAktivierenUndRechnung(session, stripeEventId) {
     land: LAENDER[b.rechnungsLand || 'DE'] || '',
   };
   const datum = new Date().toLocaleDateString('de-DE');
-  const pdfBuffer = await baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel: planInfo.label, betrag });
+  const pdfBuffer = await baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel: planInfo.label, betrag, zahlungsart });
 
   await admin.firestore().collection('rechnungen').add({
     nummer, empfaengerId: billingId, empfaengerName: empfaenger.name,
@@ -606,12 +606,12 @@ exports.stripeWebhook = onRequest(
         // schwebender SEPA-Lastschrift ('unpaid'/'no_payment_required'
         // greift hier nicht) uebernimmt async_payment_succeeded weiter unten.
         if (session.payment_status === 'paid') {
-          await stripeAboAktivierenUndRechnung(session, event.id);
+          await stripeAboAktivierenUndRechnung(session, event.id, 'Kreditkarte');
         }
       } else if (event.type === 'checkout.session.async_payment_succeeded') {
         // SEPA-Lastschrift wurde jetzt tatsaechlich bestaetigt.
         const session = event.data.object;
-        await stripeAboAktivierenUndRechnung(session, event.id);
+        await stripeAboAktivierenUndRechnung(session, event.id, 'SEPA-Lastschrift');
       } else if (event.type === 'checkout.session.async_payment_failed') {
         const session = event.data.object;
         const { billingColl, billingId } = session.metadata || {};
@@ -780,7 +780,7 @@ exports.paypalWebhook = onRequest(
         };
         const datum = new Date().toLocaleDateString('de-DE');
         const betrag = betragBezahlt || (billingData.aboPlaner ? planInfo.pricePlaner : planInfo.price);
-        const pdfBuffer = await baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel: planInfo.label, betrag });
+        const pdfBuffer = await baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel: planInfo.label, betrag, zahlungsart: 'PayPal' });
 
         await admin.firestore().collection('rechnungen').add({
           nummer, empfaengerId: billingId, empfaengerName: empfaenger.name,
