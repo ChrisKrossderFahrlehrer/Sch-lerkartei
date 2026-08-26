@@ -7,6 +7,7 @@ const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/
 const { onRequest, onCall, HttpsError } = require('firebase-functions/v2/https');
 const { setGlobalOptions } = require('firebase-functions/v2');
 const { defineSecret } = require('firebase-functions/params');
+const Stripe = require('stripe');
 const admin = require('firebase-admin');
 admin.initializeApp();
 setGlobalOptions({ region: 'europe-west3', maxInstances: 5 });
@@ -21,6 +22,8 @@ const GOOGLE_CLIENT_SECRET = defineSecret('GOOGLE_CLIENT_SECRET');
 const PAYPAL_CLIENT_ID     = defineSecret('PAYPAL_CLIENT_ID');
 const PAYPAL_CLIENT_SECRET = defineSecret('PAYPAL_CLIENT_SECRET');
 const PAYPAL_WEBHOOK_ID    = defineSecret('PAYPAL_WEBHOOK_ID');
+const STRIPE_SECRET_KEY     = defineSecret('STRIPE_SECRET_KEY');
+const STRIPE_WEBHOOK_SECRET = defineSecret('STRIPE_WEBHOOK_SECRET');
 const GOOGLE_CLIENT_ID     = '140641089306-iovtr6gnoggkg6me8k2tk0c522o4oh0e.apps.googleusercontent.com';
 const GOOGLE_REDIRECT_URI  = 'https://europe-west3-fahrschule-ebc65.cloudfunctions.net/kalenderOAuthCallback';
 const APP_URL              = 'https://fahrsync.de/kalender.html';
@@ -459,6 +462,173 @@ exports.syncSlotToGoogleCalendar = onDocumentUpdated({ document: 'slots/{slotId}
     }
   } catch (e) { console.warn('syncSlotToGoogleCalendar', e.message); }
 });
+
+// ══════════════════════════════════════════════════════════════════
+// STRIPE: Kreditkarte + SEPA-Lastschrift (zusaetzlich zu PayPal)
+//
+// Kundenwunsch: Kreditkarte schaltet sofort frei, SEPA-Lastschrift erst
+// nach tatsaechlicher Bestaetigung (dauert mehrere Werktage, kann
+// zurueckgehen). Stripe unterscheidet dafuer klar zwischen zwei
+// Ereignissen: checkout.session.completed (sofort, mit payment_status
+// 'paid' bei Karte / 'unpaid' bei noch schwebender SEPA-Lastschrift) und
+// checkout.session.async_payment_succeeded (feuert SEPARAT, erst wenn eine
+// verzoegerte Zahlung wie SEPA tatsaechlich durchgegangen ist). Aktivierung
+// und Rechnung entstehen deshalb an ZWEI Stellen, aber ueber dieselbe
+// gemeinsame Funktion, damit beide Wege exakt gleich behandelt werden.
+// ══════════════════════════════════════════════════════════════════
+
+exports.createStripeCheckoutSession = onCall({ secrets: [STRIPE_SECRET_KEY] }, async (request) => {
+  const auth = request.auth;
+  if (!auth) throw new HttpsError('unauthenticated', 'Bitte anmelden.');
+  const uid = auth.uid;
+  const { plan, planer } = request.data || {};
+  if (!plan || !RECHNUNG_PLANS[plan]) {
+    throw new HttpsError('invalid-argument', 'Ungueltiger Tarif.');
+  }
+
+  // Dieselbe Zuordnung wie bei PayPal: Fahrschule ODER Solo-Nutzer
+  const userDoc = await admin.firestore().doc(`users/${uid}`).get();
+  if (!userDoc.exists) throw new HttpsError('failed-precondition', 'Kein Profil gefunden.');
+  const userData = userDoc.data();
+  const billingColl = userData.fahrschuleId ? 'fahrschulen' : 'users';
+  const billingId   = userData.fahrschuleId || uid;
+  const billingDoc  = await admin.firestore().doc(`${billingColl}/${billingId}`).get();
+  const b = billingDoc.exists ? billingDoc.data() : {};
+  if (!b.rechnungsStrasse || !b.rechnungsPlz || !b.rechnungsOrt) {
+    throw new HttpsError('failed-precondition', 'Bitte zuerst eine Rechnungsadresse hinterlegen.');
+  }
+
+  const planInfo = RECHNUNG_PLANS[plan];
+  const betrag = planer ? planInfo.pricePlaner : planInfo.price;
+  const stripe = new Stripe(STRIPE_SECRET_KEY.value());
+
+  const session = await stripe.checkout.sessions.create({
+    mode: 'subscription',
+    payment_method_types: ['card', 'sepa_debit'],
+    line_items: [{
+      price_data: {
+        currency: 'eur',
+        product_data: { name: `FahrSync – ${planInfo.label}` },
+        unit_amount: Math.round(betrag * 100),
+        recurring: { interval: 'month' },
+      },
+      quantity: 1,
+    }],
+    client_reference_id: `${billingColl}:${billingId}`,
+    metadata: { plan, planer: planer ? '1' : '0', billingColl, billingId },
+    success_url: 'https://fahrsync.de/index.html?stripe=erfolg',
+    cancel_url:  'https://fahrsync.de/index.html?stripe=abgebrochen',
+  });
+
+  return { url: session.url };
+});
+
+// Gemeinsame Aktivierung + Rechnung, genutzt von BEIDEN Webhook-Zweigen
+// (sofortige Kartenzahlung und spaeter bestaetigte SEPA-Lastschrift).
+async function stripeAboAktivierenUndRechnung(session, stripeEventId) {
+  const { billingColl, billingId, plan, planer } = session.metadata || {};
+  if (!billingColl || !billingId || !plan) return;
+
+  // Idempotenz: dasselbe Stripe-Ereignis darf nicht zweimal verarbeitet werden
+  const bereits = await admin.firestore().collection('rechnungen')
+    .where('stripeSessionId', '==', session.id).limit(1).get();
+  if (!bereits.empty) return;
+
+  const planInfo = RECHNUNG_PLANS[plan];
+  if (!planInfo) return;
+
+  const billingRef = admin.firestore().doc(`${billingColl}/${billingId}`);
+  const billingSnap = await billingRef.get();
+  if (!billingSnap.exists) return;
+  const b = billingSnap.data();
+  if (!b.rechnungsStrasse || !b.rechnungsPlz || !b.rechnungsOrt) return;
+
+  await billingRef.update({
+    abo: plan, aboPlaner: planer === '1', aboStatus: 'aktiv',
+    aboZahlungsart: 'stripe', aboLetzteZahlungAm: Date.now(),
+  });
+
+  const betrag = planer === '1' ? planInfo.pricePlaner : planInfo.price;
+  const counterRef = admin.firestore().doc('platform/rechnungszaehler');
+  const nummer = await admin.firestore().runTransaction(async (tx) => {
+    const c = await tx.get(counterRef);
+    const jahr = new Date().getFullYear();
+    const bisher = c.exists ? (c.data().naechsteNummer || 1) : 1;
+    tx.set(counterRef, { naechsteNummer: bisher + 1 }, { merge: true });
+    return `${jahr}-${String(bisher).padStart(5, '0')}`;
+  });
+
+  const platDoc = await admin.firestore().doc('platform/impressum').get();
+  const platImp = platDoc.exists ? platDoc.data() : {};
+  const steller = {
+    name: platImp.name || 'Chriskoo', strasse: platImp.strasse || '',
+    plz: platImp.plz || '', ort: platImp.ort || '',
+    email: platImp.email || 'kontakt@fahrsync.de', web: platImp.web || 'fahrsync.de',
+    steuernummer: platImp.steuernummer || '050/240/09485',
+  };
+  const LAENDER = { DE: '', AT: 'Österreich', CH: 'Schweiz', XX: '' };
+  const empfaenger = {
+    name: b.name || 'Kunde',
+    strasse: b.rechnungsStrasse, plz: b.rechnungsPlz, ort: b.rechnungsOrt,
+    land: LAENDER[b.rechnungsLand || 'DE'] || '',
+  };
+  const datum = new Date().toLocaleDateString('de-DE');
+  const pdfBuffer = await baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel: planInfo.label, betrag });
+
+  await admin.firestore().collection('rechnungen').add({
+    nummer, empfaengerId: billingId, empfaengerName: empfaenger.name,
+    plan, planer: planer === '1', betrag, datum, erstelltAm: Date.now(),
+    pdfBase64: pdfBuffer.toString('base64'),
+    stripeSessionId: session.id,
+  });
+  console.log('stripeWebhook: Rechnung', nummer, 'erzeugt fuer', billingColl, billingId, '(Ereignis', stripeEventId, ')');
+}
+
+exports.stripeWebhook = onRequest(
+  { secrets: [STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET], rawBody: true },
+  async (req, res) => {
+    const stripe = new Stripe(STRIPE_SECRET_KEY.value());
+    let event;
+    try {
+      event = stripe.webhooks.constructEvent(
+        req.rawBody, req.headers['stripe-signature'], STRIPE_WEBHOOK_SECRET.value()
+      );
+    } catch (e) {
+      console.warn('stripeWebhook: Signatur ungueltig', e.message);
+      res.status(400).send('invalid signature');
+      return;
+    }
+
+    try {
+      if (event.type === 'checkout.session.completed') {
+        const session = event.data.object;
+        // Nur bei SOFORT bezahlt (Karte) hier aktivieren. Bei noch
+        // schwebender SEPA-Lastschrift ('unpaid'/'no_payment_required'
+        // greift hier nicht) uebernimmt async_payment_succeeded weiter unten.
+        if (session.payment_status === 'paid') {
+          await stripeAboAktivierenUndRechnung(session, event.id);
+        }
+      } else if (event.type === 'checkout.session.async_payment_succeeded') {
+        // SEPA-Lastschrift wurde jetzt tatsaechlich bestaetigt.
+        const session = event.data.object;
+        await stripeAboAktivierenUndRechnung(session, event.id);
+      } else if (event.type === 'checkout.session.async_payment_failed') {
+        const session = event.data.object;
+        const { billingColl, billingId } = session.metadata || {};
+        if (billingColl && billingId) {
+          console.warn('stripeWebhook: SEPA-Lastschrift fehlgeschlagen fuer', billingColl, billingId);
+        }
+      }
+      res.status(200).send('ok');
+    } catch (e) {
+      console.error('stripeWebhook Fehler:', e);
+      // 200 statt 500: verhindert, dass Stripe denselben fehlerhaften
+      // Vorgang endlos wiederholt zustellt.
+      res.status(200).send('ok - Fehler geloggt');
+    }
+  }
+);
+
 
 
 // ═══════════════════════════════════════════════════════════════════
