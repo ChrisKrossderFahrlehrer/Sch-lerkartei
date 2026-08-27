@@ -6,6 +6,7 @@
     "rules": "firestore.rules"
   },
   "storage": {
-    "rules": "storage.rules"
+    "rules": "storage.rules",
+    "bucket": "fahrschule-ebc65-eu-storage"
   }
 }
