@@ -483,11 +483,11 @@ service cloud.firestore {
     // create prüft die schoolId des NEUEN Dokuments. So kann niemand Daten
     // einer fremden Fahrschule lesen, ändern oder unterschieben.
     match /schueler/{docId} {
-      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || resource.data.lehrerUid == request.auth.uid;
+      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || (isAuth() && resource.data.lehrerUid == request.auth.uid);
       allow create:               if kalOwnsSchool(request.resource.data.schoolId) || (isRealAccount() && request.resource.data.lehrerUid == request.auth.uid);
     }
     match /slots/{docId} {
-      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || resource.data.lehrerUid == request.auth.uid;
+      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || (isAuth() && resource.data.lehrerUid == request.auth.uid);
       allow create:               if kalOwnsSchool(request.resource.data.schoolId) || (isRealAccount() && request.resource.data.lehrerUid == request.auth.uid);
       // Schüler-Selbststorno (OHNE Login): NUR den eigenen gebuchten Termin
       // freigeben (bookedBy -> null). Eng begrenzt:
@@ -508,27 +508,27 @@ service cloud.firestore {
       // schueler/slots/urlaub/... der Rueckfallweg ueber die eigene lehrerUid
       // fehlte - kalOwnsSchool() allein greift nur mit korrekter
       // Fahrschul-Mitgliedschaft.
-      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || resource.data.lehrerUid == request.auth.uid;
+      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || (isAuth() && resource.data.lehrerUid == request.auth.uid);
       allow create:               if kalOwnsSchool(request.resource.data.schoolId) || (isRealAccount() && request.resource.data.lehrerUid == request.auth.uid);
     }
     match /globalBlocked/{docId} {
-      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || resource.data.lehrerUid == request.auth.uid;
+      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || (isAuth() && resource.data.lehrerUid == request.auth.uid);
       allow create:               if kalOwnsSchool(request.resource.data.schoolId) || (isRealAccount() && request.resource.data.lehrerUid == request.auth.uid);
     }
     match /urlaub/{docId} {
-      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || resource.data.lehrerUid == request.auth.uid;
+      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || (isAuth() && resource.data.lehrerUid == request.auth.uid);
       allow create:               if kalOwnsSchool(request.resource.data.schoolId) || (isRealAccount() && request.resource.data.lehrerUid == request.auth.uid);
     }
     match /notizen/{docId} {
-      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || resource.data.lehrerUid == request.auth.uid;
+      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || (isAuth() && resource.data.lehrerUid == request.auth.uid);
       allow create:               if kalOwnsSchool(request.resource.data.schoolId) || (isRealAccount() && request.resource.data.lehrerUid == request.auth.uid);
     }
     match /warteliste/{docId} {
-      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || resource.data.lehrerUid == request.auth.uid;
+      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || (isAuth() && resource.data.lehrerUid == request.auth.uid);
       allow create:               if kalOwnsSchool(request.resource.data.schoolId) || (isRealAccount() && request.resource.data.lehrerUid == request.auth.uid);
     }
     match /pruefungen/{docId} {
-      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || resource.data.lehrerUid == request.auth.uid;
+      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || (isAuth() && resource.data.lehrerUid == request.auth.uid);
       allow create:               if kalOwnsSchool(request.resource.data.schoolId) || (isRealAccount() && request.resource.data.lehrerUid == request.auth.uid);
     }
     // blocked hat kein schoolId, nur lehrerUid → über den Lehrer absichern
