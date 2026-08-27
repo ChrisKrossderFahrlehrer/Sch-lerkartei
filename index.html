@@ -3724,8 +3724,7 @@ async function migrateOldAccessCodes() {
 }
 
 onAuthStateChanged(auth, async (user) => {
-  const __authOverlay = document.getElementById('auth-resolving-overlay');
-  if (__authOverlay) __authOverlay.remove();
+ try {
   if (window.__DEMO) return;
   // FIX: Anonyme Schüler-Sessions (Kalender-Sync/Push-Grundlage) dürfen NICHT
   // in die Fahrlehrer-Logik unten fallen - sonst würde die Selbstheilung
@@ -3952,6 +3951,10 @@ onAuthStateChanged(auth, async (user) => {
     if (authErr) authErr.textContent = '';
     switchTab('login');
   }
+ } finally {
+  const __authOverlay = document.getElementById('auth-resolving-overlay');
+  if (__authOverlay) __authOverlay.remove();
+ }
 });
 
 // ─────────────────────────────────────────
