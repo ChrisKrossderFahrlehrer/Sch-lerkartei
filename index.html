@@ -8845,7 +8845,7 @@ async function loadChatMessages() {
       const pfad = el.getAttribute('data-bildpfad');
       if (!pfad || el.getAttribute('src')) return;
       try {
-        const url = await getDownloadURL(ref(getStorage(), pfad));
+        const url = await getDownloadURL(ref(getStorage(app, "gs://fahrschule-ebc65-eu-storage"), pfad));
         el.src = url;
         el.onclick = () => window.open(url, '_blank');
       } catch(e) {
@@ -9973,7 +9973,7 @@ window.sendeChatBild = async (datei) => {
     const docRef = snap.docs[0];
     const blob = await komprimiereBild(datei);
     const pfad = `chat-images/${docRef.id}/${Date.now()}.jpg`;
-    const storage = getStorage();
+    const storage = getStorage(app, "gs://fahrschule-ebc65-eu-storage");
     await uploadBytes(ref(storage, pfad), blob, { contentType: 'image/jpeg' });
     const neueNachricht = {
       id: Date.now().toString(), sender: 'fahrlehrer', senderName: currentUser.displayName || 'Fahrlehrer',
@@ -10017,7 +10017,7 @@ async function loescheSchuelerBegleitdaten(studentId) {
   // 2) ZUERST die Chat-Fotos loeschen, solange die Berechtigung noch prüfbar ist
   for (const codeId of codeIds) {
     try {
-      const ordner = ref(getStorage(), `chat-images/${codeId}`);
+      const ordner = ref(getStorage(app, "gs://fahrschule-ebc65-eu-storage"), `chat-images/${codeId}`);
       const inhalt = await listAll(ordner);
       for (const datei of inhalt.items) {
         await deleteObject(datei).catch(e => console.warn('Bild loeschen:', e));
