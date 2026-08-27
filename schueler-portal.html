@@ -759,7 +759,7 @@ function renderChat() {
     const pfad = el.getAttribute('data-bildpfad');
     if (!pfad || el.getAttribute('src')) return;
     try {
-      const url = await getDownloadURL(ref(getStorage(), pfad));
+      const url = await getDownloadURL(ref(getStorage(app, "gs://fahrschule-ebc65-eu-storage"), pfad));
       el.src = url;
       el.onclick = () => window.open(url, '_blank');
     } catch(e) {
@@ -1126,7 +1126,7 @@ window.sendeSchuelerBild = async (datei) => {
   try {
     const blob = await komprimiereBildPortal(datei);
     const pfad = `chat-images/${codeDocId}/${Date.now()}.jpg`;
-    const storage = getStorage();
+    const storage = getStorage(app, "gs://fahrschule-ebc65-eu-storage");
     await uploadBytes(ref(storage, pfad), blob, { contentType: 'image/jpeg' });
     // DATENSCHUTZ: nur den internen Pfad speichern, nie die von
     // getDownloadURL erzeugte Adresse - die umgeht die Speicher-Regeln
