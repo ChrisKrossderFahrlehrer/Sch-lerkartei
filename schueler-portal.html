@@ -739,18 +739,32 @@ function renderChat() {
     return;
   }
 
+  const heuteStrP = new Date().toDateString();
+  const gesternStrP = new Date(Date.now() - 86400000).toDateString();
+  function tagLabelPortal(ts) {
+    const d = new Date(ts); const ds = d.toDateString();
+    if (ds === heuteStrP) return 'Heute';
+    if (ds === gesternStrP) return 'Gestern';
+    return d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
+  }
+  let __letzterTagPortal = null;
   wrap.innerHTML = msgs.map(m => {
     const isFL = m.sender === 'fahrlehrer';
     const time = new Date(m.timestamp).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
-    const date = new Date(m.timestamp).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
+    let trenner = '';
+    const tagSchluessel = new Date(m.timestamp).toDateString();
+    if (tagSchluessel !== __letzterTagPortal) {
+      __letzterTagPortal = tagSchluessel;
+      trenner = `<div style="text-align:center;margin:14px 0 8px;font-size:0.72rem;color:var(--muted);font-weight:600">— ${tagLabelPortal(m.timestamp)} —</div>`;
+    }
     const bildQuelle = m.imagePath || m.imageUrl;
     const inhalt = bildQuelle
       ? `<img data-bildpfad="${m.imagePath || ''}" ${m.imageUrl ? `src="${m.imageUrl}"` : ''} loading="lazy" style="max-width:100%;min-width:120px;min-height:80px;border-radius:10px;display:block;cursor:pointer;background:rgba(0,0,0,0.15)">`
       : escHtml(m.text);
-    return `<div class="msg-bubble ${m.sender}" style="display:flex;flex-direction:column">
+    return `${trenner}<div class="msg-bubble ${m.sender}" style="display:flex;flex-direction:column">
       ${isFL ? `<div style="font-size:0.68rem;color:var(--muted);margin-bottom:3px;font-weight:600">${escHtml(m.senderName||'Fahrlehrer')}</div>` : ''}
       <div>${inhalt}</div>
-      <div class="msg-meta">${date} ${time}</div>
+      <div class="msg-meta">${time}</div>
     </div>`;
   }).join('');
   // Bild-Adressen erst hier erzeugen (regelgeschuetzt), damit nie eine
