@@ -8832,11 +8832,28 @@ async function loadChatMessages() {
       return;
     }
     const schuelerGelesenBis = (codeDoc && codeDoc.studentLastRead) || 0;
+    const heuteStr = new Date().toDateString();
+    const gesternStr = new Date(Date.now() - 86400000).toDateString();
+    function tagLabel(zs) {
+      const d = new Date(zs);
+      const ds = d.toDateString();
+      if (ds === heuteStr) return 'Heute';
+      if (ds === gesternStr) return 'Gestern';
+      return d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
+    }
+    let __letzterTagSchluessel = null;
     messagesEl.innerHTML = msgs.map(msg => {
       const vonFahrlehrer = msg.senderUid === currentUser.uid || msg.sender === 'fahrlehrer';
       const zs = msg.createdAt || msg.timestamp;
       const zeit = zs ? new Date(zs).toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit'}) : '';
-      const datum = zs ? new Date(zs).toLocaleDateString('de-DE') : '';
+      let trenner = '';
+      if (zs) {
+        const tagSchluessel = new Date(zs).toDateString();
+        if (tagSchluessel !== __letzterTagSchluessel) {
+          __letzterTagSchluessel = tagSchluessel;
+          trenner = `<div style="text-align:center;margin:14px 0 8px;font-size:0.72rem;color:var(--muted);font-weight:600">— ${tagLabel(zs)} —</div>`;
+        }
+      }
       const gelesen = vonFahrlehrer && zs && schuelerGelesenBis >= zs;
       const haekchen = vonFahrlehrer
         ? `<span style="margin-left:3px;color:${gelesen ? 'var(--blue)' : 'var(--muted)'}">${gelesen ? '✓✓' : '✓'}</span>`
@@ -8845,7 +8862,7 @@ async function loadChatMessages() {
       const inhalt = bildQuelle
         ? `<img data-bildpfad="${msg.imagePath || ''}" ${msg.imageUrl ? `src="${msg.imageUrl}"` : ''} loading="lazy" style="max-width:100%;min-width:120px;min-height:80px;border-radius:12px;display:block;cursor:pointer;background:rgba(0,0,0,0.15)">`
         : (msg.text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      return `
+      return `${trenner}
         <div style="display:flex;flex-direction:column;align-items:${vonFahrlehrer?'flex-end':'flex-start'};gap:2px">
           <div class="chat-bubble" style="
             padding:${msg.imageUrl?'6px':'10px 14px'};border-radius:${vonFahrlehrer?'16px 16px 4px 16px':'16px 16px 16px 4px'};
@@ -8853,7 +8870,7 @@ async function loadChatMessages() {
             color:${vonFahrlehrer?'#0d1117':'var(--text)'}">
             ${inhalt}
           </div>
-          <div style="font-size:0.65rem;color:var(--muted);padding:0 4px">${datum} ${zeit}${haekchen}</div>
+          <div style="font-size:0.65rem;color:var(--muted);padding:0 4px">${zeit}${haekchen}</div>
         </div>`;
     }).join('');
     // Bild-Adressen erst jetzt erzeugen: getDownloadURL() selbst ist durch
