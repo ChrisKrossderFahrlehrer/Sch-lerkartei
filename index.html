@@ -527,6 +527,23 @@ body.punkte-brutal .stufe-form {
   border: 1.5px solid #14161a; background: currentColor;
   box-shadow: 2px 2px 0 #14161a;
 }
+/* Chat-Sprechblasen: eigene Klasse statt fester Inline-Werte, damit sie
+   auf die Design-Stile reagieren koennen (vorher immer gleich aussehend,
+   unabhaengig vom gewaehlten Stil - Kundenmeldung). */
+.chat-bubble {
+  max-width: 78%; font-size: 0.88rem; line-height: 1.4; word-break: break-word;
+}
+.style-strasse .chat-bubble {
+  border: 2.5px solid #14161a !important; border-radius: 8px !important;
+  box-shadow: 3px 3px 0 #14161a !important;
+}
+.style-neumorph .chat-bubble {
+  border-radius: 16px !important;
+  box-shadow: 5px 5px 10px rgba(0,0,0,0.4), -4px -4px 8px rgba(255,255,255,0.04) !important;
+}
+.style-modern .chat-bubble {
+  box-shadow: 0 4px 14px rgba(0,0,0,0.25) !important;
+}
 
 .empty-state { text-align:center; padding:60px 24px; color:var(--muted); }
 .empty-state .ei { font-size:3rem; margin-bottom:12px; }
@@ -8830,11 +8847,10 @@ async function loadChatMessages() {
         : (msg.text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       return `
         <div style="display:flex;flex-direction:column;align-items:${vonFahrlehrer?'flex-end':'flex-start'};gap:2px">
-          <div style="
-            max-width:78%;padding:${msg.imageUrl?'6px':'10px 14px'};border-radius:${vonFahrlehrer?'16px 16px 4px 16px':'16px 16px 16px 4px'};
+          <div class="chat-bubble" style="
+            padding:${msg.imageUrl?'6px':'10px 14px'};border-radius:${vonFahrlehrer?'16px 16px 4px 16px':'16px 16px 16px 4px'};
             background:${vonFahrlehrer?'var(--accent)':'var(--surface2)'};
-            color:${vonFahrlehrer?'#0d1117':'var(--text)'};
-            font-size:0.88rem;line-height:1.4;word-break:break-word">
+            color:${vonFahrlehrer?'#0d1117':'var(--text)'}">
             ${inhalt}
           </div>
           <div style="font-size:0.65rem;color:var(--muted);padding:0 4px">${datum} ${zeit}${haekchen}</div>
