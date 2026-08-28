@@ -8569,11 +8569,18 @@ window.exportPDF = () => {
   const adkHTML = ADK.map(gruppe => {
     const items = gruppe.items.map(item => {
       const val = (s.themen||{})[item] || 0;
-      const stufen = ['○','◐','◕','●','★'];
       const farben = ['#666','#f0b429','#f0b429','#3fb950','#3fb950'];
+      const formStile = [
+        'border-radius:50%;opacity:0.55',
+        'clip-path:polygon(50% 4%,96% 92%,4% 92%);opacity:0.6',
+        'clip-path:polygon(50% 4%,96% 92%,4% 92%);opacity:0.85',
+        'border-radius:50%',
+        'clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)',
+      ];
+      const formHTML = `<span style="display:inline-block;width:11px;height:11px;background:${farben[val]};${formStile[val]}"></span>`;
       return `<tr>
         <td style="padding:3px 8px;font-size:10px;color:#333">${item}</td>
-        <td style="padding:3px 8px;text-align:center;font-size:12px;color:${farben[val]}">${stufen[val]}</td>
+        <td style="padding:3px 8px;text-align:center">${formHTML}</td>
       </tr>`;
     }).join('');
     const done  = gruppe.items.filter(t => (s.themen||{})[t] >= 4).length;
