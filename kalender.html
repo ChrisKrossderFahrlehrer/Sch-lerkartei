@@ -805,6 +805,7 @@ function buildSidebar(){
     {id:'lehrer-pruefungen',icon:'🎓',label:'Prüfungen'},
     {id:'lehrer-urlaub',icon:'🏖️',label:'Urlaub'},
     {id:'lehrer-warteliste',icon:'⏳',label:'Warteliste'},
+    {id:'lehrer-theorie',icon:'📖',label:'Theorie'},
     {id:'lehrer-profil',icon:'⚙️',label:'Einstellungen'},
   ];
   const items=currentRole==='superadmin'?saNav:currentRole==='admin'?adminNav:lehrerNav;
@@ -1004,6 +1005,82 @@ window.aktivierePush = async () => {
 };
 
 const pages={};
+
+// ══ THEORIE-UNTERRICHT (Gruppen-Sitzung, Anlage 3 zu §6 Abs.1 FahrschAusbO) ══
+// Anders als praktische Fahrstunden (ein Termin = ein Schueler) laeuft
+// Theorie meist als Gruppenunterricht - daher eigene Seite mit
+// Mehrfachauswahl statt Anbindung an einen einzelnen Kalendertermin.
+pages['lehrer-theorie']=async function(el){
+  el.innerHTML=`<div class="page active">
+    <h2 class="page-title">📖 Theorie-Unterricht eintragen</h2>
+    <p class="text-muted" style="margin:-8px 0 16px">Für den amtlichen Ausbildungsnachweis (Anlage 3) – als Gruppensitzung, mehrere Schüler gleichzeitig.</p>
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;gap:6px;margin-bottom:12px">
+        <button class="scope-btn active" id="th-art-grund" onclick="setThArt('grund')" style="flex:1">📖 Grundunterricht</button>
+        <button class="scope-btn" id="th-art-klasse" onclick="setThArt('klasse')" style="flex:1">🎓 Klassenspezifisch</button>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Datum</label>
+        <input class="form-input" type="date" id="th-datum">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Thema</label>
+        <input class="form-input" id="th-thema" placeholder="z.B. Verkehrszeichen, Vorfahrt">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Dauer (Minuten)</label>
+        <input class="form-input" type="number" id="th-minuten" placeholder="z.B. 90">
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">Teilnehmende Schüler</div>
+      <div id="th-schueler-liste"><div class="spinner"></div></div>
+    </div>
+    <div id="th-status" style="font-size:0.85rem;min-height:22px;margin-bottom:10px;text-align:center;padding:10px;border-radius:8px"></div>
+    <button class="btn btn-primary" style="width:100%" onclick="speichereTheorieStunde()">💾 Für alle Ausgewählten speichern</button>
+  </div>`;
+  window.__thArt = 'grund';
+  document.getElementById('th-datum').valueAsDate = new Date();
+  const snap = await getDocs(query(collection(db,'schueler'), where('lehrerUid','==',currentUser.uid)));
+  const listEl = document.getElementById('th-schueler-liste');
+  if (snap.empty) { listEl.innerHTML = '<p class="text-muted">Keine Schüler gefunden.</p>'; return; }
+  const schueler = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (a.lname||'').localeCompare(b.lname||''));
+  listEl.innerHTML = schueler.map(s => `
+    <label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer">
+      <input type="checkbox" class="th-schueler-check" value="${s.id}" style="width:18px;height:18px;flex-shrink:0">
+      <span>${s.fname||''} ${s.lname||''}</span>
+    </label>`).join('');
+};
+window.setThArt = function(art){
+  window.__thArt = art;
+  document.getElementById('th-art-grund').classList.toggle('active', art==='grund');
+  document.getElementById('th-art-klasse').classList.toggle('active', art==='klasse');
+};
+window.speichereTheorieStunde = async function(){
+  const statusEl = document.getElementById('th-status');
+  const datum = document.getElementById('th-datum').value;
+  const thema = document.getElementById('th-thema').value.trim();
+  const minuten = parseInt(document.getElementById('th-minuten').value) || 0;
+  const gewaehlte = Array.from(document.querySelectorAll('.th-schueler-check:checked')).map(c => c.value);
+  if (!datum || !thema || !minuten) { statusEl.style.color='var(--danger)'; statusEl.textContent='Bitte Datum, Thema und Dauer ausfüllen.'; return; }
+  if (gewaehlte.length === 0) { statusEl.style.color='var(--danger)'; statusEl.textContent='Bitte mindestens einen Schüler auswählen.'; return; }
+  statusEl.style.color='var(--text-muted)'; statusEl.textContent='Wird gespeichert…';
+  try {
+    for (const schuelerId of gewaehlte) {
+      await addDoc(collection(db,'theorieStunden'), {
+        schuelerId, lehrerUid: currentUser.uid, schoolId: currentSchoolId || null,
+        art: window.__thArt, datum, thema, minuten, createdAt: serverTimestamp(),
+      });
+    }
+    statusEl.style.color='var(--accent2)'; statusEl.textContent=`✓ Für ${gewaehlte.length} Schüler gespeichert.`;
+    document.getElementById('th-thema').value = '';
+    document.querySelectorAll('.th-schueler-check:checked').forEach(c => c.checked = false);
+  } catch(e) {
+    console.warn('speichereTheorieStunde', e);
+    statusEl.style.color='var(--danger)'; statusEl.textContent='Fehler beim Speichern: ' + (e.code||e.message||'unbekannt');
+  }
+};
+
 
 // ════════════════════════════════
 // SUPER ADMIN PAGES
