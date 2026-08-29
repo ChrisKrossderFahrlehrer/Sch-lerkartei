@@ -1767,6 +1767,29 @@ window.manuellBuchen = async function(slotId, schuelerId, year, month, day) {
   }
 };
 // ══ TERMIN-DETAIL: Schueler-Zugriff, Fehlstunde, Stornieren, Fahrstunden-Historie ══
+// Amtliche Kategorien fuer besondere Ausbildungsfahrten (Anlage 3 zu §6 Abs.1
+// FahrschAusbO). Gemeinsame Liste, damit Dropdown und spaetere PDF-Erzeugung
+// konsistent dieselben Codes/Bezeichnungen verwenden.
+const AN_KATEGORIEN = [
+  { code: 'Üst', label: 'Übungsstunden i.g.O./a.g.O.' },
+  { code: 'Gf',  label: 'Grundfahraufgaben' },
+  { code: 'Uw',  label: 'Unterweisung am Ausbildungsfahrzeug' },
+  { code: 'UL',  label: 'Überlandfahrt' },
+  { code: 'AB',  label: 'Autobahn' },
+  { code: 'NF',  label: 'Fahrstunden bei Dunkelheit' },
+  { code: 'SN',  label: 'Schaltnachweis (§5a FahrschAusbO)' },
+];
+
+window.setSlotKategorie = async function(slotId, kategorie, year, month, day) {
+  try {
+    await updateDoc(doc(db, 'slots', slotId), { anKategorie: kategorie || null });
+    toast(kategorie ? 'Kategorie gespeichert.' : 'Kategorie entfernt.', 'success');
+  } catch (e) {
+    console.warn('setSlotKategorie', e);
+    toast('Konnte nicht gespeichert werden.', 'error');
+  }
+};
+
 window.oeffneTerminDetail = async function(slotId, year, month, day) {
   try {
     const slotSnap = await getDoc(doc(db, 'slots', slotId));
@@ -1788,6 +1811,7 @@ window.oeffneTerminDetail = async function(slotId, year, month, day) {
 
     const istFehlstunde = s.status === 'nichtErschienen';
     const datumTxt = s.startTime.toDate().toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long' });
+    const anOptionen = AN_KATEGORIEN.map(k => `<option value="${k.code}" ${s.anKategorie === k.code ? 'selected' : ''}>${k.code} – ${k.label}</option>`).join('');
     openModal(`
       <h2 class="modal-title">👤 ${name}</h2>
       <p class="text-muted" style="margin:-6px 0 14px">${datumTxt} · ${fmtTime(s.startTime)}–${fmtTime(s.endTime)} · ${typeBadgeHtml(s.type)}</p>
@@ -1796,6 +1820,13 @@ window.oeffneTerminDetail = async function(slotId, year, month, day) {
         <input type="checkbox" ${istFehlstunde ? 'checked' : ''} onchange="toggleFehlstunde('${slotId}',${year},${month},${day})" style="width:18px;height:18px">
         <span>Nicht erschienen (Fehlstunde)</span>
       </label>
+      <div class="form-group" style="margin-bottom:14px">
+        <label class="form-label">📋 Kategorie (Ausbildungsnachweis, Anlage 3)</label>
+        <select class="form-input" onchange="setSlotKategorie('${slotId}',this.value,${year},${month},${day})">
+          <option value="">– auswählen –</option>
+          ${anOptionen}
+        </select>
+      </div>
       <button class="btn btn-danger" style="width:100%;margin-bottom:18px" onclick="if(confirm('Diesen Termin wirklich stornieren und löschen?'))stornierGebuchtenSlot('${slotId}',${year},${month},${day})">🗑️ Termin stornieren</button>
       <hr class="divider">
       <div class="card-title">Bisherige Fahrstunden bei dir</div>
