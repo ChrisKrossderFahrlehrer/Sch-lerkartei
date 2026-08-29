@@ -1376,6 +1376,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     <div class="form-group"><label class="form-label">Vorname</label><input class="form-input" id="inp-vn" placeholder="z. B. Lena" autocomplete="off"></div>
     <div class="form-group"><label class="form-label">Nachname</label><input class="form-input" id="inp-nn" placeholder="z. B. Müller" autocomplete="off"></div>
     <div class="form-group"><label class="form-label">Geburtsdatum (optional)</label><input class="form-input" id="inp-geb" type="date"></div>
+    <div class="form-group"><label class="form-label">Straße (für Ausbildungsnachweis)</label><input class="form-input" id="inp-strasse" placeholder="z. B. Musterstraße 1" autocomplete="off"></div>
+    <div style="display:flex;gap:8px">
+      <div class="form-group" style="flex:1"><label class="form-label">PLZ</label><input class="form-input" id="inp-plz" placeholder="12345" autocomplete="off"></div>
+      <div class="form-group" style="flex:2"><label class="form-label">Ort</label><input class="form-input" id="inp-ort" placeholder="Musterstadt" autocomplete="off"></div>
+    </div>
     <div class="form-group">
       <label class="form-label">BF17 – Begleitetes Fahren ab 17</label>
       <select class="form-input" id="inp-bf17">
@@ -2251,6 +2256,21 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     </p>
     <div id="punkte-stil-liste" style="display:flex;flex-direction:column;gap:12px"></div>
     <button class="btn-sheet-cancel" onclick="document.getElementById('punkte-stil-modal').classList.remove('open')" style="margin-top:16px">Fertig</button>
+  </div>
+</div>
+
+<!-- SCHÜLER-ADRESSE MODAL (fuer Ausbildungsnachweis, Anlage 3) -->
+<div class="modal-overlay" id="adresse-modal" onclick="closeModal(event)">
+  <div class="modal-sheet" style="max-width:420px">
+    <div class="sheet-title">📍 Anschrift</div>
+    <p style="font-size:0.75rem;color:var(--muted);margin:-6px 0 14px;line-height:1.5">Pflichtangabe auf dem amtlichen Ausbildungsnachweis (Anlage 3).</p>
+    <div class="form-group"><label class="form-label">Straße</label><input class="form-input" id="edit-strasse" placeholder="z. B. Musterstraße 1"></div>
+    <div style="display:flex;gap:8px">
+      <div class="form-group" style="flex:1"><label class="form-label">PLZ</label><input class="form-input" id="edit-plz" placeholder="12345"></div>
+      <div class="form-group" style="flex:2"><label class="form-label">Ort</label><input class="form-input" id="edit-ort" placeholder="Musterstadt"></div>
+    </div>
+    <div id="adresse-status" style="font-size:0.82rem;min-height:20px;margin-bottom:8px;text-align:center;padding:8px;border-radius:8px"></div>
+    <button class="btn-main" onclick="speichereAdresse()">💾 Speichern</button>
   </div>
 </div>
 
@@ -4805,6 +4825,9 @@ function renderDetail() {
         ${a?'<span style="font-size:0.72rem;color:var(--muted)">'+a+' Jahre</span>':''}
         ${bf17DetailTag}
         ${ampelTag}
+        <span onclick="openAdresseBearbeiten('${s.id}')" style="cursor:pointer;font-size:0.72rem;color:${s.strasse ? 'var(--muted)' : 'var(--danger)'};text-decoration:underline;text-decoration-style:dotted">
+          📍 ${s.strasse ? `${s.strasse}, ${s.plz||''} ${s.ort||''}` : 'Adresse fehlt (Ausbildungsnachweis)'}
+        </span>
       </div>
     </div>
     <div style="text-align:right">
@@ -6512,6 +6535,9 @@ window.addStudent = async () => {
       schuelerNr: neueNr,
       vorname:vn, nachname:nn,
       geburt:document.getElementById('inp-geb').value,
+      strasse:document.getElementById('inp-strasse')?.value.trim() || '',
+      plz:document.getElementById('inp-plz')?.value.trim() || '',
+      ort:document.getElementById('inp-ort')?.value.trim() || '',
       bf17Override:document.getElementById('inp-bf17')?.value || '',
       klasse: newStudentKlasse,
       klassen: [newStudentKlasse],
@@ -10120,6 +10146,36 @@ window.starteStripeCheckout = async () => {
     setTimeout(() => toast('Bezahlvorgang abgebrochen.'), 800);
   }
 })();
+
+
+
+window.openAdresseBearbeiten = (schuelerId) => {
+  const s = getStudent(schuelerId);
+  if (!s) return;
+  window.__adresseSchuelerId = schuelerId;
+  document.getElementById('edit-strasse').value = s.strasse || '';
+  document.getElementById('edit-plz').value = s.plz || '';
+  document.getElementById('edit-ort').value = s.ort || '';
+  document.getElementById('adresse-status').textContent = '';
+  document.getElementById('adresse-modal').classList.add('open');
+};
+window.speichereAdresse = async () => {
+  const id = window.__adresseSchuelerId;
+  if (!id) return;
+  const strasse = document.getElementById('edit-strasse').value.trim();
+  const plz = document.getElementById('edit-plz').value.trim();
+  const ort = document.getElementById('edit-ort').value.trim();
+  const statusEl = document.getElementById('adresse-status');
+  statusEl.style.color = 'var(--muted)'; statusEl.textContent = 'Wird gespeichert…';
+  try {
+    await dbUpd(doc(db,'students', id), { strasse, plz, ort });
+    statusEl.style.color = 'var(--accent2)'; statusEl.textContent = '✓ Gespeichert';
+    setTimeout(() => { document.getElementById('adresse-modal').classList.remove('open'); openDetail(id); }, 500);
+  } catch(e) {
+    console.warn('speichereAdresse', e);
+    statusEl.style.color = 'var(--danger)'; statusEl.textContent = 'Fehler beim Speichern.';
+  }
+};
 
 </script>
 <!-- ERST-LOGIN: Passwort setzen (+ optional echte E-Mail) - nicht wegklickbar -->
