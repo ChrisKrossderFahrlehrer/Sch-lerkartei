@@ -502,6 +502,14 @@ service cloud.firestore {
                     && resource.data.startTime is timestamp
                     && resource.data.startTime > request.time + duration.value(48, 'h');
     }
+
+    // NEU: Theorie-Unterricht (Gruppensitzungen) fuer den amtlichen
+    // Ausbildungsnachweis (Anlage 3) - dieselbe Zustaendigkeits-Pruefung
+    // wie bei slots.
+    match /theorieStunden/{docId} {
+      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || (isAuth() && resource.data.lehrerUid == request.auth.uid);
+      allow create:               if kalOwnsSchool(request.resource.data.schoolId) || (isRealAccount() && request.resource.data.lehrerUid == request.auth.uid);
+    }
     match /autos/{docId} {
       // FIX: Solo-Fahrlehrer (keine Fahrschul-Mitgliedschaft/kalenderUsers-
       // Zuordnung noetig) konnten hier nie verwalten, da anders als bei
