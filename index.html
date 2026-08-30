@@ -1707,6 +1707,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     <button class="btn-sheet-cancel" id="btn-test-rechnung" onclick="testRechnungErzeugen()" style="background:var(--surface2);margin-bottom:8px">🧪 Test-Rechnung erzeugen</button>
     <button class="btn-sheet-cancel" onclick="toggleTheme()" id="theme-btn-menu" style="background:var(--surface2);margin-bottom:8px">☀️ Design wechseln (hell/dunkel)</button>
     <button class="btn-sheet-cancel" onclick="starteKomplettsicherung()" style="background:var(--surface2);margin-bottom:8px">💾 Komplettsicherung herunterladen</button>
+    <input type="file" id="sicherung-datei" accept=".json,application/json" style="display:none" onchange="leseSicherung(this.files[0])">
+    <button class="btn-sheet-cancel" onclick="document.getElementById('sicherung-datei').click()" style="background:var(--surface2);margin-bottom:8px">📂 Sicherung öffnen / prüfen</button>
     <button class="btn-sheet-cancel" onclick="openStilAuswahl()" style="background:var(--surface2);margin-bottom:8px">🎨 Design-Stil wählen</button>
     <button class="btn-sheet-cancel" onclick="openPunkteStilAuswahl()" style="background:var(--surface2);margin-bottom:8px">⚪ Bewertungspunkte-Stil</button>
     <button class="btn-sheet-cancel" onclick="toggleBetaDashboard()" id="btn-beta-dashboard" style="background:var(--surface2);margin-bottom:8px">🧪 Beta: Neues Dashboard-Design</button>
@@ -10196,8 +10198,41 @@ window.speichereAdresse = async () => {
 // funktioniert auch dann noch, wenn serverseitig nichts mehr betrieben
 // wird. Format ist JSON, weil damit ein spaeterer Import in ein anderes
 // System technisch moeglich bleibt (Art. 20 DSGVO, Datenuebertragbarkeit).
+// Verschluesselung mit dem Standard-Verfahren des Browsers (AES-GCM,
+// Schluessel aus dem Passwort per PBKDF2 mit 250.000 Runden). Bewusst ohne
+// fremde Bibliothek - laeuft ueberall, nichts zusaetzlich zu laden.
+// WICHTIG: Das Passwort kennt nur der Kunde. Geht es verloren, ist die
+// Sicherung unwiederbringlich - das steht deshalb auch klar im Hinweis.
+async function verschluesseleSicherung(klartext, passwort) {
+  const enc = new TextEncoder();
+  const salz = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const basis = await crypto.subtle.importKey('raw', enc.encode(passwort), 'PBKDF2', false, ['deriveKey']);
+  const schluessel = await crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: salz, iterations: 250000, hash: 'SHA-256' },
+    basis, { name: 'AES-GCM', length: 256 }, false, ['encrypt']);
+  const daten = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, schluessel, enc.encode(klartext));
+  const zuB64 = (arr) => btoa(String.fromCharCode(...new Uint8Array(arr)));
+  return JSON.stringify({
+    format: 'FahrSync-Sicherung-verschluesselt',
+    formatVersion: 1,
+    verfahren: 'AES-GCM-256 / PBKDF2-SHA256-250000',
+    hinweis: 'Diese Datei ist mit einem selbst gewaehlten Passwort verschluesselt. '
+           + 'Zum Wiederherstellen in FahrSync einlesen und das Passwort eingeben. '
+           + 'Ohne das Passwort sind die Daten nicht lesbar - auch nicht durch den Anbieter.',
+    salz: zuB64(salz), iv: zuB64(iv), daten: zuB64(daten),
+  }, null, 2);
+}
+
 window.starteKomplettsicherung = async () => {
   if (!currentUser) { toast('Bitte zuerst anmelden.'); return; }
+  const passwort = prompt(
+    'Passwort für die Sicherung festlegen (empfohlen):\n\n'
+    + 'Die Datei wird damit verschlüsselt – geht sie verloren, kann sie niemand lesen.\n'
+    + 'WICHTIG: Ohne dieses Passwort ist die Sicherung später NICHT wiederherstellbar. '
+    + 'Bitte sicher notieren!\n\n'
+    + 'Leer lassen = unverschlüsselt speichern.');
+  if (passwort === null) return;
   toast('💾 Sicherung wird erstellt…');
   try {
     const eigeneSchueler = students.filter(s =>
@@ -10240,17 +10275,76 @@ window.starteKomplettsicherung = async () => {
     } catch(e) { console.warn('theorieStunden', e); }
 
     const datum = new Date().toISOString().slice(0,10);
-    const blob = new Blob([JSON.stringify(sicherung, null, 2)], { type: 'application/json' });
+    let inhalt = JSON.stringify(sicherung, null, 2);
+    let dateiname = `FahrSync-Sicherung_${datum}.json`;
+    if (passwort) {
+      inhalt = await verschluesseleSicherung(inhalt, passwort);
+      dateiname = `FahrSync-Sicherung_${datum}_verschluesselt.json`;
+    }
+    const blob = new Blob([inhalt], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `FahrSync-Sicherung_${datum}.json`;
+    a.download = dateiname;
     a.click();
     URL.revokeObjectURL(url);
-    toast(`✓ Sicherung erstellt (${eigeneSchueler.length} Schüler)`);
+    toast(`✓ Sicherung erstellt (${eigeneSchueler.length} Schüler)${passwort ? ' – verschlüsselt' : ''}`);
   } catch(e) {
     console.error('Komplettsicherung:', e);
     toast('Fehler bei der Sicherung: ' + (e.message || 'unbekannt'));
+  }
+};
+
+
+
+// Gegenstueck zur Verschluesselung: Sicherung wieder lesbar machen.
+// Ohne diese Funktion waere eine verschluesselte Sicherung wertlos - der
+// Kunde muss jederzeit selbst pruefen koennen, dass seine Sicherung
+// wirklich funktioniert und was drinsteht.
+async function entschluesseleSicherung(obj, passwort) {
+  const vonB64 = (s) => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  const enc = new TextEncoder();
+  const basis = await crypto.subtle.importKey('raw', enc.encode(passwort), 'PBKDF2', false, ['deriveKey']);
+  const schluessel = await crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: vonB64(obj.salz), iterations: 250000, hash: 'SHA-256' },
+    basis, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+  const klar = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: vonB64(obj.iv) }, schluessel, vonB64(obj.daten));
+  return new TextDecoder().decode(klar);
+}
+
+window.leseSicherung = async (datei) => {
+  if (!datei) return;
+  document.getElementById('sicherung-datei').value = '';
+  try {
+    let text = await datei.text();
+    let obj = JSON.parse(text);
+    if (obj.format === 'FahrSync-Sicherung-verschluesselt') {
+      const pw = prompt('Diese Sicherung ist verschlüsselt.\n\nBitte das Passwort eingeben, das beim Erstellen vergeben wurde:');
+      if (pw === null) return;
+      try {
+        text = await entschluesseleSicherung(obj, pw);
+        obj = JSON.parse(text);
+      } catch(e) {
+        toast('❌ Falsches Passwort – Sicherung konnte nicht geöffnet werden.');
+        return;
+      }
+    }
+    const anzahl = (obj.schueler || []).length;
+    const erstellt = obj.sicherungsInfo?.erstelltAm
+      ? new Date(obj.sicherungsInfo.erstelltAm).toLocaleString('de-DE') : 'unbekannt';
+    const theorie = (obj.theorieStunden || []).length;
+    alert(`✓ Sicherung erfolgreich geöffnet\n\n`
+        + `Erstellt am: ${erstellt}\n`
+        + `Enthaltene Schüler: ${anzahl}\n`
+        + `Theorie-Einträge: ${theorie}\n\n`
+        + `Die Sicherung ist intakt und lesbar.\n\n`
+        + `Hinweis: Diese Prüfung zeigt den Inhalt nur an. Ein automatisches `
+        + `Zurückspielen in die App ist bewusst nicht vorgesehen, damit `
+        + `bestehende Daten nicht versehentlich überschrieben werden.`);
+  } catch(e) {
+    console.warn('leseSicherung', e);
+    toast('❌ Datei konnte nicht gelesen werden – ist es eine FahrSync-Sicherung?');
   }
 };
 
