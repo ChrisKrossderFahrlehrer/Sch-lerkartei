@@ -2931,7 +2931,7 @@ window.doRegister = async () => {
     // Benutzername → E-Mail-Zuordnung speichern (für Login per Benutzername)
     try {
       await dbSet(doc(db, 'usernames', unameLower), {
-        username: unameLower, email, uid: cred.user.uid, createdAt: Date.now()
+        username: unameLower, email, createdAt: Date.now()
       });
     } catch(unErr) { console.warn('username-mapping:', unErr); }
 
@@ -7048,7 +7048,7 @@ window.changeEmail = async () => {
       const uname = profDoc.exists() ? profDoc.data().username : null;
       if (uname) {
         await dbSet(doc(db, 'usernames', uname), {
-          username: uname, email: neueEmail, uid: currentUser.uid, updatedAt: Date.now()
+          username: uname, email: neueEmail, updatedAt: Date.now()
         }, { merge: true });
       }
     } catch(dbErr) { console.warn('emailPending speichern:', dbErr); }
@@ -9323,7 +9323,7 @@ window.erstLoginAbschliessen = async () => {
         await dbUpd(doc(db, 'users', currentUser.uid), { emailPending: mail, emailPendingSince: Date.now() });
         const profDoc = await getDoc(doc(db, 'users', currentUser.uid));
         const uname = profDoc.exists() ? profDoc.data().username : null;
-        if (uname) await dbSet(doc(db, 'usernames', uname), { username: uname, email: mail, uid: currentUser.uid, updatedAt: Date.now() }, { merge: true });
+        if (uname) await dbSet(doc(db, 'usernames', uname), { username: uname, email: mail, updatedAt: Date.now() }, { merge: true });
         toast('Bestätigungs-E-Mail an ' + mail + ' gesendet.');
       } catch(mailErr) {
         console.warn('Erst-Login E-Mail:', mailErr);
