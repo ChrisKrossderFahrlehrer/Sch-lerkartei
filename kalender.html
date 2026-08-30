@@ -1004,6 +1004,21 @@ window.aktivierePush = async () => {
   }
 };
 
+// ══════════════════════════════════════════════════════════════════
+// SCHUELER-SAMMLUNG: Umschalter fuer die geplante Zusammenfuehrung
+//
+// Historisch fuehren ADK und Kalender getrennte Schuelerdatensaetze -
+// ohne Verknuepfung, mit unterschiedlichen Feldnamen. Das verhindert u.a.
+// einen vollstaendigen Ausbildungsnachweis (Fahrstunden liegen im
+// Kalender, Anschrift in der ADK) und macht die DSGVO-Loeschung
+// unvollstaendig.
+//
+// Umstellung erfolgt in Etappen. Solange hier der alte Wert steht,
+// verhaelt sich alles exakt wie bisher. Nach erfolgreicher Datenuebernahme
+// wird hier auf die ADK-Sammlung umgestellt - EINE Zeile, jederzeit
+// zurueckstellbar. Die alte Sammlung bleibt als Sicherung bestehen.
+const SCHUELER_COLL = 'schueler';
+
 const pages={};
 
 // ══ THEORIE-UNTERRICHT (Gruppen-Sitzung, Anlage 3 zu §6 Abs.1 FahrschAusbO) ══
@@ -1041,7 +1056,7 @@ pages['lehrer-theorie']=async function(el){
   </div>`;
   window.__thArt = 'grund';
   document.getElementById('th-datum').valueAsDate = new Date();
-  const snap = await getDocs(query(collection(db,'schueler'), where('lehrerUid','==',currentUser.uid)));
+  const snap = await getDocs(query(collection(db,SCHUELER_COLL), where('lehrerUid','==',currentUser.uid)));
   const listEl = document.getElementById('th-schueler-liste');
   if (snap.empty) { listEl.innerHTML = '<p class="text-muted">Keine Schüler gefunden.</p>'; return; }
   const schueler = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (a.lname||'').localeCompare(b.lname||''));
@@ -1159,7 +1174,7 @@ window.deleteSchool=async function(schoolId,name){
   if(!confirm(`Fahrschule "${name}" wirklich löschen?\n\nALLE Daten (Lehrer, Schüler, Slots, Buchungen) werden unwiderruflich gelöscht!`))return;
   toast('Wird gelöscht…','');
   // Alle schoolId-gebundenen Daten löschen
-  const collections=['kalenderUsers','schueler','slots','autos','blocked','globalBlocked','urlaub','notizen','warteliste','pruefungen','mailQueue'];
+  const collections=['kalenderUsers',SCHUELER_COLL,'slots','autos','blocked','globalBlocked','urlaub','notizen','warteliste','pruefungen','theorieStunden','mailQueue'];
   for(const col of collections){
     try{
       const snap=await getDocs(query(collection(db,col),where('schoolId','==',schoolId)));
@@ -1188,7 +1203,7 @@ pages['admin-dashboard']=async function(el){
   <div class="card"><div class="card-title">Ausstehende Freischaltungen</div><div id="pending-list"></div></div></div>`;
   const [lSnap,sSnap,pSnap]=await Promise.all([
     getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId),where('role','==','lehrer'),where('approved','==',true))),
-    getDocs(query(collection(db,'schueler'),where('schoolId','==',currentSchoolId))),
+    getDocs(query(collection(db,SCHUELER_COLL),where('schoolId','==',currentSchoolId))),
     getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId),where('role','==','lehrer'),where('approved','==',false))),
   ]);
   document.getElementById('stat-lehrer').textContent=lSnap.size;
@@ -1256,11 +1271,11 @@ window.setLehrerBlockDauer=async function(uid,min){
   toast(`Blockdauer: ${min} Min gesetzt.`,'success');
 };
 window.viewLehrerSchueler=async function(lehrerUid,lehrerName){
-  const snap=await getDocs(query(collection(db,'schueler'),where('lehrerUid','==',lehrerUid),where('schoolId','==',currentSchoolId)));
+  const snap=await getDocs(query(collection(db,SCHUELER_COLL),where('lehrerUid','==',lehrerUid),where('schoolId','==',currentSchoolId)));
   const rows=snap.docs.map(d=>{const s=d.data();return`<tr><td>${s.fname} ${s.lname}</td><td>${s.email||'—'}</td><td><button class="btn btn-danger btn-sm" onclick="unassignSchueler('${d.id}')">Entfernen</button></td></tr>`;}).join('');
   openModal(`<h2 class="modal-title">Schüler: ${lehrerName}</h2>${rows?`<table><thead><tr><th>Name</th><th>E-Mail</th><th></th></tr></thead><tbody>${rows}</tbody></table>`:'<p class="text-muted">Keine Schüler.</p>'}`);
 };
-window.unassignSchueler=async function(id){await updateDoc(doc(db,'schueler',id),{lehrerUid:null});toast('Entfernt.','success');closeModal();};
+window.unassignSchueler=async function(id){await updateDoc(doc(db,SCHUELER_COLL,id),{lehrerUid:null});toast('Entfernt.','success');closeModal();};
 
 // ════════════════════════════════
 // ADMIN – SCHÜLER
@@ -1286,7 +1301,7 @@ pages['admin-schueler']=async function(el){
 };
 async function loadSchuelerList(lehrerDocs){
   const el=document.getElementById('schueler-list');if(!el)return;
-  const [snap,autosSnap]=await Promise.all([getDocs(query(collection(db,'schueler'),where('schoolId','==',currentSchoolId))),getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId)))]);
+  const [snap,autosSnap]=await Promise.all([getDocs(query(collection(db,SCHUELER_COLL),where('schoolId','==',currentSchoolId))),getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId)))]);
   if(snap.empty){el.innerHTML='<p class="text-muted">Noch keine Schüler.</p>';return;}
   const lm={};(lehrerDocs||[]).forEach(d=>{const u=d.data();lm[d.id]=u.fname+' '+u.lname;});
   const am={};autosSnap.docs.forEach(d=>{const a=d.data();am[d.id]=a;});
@@ -1312,13 +1327,13 @@ window.createSchueler=async function(){
   const maxFahrstunden=parseInt(document.getElementById('ns-max').value)||0;
   const maxAktiveTermine=parseInt(document.getElementById('ns-maxaktiv').value)||0;
   if(!fname||!lname)return toast('Vor- und Nachname erforderlich.','error');
-  await addDoc(collection(db,'schueler'),{fname,lname,email,tel,lehrerUid:lehrerUid||null,maxFahrstunden,maxAktiveTermine,bookedCount:0,schoolId:currentSchoolId,createdAt:serverTimestamp()});
+  await addDoc(collection(db,SCHUELER_COLL),{fname,lname,email,tel,lehrerUid:lehrerUid||null,maxFahrstunden,maxAktiveTermine,bookedCount:0,schoolId:currentSchoolId,createdAt:serverTimestamp()});
   toast('Schüler angelegt!','success');
   pages['admin-schueler'](document.getElementById('main-content'));
 };
-window.deleteSchueler=async function(id){if(!confirm('Schüler löschen?'))return;await deleteDoc(doc(db,'schueler',id));toast('Gelöscht.','success');pages['admin-schueler'](document.getElementById('main-content'));};
+window.deleteSchueler=async function(id){if(!confirm('Schüler löschen?'))return;await deleteDoc(doc(db,SCHUELER_COLL,id));toast('Gelöscht.','success');pages['admin-schueler'](document.getElementById('main-content'));};
 window.editSchueler=async function(id){
-  const snap=await getDoc(doc(db,'schueler',id));const s=snap.data();
+  const snap=await getDoc(doc(db,SCHUELER_COLL,id));const s=snap.data();
   const lSnap=await getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId),where('role','==','lehrer'),where('approved','==',true)));
   const opts=lSnap.docs.map(d=>{const u=d.data();return`<option value="${d.id}" ${s.lehrerUid===d.id?'selected':''}>${u.fname} ${u.lname}</option>`;}).join('');
   openModal(`<h2 class="modal-title">Schüler bearbeiten</h2>
@@ -1335,7 +1350,7 @@ window.editSchueler=async function(id){
     <button class="btn btn-primary" onclick="saveSchueler('${id}')">Speichern</button>`);
 };
 window.saveSchueler=async function(id){
-  await updateDoc(doc(db,'schueler',id),{
+  await updateDoc(doc(db,SCHUELER_COLL,id),{
     fname:document.getElementById('es-fname').value.trim(),lname:document.getElementById('es-lname').value.trim(),
     email:document.getElementById('es-email').value.trim(),tel:document.getElementById('es-tel').value.trim(),
     lehrerUid:document.getElementById('es-lehrer').value||null,
@@ -1745,7 +1760,7 @@ async function renderWeekCal(label,grid){
   const [sSnap,bSnap,scSnap]=await Promise.all([
     getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid))),
     getDocs(query(collection(db,'blocked'),where('lehrerUid','==',currentUser.uid))),
-    getDocs(query(collection(db,'schueler'),where('lehrerUid','==',currentUser.uid))),
+    getDocs(query(collection(db,SCHUELER_COLL),where('lehrerUid','==',currentUser.uid))),
   ]);
   const scm={};scSnap.docs.forEach(d=>{const s=d.data();scm[d.id]=s.fname+' '+s.lname;});
   const bSet=new Set();bSnap.docs.forEach(d=>{const b=d.data();bSet.add(`${b.year}-${b.month}-${b.day}`);});
@@ -1796,7 +1811,7 @@ window.openDayModal=async function(year,month,day){
   const daySlots=sSnap.docs.filter(d=>{const dt=d.data().startTime.toDate();return dt.getFullYear()===year&&dt.getMonth()===month&&dt.getDate()===day;});
   const isBlocked=!bSnap.empty,isGlobal=!gbSnap.empty;
   const blockedId=isBlocked?bSnap.docs[0].id:null;
-  const scSnap=await getDocs(query(collection(db,'schueler'),where('lehrerUid','==',currentUser.uid)));
+  const scSnap=await getDocs(query(collection(db,SCHUELER_COLL),where('lehrerUid','==',currentUser.uid)));
   const scm={};scSnap.docs.forEach(d=>{const s=d.data();scm[d.id]=s.fname+' '+s.lname;});
   const slotsHtml=daySlots.length?daySlots.map(d=>{const s=d.data();const pend=!s.bookedBy&&window.__pendingReq&&window.__pendingReq.bySlot[d.id];const sn=s.bookedBy?(scm[s.bookedBy]||'?'):(pend?('⏳ Anfrage: '+pend):null);
     return`<div class="slot-row"><div class="slot-time">${fmtTime(s.startTime)} – ${fmtTime(s.endTime)}</div>
@@ -1873,7 +1888,7 @@ window.oeffneTerminDetail = async function(slotId, year, month, day) {
     if (!slotSnap.exists()) { toast('Termin nicht mehr vorhanden.', 'error'); return; }
     const s = slotSnap.data();
     if (!s.bookedBy) return;
-    const scSnap = await getDoc(doc(db, 'schueler', s.bookedBy));
+    const scSnap = await getDoc(doc(db, SCHUELER_COLL, s.bookedBy));
     const name = scSnap.exists() ? `${scSnap.data().fname || ''} ${scSnap.data().lname || ''}`.trim() : 'Unbekannter Schüler';
 
     const histSnap = await getDocs(query(collection(db, 'slots'), where('lehrerUid', '==', currentUser.uid), where('bookedBy', '==', s.bookedBy)));
@@ -1967,7 +1982,7 @@ pages['lehrer-slots']=async function(el){
   el.innerHTML=`<div class="page active"><h2 class="page-title">Zeitslots</h2><div class="card"><div id="slots-list"><div class="spinner"></div></div></div></div>`;
   let snap,scSnap;
   try{
-    [snap,scSnap]=await Promise.all([getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid))),getDocs(query(collection(db,'schueler'),where('lehrerUid','==',currentUser.uid)))]);
+    [snap,scSnap]=await Promise.all([getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid))),getDocs(query(collection(db,SCHUELER_COLL),where('lehrerUid','==',currentUser.uid)))]);
   }catch(e){console.warn('lehrer-slots',e);const x=document.getElementById('slots-list');if(x)x.innerHTML='<p class="text-muted" style="line-height:1.6">⚠️ Zeitslots konnten nicht geladen werden.<br>Fehler: <b>'+((e&&e.code)||(e&&e.message)||'unbekannt')+'</b></p>';return;}
   const scm={};scSnap.docs.forEach(d=>{const s=d.data();scm[d.id]=s.fname+' '+s.lname;});
   const sl=document.getElementById('slots-list');if(!sl)return;
@@ -2056,7 +2071,7 @@ async function publishStudentBookings(schuelerId,vorname){
     const grenze=Date.now()-2*3600000;
     const meineTermine=snap.docs.filter(d=>{const s=d.data();return s.bookedBy===schuelerId && s.startTime && s.startTime.toDate().getTime()>=grenze;})
       .map(d=>{const s=d.data();return{id:d.id,start:s.startTime.toDate().toISOString(),ende:s.endTime.toDate().toISOString(),type:s.type||'fahrstunde'};});
-    let scd={};try{const sc=await getDoc(doc(db,'schueler',schuelerId));if(sc.exists())scd=sc.data();}catch(e){}
+    let scd={};try{const sc=await getDoc(doc(db,SCHUELER_COLL,schuelerId));if(sc.exists())scd=sc.data();}catch(e){}
     const payload={lehrerUid:currentUser.uid,meineTermine,maxAktiveTermine:scd.maxAktiveTermine||0,maxFahrstunden:scd.maxFahrstunden||0,bookedCount:scd.bookedCount||0,updatedAt:serverTimestamp()};
     if(vorname!==undefined&&vorname!==null)payload.vorname=vorname||'';
     await setDoc(doc(db,'bookingStudents',schuelerId),payload,{merge:true});
@@ -2068,7 +2083,7 @@ async function renderBookingOnline(){
   try{const s=await getDoc(doc(db,'bookingLinks',currentUser.uid));if(s.exists())data=s.data();}catch(e){}
   const aktiv=data.aktiv!==false;const anzahl=(data.freieSlots||[]).length;
   let schueler=[];
-  try{const sc=await getDocs(query(collection(db,'schueler'),where('lehrerUid','==',currentUser.uid)));schueler=sc.docs.map(d=>({id:d.id,...d.data()}));}catch(e){}
+  try{const sc=await getDocs(query(collection(db,SCHUELER_COLL),where('lehrerUid','==',currentUser.uid)));schueler=sc.docs.map(d=>({id:d.id,...d.data()}));}catch(e){}
   schueler.sort((a,b)=>(((a.fname||'')+(a.lname||'')).localeCompare((b.fname||'')+(b.lname||''))));
   window.__bsList=schueler;
   let html=`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px">
@@ -2158,7 +2173,7 @@ window.bestaetigeBuchung=async function(reqId){
     if(req.tausch && req.swapSlotId){
       try{const oldSnap=await getDoc(doc(db,'slots',req.swapSlotId));if(oldSnap.exists()&&oldSnap.data().bookedBy===req.schuelerId){await updateDoc(doc(db,'slots',req.swapSlotId),{bookedBy:null,bookedAt:null});}}catch(e){}
     } else {
-      try{const sc=await getDoc(doc(db,'schueler',req.schuelerId));if(sc.exists())await updateDoc(doc(db,'schueler',req.schuelerId),{bookedCount:(sc.data().bookedCount||0)+1});}catch(e){}
+      try{const sc=await getDoc(doc(db,SCHUELER_COLL,req.schuelerId));if(sc.exists())await updateDoc(doc(db,SCHUELER_COLL,req.schuelerId),{bookedCount:(sc.data().bookedCount||0)+1});}catch(e){}
     }
     await updateDoc(doc(db,'bookingRequests',reqId),{status:'bestätigt',bearbeitetAt:serverTimestamp()});
     await publishMyBookingLink();
@@ -2173,7 +2188,7 @@ async function renderBestaetigteBuchungen(){
   let snap,scSnap,autosSnap;
   try{[snap,scSnap,autosSnap]=await Promise.all([
     getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid))),
-    getDocs(query(collection(db,'schueler'),where('lehrerUid','==',currentUser.uid))),
+    getDocs(query(collection(db,SCHUELER_COLL),where('lehrerUid','==',currentUser.uid))),
     getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId))),
   ]);}catch(e){console.warn(e);bl.innerHTML='<p class="text-muted">Buchungen konnten nicht geladen werden.</p>';return;}
   const scm={},scAutoM={};scSnap.docs.forEach(d=>{const s=d.data();scm[d.id]=s.fname+' '+s.lname;scAutoM[d.id]=s.autoId||null;});
@@ -2188,7 +2203,7 @@ async function renderBestaetigteBuchungen(){
 window.cancelBookingLehrer=async function(id){
   const[sSnap,lSnap]=await Promise.all([getDoc(doc(db,'slots',id)),getDoc(doc(db,'kalenderUsers',currentUser.uid))]);
   const slot=sSnap.data();await updateDoc(doc(db,'slots',id),{bookedBy:null,bookedAt:null});
-  if(slot.bookedBy){const scSnap=await getDoc(doc(db,'schueler',slot.bookedBy));if(scSnap.exists())await updateDoc(doc(db,'schueler',slot.bookedBy),{bookedCount:Math.max(0,(scSnap.data().bookedCount||1)-1)});}
+  if(slot.bookedBy){const scSnap=await getDoc(doc(db,SCHUELER_COLL,slot.bookedBy));if(scSnap.exists())await updateDoc(doc(db,SCHUELER_COLL,slot.bookedBy),{bookedCount:Math.max(0,(scSnap.data().bookedCount||1)-1)});}
   await triggerEmail('stornierung_freigeworden',{datum:slot.startTime.toDate().toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}),von:fmtTime(slot.startTime),bis:fmtTime(slot.endTime),typ:typeLabel(slot.type),lehrerName:lSnap.data().fname+' '+lSnap.data().lname,lehrerUid:currentUser.uid,slotId:id});
   try{await publishMyBookingLink();}catch(e){}
   if(slot.bookedBy){try{await publishStudentBookings(slot.bookedBy);}catch(e){}}
@@ -2201,7 +2216,7 @@ window.cancelBookingLehrer=async function(id){
 pages['lehrer-schueler']=async function(el){
   el.innerHTML=`<div class="page active"><h2 class="page-title">Meine Schüler</h2><div id="ls-content"><div class="spinner"></div></div></div>`;
   let snap={docs:[]},autosSnap={docs:[]};
-  try{snap=await getDocs(query(collection(db,'schueler'),where('lehrerUid','==',currentUser.uid)));}catch(e){console.warn('schueler read',e);}
+  try{snap=await getDocs(query(collection(db,SCHUELER_COLL),where('lehrerUid','==',currentUser.uid)));}catch(e){console.warn('schueler read',e);}
   try{autosSnap=await getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId)));}catch(e){console.warn('autos read',e);}
   const lsContent=document.getElementById('ls-content');if(!lsContent)return;
   const _canAdd=istEinzelLehrer||(currentSchool&&currentSchool.lehrerDarfSchuelerAnlegen===true);
@@ -2265,7 +2280,7 @@ pages['lehrer-schueler']=async function(el){
   }
   lsContent.innerHTML=html;
 };
-window.saveSchuelerAuto=async function(sid){await updateDoc(doc(db,'schueler',sid),{autoId:document.getElementById('auto-sel-'+sid).value||null});toast('Auto gespeichert!','success');};
+window.saveSchuelerAuto=async function(sid){await updateDoc(doc(db,SCHUELER_COLL,sid),{autoId:document.getElementById('auto-sel-'+sid).value||null});toast('Auto gespeichert!','success');};
 window.createSchuelerLehrer=async function(){
   const fname=document.getElementById('lns-fname').value.trim(),lname=document.getElementById('lns-lname').value.trim();
   if(!fname||!lname)return toast('Vor- und Nachname erforderlich.','error');
@@ -2273,7 +2288,7 @@ window.createSchuelerLehrer=async function(){
   const maxFahrstunden=parseInt(document.getElementById('lns-max').value)||0;
   const maxAktiveTermine=parseInt(document.getElementById('lns-maxaktiv').value)||0;
   try{
-    await addDoc(collection(db,'schueler'),{fname,lname,email,tel,lehrerUid:currentUser.uid,maxFahrstunden,maxAktiveTermine,bookedCount:0,schoolId:currentSchoolId||null,createdAt:serverTimestamp()});
+    await addDoc(collection(db,SCHUELER_COLL),{fname,lname,email,tel,lehrerUid:currentUser.uid,maxFahrstunden,maxAktiveTermine,bookedCount:0,schoolId:currentSchoolId||null,createdAt:serverTimestamp()});
     toast('Schüler angelegt!','success');
     pages['lehrer-schueler'](document.getElementById('main-content'));
   }catch(e){console.warn('createSchuelerLehrer',e);toast('Konnte nicht angelegt werden'+((e&&e.code)?' ('+e.code+')':'')+'.','error');}
@@ -2312,7 +2327,7 @@ async function renderAdminCal(){
   const first=new Date(year,month,1);let startDow=first.getDay()-1;if(startDow<0)startDow=6;
   const dim=new Date(year,month+1,0).getDate(),prevDays=new Date(year,month,0).getDate();
   try{
-  const[sSnap,bSnap,scSnap]=await Promise.all([getDocs(query(collection(db,'slots'),where('lehrerUid','==',lehrerUid))),getDocs(query(collection(db,'blocked'),where('lehrerUid','==',lehrerUid))),getDocs(query(collection(db,'schueler'),where('lehrerUid','==',lehrerUid)))]);
+  const[sSnap,bSnap,scSnap]=await Promise.all([getDocs(query(collection(db,'slots'),where('lehrerUid','==',lehrerUid))),getDocs(query(collection(db,'blocked'),where('lehrerUid','==',lehrerUid))),getDocs(query(collection(db,SCHUELER_COLL),where('lehrerUid','==',lehrerUid)))]);
   const scm={};scSnap.docs.forEach(d=>{const s=d.data();scm[d.id]=s.fname+' '+s.lname;});
   const slotsByDay={};sSnap.docs.forEach(d=>{const s=d.data();if(!s.startTime||!s.startTime.toDate)return;const dt=s.startTime.toDate();if(dt.getFullYear()===year&&dt.getMonth()===month){const day=dt.getDate();if(!slotsByDay[day])slotsByDay[day]=[];slotsByDay[day].push({id:d.id,...s});}});
   const bSet=new Set();const blocksByDay={};bSnap.docs.forEach(d=>{const b=d.data();if(b.year===year&&b.month===month){bSet.add(b.day);(blocksByDay[b.day]=blocksByDay[b.day]||[]).push({id:d.id,...b});}});
@@ -2335,7 +2350,7 @@ async function renderAdminCal(){
 window.adminOpenDayDetail=async function(year,month,day){
   const lUid=window._adminCalLehrerUid;
   const date=new Date(year,month,day);const dateStr=date.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
-  const[sSnap,scSnap,bSnap]=await Promise.all([getDocs(query(collection(db,'slots'),where('lehrerUid','==',lUid))),getDocs(query(collection(db,'schueler'),where('lehrerUid','==',lUid))),getDocs(query(collection(db,'blocked'),where('lehrerUid','==',lUid),where('year','==',year),where('month','==',month),where('day','==',day)))]);
+  const[sSnap,scSnap,bSnap]=await Promise.all([getDocs(query(collection(db,'slots'),where('lehrerUid','==',lUid))),getDocs(query(collection(db,SCHUELER_COLL),where('lehrerUid','==',lUid))),getDocs(query(collection(db,'blocked'),where('lehrerUid','==',lUid),where('year','==',year),where('month','==',month),where('day','==',day)))]);
   const scm={};scSnap.docs.forEach(d=>{const s=d.data();scm[d.id]=s.fname+' '+s.lname;});
   const daySlots=sSnap.docs.filter(d=>{const dt=d.data().startTime.toDate();return dt.getFullYear()===year&&dt.getMonth()===month&&dt.getDate()===day;});
   const sHtml=daySlots.length?daySlots.map(d=>{const s=d.data();const pend=!s.bookedBy&&window.__pendingReq&&window.__pendingReq.bySlot[d.id];const sn=s.bookedBy?(scm[s.bookedBy]||'?'):(pend?('⏳ Anfrage: '+pend):null);
@@ -2387,7 +2402,7 @@ window.deletePruefung=async function(pid,sid){
 };
 pages['lehrer-pruefungen']=async function(el){
   el.innerHTML=`<div class="page active"><h2 class="page-title">Prüfungen</h2><div id="lp-content"><div class="spinner"></div></div></div>`;
-  const snap=await getDocs(query(collection(db,'schueler'),where('lehrerUid','==',currentUser.uid)));
+  const snap=await getDocs(query(collection(db,SCHUELER_COLL),where('lehrerUid','==',currentUser.uid)));
   const lp=document.getElementById('lp-content');if(snap.empty){lp.innerHTML='<p class="text-muted">Keine Schüler.</p>';return;}
   let html='';
   for(const d of snap.docs){const s=d.data();const ps=await loadPruefungenForSchueler(d.id);const ls=ps.length?ps[0].status:null;
@@ -2408,7 +2423,7 @@ pages['admin-pruefungen']=async function(el){
 };
 let _apCache=[];
 async function loadAdminPruefungen(){
-  const[scSnap,pSnap,lSnap]=await Promise.all([getDocs(query(collection(db,'schueler'),where('schoolId','==',currentSchoolId))),getDocs(query(collection(db,'pruefungen'),where('schoolId','==',currentSchoolId))),getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId)))]);
+  const[scSnap,pSnap,lSnap]=await Promise.all([getDocs(query(collection(db,SCHUELER_COLL),where('schoolId','==',currentSchoolId))),getDocs(query(collection(db,'pruefungen'),where('schoolId','==',currentSchoolId))),getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId)))]);
   const lm={};lSnap.docs.forEach(d=>{const u=d.data();lm[d.id]=u.fname+' '+u.lname;});
   const pbS={};pSnap.docs.slice().sort((a,b)=>String(b.data().datum||'').localeCompare(String(a.data().datum||''))).forEach(d=>{const p={id:d.id,...d.data()};if(!pbS[p.schuelerId])pbS[p.schuelerId]=[];pbS[p.schuelerId].push(p);});
   _apCache=scSnap.docs.map(d=>({id:d.id,...d.data(),pruefungen:pbS[d.id]||[]}));
@@ -2446,7 +2461,7 @@ pages['lehrer-warteliste']=async function(el){
   const docs=snap.docs.filter(d=>d.data().abgearbeitet!==true).sort((a,b)=>(((a.data().createdAt&&a.data().createdAt.seconds)||0)-((b.data().createdAt&&b.data().createdAt.seconds)||0)));
   if(!docs.length){wl.innerHTML='<p class="text-muted">Keine Einträge auf der Warteliste.</p>';return;}
   const scIds=[...new Set(docs.map(d=>d.data().schuelerId))];const scm={};
-  for(const id of scIds){const s=await getDoc(doc(db,'schueler',id));if(s.exists())scm[id]=s.data();}
+  for(const id of scIds){const s=await getDoc(doc(db,SCHUELER_COLL,id));if(s.exists())scm[id]=s.data();}
   wl.innerHTML=docs.map(d=>{const w=d.data();const s=scm[w.schuelerId];const name=s?`${s.fname} ${s.lname}`:'Unbekannt';const link=`${location.origin}${location.pathname}?schueler=${w.schuelerId}&lehrer=${currentUser.uid}`;
     return`<div class="warteliste-row"><div><div class="warteliste-name">${name}</div><div class="warteliste-meta">${fmtDatetime(w.createdAt)}${w.notiz?' · '+escHtml(w.notiz):''}</div></div>
     <button class="copy-btn" onclick="copyLink('${link}')">🔗 Link</button><button class="btn btn-success btn-sm" onclick="removeFromWarteliste('${d.id}')">✓ Erledigt</button></div>`;}).join('');
