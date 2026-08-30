@@ -1706,6 +1706,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openVerkehrszeichen()" style="background:var(--surface2);margin-bottom:8px">🚦 Verkehrszeichen</button>
     <button class="btn-sheet-cancel" id="btn-test-rechnung" onclick="testRechnungErzeugen()" style="background:var(--surface2);margin-bottom:8px">🧪 Test-Rechnung erzeugen</button>
     <button class="btn-sheet-cancel" onclick="toggleTheme()" id="theme-btn-menu" style="background:var(--surface2);margin-bottom:8px">☀️ Design wechseln (hell/dunkel)</button>
+    <button class="btn-sheet-cancel" onclick="starteKomplettsicherung()" style="background:var(--surface2);margin-bottom:8px">💾 Komplettsicherung herunterladen</button>
     <button class="btn-sheet-cancel" onclick="openStilAuswahl()" style="background:var(--surface2);margin-bottom:8px">🎨 Design-Stil wählen</button>
     <button class="btn-sheet-cancel" onclick="openPunkteStilAuswahl()" style="background:var(--surface2);margin-bottom:8px">⚪ Bewertungspunkte-Stil</button>
     <button class="btn-sheet-cancel" onclick="toggleBetaDashboard()" id="btn-beta-dashboard" style="background:var(--surface2);margin-bottom:8px">🧪 Beta: Neues Dashboard-Design</button>
@@ -10174,6 +10175,74 @@ window.speichereAdresse = async () => {
   } catch(e) {
     console.warn('speichereAdresse', e);
     statusEl.style.color = 'var(--danger)'; statusEl.textContent = 'Fehler beim Speichern.';
+  }
+};
+
+
+
+// ══ KOMPLETTSICHERUNG ═════════════════════════════════════════════
+// Zweck (Kundenwunsch): Der Fahrlehrer bzw. die Fahrschule soll die
+// eigenen Daten jederzeit vollstaendig aus der Plattform herausbekommen -
+// unabhaengig davon, was in Zukunft mit der Plattform passiert. Bewusst
+// als reine Client-Funktion: laeuft ohne Server, kostet nichts und
+// funktioniert auch dann noch, wenn serverseitig nichts mehr betrieben
+// wird. Format ist JSON, weil damit ein spaeterer Import in ein anderes
+// System technisch moeglich bleibt (Art. 20 DSGVO, Datenuebertragbarkeit).
+window.starteKomplettsicherung = async () => {
+  if (!currentUser) { toast('Bitte zuerst anmelden.'); return; }
+  toast('💾 Sicherung wird erstellt…');
+  try {
+    const eigeneSchueler = students.filter(s =>
+      s.uid === currentUser.uid || s.fahrschuleId === currentUser._fahrschuleId);
+
+    const sicherung = {
+      sicherungsInfo: {
+        erstelltAm: new Date().toISOString(),
+        erstelltVon: currentUser.email || currentUser.uid,
+        anzahlSchueler: eigeneSchueler.length,
+        formatVersion: 1,
+        hinweis: 'Vollstaendige Datensicherung aus FahrSync. Enthaelt alle Schuelerdaten, '
+               + 'Protokolle, Zugangscode-Daten und Theorie-Eintraege. Chat-Bilder sind als '
+               + 'Speicherpfad vermerkt, aber nicht als Bilddatei enthalten.',
+      },
+      schueler: [],
+      theorieStunden: [],
+    };
+
+    for (const s of eigeneSchueler) {
+      const eintrag = { stammdaten: s, protokolle: [], zugangscodes: [] };
+      try {
+        const ps = await getDocs(query(collection(db,'protokoll'),
+          where('studentId','==',s.id), where('uid','==',currentUser.uid)));
+        eintrag.protokolle = ps.docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch(e) { console.warn('Protokoll', s.id, e); }
+      try {
+        const cs = await getDocs(query(collection(db,'accessCodes'),
+          where('studentId','==',s.id), where('teacherUid','==',currentUser.uid)));
+        eintrag.zugangscodes = cs.docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch(e) { console.warn('accessCodes', s.id, e); }
+      sicherung.schueler.push(eintrag);
+    }
+
+    // Theorie-Eintraege (liegen im Kalender-Modul, gehoeren aber demselben Lehrer)
+    try {
+      const ts = await getDocs(query(collection(db,'theorieStunden'),
+        where('lehrerUid','==',currentUser.uid)));
+      sicherung.theorieStunden = ts.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch(e) { console.warn('theorieStunden', e); }
+
+    const datum = new Date().toISOString().slice(0,10);
+    const blob = new Blob([JSON.stringify(sicherung, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `FahrSync-Sicherung_${datum}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast(`✓ Sicherung erstellt (${eigeneSchueler.length} Schüler)`);
+  } catch(e) {
+    console.error('Komplettsicherung:', e);
+    toast('Fehler bei der Sicherung: ' + (e.message || 'unbekannt'));
   }
 };
 
