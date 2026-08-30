@@ -1017,6 +1017,39 @@ window.aktivierePush = async () => {
 // verhaelt sich alles exakt wie bisher. Nach erfolgreicher Datenuebernahme
 // wird hier auf die ADK-Sammlung umgestellt - EINE Zeile, jederzeit
 // zurueckstellbar. Die alte Sammlung bleibt als Sicherung bestehen.
+
+// ══ AMTLICHE THEORIE-THEMEN (Rahmenplan) ══════════════════════════
+// Auf dem Ausbildungsnachweis wird das Thema per amtlicher Nummer
+// eingetragen, nicht als Freitext. Grundstoff 1-12 gilt fuer alle
+// Klassen; der Zusatzstoff ist klassenspezifisch (B: 2 Themen,
+// A/A1/A2: 4 Themen, AM: 2 aus den A-Themen).
+const THEORIE_GRUNDSTOFF = [
+  { nr: '1',  titel: 'Persönliche Voraussetzungen' },
+  { nr: '2',  titel: 'Risikofaktor Mensch' },
+  { nr: '3',  titel: 'Rechtliche Rahmenbedingungen' },
+  { nr: '4',  titel: 'Straßenverkehrssystem und seine Nutzung' },
+  { nr: '5',  titel: 'Vorfahrt und Verkehrsregelung' },
+  { nr: '6',  titel: 'Verkehrszeichen, Verkehrseinrichtungen, Bahnübergänge' },
+  { nr: '7',  titel: 'Andere Teilnehmer im Straßenverkehr' },
+  { nr: '8',  titel: 'Geschwindigkeit, Abstand, umweltschonende Fahrweise' },
+  { nr: '9',  titel: 'Verkehrsverhalten bei Fahrmanövern, Verkehrsbeobachtung' },
+  { nr: '10', titel: 'Ruhender Verkehr' },
+  { nr: '11', titel: 'Besondere Verkehrssituationen, Folgen von Fehlverhalten' },
+  { nr: '12', titel: 'Lebenslanges Lernen' },
+];
+const THEORIE_ZUSATZ = {
+  B: [
+    { nr: 'B1', titel: 'Technik, Personen- und Güterbeförderung' },
+    { nr: 'B2', titel: 'Fahren mit Solokraftfahrzeugen und Zügen, Umweltschutz' },
+  ],
+  A: [
+    { nr: 'A1', titel: 'Zusatzstoff A – Thema 1' },
+    { nr: 'A2', titel: 'Zusatzstoff A – Thema 2' },
+    { nr: 'A3', titel: 'Zusatzstoff A – Thema 3' },
+    { nr: 'A4', titel: 'Zusatzstoff A – Thema 4' },
+  ],
+};
+
 const SCHUELER_COLL = 'schueler';
 
 const pages={};
@@ -1039,8 +1072,8 @@ pages['lehrer-theorie']=async function(el){
         <input class="form-input" type="date" id="th-datum">
       </div>
       <div class="form-group">
-        <label class="form-label">Thema</label>
-        <input class="form-input" id="th-thema" placeholder="z.B. Verkehrszeichen, Vorfahrt">
+        <label class="form-label">Thema (amtliche Nummer)</label>
+        <select class="form-input" id="th-thema"></select>
       </div>
       <div class="form-group">
         <label class="form-label">Dauer (Minuten)</label>
@@ -1056,6 +1089,7 @@ pages['lehrer-theorie']=async function(el){
   </div>`;
   window.__thArt = 'grund';
   document.getElementById('th-datum').valueAsDate = new Date();
+  fuelleThemenListe();
   const snap = await getDocs(query(collection(db,SCHUELER_COLL), where('lehrerUid','==',currentUser.uid)));
   const listEl = document.getElementById('th-schueler-liste');
   if (snap.empty) { listEl.innerHTML = '<p class="text-muted">Keine Schüler gefunden.</p>'; return; }
@@ -1070,11 +1104,24 @@ window.setThArt = function(art){
   window.__thArt = art;
   document.getElementById('th-art-grund').classList.toggle('active', art==='grund');
   document.getElementById('th-art-klasse').classList.toggle('active', art==='klasse');
+  fuelleThemenListe();
 };
+function fuelleThemenListe(){
+  const sel = document.getElementById('th-thema');
+  if (!sel) return;
+  const liste = window.__thArt === 'grund'
+    ? THEORIE_GRUNDSTOFF
+    : [...THEORIE_ZUSATZ.B, ...THEORIE_ZUSATZ.A];
+  sel.innerHTML = liste.map(t => `<option value="${t.nr}">${t.nr} – ${t.titel}</option>`).join('');
+}
 window.speichereTheorieStunde = async function(){
   const statusEl = document.getElementById('th-status');
   const datum = document.getElementById('th-datum').value;
-  const thema = document.getElementById('th-thema').value.trim();
+  const themaNr = document.getElementById('th-thema').value;
+  const alleThemen = [...THEORIE_GRUNDSTOFF, ...THEORIE_ZUSATZ.B, ...THEORIE_ZUSATZ.A];
+  const themaObj = alleThemen.find(t => t.nr === themaNr);
+  const thema = themaNr;
+  const themaTitel = themaObj ? themaObj.titel : '';
   const minuten = parseInt(document.getElementById('th-minuten').value) || 0;
   const gewaehlte = Array.from(document.querySelectorAll('.th-schueler-check:checked')).map(c => c.value);
   if (!datum || !thema || !minuten) { statusEl.style.color='var(--danger)'; statusEl.textContent='Bitte Datum, Thema und Dauer ausfüllen.'; return; }
@@ -1084,11 +1131,11 @@ window.speichereTheorieStunde = async function(){
     for (const schuelerId of gewaehlte) {
       await addDoc(collection(db,'theorieStunden'), {
         schuelerId, lehrerUid: currentUser.uid, schoolId: currentSchoolId || null,
-        art: window.__thArt, datum, thema, minuten, createdAt: serverTimestamp(),
+        art: window.__thArt, datum, thema, themaTitel, minuten, createdAt: serverTimestamp(),
       });
     }
     statusEl.style.color='var(--accent2)'; statusEl.textContent=`✓ Für ${gewaehlte.length} Schüler gespeichert.`;
-    document.getElementById('th-thema').value = '';
+
     document.querySelectorAll('.th-schueler-check:checked').forEach(c => c.checked = false);
   } catch(e) {
     console.warn('speichereTheorieStunde', e);
