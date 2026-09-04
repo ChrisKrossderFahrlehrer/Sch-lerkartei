@@ -10245,11 +10245,16 @@ window.starteKomplettsicherung = async () => {
         anzahlSchueler: eigeneSchueler.length,
         formatVersion: 1,
         hinweis: 'Vollstaendige Datensicherung aus FahrSync. Enthaelt alle Schuelerdaten, '
-               + 'Protokolle, Zugangscode-Daten und Theorie-Eintraege. Chat-Bilder sind als '
-               + 'Speicherpfad vermerkt, aber nicht als Bilddatei enthalten.',
+               + 'Protokolle, Zugangscode-Daten und Theorie-Eintraege aus der ADK, sowie '
+               + 'separat alle Kalender-Fahrstunden und Kalender-Schuelerdatensaetze (dieser '
+               + 'Bereich ist derzeit technisch getrennt vom ADK-Schueler-System und daher '
+               + 'nicht 1:1 verknuepft). Chat-Bilder sind als Speicherpfad vermerkt, aber nicht '
+               + 'als Bilddatei enthalten.',
       },
       schueler: [],
       theorieStunden: [],
+      kalenderFahrstunden: [],
+      kalenderSchueler: [],
     };
 
     for (const s of eigeneSchueler) {
@@ -10273,6 +10278,16 @@ window.starteKomplettsicherung = async () => {
         where('lehrerUid','==',currentUser.uid)));
       sicherung.theorieStunden = ts.docs.map(d => ({ id: d.id, ...d.data() }));
     } catch(e) { console.warn('theorieStunden', e); }
+
+    // Echte gebuchte Fahrstunden aus dem Kalender-System
+    try {
+      const slotsSnap = await getDocs(query(collection(db,'slots'), where('lehrerUid','==',currentUser.uid)));
+      sicherung.kalenderFahrstunden = slotsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch(e) { console.warn('slots', e); }
+    try {
+      const kalSchuelerSnap = await getDocs(query(collection(db,'schueler'), where('lehrerUid','==',currentUser.uid)));
+      sicherung.kalenderSchueler = kalSchuelerSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch(e) { console.warn('kalenderSchueler', e); }
 
     const datum = new Date().toISOString().slice(0,10);
     let inhalt = JSON.stringify(sicherung, null, 2);
