@@ -10345,21 +10345,77 @@ window.leseSicherung = async (datei) => {
         return;
       }
     }
-    const anzahl = (obj.schueler || []).length;
     const erstellt = obj.sicherungsInfo?.erstelltAm
       ? new Date(obj.sicherungsInfo.erstelltAm).toLocaleString('de-DE') : 'unbekannt';
-    const theorie = (obj.theorieStunden || []).length;
-    alert(`✓ Sicherung erfolgreich geöffnet\n\n`
-        + `Erstellt am: ${erstellt}\n`
-        + `Enthaltene Schüler: ${anzahl}\n`
-        + `Theorie-Einträge: ${theorie}\n\n`
-        + `Die Sicherung ist intakt und lesbar.\n\n`
-        + `Hinweis: Diese Prüfung zeigt den Inhalt nur an. Ein automatisches `
-        + `Zurückspielen in die App ist bewusst nicht vorgesehen, damit `
-        + `bestehende Daten nicht versehentlich überschrieben werden.`);
+    const bestaetigt = confirm(
+      `Sicherung vom ${erstellt} gefunden.\n\n`
+      + `Enthält ${(obj.schueler||[]).length} Schüler, ${(obj.theorieStunden||[]).length} Theorie-Einträge.\n\n`
+      + `Jetzt einlesen? Bereits vorhandene Datensätze werden dabei NICHT `
+      + `überschrieben – es kommt nur hinzu, was noch fehlt.`);
+    if (!bestaetigt) return;
+
+    toast('📥 Sicherung wird eingelesen…');
+    let neuSchueler = 0, uebersprSchueler = 0, neuProtokoll = 0, neuCodes = 0,
+        neuTheorie = 0, neuSlots = 0, neuKalSchueler = 0, fehlerAnzahl = 0;
+
+    async function importiereFallsNeu(coll, datensatz) {
+      if (!datensatz || !datensatz.id) return 'ungueltig';
+      const { id, ...ohneId } = datensatz;
+      try {
+        const vorhanden = await getDoc(doc(db, coll, id));
+        if (vorhanden.exists()) return 'uebersprungen';
+      } catch (leseFehler) {
+        // Erwarteter Fall bei nicht existierendem Dokument (siehe oben) -
+        // weiter zum Schreibversuch.
+      }
+      try {
+        await dbSet(doc(db, coll, id), ohneId);
+        return 'neu';
+      } catch (schreibFehler) {
+        console.warn('Import fehlgeschlagen fuer', coll, id, schreibFehler);
+        return 'fehler';
+      }
+    }
+
+    for (const eintrag of (obj.schueler || [])) {
+      const s = eintrag.stammdaten;
+      const ergebnis = await importiereFallsNeu('students', s);
+      if (ergebnis === 'neu') neuSchueler++;
+      else if (ergebnis === 'uebersprungen') uebersprSchueler++;
+      else if (ergebnis === 'fehler') fehlerAnzahl++;
+
+      for (const p of (eintrag.protokolle || [])) {
+        const r = await importiereFallsNeu('protokoll', p);
+        if (r === 'neu') neuProtokoll++; else if (r === 'fehler') fehlerAnzahl++;
+      }
+      for (const c of (eintrag.zugangscodes || [])) {
+        const r = await importiereFallsNeu('accessCodes', c);
+        if (r === 'neu') neuCodes++; else if (r === 'fehler') fehlerAnzahl++;
+      }
+    }
+    for (const t of (obj.theorieStunden || [])) {
+      const r = await importiereFallsNeu('theorieStunden', t);
+      if (r === 'neu') neuTheorie++; else if (r === 'fehler') fehlerAnzahl++;
+    }
+    for (const sl of (obj.kalenderFahrstunden || [])) {
+      const r = await importiereFallsNeu('slots', sl);
+      if (r === 'neu') neuSlots++; else if (r === 'fehler') fehlerAnzahl++;
+    }
+    for (const ks of (obj.kalenderSchueler || [])) {
+      const r = await importiereFallsNeu('schueler', ks);
+      if (r === 'neu') neuKalSchueler++; else if (r === 'fehler') fehlerAnzahl++;
+    }
+
+    alert(`✓ Import abgeschlossen\n\n`
+        + `Neu hinzugefügt: ${neuSchueler} Schüler, ${neuProtokoll} Protokolle, `
+        + `${neuCodes} Zugangscodes, ${neuTheorie} Theorie-Einträge, `
+        + `${neuSlots} Kalender-Fahrstunden, ${neuKalSchueler} Kalender-Schüler.\n\n`
+        + `Übersprungen (bereits vorhanden): ${uebersprSchueler} Schüler.`
+        + (fehlerAnzahl ? `\n\n⚠️ ${fehlerAnzahl} Datensätze konnten nicht importiert werden (siehe Konsole).` : ''));
+    toast('✓ Import abgeschlossen');
   } catch(e) {
     console.warn('leseSicherung', e);
-    toast('❌ Datei konnte nicht gelesen werden – ist es eine FahrSync-Sicherung?');
+    toast('❌ Datei konnte nicht gelesen/eingelesen werden: ' + (e.message || 'unbekannt'));
   }
 };
 
