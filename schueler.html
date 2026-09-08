@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FahrSync – Schüler-Portal</title>
+<!-- Kuerzere, einpraegsamere Adresse (fahrsync.de/schueler) fuer Schueler,
+     leitet zur eigentlichen Seite weiter. Bewusst als eigene, kleine Datei
+     statt die bestehende schueler-portal.html umzubenennen - so bleibt
+     jeder bereits verschickte alte Link weiterhin gueltig, nichts bricht. -->
+<script>
+  window.location.replace('schueler-portal.html' + window.location.search + window.location.hash);
+</script>
+<meta http-equiv="refresh" content="0; url=schueler-portal.html">
+</head>
+<body style="background:#0d1117;color:#e6edf3;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+  <p>Weiterleitung… <a href="schueler-portal.html" style="color:#f0b429">Falls nicht automatisch, hier klicken</a></p>
+</body>
+</html>
