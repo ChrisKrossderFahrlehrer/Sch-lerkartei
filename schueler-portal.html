@@ -982,6 +982,13 @@ function renderFortschritt() {
     `).join('');
 
   document.getElementById('tab-fortschritt').innerHTML = `
+    <button onclick="oeffneTheorieWissen()" class="card" style="margin-bottom:16px;width:100%;text-align:left;border:none;cursor:pointer;display:flex;align-items:center;gap:12px">
+      <div style="font-size:1.8rem">📖</div>
+      <div>
+        <div style="font-weight:700">Theorie-Wissen zum Nachschlagen</div>
+        <div style="font-size:0.78rem;color:var(--muted);margin-top:2px">Bremsformeln, Vorfahrt, Bußgeld & mehr</div>
+      </div>
+    </button>
     <div class="card" style="margin-bottom:16px">
       <div class="card-title">📚 ADK-Lernstand Klasse ${klasse}</div>
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
@@ -1155,6 +1162,97 @@ window.sendeSchuelerBild = async (datei) => {
   }
 };
 
+
+
+// ══ THEORIE-WISSEN: kompaktes Nachschlagewerk (Kundenwunsch) ══════
+// Inhalte sorgfaeltig recherchiert und mehrfach quellenmaessig
+// gegengeprueft (Bremsformeln nach ADAC-Faustformel, Buhgeldbetraege
+// nach BKatV 2026, Promillegrenzen nach §24c StVG). Bewusst kompakt und
+// in einfacher Sprache - kein Ersatz fuer den eigentlichen Theorieunterricht,
+// sondern eine schnelle Gedaechtnisstuetze.
+const THEORIE_WISSEN = [
+  {
+    icon: '🧮', titel: 'Bremsformeln',
+    html: `
+      <p><b>Reaktionsweg</b> (bis du überhaupt bremst):<br>
+      <code>(km/h ÷ 10) × 3</code> = Meter</p>
+      <p><b>Bremsweg</b> (ab Bremsbeginn bis zum Stillstand):<br>
+      <code>(km/h ÷ 10)²</code> = Meter</p>
+      <p><b>Anhalteweg</b> = Reaktionsweg + Bremsweg</p>
+      <p style="color:var(--muted);font-size:0.85rem">Beispiel bei 100 km/h: Reaktionsweg 30 m + Bremsweg 100 m = 130 m Anhalteweg.</p>
+      <p style="color:var(--muted);font-size:0.85rem">Bei einer <b>Gefahrenbremsung</b> (Vollbremsung) wird der Bremsweg nur halb so lang gerechnet: <code>(km/h ÷ 10)² ÷ 2</code>.</p>`
+  },
+  {
+    icon: '🍺', titel: 'Promillegrenzen',
+    html: `
+      <p><b>0,0 ‰</b> – für Fahranfänger in der Probezeit und alle unter 21 Jahren. Absolutes Alkoholverbot, egal wie wenig.</p>
+      <p><b>0,5 ‰</b> – für alle anderen Fahrer die allgemeine Grenze.</p>
+      <p style="color:var(--muted);font-size:0.85rem">Verstößt du als Fahranfänger gegen die 0,0-‰-Grenze: 250 € Bußgeld, 1 Punkt, Probezeit verlängert sich auf 4 Jahre, zusätzlich ein Aufbauseminar.</p>
+      <p style="color:var(--muted);font-size:0.85rem">Ab 1,1 ‰ gilt es als Straftat, nicht mehr nur als Ordnungswidrigkeit.</p>`
+  },
+  {
+    icon: '📏', titel: 'Sicherheitsabstand',
+    html: `
+      <p><b>Außerorts:</b> „Halber Tacho" in Metern. Bei 100 km/h also mind. 50 m Abstand.</p>
+      <p><b>Innerorts:</b> ca. 15 m bzw. 3 Wagenlängen.</p>
+      <p style="color:var(--muted);font-size:0.85rem">Bei Nässe verdoppelt sich der nötige Abstand, bei Schnee/Eis kann er ein Vielfaches betragen.</p>`
+  },
+  {
+    icon: '🔀', titel: 'Vorfahrt & Kreisverkehr',
+    html: `
+      <p><b>Rechts vor links</b> gilt nur, wenn kein Schild, keine Ampel und keine Polizei die Vorfahrt regeln.</p>
+      <p><b>Keine Rechts-vor-links-Regel</b> gilt u.a.: bei Ein-/Ausfahrt aus einem verkehrsberuhigten Bereich, aus einem Feld-/Waldweg, oder wenn Schilder/Ampeln die Vorfahrt schon regeln.</p>
+      <p><b>Im Kreisverkehr</b> (mit Schild „Kreisverkehr"): Wer schon im Kreis fährt, hat Vorfahrt. Einfahrende müssen warten, egal ob von rechts oder nicht.</p>
+      <p style="color:var(--muted);font-size:0.85rem">Blinken beim Einfahren in den Kreisverkehr ist nicht Pflicht – beim Ausfahren aber schon.</p>`
+  },
+  {
+    icon: '💶', titel: 'Bußgeldkatalog (Auswahl)',
+    html: `
+      <p><b>Handy am Steuer:</b> 100 € + 1 Punkt</p>
+      <p><b>Rotlichtverstoß einfach:</b> 90 € + 1 Punkt</p>
+      <p><b>Rotlichtverstoß qualifiziert</b> (länger als 1 Sek. rot): 200 € + 2 Punkte + 1 Monat Fahrverbot</p>
+      <p><b>Geschwindigkeit innerorts</b> ab 21 km/h zu schnell: 80 € + 1 Punkt</p>
+      <p style="color:var(--muted);font-size:0.85rem">Ein Fahrverbot droht i.d.R. ab 21 km/h innerorts bzw. 41 km/h außerorts zu schnell.</p>
+      <p style="color:var(--muted);font-size:0.72rem">Werte nach Bußgeldkatalog-Verordnung (BKatV) 2026, ohne Gewähr – bei Rechtsfragen bitte deinen Fahrlehrer fragen.</p>`
+  },
+  {
+    icon: '🚦', titel: 'Verkehrszeichen',
+    html: `<p>Die amtlichen Verkehrszeichen findest du direkt bei deinem Ausbildungsstand – dort siehst du auch, wie sicher du bei jedem einzelnen Zeichen schon bist.</p>`
+  },
+];
+
+window.oeffneTheorieWissen = () => {
+  document.getElementById('tw-detail').style.display = 'none';
+  document.getElementById('tw-liste').style.display = 'block';
+  document.getElementById('tw-liste').innerHTML = THEORIE_WISSEN.map((t, i) => `
+    <button onclick="zeigeTheorieDetail(${i})" class="card" style="width:100%;text-align:left;border:none;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;gap:12px">
+      <div style="font-size:1.6rem">${t.icon}</div>
+      <div style="font-weight:700">${t.titel}</div>
+    </button>`).join('');
+  document.getElementById('theorie-wissen-modal').classList.add('open');
+};
+window.zeigeTheorieDetail = (i) => {
+  const t = THEORIE_WISSEN[i];
+  document.getElementById('tw-liste').style.display = 'none';
+  const detail = document.getElementById('tw-detail');
+  detail.style.display = 'block';
+  detail.innerHTML = `
+    <button onclick="oeffneTheorieWissen()" style="background:none;border:none;color:var(--accent);cursor:pointer;padding:0;margin-bottom:12px;font-size:0.85rem">← Zurück</button>
+    <div style="font-size:1.1rem;font-weight:700;margin-bottom:10px">${t.icon} ${t.titel}</div>
+    <div style="font-size:0.9rem;line-height:1.6">${t.html}</div>`;
+};
+
 </script>
+
+<!-- THEORIE-WISSEN MODAL (Nachschlage-Bereich fuer Schueler) -->
+<div class="modal-overlay" id="theorie-wissen-modal" onclick="closeModal(event)">
+  <div class="modal-sheet" style="max-width:520px;max-height:85vh;overflow-y:auto">
+    <div class="sheet-title">📖 Theorie-Wissen</div>
+    <div id="tw-liste"></div>
+    <div id="tw-detail" style="display:none"></div>
+    <button class="btn-sheet-cancel" onclick="document.getElementById('theorie-wissen-modal').classList.remove('open')" style="margin-top:12px">Schließen</button>
+  </div>
+</div>
+
 </body>
 </html>
