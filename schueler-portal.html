@@ -248,6 +248,25 @@ html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--tex
 }
 .lehrer-kommentar-header { font-weight:700; color:var(--accent2); font-size:0.88rem; margin-bottom:6px; }
 .lehrer-kommentar-text { font-size:0.88rem; line-height:1.55; white-space:pre-wrap; }
+/* Gestaffelte Eintritts-Animation fuer den Anmelde-Bildschirm (Kundenwunsch):
+   jedes Element des Login-Bereichs rutscht einzeln von oben herein, statt
+   alles gleichzeitig zu zeigen. Reine Optik, keine Funktionsaenderung -
+   respektiert reduzierte Bewegung, falls im Geraet eingestellt. */
+@keyframes loginSlideDown {
+  from { opacity: 0; transform: translateY(-26px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.login-wrap > * {
+  animation: loginSlideDown 0.55s cubic-bezier(0.16,1,0.3,1) both;
+}
+.login-wrap > *:nth-child(1) { animation-delay: 0.05s; }
+.login-wrap > *:nth-child(2) { animation-delay: 0.18s; }
+.login-wrap > *:nth-child(3) { animation-delay: 0.28s; }
+.login-wrap > *:nth-child(4) { animation-delay: 0.36s; }
+.login-wrap > *:nth-child(5) { animation-delay: 0.44s; }
+@media (prefers-reduced-motion: reduce) {
+  .login-wrap > * { animation: none; }
+}
 </style>
 <link rel="manifest" href="./manifest-portal.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
