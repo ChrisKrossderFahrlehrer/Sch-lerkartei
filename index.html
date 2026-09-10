@@ -267,28 +267,28 @@ input, textarea, select { font-size: max(16px, 0.88rem); }
   position: relative;
   overflow: hidden;
 }
-#screen-login::before {
-  content: '';
+.login-box { position: relative; z-index: 2; }
+.zeichen-drift {
   position: absolute;
-  inset: -20% -20%;
-  background-image: repeating-linear-gradient(
-    to top,
-    var(--accent) 0px, var(--accent) 3px,
-    transparent 3px, transparent 90px
-  );
-  background-size: 3px 180px;
-  background-position: 50% 0;
-  background-repeat: repeat;
-  opacity: 0.05;
-  animation: strassenMarkierung 6s linear infinite;
+  inset: 0;
+  overflow: hidden;
   pointer-events: none;
+  z-index: 1;
 }
-@keyframes strassenMarkierung {
-  from { background-position: 50% 0; }
-  to   { background-position: 50% 180px; }
+.zeichen-drift img {
+  position: absolute;
+  opacity: 0.10;
+  filter: grayscale(35%);
+  animation-name: zeichenDiagonal;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+@keyframes zeichenDiagonal {
+  from { transform: translate(-15vw, 115vh) rotate(-8deg); }
+  to   { transform: translate(115vw, -25vh) rotate(-8deg); }
 }
 @media (prefers-reduced-motion: reduce) {
-  #screen-login::before { animation: none; }
+  .zeichen-drift img { animation: none; display: none; }
 }
 
 .login-box {
@@ -1020,7 +1020,15 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 </div>
 
 <!-- ══ LOGIN ══ -->
-<div class="screen active" id="screen-login">
+<div class="screen active" id="screen-login"><div class="zeichen-drift">
+    <img src="./verkehrszeichen/zeichen-306-vorfahrtstrasse.png" width="62" style="left:8%;animation-delay:0s;animation-duration:34s" alt="">
+    <img src="./verkehrszeichen/zeichen-205-vorfahrt-gewaehren.png" width="54" style="left:38%;animation-delay:-6s;animation-duration:29s" alt="">
+    <img src="./verkehrszeichen/zeichen-206-stop.png" width="58" style="left:68%;animation-delay:-12s;animation-duration:31s" alt="">
+    <img src="./verkehrszeichen/zeichen-220-einbahnstrasse.png" width="48" style="left:22%;animation-delay:-19s;animation-duration:26s" alt="">
+    <img src="./verkehrszeichen/zeichen-325-1-verkehrsberuhigt.png" width="56" style="left:82%;animation-delay:-24s;animation-duration:33s" alt="">
+    <img src="./verkehrszeichen/zeichen-720-gruenpfeil.png" width="50" style="left:52%;animation-delay:-9s;animation-duration:28s" alt="">
+  </div>
+  
       <div style="text-align:center;margin:4px 0 18px">
         <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.6rem;color:var(--accent);letter-spacing:0.02em;margin-bottom:2px">FahrSync</div>
         <h1 style="font-size:1.05rem;font-weight:600;line-height:1.3;margin:0 0 10px;color:var(--text)">Die digitale Kartei für Fahrlehrer</h1>
