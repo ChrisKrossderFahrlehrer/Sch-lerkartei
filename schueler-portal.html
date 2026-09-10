@@ -431,9 +431,9 @@ import { initializeApp }    from 'https://www.gstatic.com/firebasejs/10.12.0/fir
 import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getMessaging, getToken, isSupported } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
-import { getFirestore, collection, doc, getDoc, getDocs, onSnapshot,
-         query, where, updateDoc }
+import { getFirestore, doc, getDoc, onSnapshot, updateDoc }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js';
 
 const firebaseConfig = {
   apiKey:            'AIzaSyD490kLzTOq3h3VdQ9ZqWZd_aXcDRfxBOs',
@@ -446,6 +446,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
+const fns = getFunctions(app, 'europe-west3');
 
 // ── State ──────────────────────────────────────────────────────
 let codeDocId      = null;   // Firestore-Dokument-ID des accessCode
@@ -499,11 +500,21 @@ window.doLogin = async () => {
       docRef = direct; data = direct.data();
     } else {
       // Fallback für ALTE Codes (vor der Umstellung, noch mit Zufalls-ID).
+      // SICHERHEIT: Die Suche laeuft ueber die Cloud Function
+      // findeAltenZugangscode statt ueber ein direktes list() auf
+      // accessCodes - ein offenes list() haette das komplette Auflisten
+      // ALLER aktiven Zugangscodes samt Schueler-Daten erlaubt, da
+      // Firestore-Regeln bei list() nicht pruefen koennen, wonach gefiltert
+      // wurde. Die Function gibt nur die Dokument-ID zurueck; die eigentlichen
+      // Daten holt der Client danach ganz normal per get() (dafuer bereits
+      // erlaubt).
       try {
-        const q = query(collection(db,'accessCodes'), where('code','==',code));
-        const snap = await getDocs(q);
-        if (!snap.empty) { docRef = snap.docs[0]; data = docRef.data(); }
-      } catch(_) { /* list evtl. gesperrt – dann bleibt es bei 'nicht gefunden' */ }
+        const res = await httpsCallable(fns, 'findeAltenZugangscode')({ code });
+        if (res.data && res.data.found && res.data.docId) {
+          const direktNachId = await getDoc(doc(db,'accessCodes', res.data.docId));
+          if (direktNachId.exists()) { docRef = direktNachId; data = direktNachId.data(); }
+        }
+      } catch(_) { /* dann bleibt es bei 'nicht gefunden' */ }
     }
     if (!docRef || !data) { errEl.textContent = '❌ Code nicht gefunden.'; return; }
 

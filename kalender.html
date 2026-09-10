@@ -1097,7 +1097,7 @@ pages['lehrer-theorie']=async function(el){
   listEl.innerHTML = schueler.map(s => `
     <label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer">
       <input type="checkbox" class="th-schueler-check" value="${s.id}" style="width:18px;height:18px;flex-shrink:0">
-      <span>${s.fname||''} ${s.lname||''}</span>
+      <span>${escHtml(s.fname||'')} ${escHtml(s.lname||'')}</span>
     </label>`).join('');
 };
 window.setThArt = function(art){

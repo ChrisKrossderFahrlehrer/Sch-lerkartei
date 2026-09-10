@@ -3609,14 +3609,12 @@ async function activateAbo(subscriptionId, planId) {
   try {
     if (!currentUser || !window.__billingDocRef) return;
     const p = PLANS[selectedTier];
-    await dbUpd(doc(db, window.__billingDocRef.coll, window.__billingDocRef.id), {
-      abo:               selectedTier,
-      aboPlaner:         planerGewuenscht,
-      aboMaxLehrer:      p.maxLehrer,
-      aboSubscriptionId: subscriptionId,
-      aboPlanId:         planId,
-      aboAktiviertAm:    Date.now(),
-      aboSetByAdmin:     false
+    // SICHERHEITSFIX: Vorher schrieb der Client die Abo-Felder direkt per
+    // updateDoc() in Firestore - ganz ohne Pruefung, ob wirklich bezahlt
+    // wurde. Jetzt prueft eine Cloud Function die Subscription-ID bei
+    // PayPal selbst nach und aktiviert erst dann serverseitig.
+    await httpsCallable(fns, 'bestaetigePaypalAbo')({
+      subscriptionId, plan: selectedTier, planer: planerGewuenscht
     });
     aboStatus = selectedTier;
     aboMaxLehrerAktuell = p.maxLehrer;
@@ -6235,7 +6233,7 @@ function renderTeacherChat() {
     const align  = isFL ? 'flex-end' : 'flex-start';
     const radius = isFL ? '18px 18px 4px 18px' : '18px 18px 18px 4px';
     return `<div style="display:flex;flex-direction:column;align-items:${align}">
-      ${!isFL ? `<div style="font-size:0.65rem;color:var(--muted);margin-bottom:2px">${m.senderName||'Schüler'}</div>` : ''}
+      ${!isFL ? `<div style="font-size:0.65rem;color:var(--muted);margin-bottom:2px">${escapeHtmlEigen(m.senderName||'Schüler')}</div>` : ''}
       <div style="max-width:80%;background:${bg};color:${color};border-radius:${radius};padding:10px 14px;font-size:0.88rem;line-height:1.45;word-break:break-word">${(m.text||'').replace(/</g,'&lt;')}</div>
       <div style="font-size:0.6rem;color:var(--muted);margin-top:2px">${date} ${time}</div>
     </div>`;
@@ -8625,7 +8623,7 @@ window.exportiereDatenPDF = async () => {
     <script>window.onload=()=>window.print()<\/script>
     </body></html>`;
 
-  const w = window.open('', '_blank');
+  const w = window.open('', '_blank', 'noopener');
   if (w) { w.document.write(html); w.document.close(); }
   document.getElementById('datenexport-modal').classList.remove('open');
   toast('✓ PDF-Auskunft geöffnet');
@@ -8718,7 +8716,7 @@ window.exportPDF = () => {
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Ausbildungsnachweis – ${s.vorname} ${s.nachname}</title>
+<title>Ausbildungsnachweis – ${escapeHtmlEigen(s.vorname)} ${escapeHtmlEigen(s.nachname)}</title>
 <style>
   * { box-sizing:border-box; margin:0; padding:0; }
   body { font-family: Arial, sans-serif; font-size:11px; color:#1a1a1a; background:#fff; }
@@ -8746,7 +8744,7 @@ window.exportPDF = () => {
       <img src="./icon-192.png?v=3" alt="ADK" style="width:56px;height:56px;border-radius:50%;flex-shrink:0" onerror="this.style.display='none'">
       <div>
         <div style="font-size:10px;color:#f0b429;text-transform:uppercase;letter-spacing:1px">Ausbildungsnachweis</div>
-        <div style="font-size:18px;font-weight:bold;margin:4px 0">${s.vorname} ${s.nachname}</div>
+        <div style="font-size:18px;font-weight:bold;margin:4px 0">${escapeHtmlEigen(s.vorname)} ${escapeHtmlEigen(s.nachname)}</div>
         <div style="font-size:11px;color:#aaa">
           <span class="badge badge-gold">${klasseNamen[klasse]||klasse}</span>
           ${s.geburt ? '&nbsp;&nbsp;Geb. '+formatDate(s.geburt) : ''}
@@ -8826,7 +8824,7 @@ window.exportPDF = () => {
 </html>`;
 
   // PDF öffnen in neuem Tab → Browser-Druckdialog
-  const win = window.open('', '_blank');
+  const win = window.open('', '_blank', 'noopener');
   if (!win) { toast('⚠️ Popup blockiert – bitte erlauben'); return; }
   win.document.write(html);
   win.document.close();

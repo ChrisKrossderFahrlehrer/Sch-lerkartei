@@ -277,6 +277,18 @@ const RECHNUNG_PLANS = {
   unbegrenzt: { label: 'Fahrschule unbegrenzt',             price: 34.99, pricePlaner: 40.99 },
 };
 
+// Echte PayPal-Plan-IDs je Tarif (Standard/mit Planer) - dieselben wie im
+// Client (index.html, Konstante PLANS). Dient NUR der serverseitigen
+// Verifikation in bestaetigePaypalAbo: eine PayPal-Subscription-ID muss zu
+// GENAU diesem Plan gehoeren, sonst wird kein Abo aktiviert.
+const PAYPAL_PLAN_IDS = {
+  solo:       { id: 'P-4NU22633BD298162DNJFEWLI', idPlaner: 'P-5WR5028990092335YNJFEXYA', maxLehrer: 1 },
+  bis5:       { id: 'P-6MT978804E871203DNJFEY6I', idPlaner: 'P-62X57828ND5677308NJFEZVA', maxLehrer: 5 },
+  bis10:      { id: 'P-6PU84465TJ206253SNJFE2GI', idPlaner: 'P-0R339159LA0608445NJFE2ZQ', maxLehrer: 10 },
+  bis15:      { id: 'P-73W48950B2092742VNJFE3KY', idPlaner: 'P-3P20164845621960ANJFE35A', maxLehrer: 15 },
+  unbegrenzt: { id: 'P-22Y05276M00023207NJFE4ZA', idPlaner: 'P-4SF532859T7264908NJFE5PQ', maxLehrer: null },
+};
+
 function baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel, betrag, zahlungsart }) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 56 });
@@ -575,12 +587,23 @@ async function stripeAboAktivierenUndRechnung(session, stripeEventId, zahlungsar
   const datum = new Date().toLocaleDateString('de-DE');
   const pdfBuffer = await baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel: planInfo.label, betrag, zahlungsart });
 
-  await admin.firestore().collection('rechnungen').add({
-    nummer, empfaengerId: billingId, empfaengerName: empfaenger.name,
-    plan, planer: planer === '1', betrag, datum, erstelltAm: Date.now(),
-    pdfBase64: pdfBuffer.toString('base64'),
-    stripeSessionId: session.id,
-  });
+  // FIX: Der obige "bereits"-Check liest und schreibt nicht atomar - bei
+  // zeitgleich zugestellten Retry-Webhooks (von Stripe ausdruecklich
+  // vorgesehen) konnten beide daran vorbeirennen und zwei Rechnungen fuer
+  // dieselbe Zahlung anlegen. .create() auf einer aus der Stripe-Session-ID
+  // abgeleiteten, deterministischen Dokument-ID ist dagegen atomar: der
+  // zweite Versuch schlaegt garantiert mit ALREADY_EXISTS fehl.
+  try {
+    await admin.firestore().collection('rechnungen').doc(`stripe_${session.id}`).create({
+      nummer, empfaengerId: billingId, empfaengerName: empfaenger.name,
+      plan, planer: planer === '1', betrag, datum, erstelltAm: Date.now(),
+      pdfBase64: pdfBuffer.toString('base64'),
+      stripeSessionId: session.id,
+    });
+  } catch (e) {
+    if (e.code === 6) { console.log('stripeWebhook: Rechnung bereits vorhanden (Retry), ignoriert'); return; }
+    throw e;
+  }
   console.log('stripeWebhook: Rechnung', nummer, 'erzeugt fuer', billingColl, billingId, '(Ereignis', stripeEventId, ')');
 }
 
@@ -628,6 +651,33 @@ exports.stripeWebhook = onRequest(
     }
   }
 );
+
+// ══ ALTE ZUGANGSCODES: SICHERER LOGIN-FALLBACK ═══════════════════════
+// Vor der Umstellung auf "Code = Dokument-ID" hatten Zugangscode-Dokumente
+// eine zufaellige ID und ein eigenes 'code'-Feld. Der Login-Fallback im
+// Schueler-Portal fuer solche Alt-Codes brauchte bisher ein Client-seitiges
+// where('code','==',code) - also ein 'list()' auf accessCodes. Firestore-
+// Regeln koennen bei 'list' aber nur pruefen, WAS zurueckkommt, nicht WELCHE
+// Query gestellt wurde - ein offenes 'list' fuer diesen Zweck haette also
+// das komplette Auflisten ALLER aktiven Zugangscodes (samt Schueler-
+// Stammdaten/Chat) ermoeglicht, ganz ohne einen einzigen Code zu kennen.
+// Diese Funktion macht dieselbe Suche stattdessen serverseitig (Admin SDK,
+// umgeht Rules) und gibt NUR die Dokument-ID zurueck, wenn Code + Ablauf
+// passen - der Client liest die eigentlichen Daten danach ganz normal per
+// get() (bereits durch die bestehende accessCodes/get-Regel erlaubt).
+exports.findeAltenZugangscode = onCall(async (request) => {
+  const { code } = request.data || {};
+  if (!code || typeof code !== 'string' || code.length < 4 || code.length > 40) {
+    throw new HttpsError('invalid-argument', 'Ungueltiger Code.');
+  }
+  const snap = await admin.firestore().collection('accessCodes')
+    .where('code', '==', code).limit(1).get();
+  if (snap.empty) return { found: false };
+  const doc = snap.docs[0];
+  const data = doc.data();
+  if (data.expiresAt && data.expiresAt < Date.now()) return { found: false };
+  return { found: true, docId: doc.id };
+});
 
 // ══ ADMIN: E-Mail manuell bestaetigen (SuperAdmin-only) ═════════
 // Fuer Testkonten, bei denen die Bestaetigungs-Mail nicht ankommt (Spam-
@@ -684,6 +734,97 @@ async function paypalAccessToken(clientId, clientSecret) {
   if (!data.access_token) throw new Error('PayPal-Zugriffstoken nicht erhalten');
   return data.access_token;
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// SICHERHEITSFIX: Abo-Aktivierung nach PayPal-Zahlung serverseitig
+//
+// Bisher schrieb der Client (activateAbo() im Browser, index.html) die
+// Felder abo/aboMaxLehrer/aboSubscriptionId/... DIREKT per updateDoc() in
+// Firestore - im onApprove-Callback von PayPal, also OHNE jede
+// serverseitige Pruefung, ob ueberhaupt eine echte Zahlung stattgefunden
+// hat. Jeder eingeloggte Nutzer haette sich per Browser-Konsole (z.B.
+// updateDoc(doc(db,'users',meineUid),{abo:'unbegrenzt',aboStatus:'aktiv'}))
+// ein kostenloses Premium-Abo selbst freischalten koennen.
+//
+// Diese Funktion ersetzt den direkten Client-Schreibzugriff: Sie fragt bei
+// PayPal selbst nach (Admin-API, server-zu-server), ob die genannte
+// Subscription-ID wirklich existiert, aktiv ist und zum angefragten Tarif
+// passt - erst DANACH aktiviert sie serverseitig (Admin SDK, umgeht die
+// Firestore-Regeln). Die Firestore-Regeln selbst verbieten Clients
+// zusaetzlich das direkte Schreiben dieser Felder (siehe firestore.rules,
+// aboFelderUnveraendert()).
+// ═══════════════════════════════════════════════════════════════════
+exports.bestaetigePaypalAbo = onCall(
+  { secrets: [PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET] },
+  async (request) => {
+    const auth = request.auth;
+    if (!auth) throw new HttpsError('unauthenticated', 'Bitte anmelden.');
+
+    const { subscriptionId, plan, planer } = request.data || {};
+    const planInfo = PAYPAL_PLAN_IDS[plan];
+    if (!subscriptionId || typeof subscriptionId !== 'string' || !planInfo) {
+      throw new HttpsError('invalid-argument', 'Ungueltiger Tarif oder Subscription-ID.');
+    }
+    const erwartetePlanId = planer ? planInfo.idPlaner : planInfo.id;
+
+    // Bei PayPal nachfragen statt dem Client zu glauben.
+    const accessToken = await paypalAccessToken(PAYPAL_CLIENT_ID.value(), PAYPAL_CLIENT_SECRET.value());
+    const subResp = await fetch(
+      `https://api-m.paypal.com/v1/billing/subscriptions/${encodeURIComponent(subscriptionId)}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (!subResp.ok) {
+      throw new HttpsError('failed-precondition', 'PayPal-Abo konnte nicht geprueft werden.');
+    }
+    const sub = await subResp.json();
+    if (sub.status !== 'ACTIVE') {
+      throw new HttpsError('failed-precondition', 'PayPal-Abo ist nicht aktiv.');
+    }
+    if (sub.plan_id !== erwartetePlanId) {
+      throw new HttpsError('failed-precondition', 'Die Subscription passt nicht zum gewaehlten Tarif.');
+    }
+
+    const uid = auth.uid;
+    const userSnap = await admin.firestore().doc(`users/${uid}`).get();
+    if (!userSnap.exists) throw new HttpsError('failed-precondition', 'Nutzerprofil nicht gefunden.');
+    const userData = userSnap.data();
+
+    // Dieselbe Ermittlung wie in erstelleRechnung/createStripeCheckoutSession.
+    let billingColl, billingId;
+    if (userData.typ === 'fahrschule') {
+      billingColl = 'fahrschulen'; billingId = uid;
+    } else if (!userData.fahrschuleId || userData.fahrschuleId === uid) {
+      billingColl = 'users'; billingId = uid;
+    } else {
+      throw new HttpsError('permission-denied', 'Nur der Fahrschul-Inhaber kann ein Abo aktivieren.');
+    }
+
+    // Verhindert, dass dieselbe Subscription-ID zweimal (bei zwei
+    // verschiedenen Konten) verwendet wird, um sich mit einer fremden,
+    // echten Zahlung selbst freizuschalten.
+    for (const coll of ['fahrschulen', 'users']) {
+      const belegt = await admin.firestore().collection(coll)
+        .where('aboSubscriptionId', '==', subscriptionId).limit(1).get();
+      if (!belegt.empty && !(coll === billingColl && belegt.docs[0].id === billingId)) {
+        throw new HttpsError('failed-precondition', 'Diese Subscription ist bereits einem anderen Konto zugeordnet.');
+      }
+    }
+
+    await admin.firestore().doc(`${billingColl}/${billingId}`).set({
+      abo:               plan,
+      aboPlaner:         !!planer,
+      aboMaxLehrer:      planInfo.maxLehrer,
+      aboSubscriptionId: subscriptionId,
+      aboPlanId:         erwartetePlanId,
+      aboAktiviertAm:    Date.now(),
+      aboSetByAdmin:     false,
+      aboStatus:         'aktiv',
+      aboZahlungsart:    'paypal',
+    }, { merge: true });
+
+    return { success: true, maxLehrer: planInfo.maxLehrer };
+  }
+);
 
 exports.paypalWebhook = onRequest(
   { secrets: [PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, PAYPAL_WEBHOOK_ID] },
@@ -782,13 +923,21 @@ exports.paypalWebhook = onRequest(
         const betrag = betragBezahlt || (billingData.aboPlaner ? planInfo.pricePlaner : planInfo.price);
         const pdfBuffer = await baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel: planInfo.label, betrag, zahlungsart: 'PayPal' });
 
-        await admin.firestore().collection('rechnungen').add({
-          nummer, empfaengerId: billingId, empfaengerName: empfaenger.name,
-          plan: billingData.abo, planer: !!billingData.aboPlaner, betrag, datum,
-          erstelltAm: Date.now(),
-          pdfBase64: pdfBuffer.toString('base64'),
-          paypalSaleId: saleId, paypalSubscriptionId: subscriptionId,
-        });
+        // FIX: derselbe Race wie beim Stripe-Webhook - PayPal stellt Events
+        // ebenfalls mehrfach zu. .create() auf deterministischer, aus der
+        // Sale-ID abgeleiteter Dokument-ID ist atomar statt check-then-write.
+        try {
+          await admin.firestore().collection('rechnungen').doc(`paypal_${saleId}`).create({
+            nummer, empfaengerId: billingId, empfaengerName: empfaenger.name,
+            plan: billingData.abo, planer: !!billingData.aboPlaner, betrag, datum,
+            erstelltAm: Date.now(),
+            pdfBase64: pdfBuffer.toString('base64'),
+            paypalSaleId: saleId, paypalSubscriptionId: subscriptionId,
+          });
+        } catch (e) {
+          if (e.code === 6) { console.log('paypalWebhook: Rechnung bereits vorhanden (Retry), ignoriert'); res.status(200).send('ok - bereits verarbeitet'); return; }
+          throw e;
+        }
         await admin.firestore().doc(`${billingColl}/${billingId}`).update({ aboLetzteZahlungAm: Date.now() });
         console.log('paypalWebhook: Rechnung', nummer, 'erzeugt fuer', billingColl, billingId);
       }

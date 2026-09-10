@@ -67,6 +67,48 @@ service cloud.firestore {
              resData.uid == request.auth.uid;
     }
 
+    // SICHERHEITS-AUDIT: Cross-Tenant-Schutz fuer Schueler/Protokoll/Custom-*.
+    // Vorher pruefte create/update nur 'uid', NIE 'fahrschuleId' - jeder echte
+    // Fahrlehrer-Account konnte Dokumente mit einer FREMDEN fahrschuleId
+    // anlegen oder eine bestehende fahrschuleId auf eine fremde Schule
+    // umbiegen und so fremde Kartei-Daten sichtbar/beeinflussbar machen.
+    // Nur relevant, wenn die Collection ueberhaupt eine fahrschuleId nutzt
+    // (customFields speichert z.B. nur 'uid') - deshalb .get() mit Default.
+    function fahrschuleIdOkBeiCreate(data) {
+      return data.get('fahrschuleId', userFsId()) == userFsId();
+    }
+    // 'uid' bleibt bewusst aenderbar (Schueler an Kollegen derselben Schule
+    // uebergeben, siehe index.html transferStudent) - nur 'fahrschuleId'
+    // darf sich nach dem Anlegen nicht mehr aendern.
+    function fahrschuleIdUnveraendert(before, after) {
+      return after.get('fahrschuleId', before.get('fahrschuleId', null))
+          == before.get('fahrschuleId', null);
+    }
+
+    // SICHERHEITS-AUDIT: Abo-Felder duerfen NIE direkt vom Client geschrieben
+    // werden - nur serverseitig durch die Cloud Functions (Admin SDK, umgeht
+    // diese Regeln ohnehin) nach echter, geprüfter Zahlung. Vorher liess sich
+    // z.B. per Browser-Konsole updateDoc(users/eigeneUid,{abo:'unbegrenzt'})
+    // aufrufen und sich damit ein kostenloses Premium-Abo selbst freischalten.
+    function aboFelderUnveraendert(before, after) {
+      return after.get('abo', null)                == before.get('abo', null)
+          && after.get('aboStatus', null)            == before.get('aboStatus', null)
+          && after.get('aboPlaner', null)             == before.get('aboPlaner', null)
+          && after.get('aboMaxLehrer', null)           == before.get('aboMaxLehrer', null)
+          && after.get('aboSubscriptionId', null)      == before.get('aboSubscriptionId', null)
+          && after.get('aboPlanId', null)               == before.get('aboPlanId', null)
+          && after.get('aboAktiviertAm', null)         == before.get('aboAktiviertAm', null)
+          && after.get('aboSetByAdmin', null)          == before.get('aboSetByAdmin', null)
+          && after.get('aboLetzteZahlungAm', null)     == before.get('aboLetzteZahlungAm', null)
+          && after.get('aboZahlungsart', null)         == before.get('aboZahlungsart', null);
+    }
+    function keineAboFelderBeiCreate(data) {
+      return !data.keys().hasAny([
+        'abo','aboStatus','aboPlaner','aboMaxLehrer','aboSubscriptionId',
+        'aboPlanId','aboAktiviertAm','aboSetByAdmin','aboLetzteZahlungAm','aboZahlungsart'
+      ]);
+    }
+
     // Helper: Stimmt der beim Beitritt mitgesendete Code mit dem Code der
     // Ziel-Fahrschule überein? Verhindert, dass jemand seine fahrschuleId
     // einfach auf eine fremde Schule setzt (Cross-Tenant), ohne den geheimen
@@ -161,16 +203,25 @@ service cloud.firestore {
                      (isAuth() && fsId == userFsId());
       allow list: if isSuperAdmin();
 
+      // FIX: 'kalenderAktiv' und alle Abo-Felder waren beim ANLEGEN gar nicht
+      // eingeschraenkt (anders als beim spaeteren update) - eine neu
+      // angelegte Fahrschule konnte sich so von Anfang an selbst
+      // 'kalenderAktiv:true' oder ein Abo setzen, ganz ohne SuperAdmin/
+      // Zahlung.
       allow create: if isRealAccount() &&
                        (request.resource.data.adminUid == request.auth.uid ||
-                        fsId == request.auth.uid);
+                        fsId == request.auth.uid) &&
+                       request.resource.data.get('kalenderAktiv', false) == false &&
+                       keineAboFelderBeiCreate(request.resource.data);
 
       // UPDATE: Ein FS-Admin darf seine eigene Fahrschule bearbeiten, ABER
-      // 'kalenderAktiv' (bezahltes Extra) darf nur der SuperAdmin setzen.
+      // 'kalenderAktiv' (bezahltes Extra) und alle Abo-Felder duerfen nur
+      // der SuperAdmin bzw. die Cloud Functions (Admin SDK) setzen.
       allow update: if isSuperAdmin() ||
                        (isFsAdmin() && userFsId() == fsId &&
                         request.resource.data.get('kalenderAktiv', false)
-                          == resource.data.get('kalenderAktiv', false));
+                          == resource.data.get('kalenderAktiv', false) &&
+                        aboFelderUnveraendert(resource.data, request.resource.data));
 
       allow delete: if isSuperAdmin();
     }
@@ -204,6 +255,7 @@ service cloud.firestore {
                         request.resource.data.rolle in ['fahrlehrer', 'fahrschul-admin'] &&
                         request.resource.data.get('status', 'ausstehend') in ['aktiv', 'ausstehend'] &&
                         request.resource.data.get('kalenderAktiv', false) == false &&
+                        keineAboFelderBeiCreate(request.resource.data) &&
                         (
                           request.resource.data.fahrschuleId == request.auth.uid ||
                           fahrschulCodeStimmt()
@@ -227,6 +279,7 @@ service cloud.firestore {
                         request.resource.data.rolle == resource.data.rolle &&
                         request.resource.data.get('kalenderAktiv', false)
                           == resource.data.get('kalenderAktiv', false) &&
+                        aboFelderUnveraendert(resource.data, request.resource.data) &&
                         (
                           isFsAdmin() ||
                           request.resource.data.get('status', '')
@@ -251,8 +304,10 @@ service cloud.firestore {
       // SuperAdmin darf lesen (nötig zum Auffinden beim Voll-Löschen)
       allow read:   if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
       allow create: if isRealAccount() &&
-                       request.resource.data.uid == request.auth.uid;
-      allow update: if isAuth() && docBelongsToUser(resource.data);
+                       request.resource.data.uid == request.auth.uid &&
+                       fahrschuleIdOkBeiCreate(request.resource.data);
+      allow update: if isAuth() && docBelongsToUser(resource.data) &&
+                       fahrschuleIdUnveraendert(resource.data, request.resource.data);
       allow delete: if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
     }
 
@@ -262,8 +317,10 @@ service cloud.firestore {
     match /protokoll/{eintragId} {
       allow read:   if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
       allow create: if isRealAccount() &&
-                       request.resource.data.uid == request.auth.uid;
-      allow update: if isAuth() && docBelongsToUser(resource.data);
+                       request.resource.data.uid == request.auth.uid &&
+                       fahrschuleIdOkBeiCreate(request.resource.data);
+      allow update: if isAuth() && docBelongsToUser(resource.data) &&
+                       fahrschuleIdUnveraendert(resource.data, request.resource.data);
       allow delete: if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
     }
 
@@ -273,8 +330,10 @@ service cloud.firestore {
     match /customFields/{docId} {
       allow read:   if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
       allow create: if isRealAccount() &&
-                       request.resource.data.uid == request.auth.uid;
-      allow update: if isAuth() && docBelongsToUser(resource.data);
+                       request.resource.data.uid == request.auth.uid &&
+                       fahrschuleIdOkBeiCreate(request.resource.data);
+      allow update: if isAuth() && docBelongsToUser(resource.data) &&
+                       fahrschuleIdUnveraendert(resource.data, request.resource.data);
       allow delete: if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
     }
 
@@ -284,8 +343,10 @@ service cloud.firestore {
     match /customThemen/{docId} {
       allow read:   if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
       allow create: if isRealAccount() &&
-                       request.resource.data.uid == request.auth.uid;
-      allow update: if isAuth() && docBelongsToUser(resource.data);
+                       request.resource.data.uid == request.auth.uid &&
+                       fahrschuleIdOkBeiCreate(request.resource.data);
+      allow update: if isAuth() && docBelongsToUser(resource.data) &&
+                       fahrschuleIdUnveraendert(resource.data, request.resource.data);
       allow delete: if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
     }
 
@@ -295,8 +356,10 @@ service cloud.firestore {
     match /customGruppen/{docId} {
       allow read:   if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
       allow create: if isRealAccount() &&
-                       request.resource.data.uid == request.auth.uid;
-      allow update: if isAuth() && docBelongsToUser(resource.data);
+                       request.resource.data.uid == request.auth.uid &&
+                       fahrschuleIdOkBeiCreate(request.resource.data);
+      allow update: if isAuth() && docBelongsToUser(resource.data) &&
+                       fahrschuleIdUnveraendert(resource.data, request.resource.data);
       allow delete: if isAuth() && (docBelongsToUser(resource.data) || isSuperAdmin());
     }
 
@@ -332,6 +395,15 @@ service cloud.firestore {
       // rein, kein anderer Fahrlehrer/Admin derselben Fahrschule. Der
       // bewusste Schueler-Zugang ueber den Code selbst (ohne Konto) bleibt
       // unveraendert ueber die Ablauf-Bedingungen erhalten.
+      // WICHTIG: 'list' bewusst STRENG (nur SuperAdmin/zustaendiger
+      // Fahrlehrer) - Firestore-Regeln koennen bei 'list' nur die
+      // ZURUECKGEGEBENEN Dokumente pruefen, nicht erzwingen, dass die Anfrage
+      // tatsaechlich nach 'code' gefiltert war. Eine Lockerung wie bei 'get'
+      // (die nur die Kenntnis EINER Dokument-ID/EINES Codes voraussetzt)
+      // wuerde hier stattdessen das listenweise Auflisten ALLER aktiven
+      // Zugangscodes (samt Schueler-Stammdaten/Chat) ohne jede Kenntnis
+      // erlauben - siehe stattdessen die Cloud Function
+      // findeAltenZugangscode fuer den Login-Fallback alter Codes.
       allow get:  if isSuperAdmin()
                   || (isAuth() && userDocExists() && resource.data.teacherUid == request.auth.uid)
                   || !('expiresAt' in resource.data)
