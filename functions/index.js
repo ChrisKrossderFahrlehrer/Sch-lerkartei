@@ -274,7 +274,9 @@ const RECHNUNG_PLANS = {
   bis5:       { label: 'Fahrschule bis 5 Fahrlehrer',       price: 12.99, pricePlaner: 16.99 },
   bis10:      { label: 'Fahrschule bis 10 Fahrlehrer',      price: 20.99, pricePlaner: 25.99 },
   bis15:      { label: 'Fahrschule bis 15 Fahrlehrer',      price: 26.99, pricePlaner: 34.99 },
-  unbegrenzt: { label: 'Fahrschule unbegrenzt',             price: 34.99, pricePlaner: 40.99 },
+  // setup/setupPlaner: einmalige Einrichtungsgebuehr fuer diese Stufe (siehe
+  // agb.html § 4) - dieselben Betraege wie im Client (index.html, PLANS.unbegrenzt).
+  unbegrenzt: { label: 'Fahrschule unbegrenzt',             price: 34.99, pricePlaner: 40.99, setup: 42.99, setupPlaner: 45.99 },
 };
 
 // Echte PayPal-Plan-IDs je Tarif (Standard/mit Planer) - dieselben wie im
@@ -514,18 +516,51 @@ exports.createStripeCheckoutSession = onCall({ secrets: [STRIPE_SECRET_KEY] }, a
   const betrag = planer ? planInfo.pricePlaner : planInfo.price;
   const stripe = new Stripe(STRIPE_SECRET_KEY.value());
 
+  const lineItems = [{
+    price_data: {
+      currency: 'eur',
+      product_data: { name: `FahrSync – ${planInfo.label}` },
+      unit_amount: Math.round(betrag * 100),
+      recurring: { interval: 'month' },
+    },
+    quantity: 1,
+  }];
+
+  // FIX: Fuer die Stufe "Unbegrenzt" sieht die AGB (§ 4) eine einmalige,
+  // nicht erstattungsfaehige Einrichtungsgebuehr vor - die war bisher NUR im
+  // Client als Text angezeigt, aber in der Stripe-Checkout-Session nie als
+  // tatsaechliche Position enthalten. Zahlende ueber Stripe wurden die
+  // Gebuehr also nie in Rechnung gestellt. Einmalige Position (kein
+  // 'recurring') zusaetzlich zum Abo hinzufuegen, wenn vorhanden.
+  const setupGebuehr = planer ? planInfo.setupPlaner : planInfo.setup;
+  if (setupGebuehr) {
+    lineItems.push({
+      price_data: {
+        currency: 'eur',
+        product_data: { name: `FahrSync – Einrichtungsgebühr (${planInfo.label})` },
+        unit_amount: Math.round(setupGebuehr * 100),
+      },
+      quantity: 1,
+    });
+  }
+
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     payment_method_types: ['card', 'sepa_debit'],
-    line_items: [{
-      price_data: {
-        currency: 'eur',
-        product_data: { name: `FahrSync – ${planInfo.label}` },
-        unit_amount: Math.round(betrag * 100),
-        recurring: { interval: 'month' },
-      },
-      quantity: 1,
-    }],
+    line_items: lineItems,
+    // FIX: Die AGB (§ 3) und die Preis-Uebersicht im Client versprechen fuer
+    // JEDES Abonnement eine 14-taegige kostenlose Testphase ("keine
+    // automatische Abbuchung waehrend der Testphase") - ohne diesen
+    // Parameter haette Stripe (anders als die PayPal-Plaene, die die
+    // Testphase serverseitig im PayPal-Dashboard hinterlegt haben) sofort
+    // bei Checkout-Abschluss abgebucht.
+    subscription_data: {
+      trial_period_days: 14,
+      // Wird auf das entstehende Abo (nicht nur die Checkout Session)
+      // uebertragen - noetig, damit spaetere Verlaengerungs-Rechnungen
+      // (invoice.paid, siehe unten) wissen, wem die Zahlung zuzuordnen ist.
+      metadata: { plan, planer: planer ? '1' : '0', billingColl, billingId },
+    },
     client_reference_id: `${billingColl}:${billingId}`,
     metadata: { plan, planer: planer ? '1' : '0', billingColl, billingId },
     success_url: `https://fahrsync.de/index.html?stripe=erfolg${request.data.rueckkehrZusatz === '&normal=1' ? '&normal=1' : ''}`,
@@ -535,32 +570,25 @@ exports.createStripeCheckoutSession = onCall({ secrets: [STRIPE_SECRET_KEY] }, a
   return { url: session.url };
 });
 
-// Gemeinsame Aktivierung + Rechnung, genutzt von BEIDEN Webhook-Zweigen
-// (sofortige Kartenzahlung und spaeter bestaetigte SEPA-Lastschrift).
-async function stripeAboAktivierenUndRechnung(session, stripeEventId, zahlungsart) {
-  const { billingColl, billingId, plan, planer } = session.metadata || {};
-  if (!billingColl || !billingId || !plan) return;
-
-  // Idempotenz: dasselbe Stripe-Ereignis darf nicht zweimal verarbeitet werden
-  const bereits = await admin.firestore().collection('rechnungen')
-    .where('stripeSessionId', '==', session.id).limit(1).get();
-  if (!bereits.empty) return;
-
-  const planInfo = RECHNUNG_PLANS[plan];
-  if (!planInfo) return;
-
+// Setzt nur die Abo-Felder auf dem Fahrschulen-/Users-Dokument - OHNE
+// Rechnung. Wird sowohl bei sofortiger Zahlung als auch beim reinen
+// Testphase-Start (0 EUR faellig) gebraucht.
+async function stripeAboAktivieren(billingColl, billingId, plan, planer) {
   const billingRef = admin.firestore().doc(`${billingColl}/${billingId}`);
   const billingSnap = await billingRef.get();
-  if (!billingSnap.exists) return;
-  const b = billingSnap.data();
-  if (!b.rechnungsStrasse || !b.rechnungsPlz || !b.rechnungsOrt) return;
-
+  if (!billingSnap.exists) return null;
   await billingRef.update({
     abo: plan, aboPlaner: planer === '1', aboStatus: 'aktiv',
     aboZahlungsart: 'stripe', aboLetzteZahlungAm: Date.now(),
   });
+  return billingSnap.data();
+}
 
-  const betrag = planer === '1' ? planInfo.pricePlaner : planInfo.price;
+// Gemeinsame PDF-/Rechnungsnummern-Erzeugung, genutzt sowohl fuer die erste
+// Zahlung (Checkout Session) als auch fuer jede spaetere monatliche
+// Verlaengerung (Stripe-Invoice) - dieselbe Logik, nur mit unterschiedlicher
+// Herkunft von Betrag/Zahlungsart/Idempotenz-Schluessel.
+async function stripeRechnungSpeichern({ billingId, empfaengerName, b, plan, planer, planInfo, betrag, zahlungsart, docId, referenzFelder }) {
   const counterRef = admin.firestore().doc('platform/rechnungszaehler');
   const nummer = await admin.firestore().runTransaction(async (tx) => {
     const c = await tx.get(counterRef);
@@ -580,31 +608,103 @@ async function stripeAboAktivierenUndRechnung(session, stripeEventId, zahlungsar
   };
   const LAENDER = { DE: '', AT: 'Österreich', CH: 'Schweiz', XX: '' };
   const empfaenger = {
-    name: b.name || 'Kunde',
+    name: empfaengerName,
     strasse: b.rechnungsStrasse, plz: b.rechnungsPlz, ort: b.rechnungsOrt,
     land: LAENDER[b.rechnungsLand || 'DE'] || '',
   };
   const datum = new Date().toLocaleDateString('de-DE');
   const pdfBuffer = await baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel: planInfo.label, betrag, zahlungsart });
 
-  // FIX: Der obige "bereits"-Check liest und schreibt nicht atomar - bei
-  // zeitgleich zugestellten Retry-Webhooks (von Stripe ausdruecklich
-  // vorgesehen) konnten beide daran vorbeirennen und zwei Rechnungen fuer
-  // dieselbe Zahlung anlegen. .create() auf einer aus der Stripe-Session-ID
-  // abgeleiteten, deterministischen Dokument-ID ist dagegen atomar: der
-  // zweite Versuch schlaegt garantiert mit ALREADY_EXISTS fehl.
+  // FIX: Ein reiner check-then-write ("existiert schon eine Rechnung fuer
+  // dieses Ereignis?") ist bei zeitgleich zugestellten Retry-Webhooks nicht
+  // race-sicher. .create() auf einer deterministischen, aus dem jeweiligen
+  // Stripe-Ereignis abgeleiteten Dokument-ID ist dagegen atomar: der zweite
+  // Versuch schlaegt garantiert mit ALREADY_EXISTS (Code 6) fehl.
   try {
-    await admin.firestore().collection('rechnungen').doc(`stripe_${session.id}`).create({
+    await admin.firestore().collection('rechnungen').doc(docId).create({
       nummer, empfaengerId: billingId, empfaengerName: empfaenger.name,
       plan, planer: planer === '1', betrag, datum, erstelltAm: Date.now(),
       pdfBase64: pdfBuffer.toString('base64'),
-      stripeSessionId: session.id,
+      ...referenzFelder,
     });
   } catch (e) {
-    if (e.code === 6) { console.log('stripeWebhook: Rechnung bereits vorhanden (Retry), ignoriert'); return; }
+    if (e.code === 6) { console.log('stripeWebhook: Rechnung bereits vorhanden (Retry), ignoriert'); return null; }
     throw e;
   }
-  console.log('stripeWebhook: Rechnung', nummer, 'erzeugt fuer', billingColl, billingId, '(Ereignis', stripeEventId, ')');
+  return nummer;
+}
+
+// Erste Zahlung (Checkout Session), genutzt von BEIDEN Webhook-Zweigen
+// (sofortige Kartenzahlung und spaeter bestaetigte SEPA-Lastschrift).
+async function stripeAboAktivierenUndRechnung(session, stripeEventId, zahlungsart) {
+  const { billingColl, billingId, plan, planer } = session.metadata || {};
+  if (!billingColl || !billingId || !plan) return;
+  const planInfo = RECHNUNG_PLANS[plan];
+  if (!planInfo) return;
+
+  const b = await stripeAboAktivieren(billingColl, billingId, plan, planer);
+  if (!b) return;
+  if (!b.rechnungsStrasse || !b.rechnungsPlz || !b.rechnungsOrt) return;
+
+  // FIX: Bei einer Testphase OHNE Einrichtungsgebuehr ist beim Checkout
+  // tatsaechlich 0 EUR faellig (amount_total === 0, Stripe liefert dafuer
+  // payment_status 'no_payment_required') - das Abo wurde oben trotzdem
+  // schon freigeschaltet (die Testphase soll nutzbar sein), aber es wird
+  // bewusst KEINE Rechnung ueber den vollen Monatspreis erzeugt, da noch
+  // nichts bezahlt wurde. Die erste echte Rechnung entsteht automatisch
+  // nach Ablauf der Testphase ueber invoice.paid (stripeVerlaengerungsRechnung).
+  if (!session.amount_total) {
+    console.log('stripeWebhook: Testphase gestartet (0 EUR faellig), Abo aktiviert ohne Rechnung fuer', billingColl, billingId);
+    return;
+  }
+
+  const betrag = planer === '1' ? planInfo.pricePlaner : planInfo.price;
+  const nummer = await stripeRechnungSpeichern({
+    billingId, empfaengerName: b.name || 'Kunde', b, plan, planer, planInfo, betrag, zahlungsart,
+    docId: `stripe_${session.id}`,
+    referenzFelder: { stripeSessionId: session.id },
+  });
+  if (nummer) console.log('stripeWebhook: Rechnung', nummer, 'erzeugt fuer', billingColl, billingId, '(Ereignis', stripeEventId, ')');
+}
+
+// FIX: Bisher hoerte der Webhook NUR auf checkout.session.*-Ereignisse - das
+// deckt ausschliesslich die ALLERERSTE Zahlung ab. Jede folgende monatliche
+// Verlaengerung eines Stripe-Abos laeuft technisch ueber ein eigenes
+// Invoice-Objekt auf dem Abo selbst (keine neue Checkout Session) und hat
+// bisher NIE eine Rechnung erzeugt - anders als bei PayPal, wo genau dieses
+// Problem bereits ueber PAYMENT.SALE.COMPLETED im paypalWebhook geloest
+// wurde. 'invoice.paid' deckt sowohl Karten- als auch (verzoegerte)
+// SEPA-Zahlungen ab.
+async function stripeVerlaengerungsRechnung(invoice, stripeEventId) {
+  // Nur echte Verlaengerungen - die allererste Zahlung laeuft bereits ueber
+  // checkout.session.completed/stripeAboAktivierenUndRechnung; wuerde man
+  // sie hier zusaetzlich verarbeiten, entstuenden doppelte Rechnungen.
+  if (invoice.billing_reason !== 'subscription_cycle' || !invoice.subscription) return;
+  if (!invoice.amount_paid) return;
+
+  const stripe = new Stripe(STRIPE_SECRET_KEY.value());
+  const subId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription.id;
+  const sub = await stripe.subscriptions.retrieve(subId);
+  const { billingColl, billingId, plan, planer } = sub.metadata || {};
+  if (!billingColl || !billingId || !plan) return;
+  const planInfo = RECHNUNG_PLANS[plan];
+  if (!planInfo) return;
+
+  const billingSnap = await admin.firestore().doc(`${billingColl}/${billingId}`).get();
+  if (!billingSnap.exists) return;
+  const b = billingSnap.data();
+  if (!b.rechnungsStrasse || !b.rechnungsPlz || !b.rechnungsOrt) return;
+
+  await admin.firestore().doc(`${billingColl}/${billingId}`).update({ aboLetzteZahlungAm: Date.now() });
+
+  const betrag = invoice.amount_paid / 100;
+  const nummer = await stripeRechnungSpeichern({
+    billingId, empfaengerName: b.name || 'Kunde', b, plan, planer, planInfo, betrag,
+    zahlungsart: 'Kreditkarte/SEPA (Verlängerung)',
+    docId: `stripe_invoice_${invoice.id}`,
+    referenzFelder: { stripeInvoiceId: invoice.id },
+  });
+  if (nummer) console.log('stripeWebhook: Verlaengerungs-Rechnung', nummer, 'erzeugt fuer', billingColl, billingId, '(Ereignis', stripeEventId, ')');
 }
 
 exports.stripeWebhook = onRequest(
@@ -625,16 +725,25 @@ exports.stripeWebhook = onRequest(
     try {
       if (event.type === 'checkout.session.completed') {
         const session = event.data.object;
-        // Nur bei SOFORT bezahlt (Karte) hier aktivieren. Bei noch
-        // schwebender SEPA-Lastschrift ('unpaid'/'no_payment_required'
-        // greift hier nicht) uebernimmt async_payment_succeeded weiter unten.
         if (session.payment_status === 'paid') {
+          // Sofort bezahlt (Karte, oder Testphase + Einrichtungsgebuehr).
           await stripeAboAktivierenUndRechnung(session, event.id, 'Kreditkarte');
+        } else if (session.payment_status === 'no_payment_required') {
+          // FIX: Testphase OHNE Einrichtungsgebuehr -> 0 EUR beim Checkout
+          // faellig. Abo trotzdem sofort freischalten (die 14-taegige
+          // Testphase soll nutzbar sein), aber ohne Rechnung.
+          const { billingColl, billingId, plan, planer } = session.metadata || {};
+          if (billingColl && billingId && plan) await stripeAboAktivieren(billingColl, billingId, plan, planer);
         }
+        // Bei noch schwebender SEPA-Lastschrift ('unpaid') uebernimmt
+        // async_payment_succeeded weiter unten.
       } else if (event.type === 'checkout.session.async_payment_succeeded') {
         // SEPA-Lastschrift wurde jetzt tatsaechlich bestaetigt.
         const session = event.data.object;
         await stripeAboAktivierenUndRechnung(session, event.id, 'SEPA-Lastschrift');
+      } else if (event.type === 'invoice.paid') {
+        // Monatliche Abo-Verlaengerung (siehe stripeVerlaengerungsRechnung).
+        await stripeVerlaengerungsRechnung(event.data.object, event.id);
       } else if (event.type === 'checkout.session.async_payment_failed') {
         const session = event.data.object;
         const { billingColl, billingId } = session.metadata || {};

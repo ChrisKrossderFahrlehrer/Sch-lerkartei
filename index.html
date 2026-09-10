@@ -1191,8 +1191,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 
       <strong style="color:var(--text)">2. Welche Daten werden verarbeitet?</strong><br>
       • Konto-Daten: E-Mail-Adresse, Name, Passwort (verschlüsselt)<br>
-      • Schüler-Daten: Name, Geburtsdatum, Ausbildungsfortschritt, Fahrstunden, Protokolle<br>
+      • Schüler-Daten: Name, Geburtsdatum, Anschrift (Straße, PLZ, Ort), Ausbildungsfortschritt, Fahrstunden, Protokolle<br>
+      • Ausbildungsnachweis: Art und Inhalt der praktischen Fahrstunden (Kategorien nach Anlage 3 zu § 6 Abs. 1 FahrschAusbO), besuchter theoretischer Unterricht (Themennummer, Datum, Dauer) – erforderlich zur gesetzlich vorgeschriebenen Ausbildungsdokumentation<br>
+      • Chat-Nachrichten und optional übermittelte Bilder zwischen Fahrlehrer und Fahrschüler, einschließlich des Zeitpunkts der letzten Kenntnisnahme (Lesestatus)<br>
       • Nutzungsdaten: Anmeldezeitpunkte, technische Verbindungsdaten<br>
+      • Push-Benachrichtigungen: Geräte-Token zur Zustellung von Benachrichtigungen (z.B. bei neuen Chat-Nachrichten)<br>
       • Bei minderjährigen Fahrschülern: Für den eigenständigen Zugang (Zugangscode) werden bewusst nur ausbildungsrelevante Daten verwendet; Geburtsdatum und interne Fahrlehrer-Kommentare werden dort nicht angezeigt.<br><br>
 
       <strong style="color:var(--text)">3. Zweck & Rechtsgrundlage (Art. 6 DSGVO)</strong><br>
@@ -1201,13 +1204,16 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       <strong style="color:var(--text)">4. Speicherort & Hosting</strong><br>
       Die Datenbank (Cloud Firestore) wird ausschließlich in Frankfurt am Main (EU, Region europe-west3) betrieben; hierfür findet keine Übermittlung in Drittländer statt. Die Nutzer-Anmeldung (Firebase Authentication) läuft technisch über die globale Infrastruktur des Anbieters Google, die auch außerhalb der EU (u.a. in den USA) verarbeiten kann. Diese Übermittlung ist über die EU-Standardvertragsklauseln (Art. 46 DSGVO) im Rahmen der Google-Auftragsverarbeitungsbedingungen abgesichert. Eine Weitergabe an unbefugte Dritte erfolgt nicht.<br><br>
 
-      <strong style="color:var(--text)">5. Weitere eingesetzte Dienstleister</strong><br>
+      <strong style="color:var(--text)">5. Google-Kalender-Anbindung (optionales Zusatzmodul)</strong><br>
+      Fahrlehrer können optional ihren persönlichen Google-Kalender mit FahrSync verbinden. Dabei fordert FahrSync ausschließlich die Berechtigung „Google Kalenderereignisse verwalten" (Scope: calendar.events) an; auf E-Mails, Kontakte oder andere Google-Dienste wird nicht zugegriffen. FahrSync legt vereinbarte Fahrstunden-Termine als Kalenderereignisse im Google-Kalender des Fahrlehrers an und entfernt sie bei Stornierung; eine Weitergabe an Dritte erfolgt nicht. Der Fahrlehrer kann die Verbindung jederzeit trennen.<br><br>
+
+      <strong style="color:var(--text)">6. Weitere eingesetzte Dienstleister</strong><br>
       Für den Versand automatischer Benachrichtigungs-E-Mails (z.B. bei Neuregistrierungen oder Passwort-Zurücksetzung) werden die Dienste EmailJS sowie das E-Mail-Postfach des Betreibers bei IONOS SE (Elgendorfer Str. 57, 56410 Montabaur) genutzt. Dabei werden lediglich die für die jeweilige Benachrichtigung notwendigen Angaben (z.B. Name, E-Mail-Adresse) übermittelt.<br><br>
 
-      <strong style="color:var(--text)">6. Speicherdauer</strong><br>
+      <strong style="color:var(--text)">7. Speicherdauer</strong><br>
       Daten werden gespeichert, solange das Nutzungsverhältnis besteht. Nach Beendigung werden alle Daten innerhalb von 30 Tagen unwiderruflich gelöscht.<br><br>
 
-      <strong style="color:var(--text)">7. Ihre Rechte als betroffene Person</strong><br>
+      <strong style="color:var(--text)">8. Ihre Rechte als betroffene Person</strong><br>
       Sie haben das Recht auf:<br>
       • Auskunft über Ihre Daten (Art. 15 DSGVO)<br>
       • Berichtigung (Art. 16 DSGVO)<br>
@@ -1217,17 +1223,23 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       • Widerspruch gegen die Verarbeitung (Art. 21 DSGVO)<br>
       • Beschwerde bei einer Aufsichtsbehörde (Art. 77 DSGVO) – zuständig ist die Datenschutz-Aufsichtsbehörde am Sitz der jeweiligen Fahrschule<br><br>
 
-      <strong style="color:var(--text)">8. Widerruf der Einwilligung</strong><br>
+      <strong style="color:var(--text)">9. Widerruf der Einwilligung</strong><br>
       Eine erteilte Einwilligung können Sie jederzeit mit Wirkung für die Zukunft widerrufen, indem Sie Ihr Konto löschen oder den Betreiber kontaktieren.<br><br>
 
-      <strong style="color:var(--text)">9. Lokal gespeicherte Daten (§ 25 TTDSG)</strong><br>
-      Diese App speichert technische Informationen (z.B. Anmeldestatus, ausgewählte Darstellung) lokal auf Ihrem Gerät. Dies ist zur Bereitstellung der App unbedingt erforderlich und erfordert daher keine gesonderte Einwilligung nach § 25 Abs. 2 Nr. 2 TTDSG. Es werden keine Cookies oder lokalen Daten zu Werbe- oder Analysezwecken eingesetzt.<br><br>
+      <strong style="color:var(--text)">10. Lokal gespeicherte Daten (§ 25 TDDDG)</strong><br>
+      Diese App speichert technische Informationen (z.B. Anmeldestatus, ausgewählte Darstellung) lokal auf Ihrem Gerät. Dies ist zur Bereitstellung der App unbedingt erforderlich und erfordert daher keine gesonderte Einwilligung nach § 25 Abs. 2 Nr. 2 TDDDG. Es werden keine Cookies oder lokalen Daten zu Werbe- oder Analysezwecken eingesetzt.<br><br>
 
-      <strong style="color:var(--text)">10. Kontakt</strong><br>
+      <strong style="color:var(--text)">11. Kontakt</strong><br>
       Bei Fragen zum Datenschutz wenden Sie sich an den im Impressum genannten Verantwortlichen.<br><br>
 
-      <strong style="color:var(--text)">11. Zahlungsdienstleister (PayPal)</strong><br>
+      <strong style="color:var(--text)">12. Zahlungsdienstleister (PayPal)</strong><br>
       Für kostenpflichtige Abonnements erfolgt die Zahlungsabwicklung über PayPal (Europe) S.à r.l. et Cie, S.C.A., 22–24 Boulevard Royal, L-2449 Luxemburg. Die für die Zahlung erforderlichen Daten werden direkt bei PayPal erhoben und verarbeitet; ergänzend gelten die Datenschutzhinweise von PayPal. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung). Diese App speichert keine Zahlungsdaten, sondern lediglich den Abo-Status und die PayPal-Abonnement-Kennung.<br><br>
+
+      <strong style="color:var(--text)">13. Zahlungsdienstleister (Stripe)</strong><br>
+      Für kostenpflichtige Abonnements erfolgt die Zahlungsabwicklung wahlweise auch über Stripe Payments Europe, Limited, One Wilton Park, Wilton Place, Dublin 2, D02 FX04, Irland. Die für die Zahlung erforderlichen Daten (z. B. Karten- oder Kontodaten) werden direkt bei Stripe erhoben und verarbeitet; ergänzend gelten die Datenschutzhinweise von Stripe. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung). Diese App speichert keine Zahlungsdaten, sondern lediglich den Abo-Status und eine interne Zahlungsreferenz.<br><br>
+
+      <strong style="color:var(--text)">14. Chat-Bilder</strong><br>
+      Im Chat zwischen Fahrlehrer und Fahrschüler können optional Bilder übermittelt werden. Diese werden vor dem Hochladen automatisch verkleinert und ausschließlich in Frankfurt am Main (EU, Region europe-west3) gespeichert. Der Zugriff ist technisch auf den jeweils zuständigen Fahrlehrer sowie den betreffenden Fahrschüler beschränkt.<br><br>
 
     </div>
     <button class="btn-sheet-cancel" onclick="document.getElementById('datenschutz-modal').classList.remove('open')" style="margin-top:16px">Schließen</button>
@@ -5562,6 +5574,12 @@ function initAbschlussSigPad() {
     const src = e.touches ? e.touches[0] : e;
     return { x: src.clientX - r.left, y: src.clientY - r.top };
   };
+  // FIX: Ohne diesen Guard (siehe initSignaturePad() fuer dasselbe Muster)
+  // wurden bei jedem Oeffnen des Abschluss-Unterschrift-Modals erneut
+  // pointerdown/-move/-up/-out-Listener auf demselben Canvas registriert -
+  // mit jedem erneuten Oeffnen mehr, ohne dass die alten je entfernt wurden.
+  if (aSigCanvas.__sigBound) return;
+  aSigCanvas.__sigBound = true;
   aSigCanvas.addEventListener('pointerdown', e => {
     aSigDrawing = true;
     const p = getPos(e);
@@ -6217,7 +6235,12 @@ window.openTeacherChat = async () => {
 };
 
 function renderTeacherChat() {
-  const msgs = ((teacherChatData || {}).messages || []).sort((a,b) => a.timestamp - b.timestamp);
+  // FIX: Bildnachrichten (gesendet ueber das neuere sendeChatBild()) haben
+  // kein 'timestamp'-Feld, nur 'createdAt' - ohne Fallback sortierte das
+  // hier per NaN (undefined - undefined) in unspezifizierter Reihenfolge.
+  const msgs = ((teacherChatData || {}).messages || [])
+    .slice()
+    .sort((a,b) => (a.timestamp||a.createdAt||0) - (b.timestamp||b.createdAt||0));
   const wrap = document.getElementById('teacher-chat-messages');
   if (!wrap) return;
   if (!msgs.length) {
@@ -6225,16 +6248,24 @@ function renderTeacherChat() {
     return;
   }
   wrap.innerHTML = msgs.map(m => {
-    const isFL   = m.sender === 'fahrlehrer';
-    const time   = new Date(m.timestamp).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
-    const date   = new Date(m.timestamp).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
+    const isFL = m.sender === 'fahrlehrer';
+    const zs   = m.timestamp || m.createdAt || 0;
+    const time = zs ? new Date(zs).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}) : '';
+    const date = zs ? new Date(zs).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}) : '';
     const bg     = isFL ? 'var(--accent)' : 'var(--surface2)';
     const color  = isFL ? '#0d1117' : 'var(--text)';
     const align  = isFL ? 'flex-end' : 'flex-start';
     const radius = isFL ? '18px 18px 4px 18px' : '18px 18px 18px 4px';
+    // FIX: Bildnachrichten (imagePath/imageUrl, kein 'text') wurden hier
+    // bisher als leere Sprechblase mit "Invalid Date" darunter angezeigt -
+    // diese aeltere Chat-Ansicht kann Bilder (anders als der neuere Chat
+    // unter openChat()) nicht laden. Zeigt jetzt wenigstens einen Hinweis.
+    const inhalt = (m.imagePath || m.imageUrl)
+      ? '📷 Bild – bitte über das 💬-Symbol öffnen, um es anzuzeigen'
+      : (m.text||'').replace(/</g,'&lt;');
     return `<div style="display:flex;flex-direction:column;align-items:${align}">
       ${!isFL ? `<div style="font-size:0.65rem;color:var(--muted);margin-bottom:2px">${escapeHtmlEigen(m.senderName||'Schüler')}</div>` : ''}
-      <div style="max-width:80%;background:${bg};color:${color};border-radius:${radius};padding:10px 14px;font-size:0.88rem;line-height:1.45;word-break:break-word">${(m.text||'').replace(/</g,'&lt;')}</div>
+      <div style="max-width:80%;background:${bg};color:${color};border-radius:${radius};padding:10px 14px;font-size:0.88rem;line-height:1.45;word-break:break-word">${inhalt}</div>
       <div style="font-size:0.6rem;color:var(--muted);margin-top:2px">${date} ${time}</div>
     </div>`;
   }).join('');
@@ -6919,6 +6950,16 @@ window.openSettings = async () => {
   if (emDisp && currentUser) emDisp.innerHTML = 'Aktuelle E-Mail: <b>' + (currentUser.email || '–') + '</b>';
   const disp = document.getElementById('settings-username-display');
   if (disp && currentUser) disp.textContent = '👤 Angemeldet als: ' + (currentUser.displayName || '');
+  // FIX: Der Testrechnung-Button war fuer JEDEN Fahrlehrer sichtbar, obwohl
+  // die zugehoerige Cloud Function erstelleRechnung serverseitig laengst nur
+  // fuer SuperAdmin erlaubt ist - normale Nutzer sahen also einen Button, der
+  // bei ihnen immer nur mit einer Fehlermeldung scheitert. Jetzt nur noch
+  // fuer SuperAdmin sichtbar, wie die Funktion dahinter es ohnehin verlangt.
+  const testRechnungBtn = document.getElementById('btn-test-rechnung');
+  if (testRechnungBtn) {
+    const istSuperadminHier = window.__userRolle === 'superadmin' || (currentUser && currentUser.email === 'chriskoo@mail.de');
+    testRechnungBtn.style.display = istSuperadminHier ? '' : 'none';
+  }
   document.getElementById('settings-modal').classList.add('open');
   // Fahrschul-Bereich befüllen (Code anzeigen ODER Beitritts-Feld)
   renderFscodeSection();
@@ -8420,23 +8461,33 @@ window.openImpressum = async () => {
           FahrSync (ADK – Digitale Kartei) stellt eine webbasierte Software zur Verwaltung von Fahrschülern und Ausbildungsnachweisen bereit. Optional kann das Zusatzmodul „Planer" (Kalender &amp; Terminplanung) gebucht werden. Die verfügbaren Preisstufen unterscheiden sich in der zulässigen Anzahl an Fahrlehrer-Konten; die jeweils gültigen Stufen und Preise sind in der App auf der Bestellseite ausgewiesen.<br><br>
           <strong style="color:var(--text)">§ 2 Geltungsbereich – Angebot nur für Unternehmer</strong><br>
           Das Angebot richtet sich ausschließlich an Unternehmer im Sinne des § 14 BGB (Fahrschulen und Fahrlehrer in Ausübung ihrer gewerblichen oder selbständigen beruflichen Tätigkeit), nicht an Verbraucher. Mit der Registrierung und dem Abschluss eines Abonnements bestätigt der Kunde, als Unternehmer zu handeln. Ein gesetzliches Widerrufsrecht für Verbraucher besteht daher nicht.<br><br>
+          <strong style="color:var(--text)">§ 2a Zielmarkt und Vertragssprache</strong><br>
+          Das Angebot ist inhaltlich auf die Fahrschulausbildung nach deutschem Recht ausgerichtet (Straßenverkehrs-Ordnung, deutsche Führerscheinklassen, amtlicher Ausbildungsrahmenplan) und richtet sich an Fahrschulen und Fahrlehrer mit Sitz in Deutschland. Vertrags- und Kommunikationssprache ist ausschließlich Deutsch; Support wird ausschließlich in deutscher Sprache erbracht. Eine Anpassung der Software an ausländische Rechtsvorschriften, Sprachen oder Ausbildungssysteme ist nicht geschuldet. Der Anbieter behält sich vor, Verträge mit Kunden außerhalb des Europäischen Wirtschaftsraums nicht abzuschließen.<br><br>
           <strong style="color:var(--text)">§ 3 Testphase und Vertragsschluss</strong><br>
-          Die Registrierung eines Kontos ist kostenlos. Ein kostenpflichtiges Abonnement kommt erst durch den Abschluss über den Zahlungsdienstleister PayPal zustande. Jedes Abonnement beginnt mit einer 14-tägigen kostenlosen Testphase. Nach Ablauf der Testphase verlängert sich das Abonnement automatisch als zahlungspflichtiges Monats-Abonnement zum ausgewiesenen Preis, sofern es nicht zuvor gekündigt wird. Auf die Kostenpflicht wird vor Abschluss deutlich hingewiesen.<br><br>
+          Die Registrierung eines Kontos ist kostenlos. Ein kostenpflichtiges Abonnement kommt erst durch den Abschluss über den gewählten Zahlungsdienstleister (PayPal oder Stripe) zustande. Jedes Abonnement beginnt mit einer 14-tägigen kostenlosen Testphase. Nach Ablauf der Testphase verlängert sich das Abonnement automatisch als zahlungspflichtiges Monats-Abonnement zum ausgewiesenen Preis, sofern es nicht zuvor gekündigt wird. Auf die Kostenpflicht wird vor Abschluss deutlich hingewiesen.<br><br>
           <strong style="color:var(--text)">§ 4 Preise und Zahlung</strong><br>
-          Es gelten die zum Zeitpunkt der Bestellung in der App ausgewiesenen Preise. Die Abrechnung erfolgt monatlich im Voraus über PayPal. Gemäß § 19 UStG wird keine Umsatzsteuer berechnet. Für die Stufe „Unbegrenzt" fällt zusätzlich eine einmalige, nicht erstattungsfähige Einrichtungsgebühr an, die auf der Bestellseite ausgewiesen ist. Preisänderungen werden mindestens sechs Wochen im Voraus per E-Mail oder In-App-Mitteilung angekündigt; dem Kunden steht in diesem Fall ein Sonderkündigungsrecht zum Zeitpunkt des Wirksamwerdens der Änderung zu.<br><br>
+          Es gelten die zum Zeitpunkt der Bestellung in der App ausgewiesenen Preise. Die Abrechnung erfolgt monatlich im Voraus über den vom Kunden gewählten Zahlungsdienstleister (PayPal oder Stripe). Gemäß § 19 UStG wird keine Umsatzsteuer berechnet. Für die Stufe „Unbegrenzt" fällt zusätzlich eine einmalige, nicht erstattungsfähige Einrichtungsgebühr an, die auf der Bestellseite ausgewiesen ist. Preisänderungen werden mindestens sechs Wochen im Voraus per E-Mail oder In-App-Mitteilung angekündigt; dem Kunden steht in diesem Fall ein Sonderkündigungsrecht zum Zeitpunkt des Wirksamwerdens der Änderung zu.<br><br>
           <strong style="color:var(--text)">§ 5 Laufzeit und Kündigung</strong><br>
-          Das Abonnement läuft auf unbestimmte Zeit und ist jederzeit zum Ende des laufenden Abrechnungsmonats kündbar. Die Kündigung erfolgt wahlweise direkt im PayPal-Konto des Kunden (Zahlungen → Abonnements → Kündigen) oder formlos per E-Mail an kontakt@fahrsync.de. Nach Wirksamwerden der Kündigung endet der Zugriff auf die kostenpflichtigen Funktionen; § 10 bleibt unberührt. Ein Wechsel der Preisstufe erfolgt durch Kündigung des bestehenden und Abschluss eines neuen Abonnements.<br><br>
+          Das Abonnement läuft auf unbestimmte Zeit und ist jederzeit zum Ende des laufenden Abrechnungsmonats kündbar. Bei Zahlung per PayPal erfolgt die Kündigung wahlweise direkt im PayPal-Konto des Kunden (Zahlungen → Abonnements → Kündigen); unabhängig vom gewählten Zahlungsdienstleister genügt außerdem jederzeit eine formlose Kündigung per E-Mail an kontakt@fahrsync.de. Nach Wirksamwerden der Kündigung endet der Zugriff auf die kostenpflichtigen Funktionen; § 10 bleibt unberührt. Ein Wechsel der Preisstufe erfolgt durch Kündigung des bestehenden und Abschluss eines neuen Abonnements.<br><br>
           <strong style="color:var(--text)">§ 6 Zahlungsverzug und Sperrung</strong><br>
-          Schlägt eine fällige Abbuchung fehl, wiederholt PayPal den Einzug. Bleibt die Zahlung aus, ist der Betreiber berechtigt, den Zugang bis zum Ausgleich der offenen Forderung zu sperren. Während der Sperrung bleiben die Daten des Kunden erhalten.<br><br>
+          Schlägt eine fällige Abbuchung fehl, unternimmt der jeweilige Zahlungsdienstleister (PayPal oder Stripe) automatisch weitere Einzugsversuche. Bleibt die Zahlung aus, ist der Betreiber berechtigt, den Zugang bis zum Ausgleich der offenen Forderung zu sperren. Während der Sperrung bleiben die Daten des Kunden erhalten.<br><br>
           <strong style="color:var(--text)">§ 7 Nutzungsbedingungen</strong><br>
           Die Nutzung erfolgt ausschließlich für legale Zwecke im Rahmen der Fahrausbildung. Zugangsdaten sind vertraulich zu behandeln und dürfen nicht an Dritte weitergegeben werden. Die Anzahl der Fahrlehrer-Konten richtet sich nach der gebuchten Preisstufe.<br><br>
           <strong style="color:var(--text)">§ 8 Datenverantwortung</strong><br>
           Der Nutzer ist Verantwortlicher i.S.d. Art. 4 Nr. 7 DSGVO für alle eingegebenen Schülerdaten und stellt sicher, dass eine Rechtsgrundlage für deren Verarbeitung vorliegt.<br><br>
+          <strong style="color:var(--text)">§ 8a Ausbildungsnachweis und gesetzliche Dokumentationspflichten</strong><br>
+          Die Software unterstützt bei der Erfassung und Aufbereitung von Ausbildungsdaten. Die gesetzliche Pflicht zur ordnungsgemäßen Führung, inhaltlichen Richtigkeit, Unterzeichnung und Aufbewahrung des Ausbildungsnachweises (§ 31 FahrlG, § 6 FahrschAusbO nebst Anlagen) verbleibt ausschließlich beim Nutzer bzw. der Fahrschule. Der Nutzer prüft vor Ausstellung eigenverantwortlich, ob die erfassten Angaben vollständig und zutreffend sind. Der Betreiber übernimmt keine Gewähr für die rechtliche Anerkennung erzeugter Dokumente durch Behörden oder Prüforganisationen.<br><br>
+          <strong style="color:var(--text)">§ 8b Vom Nutzer übermittelte Inhalte</strong><br>
+          Der Nutzer und seine Fahrschüler können über die Chat-Funktion Bilder übermitteln. Der Nutzer stellt sicher, dass hierbei keine rechtswidrigen Inhalte übertragen werden und dass er zur Übermittlung berechtigt ist. Der Betreiber sichtet übermittelte Inhalte nicht anlasslos, ist jedoch berechtigt, bei konkreten Hinweisen auf rechtswidrige Inhalte diese zu entfernen.<br><br>
           <strong style="color:var(--text)">§ 9 Verfügbarkeit</strong><br>
           Eine ständige Verfügbarkeit der Software wird nicht garantiert. Wartungsarbeiten können zu vorübergehenden Einschränkungen führen.<br><br>
           <strong style="color:var(--text)">§ 10 Beendigung &amp; Datenlöschung</strong><br>
           Bei Beendigung des Nutzungsverhältnisses werden alle Daten nach 30 Tagen unwiderruflich gelöscht. Bis dahin kann der Kunde einen Export seiner Daten anfordern.<br><br>
-          <strong style="color:var(--text)">§ 11 Anwendbares Recht</strong><br>
+          <strong style="color:var(--text)">§ 11 Haftung</strong><br>
+          Der Betreiber haftet unbeschränkt bei Vorsatz und grober Fahrlässigkeit sowie bei der Verletzung von Leben, Körper oder Gesundheit. Bei leicht fahrlässiger Verletzung wesentlicher Vertragspflichten (Kardinalpflichten, deren Erfüllung die ordnungsgemäße Durchführung des Vertrags erst ermöglicht und auf deren Einhaltung der Kunde regelmäßig vertrauen darf) ist die Haftung auf den bei Vertragsschluss vorhersehbaren, vertragstypischen Schaden begrenzt. Im Übrigen ist die Haftung für leicht fahrlässig verursachte Schäden ausgeschlossen. Die Haftung nach dem Produkthaftungsgesetz bleibt unberührt. Der Kunde ist für eine regelmäßige eigene Datensicherung seiner in der Software erfassten Daten selbst verantwortlich.<br><br>
+          <strong style="color:var(--text)">§ 12 Salvatorische Klausel</strong><br>
+          Sollte eine Bestimmung dieser AGB unwirksam sein oder werden, bleibt die Wirksamkeit der übrigen Bestimmungen hiervon unberührt. An die Stelle der unwirksamen Bestimmung tritt die gesetzliche Regelung.<br><br>
+          <strong style="color:var(--text)">§ 13 Anwendbares Recht</strong><br>
           Es gilt das Recht der Bundesrepublik Deutschland. Gerichtsstand ist, soweit gesetzlich zulässig, der Sitz des Betreibers.
         </div>
       </div>
