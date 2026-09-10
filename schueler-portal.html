@@ -103,7 +103,35 @@ html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--tex
 .prog-pct      { font-family:'Syne',sans-serif; font-weight:800; font-size:2rem; color:var(--accent); }
 
 /* ─── LOGIN SCREEN ─────────────────────────────── */
-#screen-login { background:var(--bg); align-items:center; justify-content:center; }
+#screen-login {
+  background:var(--bg); align-items:center; justify-content:center;
+  position: relative; overflow: hidden;
+}
+#screen-login::before {
+  content: '';
+  position: absolute;
+  inset: -20% -20%;
+  background-image: repeating-linear-gradient(
+    to top,
+    var(--accent) 0px, var(--accent) 3px,
+    transparent 3px, transparent 90px
+  );
+  background-size: 3px 180px;
+  background-position: 50% 0;
+  background-repeat: repeat;
+  opacity: 0.05;
+  animation: strassenMarkierung 6s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+#screen-login > * { position: relative; z-index: 1; }
+@keyframes strassenMarkierung {
+  from { background-position: 50% 0; }
+  to   { background-position: 50% 180px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #screen-login::before { animation: none; }
+}
 .login-wrap { width:100%; max-width:360px; padding:32px 24px; }
 .login-logo {
   text-align:center; margin-bottom:32px;
