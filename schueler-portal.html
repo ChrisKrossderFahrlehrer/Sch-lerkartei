@@ -107,30 +107,28 @@ html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--tex
   background:var(--bg); align-items:center; justify-content:center;
   position: relative; overflow: hidden;
 }
-#screen-login::before {
-  content: '';
+.login-wrap { position: relative; z-index: 2; }
+.zeichen-drift {
   position: absolute;
-  inset: -20% -20%;
-  background-image: repeating-linear-gradient(
-    to top,
-    var(--accent) 0px, var(--accent) 3px,
-    transparent 3px, transparent 90px
-  );
-  background-size: 3px 180px;
-  background-position: 50% 0;
-  background-repeat: repeat;
-  opacity: 0.05;
-  animation: strassenMarkierung 6s linear infinite;
+  inset: 0;
+  overflow: hidden;
   pointer-events: none;
-  z-index: 0;
+  z-index: 1;
 }
-#screen-login > * { position: relative; z-index: 1; }
-@keyframes strassenMarkierung {
-  from { background-position: 50% 0; }
-  to   { background-position: 50% 180px; }
+.zeichen-drift img {
+  position: absolute;
+  opacity: 0.10;
+  filter: grayscale(35%);
+  animation-name: zeichenDiagonal;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+@keyframes zeichenDiagonal {
+  from { transform: translate(-15vw, 115vh) rotate(-8deg); }
+  to   { transform: translate(115vw, -25vh) rotate(-8deg); }
 }
 @media (prefers-reduced-motion: reduce) {
-  #screen-login::before { animation: none; }
+  .zeichen-drift img { animation: none; display: none; }
 }
 .login-wrap { width:100%; max-width:360px; padding:32px 24px; }
 .login-logo {
@@ -316,7 +314,15 @@ html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--tex
 <div id="portal-toast"></div>
 
 <!-- ════ LOGIN ════ -->
-<div class="screen active" id="screen-login">
+<div class="screen active" id="screen-login"><div class="zeichen-drift">
+    <img src="./verkehrszeichen/zeichen-306-vorfahrtstrasse.png" width="62" style="left:8%;animation-delay:0s;animation-duration:34s" alt="">
+    <img src="./verkehrszeichen/zeichen-205-vorfahrt-gewaehren.png" width="54" style="left:38%;animation-delay:-6s;animation-duration:29s" alt="">
+    <img src="./verkehrszeichen/zeichen-206-stop.png" width="58" style="left:68%;animation-delay:-12s;animation-duration:31s" alt="">
+    <img src="./verkehrszeichen/zeichen-220-einbahnstrasse.png" width="48" style="left:22%;animation-delay:-19s;animation-duration:26s" alt="">
+    <img src="./verkehrszeichen/zeichen-325-1-verkehrsberuhigt.png" width="56" style="left:82%;animation-delay:-24s;animation-duration:33s" alt="">
+    <img src="./verkehrszeichen/zeichen-720-gruenpfeil.png" width="50" style="left:52%;animation-delay:-9s;animation-duration:28s" alt="">
+  </div>
+  
   <div class="login-wrap">
     <div class="login-logo">
       <img src="./icon-192.png?v=3" alt="ADK" style="height:80px;width:80px;border-radius:50%;display:block;margin:0 auto 8px" onerror="this.style.display='none'">
