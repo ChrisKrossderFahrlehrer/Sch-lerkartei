@@ -109,6 +109,17 @@ service cloud.firestore {
       ]);
     }
 
+    // Die Loeschvormerkung (DSGVO-Frist) darf ausschliesslich serverseitig
+    // gesetzt und wieder entfernt werden - ueber die Cloud Functions
+    // kontoLoeschungBeantragen / kontoLoeschungWiderrufen. Koennte ein Client
+    // sie selbst schreiben, liesse sich die Loeschung eines fremden Kontos
+    // ausloesen oder die eigene, bereits beantragte Loeschung still
+    // aushebeln, ohne dass es je protokolliert wird.
+    function loeschmarkerUnveraendert(before, after) {
+      return after.get('geloeschtAm', null) == before.get('geloeschtAm', null)
+          && after.get('loeschungAm', null) == before.get('loeschungAm', null);
+    }
+
     // Helper: Stimmt der beim Beitritt mitgesendete Code mit dem Code der
     // Ziel-Fahrschule überein? Verhindert, dass jemand seine fahrschuleId
     // einfach auf eine fremde Schule setzt (Cross-Tenant), ohne den geheimen
@@ -221,7 +232,8 @@ service cloud.firestore {
                        (isFsAdmin() && userFsId() == fsId &&
                         request.resource.data.get('kalenderAktiv', false)
                           == resource.data.get('kalenderAktiv', false) &&
-                        aboFelderUnveraendert(resource.data, request.resource.data));
+                        aboFelderUnveraendert(resource.data, request.resource.data) &&
+                        loeschmarkerUnveraendert(resource.data, request.resource.data));
 
       allow delete: if isSuperAdmin();
     }
@@ -280,6 +292,7 @@ service cloud.firestore {
                         request.resource.data.get('kalenderAktiv', false)
                           == resource.data.get('kalenderAktiv', false) &&
                         aboFelderUnveraendert(resource.data, request.resource.data) &&
+                        loeschmarkerUnveraendert(resource.data, request.resource.data) &&
                         (
                           isFsAdmin() ||
                           request.resource.data.get('status', '')

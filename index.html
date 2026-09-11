@@ -1208,10 +1208,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       Fahrlehrer können optional ihren persönlichen Google-Kalender mit FahrSync verbinden. Dabei fordert FahrSync ausschließlich die Berechtigung „Google Kalenderereignisse verwalten" (Scope: calendar.events) an; auf E-Mails, Kontakte oder andere Google-Dienste wird nicht zugegriffen. FahrSync legt vereinbarte Fahrstunden-Termine als Kalenderereignisse im Google-Kalender des Fahrlehrers an und entfernt sie bei Stornierung; eine Weitergabe an Dritte erfolgt nicht. Der Fahrlehrer kann die Verbindung jederzeit trennen.<br><br>
 
       <strong style="color:var(--text)">6. Weitere eingesetzte Dienstleister</strong><br>
-      Für den Versand automatischer Benachrichtigungs-E-Mails (z.B. bei Neuregistrierungen oder Passwort-Zurücksetzung) werden die Dienste EmailJS sowie das E-Mail-Postfach des Betreibers bei IONOS SE (Elgendorfer Str. 57, 56410 Montabaur) genutzt. Dabei werden lediglich die für die jeweilige Benachrichtigung notwendigen Angaben (z.B. Name, E-Mail-Adresse) übermittelt.<br><br>
+      Für den Versand automatischer Benachrichtigungs-E-Mails (z.B. bei Neuregistrierungen oder Passwort-Zurücksetzung) werden die Dienste EmailJS sowie das E-Mail-Postfach des Betreibers bei IONOS SE (Elgendorfer Str. 57, 56410 Montabaur) genutzt. Dabei werden lediglich die für die jeweilige Benachrichtigung notwendigen Angaben (z.B. Name, E-Mail-Adresse) übermittelt. Soweit bei EmailJS eine Verarbeitung außerhalb der EU/des EWR stattfindet, ist diese über die EU-Standardvertragsklauseln (Art. 46 DSGVO) abgesichert; Schülerdaten werden dorthin nicht übermittelt.<br><br>
 
-      <strong style="color:var(--text)">7. Speicherdauer</strong><br>
-      Daten werden gespeichert, solange das Nutzungsverhältnis besteht. Nach Beendigung werden alle Daten innerhalb von 30 Tagen unwiderruflich gelöscht.<br><br>
+      <strong style="color:var(--text)">7. Speicherdauer und Löschung</strong><br>
+      Daten werden gespeichert, solange das Nutzungsverhältnis besteht. Sie können die Löschung Ihres Kontos jederzeit selbst in der App auslösen (Einstellungen → „Konto und alle Daten löschen"). Nach der Beantragung läuft eine Frist von 30 Tagen, innerhalb derer die Löschung zurückgenommen werden kann; danach werden sämtliche Konto- und Schülerdaten automatisch und unwiderruflich entfernt – einschließlich Chatverlauf, Chat-Bildern, Zugangscodes und Terminen.<br>
+      Zusätzlich gelten feste Grenzen: abgelaufene Zugangscodes samt Chatverlauf und Bildern 90 Tage, Passwort-Zurücksetzungsanfragen 30 Tage, Terminanfragen und Nachrichten aus der öffentlichen Terminbuchung 90 Tage.<br>
+      Ausgenommen sind Rechnungen, solange die gesetzlichen Aufbewahrungspflichten bestehen (§ 14b UStG, § 147 AO; Art. 6 Abs. 1 lit. c DSGVO).<br><br>
 
       <strong style="color:var(--text)">8. Ihre Rechte als betroffene Person</strong><br>
       Sie haben das Recht auf:<br>
@@ -1224,7 +1226,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       • Beschwerde bei einer Aufsichtsbehörde (Art. 77 DSGVO) – zuständig ist die Datenschutz-Aufsichtsbehörde am Sitz der jeweiligen Fahrschule<br><br>
 
       <strong style="color:var(--text)">9. Widerruf der Einwilligung</strong><br>
-      Eine erteilte Einwilligung können Sie jederzeit mit Wirkung für die Zukunft widerrufen, indem Sie Ihr Konto löschen oder den Betreiber kontaktieren.<br><br>
+      Eine erteilte Einwilligung können Sie jederzeit mit Wirkung für die Zukunft widerrufen, indem Sie Ihr Konto in der App löschen (Einstellungen → „Konto und alle Daten löschen", siehe Ziffer 7) oder den Betreiber kontaktieren.<br><br>
 
       <strong style="color:var(--text)">10. Lokal gespeicherte Daten (§ 25 TDDDG)</strong><br>
       Diese App speichert technische Informationen (z.B. Anmeldestatus, ausgewählte Darstellung) lokal auf Ihrem Gerät. Dies ist zur Bereitstellung der App unbedingt erforderlich und erfordert daher keine gesonderte Einwilligung nach § 25 Abs. 2 Nr. 2 TDDDG. Es werden keine Cookies oder lokalen Daten zu Werbe- oder Analysezwecken eingesetzt.<br><br>
@@ -1775,6 +1777,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openMeineRechnungen()" style="background:var(--surface2);margin-bottom:8px">🧾 Meine Rechnungen</button>
     <button class="btn-sheet-cancel" id="btn-invite-settings" style="display:none;background:var(--surface2);margin-bottom:8px" onclick="document.getElementById('settings-modal').classList.remove('open');openInviteModal()">👥 Fahrlehrer einladen</button>
     <button class="btn-sheet-cancel" id="btn-abo-settings" style="display:none;background:var(--surface2);margin-bottom:8px" onclick="document.getElementById('settings-modal').classList.remove('open');document.getElementById('abo-verwalten-modal').classList.add('open')">💳 Abo verwalten &amp; kündigen</button>
+    <!-- DSGVO Art. 17: Recht auf Löschung, vom Nutzer selbst auslösbar -->
+    <div style="height:1px;background:var(--border);margin:14px 0 12px"></div>
+    <div id="konto-loeschung-laeuft" style="display:none;background:rgba(248,81,73,0.1);border:1px solid var(--danger);border-radius:10px;padding:12px;margin-bottom:8px;font-size:0.78rem;line-height:1.5;color:var(--text)"></div>
+    <button class="btn-sheet-cancel" id="btn-konto-loeschen" onclick="kontoLoeschenStarten()" style="background:none;border:1px solid var(--danger);color:var(--danger);margin-bottom:8px">🗑️ Konto und alle Daten löschen</button>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open')">Schließen</button>
     <div style="text-align:center;margin-top:14px;font-size:0.7rem;color:var(--muted);opacity:0.7">
       © 2026 ChrisKross der Fahrlehrer
@@ -6941,6 +6947,56 @@ function downloadBlob(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+// ── DSGVO Art. 17: Konto selbst löschen ─────────────────────────────
+// Die Datenschutzerklärung nennt die Konto-Löschung ausdrücklich als Weg,
+// eine Einwilligung zu widerrufen - eine Funktion dafür gab es bisher nicht.
+// Gelöscht wird nicht sofort, sondern nach der in AGB/AVV zugesagten Frist
+// von 30 Tagen; bis dahin lässt sich der Vorgang zurücknehmen.
+window.kontoLoeschenStarten = async () => {
+  const istInhaber = window.__userTyp === 'fahrschule';
+  const warnung = istInhaber
+    ? 'Damit werden die gesamte Fahrschule, ALLE Fahrlehrer-Konten und ALLE Schülerdaten gelöscht.'
+    : 'Damit werden dein Konto und alle von dir angelegten Schülerdaten gelöscht.';
+  if (!confirm(`Konto wirklich löschen?\n\n${warnung}\n\nDie Löschung erfolgt endgültig nach 30 Tagen. Bis dahin kannst du sie hier wieder zurücknehmen.\n\nRechnungen bleiben aus steuerlichen Gründen (§ 14b UStG) erhalten.`)) return;
+  const kontrolle = prompt('Zur Sicherheit: Tippe LÖSCHEN ein, um fortzufahren.');
+  if ((kontrolle || '').trim().toUpperCase() !== 'LÖSCHEN') { toast('Abgebrochen.'); return; }
+  try {
+    const res = await httpsCallable(fns, 'kontoLoeschungBeantragen')({});
+    const datum = new Date(res.data.loeschungAm).toLocaleDateString('de-DE');
+    toast('Konto zur Löschung vorgemerkt (endgültig am ' + datum + ').');
+    await zeigeLoeschStatus();
+  } catch(e) { console.error('kontoLoeschenStarten:', e); toast('Fehler: ' + (e.message || e)); }
+};
+
+window.kontoLoeschenWiderrufen = async () => {
+  try {
+    await httpsCallable(fns, 'kontoLoeschungWiderrufen')({});
+    toast('✓ Löschung zurückgenommen – dein Konto bleibt bestehen.');
+    await zeigeLoeschStatus();
+  } catch(e) { console.error('kontoLoeschenWiderrufen:', e); toast('Fehler: ' + (e.message || e)); }
+};
+
+async function zeigeLoeschStatus() {
+  const box = document.getElementById('konto-loeschung-laeuft');
+  const btn = document.getElementById('btn-konto-loeschen');
+  if (!box || !currentUser) return;
+  let daten = {};
+  try {
+    const snap = await getDoc(doc(db, 'users', currentUser.uid));
+    daten = snap.exists() ? snap.data() : {};
+  } catch(e) { return; }
+  if (daten.loeschungAm) {
+    const datum = new Date(daten.loeschungAm).toLocaleDateString('de-DE');
+    box.innerHTML = `⚠️ <b>Dein Konto wird am ${datum} endgültig gelöscht.</b><br>`
+      + `<button onclick="kontoLoeschenWiderrufen()" style="margin-top:8px;background:var(--accent);color:#0d1117;border:none;border-radius:8px;padding:8px 14px;font-size:0.8rem;font-weight:700;cursor:pointer">Löschung zurücknehmen</button>`;
+    box.style.display = 'block';
+    if (btn) btn.style.display = 'none';
+  } else {
+    box.style.display = 'none';
+    if (btn) btn.style.display = '';
+  }
+}
+
 window.openSettings = async () => {
   document.getElementById('inp-pw-alt').value = '';
   document.getElementById('inp-pw-neu').value = '';
@@ -6973,6 +7029,7 @@ window.openSettings = async () => {
   document.getElementById('settings-modal').classList.add('open');
   // Fahrschul-Bereich befüllen (Code anzeigen ODER Beitritts-Feld)
   renderFscodeSection();
+  zeigeLoeschStatus();
 };
 
 async function renderFscodeSection() {
@@ -8473,6 +8530,8 @@ window.openImpressum = async () => {
           Das Angebot richtet sich ausschließlich an Unternehmer im Sinne des § 14 BGB (Fahrschulen und Fahrlehrer in Ausübung ihrer gewerblichen oder selbständigen beruflichen Tätigkeit), nicht an Verbraucher. Mit der Registrierung und dem Abschluss eines Abonnements bestätigt der Kunde, als Unternehmer zu handeln. Ein gesetzliches Widerrufsrecht für Verbraucher besteht daher nicht.<br><br>
           <strong style="color:var(--text)">§ 2a Zielmarkt und Vertragssprache</strong><br>
           Das Angebot ist inhaltlich auf die Fahrschulausbildung nach deutschem Recht ausgerichtet (Straßenverkehrs-Ordnung, deutsche Führerscheinklassen, amtlicher Ausbildungsrahmenplan) und richtet sich an Fahrschulen und Fahrlehrer mit Sitz in Deutschland. Vertrags- und Kommunikationssprache ist ausschließlich Deutsch; Support wird ausschließlich in deutscher Sprache erbracht. Eine Anpassung der Software an ausländische Rechtsvorschriften, Sprachen oder Ausbildungssysteme ist nicht geschuldet. Der Anbieter behält sich vor, Verträge mit Kunden außerhalb des Europäischen Wirtschaftsraums nicht abzuschließen.<br><br>
+          <strong style="color:var(--text)">§ 2b Pflichten im elektronischen Geschäftsverkehr</strong><br>
+          Da sich das Angebot ausschließlich an Unternehmer richtet, werden die Pflichten aus § 312i Abs. 1 Satz 1 Nr. 1 bis 3 sowie Satz 2 BGB (Bereitstellung technischer Mittel zur Fehlererkennung, Informationspflichten, Zugangsbestätigung) gemäß § 312i Abs. 2 BGB abbedungen. Die Speicherung des Vertragstextes erfolgt durch den Anbieter; die jeweils gültigen AGB sind jederzeit unter fahrsync.de/agb.html abrufbar.<br><br>
           <strong style="color:var(--text)">§ 3 Testphase und Vertragsschluss</strong><br>
           Die Registrierung eines Kontos ist kostenlos. Ein kostenpflichtiges Abonnement kommt erst durch den Abschluss über den gewählten Zahlungsdienstleister (PayPal oder Stripe) zustande. Jedes Abonnement beginnt mit einer 14-tägigen kostenlosen Testphase. Nach Ablauf der Testphase verlängert sich das Abonnement automatisch als zahlungspflichtiges Monats-Abonnement zum ausgewiesenen Preis, sofern es nicht zuvor gekündigt wird. Auf die Kostenpflicht wird vor Abschluss deutlich hingewiesen.<br><br>
           <strong style="color:var(--text)">§ 4 Preise und Zahlung</strong><br>
@@ -8492,7 +8551,7 @@ window.openImpressum = async () => {
           <strong style="color:var(--text)">§ 9 Verfügbarkeit</strong><br>
           Eine ständige Verfügbarkeit der Software wird nicht garantiert. Wartungsarbeiten können zu vorübergehenden Einschränkungen führen.<br><br>
           <strong style="color:var(--text)">§ 10 Beendigung &amp; Datenlöschung</strong><br>
-          Bei Beendigung des Nutzungsverhältnisses werden alle Daten nach 30 Tagen unwiderruflich gelöscht. Bis dahin kann der Kunde einen Export seiner Daten anfordern.<br><br>
+          Der Kunde kann die Löschung seines Kontos jederzeit selbst in der App auslösen (Einstellungen → „Konto und alle Daten löschen"). Bei Beendigung des Nutzungsverhältnisses werden alle Daten nach 30 Tagen unwiderruflich gelöscht; innerhalb dieser Frist kann die Löschung zurückgenommen werden, und der Kunde kann einen Export seiner Daten anfordern bzw. die Exportfunktion der App nutzen. Von der Löschung ausgenommen sind Rechnungen, solange gesetzliche Aufbewahrungspflichten bestehen (§ 14b UStG, § 147 AO).<br><br>
           <strong style="color:var(--text)">§ 11 Haftung</strong><br>
           Der Betreiber haftet unbeschränkt bei Vorsatz und grober Fahrlässigkeit sowie bei der Verletzung von Leben, Körper oder Gesundheit. Bei leicht fahrlässiger Verletzung wesentlicher Vertragspflichten (Kardinalpflichten, deren Erfüllung die ordnungsgemäße Durchführung des Vertrags erst ermöglicht und auf deren Einhaltung der Kunde regelmäßig vertrauen darf) ist die Haftung auf den bei Vertragsschluss vorhersehbaren, vertragstypischen Schaden begrenzt. Im Übrigen ist die Haftung für leicht fahrlässig verursachte Schäden ausgeschlossen. Die Haftung nach dem Produkthaftungsgesetz bleibt unberührt. Der Kunde ist für eine regelmäßige eigene Datensicherung seiner in der Software erfassten Daten selbst verantwortlich.<br><br>
           <strong style="color:var(--text)">§ 12 Salvatorische Klausel</strong><br>

@@ -5,6 +5,7 @@
 // (zuverlaessig auf iOS-PWA und Android/Chrome, keine Doppelanzeige).
 const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
 const { onRequest, onCall, HttpsError } = require('firebase-functions/v2/https');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { setGlobalOptions } = require('firebase-functions/v2');
 const { defineSecret } = require('firebase-functions/params');
 const Stripe = require('stripe');
@@ -573,14 +574,19 @@ exports.createStripeCheckoutSession = onCall({ secrets: [STRIPE_SECRET_KEY] }, a
 // Setzt nur die Abo-Felder auf dem Fahrschulen-/Users-Dokument - OHNE
 // Rechnung. Wird sowohl bei sofortiger Zahlung als auch beim reinen
 // Testphase-Start (0 EUR faellig) gebraucht.
-async function stripeAboAktivieren(billingColl, billingId, plan, planer) {
+async function stripeAboAktivieren(billingColl, billingId, plan, planer, subscriptionId) {
   const billingRef = admin.firestore().doc(`${billingColl}/${billingId}`);
   const billingSnap = await billingRef.get();
   if (!billingSnap.exists) return null;
-  await billingRef.update({
+  const felder = {
     abo: plan, aboPlaner: planer === '1', aboStatus: 'aktiv',
     aboZahlungsart: 'stripe', aboLetzteZahlungAm: Date.now(),
-  });
+  };
+  // Die Stripe-Abo-Kennung wurde bisher nirgends gespeichert - ohne sie
+  // laesst sich ein laufendes Abo spaeter nicht kuendigen (z.B. wenn der
+  // Kunde sein Konto loescht, siehe kuendigeLaufendesAbo).
+  if (subscriptionId) felder.aboSubscriptionId = subscriptionId;
+  await billingRef.update(felder);
   return billingSnap.data();
 }
 
@@ -642,7 +648,7 @@ async function stripeAboAktivierenUndRechnung(session, stripeEventId, zahlungsar
   const planInfo = RECHNUNG_PLANS[plan];
   if (!planInfo) return;
 
-  const b = await stripeAboAktivieren(billingColl, billingId, plan, planer);
+  const b = await stripeAboAktivieren(billingColl, billingId, plan, planer, session.subscription);
   if (!b) return;
   if (!b.rechnungsStrasse || !b.rechnungsPlz || !b.rechnungsOrt) return;
 
@@ -733,7 +739,7 @@ exports.stripeWebhook = onRequest(
           // faellig. Abo trotzdem sofort freischalten (die 14-taegige
           // Testphase soll nutzbar sein), aber ohne Rechnung.
           const { billingColl, billingId, plan, planer } = session.metadata || {};
-          if (billingColl && billingId && plan) await stripeAboAktivieren(billingColl, billingId, plan, planer);
+          if (billingColl && billingId && plan) await stripeAboAktivieren(billingColl, billingId, plan, planer, session.subscription);
         }
         // Bei noch schwebender SEPA-Lastschrift ('unpaid') uebernimmt
         // async_payment_succeeded weiter unten.
@@ -1059,5 +1065,313 @@ exports.paypalWebhook = onRequest(
       // trotzdem sichtbar bleibt.
       res.status(200).send('error geloggt');
     }
+  }
+);
+
+// ═══════════════════════════════════════════════════════════════════
+// DSGVO-LOESCHKONZEPT (Art. 17 DSGVO, § 6 Nr. 7 AVV, AGB § 10)
+//
+// Datenschutzerklaerung, AGB und AVV versprechen seit jeher: "Nach
+// Beendigung werden alle Daten innerhalb von 30 Tagen unwiderruflich
+// geloescht" - technisch gab es dafuer bisher NICHTS. Weder konnte ein
+// Nutzer sein Konto selbst loeschen (obwohl die Datenschutzerklaerung
+// genau das als Weg zum Widerruf nennt), noch lief irgendwo ein Job, der
+// die Frist umsetzt. Geloescht wurde nur, wenn der Betreiber es von Hand
+// tat. Diese drei Funktionen setzen das Versprechen technisch um:
+//
+//   kontoLoeschungBeantragen  - Nutzer stoesst die Loeschung an (Frist laeuft)
+//   kontoLoeschungWiderrufen  - Rueckzieher innerhalb der Frist
+//   taeglichesAufraeumen      - loescht nach Fristablauf endgueltig und
+//                               raeumt zusaetzlich alle uebrigen Daten mit
+//                               abgelaufener Aufbewahrung ab
+//
+// WICHTIG - was NIE geloescht wird: die Rechnungen. Fuer sie gilt die
+// gesetzliche Aufbewahrungspflicht (§ 14b UStG, § 147 AO), die der
+// Loeschpflicht ausdruecklich vorgeht (so auch § 6 Nr. 7 AVV).
+// ═══════════════════════════════════════════════════════════════════
+
+const LOESCH_FRIST_TAGE = 30;
+const TAG_MS = 24 * 60 * 60 * 1000;
+const CHAT_BUCKET = 'fahrschule-ebc65-eu-storage';
+
+// Loescht alle Dokumente einer Abfrage in Bloecken (Firestore erlaubt
+// hoechstens 500 Schreibvorgaenge pro Stapel).
+async function loescheAlle(abfrage) {
+  let geloescht = 0;
+  while (true) {
+    const snap = await abfrage.limit(400).get();
+    if (snap.empty) break;
+    const stapel = admin.firestore().batch();
+    snap.docs.forEach(d => stapel.delete(d.ref));
+    await stapel.commit();
+    geloescht += snap.size;
+    if (snap.size < 400) break;
+  }
+  return geloescht;
+}
+
+// Chat-Fotos eines Zugangscodes im Speicher entfernen. Serverseitig (Admin
+// SDK) - die Speicher-Regeln greifen hier nicht, deshalb funktioniert das
+// auch bei laengst abgelaufenen Codes.
+async function loescheChatBilderServer(codeId) {
+  try {
+    await admin.storage().bucket(CHAT_BUCKET).deleteFiles({ prefix: `chat-images/${codeId}/` });
+  } catch (e) {
+    console.warn('Chat-Bilder loeschen fehlgeschlagen fuer', codeId, e.message);
+  }
+}
+
+// Alle Zugangscodes einer Abfrage samt zugehoeriger Chat-Fotos loeschen.
+// Reihenfolge egal, da serverseitig keine Regelpruefung stattfindet.
+async function loescheZugangscodesMitBildern(abfrage) {
+  const snap = await abfrage.get();
+  for (const d of snap.docs) {
+    await loescheChatBilderServer(d.id);
+    await d.ref.delete();
+  }
+  return snap.size;
+}
+
+// Ermittelt, was zu einem Konto gehoert. Ein Fahrschul-Inhaber nimmt die
+// ganze Fahrschule mit (er ist der Verantwortliche i.S.d. DSGVO), ein
+// einzelner Fahrlehrer nur seine eigenen Daten.
+function loeschUmfang(uid, userData) {
+  const istInhaber = userData.typ === 'fahrschule';
+  return {
+    istInhaber,
+    fahrschuleId: istInhaber ? uid : (userData.fahrschuleId || uid),
+  };
+}
+
+// Harte, endgueltige Loeschung eines Kontos samt aller Daten.
+async function loescheKontoHart(uid) {
+  const db = admin.firestore();
+  const userSnap = await db.doc(`users/${uid}`).get();
+  const userData = userSnap.exists ? userSnap.data() : {};
+  const { istInhaber, fahrschuleId } = loeschUmfang(uid, userData);
+  const bericht = { uid, istInhaber, schueler: 0, codes: 0 };
+
+  // Betroffene Konten: bei einem Fahrschul-Inhaber alle Mitglieder mit.
+  let betroffeneUids = [uid];
+  if (istInhaber) {
+    const mitglieder = await db.collection('users').where('fahrschuleId', '==', fahrschuleId).get();
+    betroffeneUids = [...new Set([uid, ...mitglieder.docs.map(d => d.id)])];
+  }
+
+  // 1) Zugangscodes samt Chat-Fotos - zuerst, weil an ihnen die Bilder haengen
+  for (const einUid of betroffeneUids) {
+    bericht.codes += await loescheZugangscodesMitBildern(
+      db.collection('accessCodes').where('teacherUid', '==', einUid));
+  }
+  if (istInhaber) {
+    bericht.codes += await loescheZugangscodesMitBildern(
+      db.collection('accessCodes').where('fahrschuleId', '==', fahrschuleId));
+  }
+
+  // 2) Kartei-Daten (Schueler, Protokoll, eigene Listen)
+  for (const coll of ['students', 'protokoll', 'customFields', 'customThemen', 'customGruppen']) {
+    for (const einUid of betroffeneUids) {
+      const anzahl = await loescheAlle(db.collection(coll).where('uid', '==', einUid));
+      if (coll === 'students') bericht.schueler += anzahl;
+    }
+    if (istInhaber) {
+      const anzahl = await loescheAlle(db.collection(coll).where('fahrschuleId', '==', fahrschuleId));
+      if (coll === 'students') bericht.schueler += anzahl;
+    }
+  }
+  // Der Team-Chat fuehrt den Absender als 'senderUid' (nicht 'uid') - mit dem
+  // falschen Feldnamen bliebe er stehen.
+  for (const einUid of betroffeneUids) {
+    await loescheAlle(db.collection('chat').where('senderUid', '==', einUid));
+  }
+  if (istInhaber) {
+    await loescheAlle(db.collection('chat').where('fahrschuleId', '==', fahrschuleId));
+  }
+
+  // 3) Kalender-Modul (eigener Namensraum, haengt an lehrerUid bzw. schoolId)
+  for (const coll of ['schueler', 'slots', 'autos', 'blocked', 'globalBlocked', 'urlaub',
+                      'notizen', 'warteliste', 'pruefungen', 'theorieStunden',
+                      'bookingStudents', 'bookingRequests', 'bookingMessages', 'bookingWaitlist']) {
+    for (const einUid of betroffeneUids) {
+      await loescheAlle(db.collection(coll).where('lehrerUid', '==', einUid));
+    }
+    if (istInhaber) {
+      await loescheAlle(db.collection(coll).where('schoolId', '==', fahrschuleId));
+    }
+  }
+
+  // 4) Konto-gebundene Einzeldokumente
+  for (const einUid of betroffeneUids) {
+    for (const pfad of [`calendarTokens/${einUid}`, `calendarStatus/${einUid}`,
+                        `kalenderUsers/${einUid}`, `bookingLinks/${einUid}`,
+                        `studentSessions/${einUid}`]) {
+      await db.doc(pfad).delete().catch(() => {});
+    }
+    await loescheAlle(db.collection('fcmTokens').where('uid', '==', einUid));
+    await loescheAlle(db.collection('usernames').where('uid', '==', einUid));
+  }
+
+  // 5) Fahrschul-Ebene
+  if (istInhaber) {
+    await loescheAlle(db.collection('schoolCodes').where('schoolId', '==', fahrschuleId));
+    await loescheAlle(db.collection('invites').where('fahrschuleId', '==', fahrschuleId));
+    await db.doc(`schools/${fahrschuleId}`).delete().catch(() => {});
+    await db.doc(`fahrschulen/${fahrschuleId}`).delete().catch(() => {});
+  }
+
+  // 6) Nutzerprofile und Anmeldekonten zuletzt
+  for (const einUid of betroffeneUids) {
+    await db.doc(`users/${einUid}`).delete().catch(() => {});
+    await admin.auth().deleteUser(einUid).catch(e => {
+      if (e.code !== 'auth/user-not-found') console.warn('Auth-Konto loeschen:', einUid, e.message);
+    });
+  }
+
+  // Die Rechnungen bleiben bewusst erhalten (§ 14b UStG, § 147 AO).
+  console.log('Konto endgueltig geloescht:', JSON.stringify(bericht));
+  return bericht;
+}
+
+// Ein laufendes Abonnement beim Zahlungsdienstleister beenden. Ohne das
+// wuerde nach der Kontoloeschung munter weiter abgebucht - der Kunde haette
+// kein Konto mehr, aber weiter eine monatliche Belastung.
+async function kuendigeLaufendesAbo(billingColl, billingId) {
+  const snap = await admin.firestore().doc(`${billingColl}/${billingId}`).get();
+  if (!snap.exists) return null;
+  const b = snap.data();
+  const subId = b.aboSubscriptionId;
+  if (!subId) return null;
+  try {
+    // Stripe-Abo-Kennungen beginnen mit 'sub_', PayPal-Kennungen mit 'I-'.
+    if (b.aboZahlungsart === 'stripe' || String(subId).startsWith('sub_')) {
+      const stripe = new Stripe(STRIPE_SECRET_KEY.value());
+      await stripe.subscriptions.cancel(subId);
+      return 'stripe';
+    }
+    const token = await paypalAccessToken(PAYPAL_CLIENT_ID.value(), PAYPAL_CLIENT_SECRET.value());
+    const resp = await fetch(
+      `https://api-m.paypal.com/v1/billing/subscriptions/${encodeURIComponent(subId)}/cancel`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'Konto vom Nutzer geloescht' }),
+      });
+    if (!resp.ok) console.warn('PayPal-Kuendigung antwortete mit', resp.status);
+    return 'paypal';
+  } catch (e) {
+    console.warn('Abo-Kuendigung fehlgeschlagen fuer', billingColl, billingId, e.message);
+    return null;
+  }
+}
+
+// ── Nutzer beantragt die Loeschung seines Kontos ────────────────────
+exports.kontoLoeschungBeantragen = onCall(
+  { secrets: [STRIPE_SECRET_KEY, PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET] },
+  async (request) => {
+    const auth = request.auth;
+    if (!auth) throw new HttpsError('unauthenticated', 'Bitte anmelden.');
+    const uid = auth.uid;
+    const userSnap = await admin.firestore().doc(`users/${uid}`).get();
+    if (!userSnap.exists) throw new HttpsError('failed-precondition', 'Kein Profil gefunden.');
+    const userData = userSnap.data();
+
+    // Ein Fahrschul-Admin, der NICHT Inhaber ist, kann nur sein eigenes Konto
+    // loeschen - die Schuldaten gehoeren dem Inhaber.
+    const { istInhaber } = loeschUmfang(uid, userData);
+    const geloeschtAm = Date.now();
+    const loeschungAm = geloeschtAm + LOESCH_FRIST_TAGE * TAG_MS;
+
+    // Laufendes Abo sofort beenden (nicht erst nach Fristablauf - sonst
+    // liefen bis dahin weitere Abbuchungen auf).
+    // Ein Fahrlehrer, der nur Mitglied einer fremden Fahrschule ist, hat kein
+    // eigenes Abo - dessen users-Dokument traegt keine Abo-Kennung, es wird
+    // also nichts gekuendigt (das Abo der Schule bleibt unberuehrt).
+    const gekuendigt = await kuendigeLaufendesAbo(istInhaber ? 'fahrschulen' : 'users', uid);
+
+    await admin.firestore().doc(`users/${uid}`).update({
+      geloeschtAm, loeschungAm, aboStatus: 'gekuendigt',
+    });
+    if (istInhaber) {
+      await admin.firestore().doc(`fahrschulen/${uid}`)
+        .update({ geloeschtAm, loeschungAm, aboStatus: 'gekuendigt' }).catch(() => {});
+    }
+
+    console.log('Kontoloeschung beantragt von', uid, '- faellig am',
+      new Date(loeschungAm).toISOString(), '- Abo gekuendigt:', gekuendigt || 'keines');
+    return { success: true, loeschungAm, fristTage: LOESCH_FRIST_TAGE, istInhaber, aboGekuendigt: gekuendigt };
+  });
+
+// ── Rueckzieher innerhalb der Frist ─────────────────────────────────
+exports.kontoLoeschungWiderrufen = onCall(async (request) => {
+  const auth = request.auth;
+  if (!auth) throw new HttpsError('unauthenticated', 'Bitte anmelden.');
+  const uid = auth.uid;
+  const entfernen = {
+    geloeschtAm: admin.firestore.FieldValue.delete(),
+    loeschungAm: admin.firestore.FieldValue.delete(),
+  };
+  await admin.firestore().doc(`users/${uid}`).update(entfernen);
+  await admin.firestore().doc(`fahrschulen/${uid}`).update(entfernen).catch(() => {});
+  console.log('Kontoloeschung widerrufen von', uid);
+  return { success: true };
+});
+
+// ── Taeglicher Aufraeum-Job ─────────────────────────────────────────
+// Setzt sowohl die 30-Tage-Frist als auch alle uebrigen Aufbewahrungs-
+// grenzen durch. Laeuft nachts, wenn niemand arbeitet.
+exports.taeglichesAufraeumen = onSchedule(
+  { schedule: 'every day 03:15', timeZone: 'Europe/Berlin', timeoutSeconds: 540, memory: '512MiB' },
+  async () => {
+    const db = admin.firestore();
+    const jetzt = Date.now();
+    const bericht = { konten: 0, codes: 0, mails: 0, resets: 0, buchungen: 0, oauth: 0 };
+
+    // 1) Konten, deren 30-Tage-Frist abgelaufen ist
+    try {
+      const faellig = await db.collection('users')
+        .where('loeschungAm', '<=', jetzt).limit(20).get();
+      for (const d of faellig.docs) {
+        await loescheKontoHart(d.id);
+        bericht.konten++;
+      }
+    } catch (e) { console.error('Konto-Loeschung:', e); }
+
+    // 2) Zugangscodes, die seit ueber 90 Tagen abgelaufen sind. Darin stecken
+    // Name, Lernstand und der komplette Chatverlauf eines Schuelers - es gibt
+    // keinen Grund, das ueber das Ende der Gueltigkeit hinaus aufzubewahren.
+    try {
+      bericht.codes = await loescheZugangscodesMitBildern(
+        db.collection('accessCodes').where('expiresAt', '<=', jetzt - 90 * TAG_MS).limit(200));
+    } catch (e) { console.error('Alte Zugangscodes:', e); }
+
+    // 3) Uebrige Aufbewahrungsgrenzen
+    try {
+      bericht.mails = await loescheAlle(
+        db.collection('mailQueue').where('createdAt', '<=',
+          admin.firestore.Timestamp.fromMillis(jetzt - 90 * TAG_MS)));
+    } catch (e) { console.error('mailQueue:', e); }
+    try {
+      bericht.resets = await loescheAlle(
+        db.collection('passwordResets').where('createdAt', '<=', jetzt - 30 * TAG_MS));
+    } catch (e) { console.error('passwordResets:', e); }
+    // ACHTUNG Feldtypen: bookingRequests/bookingMessages schreiben createdAt
+    // als serverTimestamp() (Firestore-Timestamp), passwordResets und
+    // oauthStates dagegen als Date.now() (Zahl). Vergleicht man hier mit dem
+    // falschen Typ, liefert Firestore stillschweigend KEINE Treffer und der
+    // Aufraeum-Job laeuft wirkungslos ins Leere.
+    const grenzeTimestamp = admin.firestore.Timestamp.fromMillis(jetzt - 90 * TAG_MS);
+    for (const coll of ['bookingRequests', 'bookingMessages']) {
+      try {
+        bericht.buchungen += await loescheAlle(
+          db.collection(coll).where('createdAt', '<=', grenzeTimestamp));
+      } catch (e) { console.error(coll + ':', e); }
+    }
+    // Kurzlebige CSRF-Marken des Kalender-Logins (eine Stunde reicht)
+    try {
+      bericht.oauth = await loescheAlle(
+        db.collection('oauthStates').where('createdAt', '<=', jetzt - 60 * 60 * 1000));
+    } catch (e) { console.error('oauthStates:', e); }
+
+    console.log('Taegliches Aufraeumen fertig:', JSON.stringify(bericht));
   }
 );
