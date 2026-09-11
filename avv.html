@@ -127,7 +127,7 @@
   <ul>
     <li><strong>Zutrittskontrolle:</strong> Eigene Serverräume werden nicht betrieben; die physische Zutrittskontrolle zu den Rechenzentren obliegt dem Unterauftragsverarbeiter Google (siehe dessen Sicherheitsnachweise, u.a. ISO 27001)</li>
     <li><strong>Zugangskontrolle:</strong> Zugriff auf Daten ausschließlich über individuelle, passwortgeschützte Fahrlehrer-Konten (Firebase Authentication); Schülerzugriff nur über zeitlich begrenzte, individuelle Zugangscodes</li>
-    <li><strong>Zugriffskontrolle / Mandantentrennung:</strong> Serverseitige Sicherheitsregeln stellen pro Datensatz sicher, dass ausschließlich der zugeordnete Fahrlehrer bzw. die zugeordnete Fahrschule zugreifen kann; ein Zugriff auf Daten anderer Fahrschulen ist technisch ausgeschlossen</li>
+    <li><strong>Zugriffskontrolle / Mandantentrennung:</strong> Serverseitige Sicherheitsregeln stellen pro Datensatz sicher, dass ausschließlich der zugeordnete Fahrlehrer bzw. die zugeordnete Fahrschule zugreifen kann; ein Zugriff einer Fahrschule auf Daten einer anderen Fahrschule ist technisch ausgeschlossen. Davon ausgenommen ist der administrative Zugang des Auftragsverarbeiters selbst, der für Betrieb, Fehlerbehebung, Support und die Erfüllung von Löschpflichten technisch erforderlich ist; er ist auf wenige berechtigte Personen beschränkt, die zur Vertraulichkeit verpflichtet sind (§ 6 Nr. 2), und erfolgt ausschließlich weisungsgebunden</li>
     <li><strong>Weitergabekontrolle:</strong> Verschlüsselte Datenübertragung ausschließlich über HTTPS/TLS</li>
     <li><strong>Speicherort:</strong> Datenspeicherung bei Google Cloud/Firebase in der Region europe-west3 (Frankfurt am Main, Deutschland)</li>
     <li><strong>Eingabekontrolle:</strong> Änderungen an Schülerdaten sind ausschließlich dem jeweils zugeordneten Fahrlehrer möglich; Bewertungen und Notizen sind dem eingebenden Konto zugeordnet</li>
@@ -145,7 +145,7 @@
     <tr><td>IONOS SE, Elgendorfer Str. 57, 56410 Montabaur</td><td>Versand von System- und Benachrichtigungs-E-Mails</td><td>Deutschland</td></tr>
     <tr><td>EmailJS</td><td>Versand von Benachrichtigungs-E-Mails bei Neuregistrierung</td><td>siehe Anbieter-Datenschutzerklärung</td></tr>
   </table>
-  <p style="font-size:0.82rem;color:var(--muted)">Zahlungsabwicklung über PayPal erfolgt nicht als Unterauftragsverarbeitung im Sinne dieses Vertrags, da PayPal insoweit als eigenständig Verantwortlicher für die Zahlungsabwicklung auftritt.</p>
+  <p style="font-size:0.82rem;color:var(--muted)">Die Zahlungsabwicklung über PayPal (Europe) S.à r.l. et Cie, S.C.A., Luxemburg bzw. – je nach gewählter Zahlungsart – über Stripe Payments Europe, Limited, Dublin, Irland erfolgt nicht als Unterauftragsverarbeitung im Sinne dieses Vertrags, da beide Anbieter insoweit als eigenständig Verantwortliche für die Zahlungsabwicklung auftreten. Betroffen sind hiervon ausschließlich die Vertrags- und Zahlungsdaten des Verantwortlichen selbst, nicht die Daten der Fahrschüler.</p>
 
   <div class="box" style="margin-top:32px">
     Fragen zu diesem Vertrag richten Sie bitte an die im <a href="./impressum.html">Impressum</a> genannte Kontaktadresse.

@@ -643,6 +643,7 @@ import { getFirestore, enableIndexedDbPersistence,
          collection, doc, addDoc, updateDoc, deleteDoc,
          getDoc, getDocs, setDoc,
          onSnapshot, query, where, orderBy }                     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, listAll, deleteObject }                from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 // ── FIREBASE CONFIG ──────────────────────────────────────────
 const firebaseConfig = {
@@ -2088,10 +2089,18 @@ window.deleteFahrschuleComplete = async (fsId, fsName) => {
     for (const d of lehrerSnap.docs) { backup.push({coll:'users', id:d.id, data:d.data()}); await deleteDoc(d.ref); geloescht.lehrer++; }
 
     // 4. Weitere zugehörige Daten
+    // DSGVO-FIX: Die Zugangscode-IDs vorher merken - an ihnen haengen die
+    // Chat-Fotos im Speicher. Ohne das blieben sie nach dem Loeschen der
+    // Fahrschule dauerhaft liegen (personenbezogene Bilder ohne jeden Bezug,
+    // niemand kann sie ueber die App noch entfernen).
+    const codeIdsFuerBilder = [];
     for (const coll of ['customFields','customThemen','customGruppen','chat','accessCodes']) {
       try {
         const snap = await getDocs(query(collection(db,coll), where('fahrschuleId','==',fsId)));
-        for (const d of snap.docs) { backup.push({coll, id:d.id, data:d.data()}); await deleteDoc(d.ref); geloescht.sonstige++; }
+        for (const d of snap.docs) {
+          if (coll === 'accessCodes') codeIdsFuerBilder.push(d.id);
+          backup.push({coll, id:d.id, data:d.data()}); await deleteDoc(d.ref); geloescht.sonstige++;
+        }
       } catch(subErr) {}
     }
 
@@ -2102,7 +2111,10 @@ window.deleteFahrschuleComplete = async (fsId, fsName) => {
 
     const modalEl = document.getElementById('modal-fs-detail');
     if (modalEl) modalEl.classList.remove('open');
-    zeigeUndoBalken(`🗑️ "${fsName}" gelöscht (${geloescht.students} Schüler, ${geloescht.lehrer} Lehrer)`, backup);
+    // Bilder erst NACH Ablauf der Rueckgaengig-Frist loeschen - sie lassen
+    // sich, anders als die Firestore-Dokumente, nicht wiederherstellen.
+    zeigeUndoBalken(`🗑️ "${fsName}" gelöscht (${geloescht.students} Schüler, ${geloescht.lehrer} Lehrer)`, backup,
+      () => loescheChatBilder(codeIdsFuerBilder));
   } catch(e) {
     console.error('deleteFahrschuleComplete:', e);
     toast('❌ Fehler beim Löschen: ' + e.message);
@@ -2133,21 +2145,56 @@ window.deleteLehrerComplete = async (userId, lehrerName) => {
     const protSnap = await getDocs(query(collection(db,'protokoll'), where('fahrschuleId','==',userId)));
     for (const d of protSnap.docs) { backup.push({coll:'protokoll', id:d.id, data:d.data()}); await deleteDoc(d.ref); geloescht.protokoll++; }
 
+    // DSGVO-FIX: Zugangscodes und eigene Listen dieses Fahrlehrers wurden hier
+    // bisher gar nicht geloescht - im Zugangscode-Dokument stecken aber Name,
+    // Lernstand und der komplette Chatverlauf des Schuelers, an der Code-ID
+    // haengen zusaetzlich die Chat-Fotos. Beides blieb nach dem Loeschen des
+    // Fahrlehrers dauerhaft gespeichert.
+    const codeIdsFuerBilder = [];
+    const codesSnap = await getDocs(query(collection(db,'accessCodes'), where('teacherUid','==',userId)));
+    for (const d of codesSnap.docs) {
+      codeIdsFuerBilder.push(d.id);
+      backup.push({coll:'accessCodes', id:d.id, data:d.data()}); await deleteDoc(d.ref);
+    }
+    for (const coll of ['customFields','customThemen','customGruppen']) {
+      try {
+        const snap = await getDocs(query(collection(db,coll), where('uid','==',userId)));
+        for (const d of snap.docs) { backup.push({coll, id:d.id, data:d.data()}); await deleteDoc(d.ref); }
+      } catch(subErr) {}
+    }
+
     // Das Konto selbst
     const uSnap = await getDoc(doc(db,'users',userId));
     if (uSnap.exists()) backup.push({coll:'users', id:userId, data:uSnap.data()});
     await deleteDoc(doc(db, 'users', userId));
 
-    zeigeUndoBalken(`🗑️ "${lehrerName}" gelöscht (${geloescht.students} Schüler)`, backup);
+    zeigeUndoBalken(`🗑️ "${lehrerName}" gelöscht (${geloescht.students} Schüler)`, backup,
+      () => loescheChatBilder(codeIdsFuerBilder));
   } catch(e) {
     console.error('deleteLehrerComplete:', e);
     toast('❌ Fehler beim Löschen: ' + e.message);
   }
 };
 
+// Chat-Fotos zu den angegebenen Zugangscodes im Speicher loeschen. Die
+// Speicher-Regeln erlauben dem SuperAdmin das ausdruecklich auch dann noch,
+// wenn das zugehoerige Code-Dokument bereits weg oder abgelaufen ist.
+async function loescheChatBilder(codeIds) {
+  if (!Array.isArray(codeIds) || !codeIds.length) return;
+  const storage = getStorage(app, "gs://fahrschule-ebc65-eu-storage");
+  for (const codeId of codeIds) {
+    try {
+      const inhalt = await listAll(ref(storage, `chat-images/${codeId}`));
+      for (const datei of inhalt.items) {
+        await deleteObject(datei).catch(e => console.warn('Bild loeschen:', e));
+      }
+    } catch(e) { console.warn('Bilder auflisten:', e); }
+  }
+}
+
 // ── UNDO-BALKEN für SuperAdmin (stellt alle gesicherten Dokumente wieder her) ──
 let saUndoTimer = null;
-function zeigeUndoBalken(text, backup) {
+function zeigeUndoBalken(text, backup, nachAblaufCallback) {
   const alt = document.getElementById('undo-bar');
   if (alt) alt.remove();
   if (saUndoTimer) clearTimeout(saUndoTimer);
@@ -2180,6 +2227,9 @@ function zeigeUndoBalken(text, backup) {
   saUndoTimer = setTimeout(() => {
     const b = document.getElementById('undo-bar');
     if (b) b.remove();
+    if (typeof nachAblaufCallback === 'function') {
+      Promise.resolve(nachAblaufCallback()).catch(e => console.warn('Aufraeumen nach Loeschung:', e));
+    }
   }, 60000); // SuperAdmin: 1 Minute Bedenkzeit zum Wiederherstellen
 }
 

@@ -1131,7 +1131,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
         <div style="font-size:0.72rem;color:var(--muted);margin-top:5px">Nur Buchstaben, Zahlen und Punkte. Damit ODER mit E-Mail anmelden.</div>
       </div>
       <div class="form-group">
-        <label class="form-label">Passwort (min. 6 Zeichen)</label>
+        <label class="form-label">Passwort (min. 8 Zeichen)</label>
         <input class="form-input" id="reg-pw" type="password" placeholder="••••••••" autocomplete="new-password">
       </div>
       <!-- Fahrschul-Code (nur für Fahrlehrer, optional) -->
@@ -1744,7 +1744,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       <input class="form-input" id="inp-pw-alt" type="password" placeholder="••••••••" autocomplete="current-password">
     </div>
     <div class="form-group">
-      <label class="form-label">Neues Passwort (min. 6 Zeichen)</label>
+      <label class="form-label">Neues Passwort (min. 8 Zeichen)</label>
       <input class="form-input" id="inp-pw-neu" type="password" placeholder="••••••••" autocomplete="new-password">
     </div>
     <div class="form-group">
@@ -2971,7 +2971,10 @@ window.doRegister = async () => {
   if (!name || !email || !username || !pw) { setAuthError('Bitte alle Felder ausfüllen.'); return; }
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { setAuthError('Bitte eine gültige E-Mail-Adresse eingeben.'); return; }
   if (!validateUsername(username)) { setAuthError('Benutzername: nur Buchstaben, Zahlen, Punkte und Bindestriche (min. 3 Zeichen).'); return; }
-  if (pw.length < 6) { setAuthError('Passwort muss mindestens 6 Zeichen haben.'); return; }
+  // Art. 32 DSGVO: Diese Konten halten die personenbezogenen Daten aller
+  // Fahrschueler. 6 Zeichen waren hier zu wenig - der Rest der App (Admin-
+  // Portal, Schuelerverwaltung) verlangt ohnehin schon 8.
+  if (pw.length < 8) { setAuthError('Passwort muss mindestens 8 Zeichen haben.'); return; }
   if (!regConsentGegeben) { setAuthError('Bitte stimme der Datenschutzerklärung zu, um fortzufahren.'); return; }
   btn.disabled = true; btn.textContent = '…';
   try {
@@ -3665,7 +3668,7 @@ function friendlyError(code) {
     'auth/user-not-found': 'Kein Konto mit diesem Benutzernamen gefunden.',
     'auth/wrong-password': 'Falsches Passwort.',
     'auth/email-already-in-use': 'Dieser Benutzername ist bereits vergeben.',
-    'auth/weak-password': 'Passwort zu schwach (min. 6 Zeichen).',
+    'auth/weak-password': 'Passwort zu schwach (min. 8 Zeichen).',
     'auth/invalid-credential': 'Benutzername oder Passwort falsch.',
     'auth/too-many-requests': 'Zu viele Versuche. Bitte kurz warten.',
   };
@@ -4030,6 +4033,9 @@ onAuthStateChanged(auth, async (user) => {
     checkFirstTime();
     loadAboStatus(user.uid);
     setTimeout(() => migrateOldAccessCodes(), 2000);
+    // Beim letzten Mal abgebrochenes DSGVO-Aufraeumen nachholen (App wurde
+    // innerhalb der Rueckgaengig-Frist geschlossen).
+    setTimeout(() => holeOffeneLoeschungenNach().catch(e => console.warn('Nachholen:', e)), 3000);
   } else {
     currentUser = null;
     students = [];
@@ -6511,10 +6517,14 @@ window.deleteStudent = async () => {
     activeId = null;
     goBack();
     const geloeschteId = backup.id;
+    // Offene Aufraeum-Arbeit vormerken, falls die App vor Ablauf der
+    // Rueckgaengig-Frist geschlossen wird (siehe holeOffeneLoeschungenNach).
+    offeneLoeschungVormerken(geloeschteId);
     zeigeUndoBalken(`🗑️ ${s.vorname} ${s.nachname} gelöscht`, async () => {
       // Rückgängig: Schüler mit gleicher ID wiederherstellen
       try {
         await dbSet(doc(db,'students',backup.id), backup.data);
+        offeneLoeschungAbhaken(geloeschteId);
         toast('✓ Wiederhergestellt');
       } catch(e) { console.error('undo student:', e); toast('❌ Wiederherstellen fehlgeschlagen'); }
     }, async () => {
@@ -7087,7 +7097,7 @@ window.changePassword = async () => {
   errEl.textContent = ''; okEl.textContent = '';
 
   if (!altPw || !neuPw || !neuPw2) { errEl.textContent = 'Bitte alle Felder ausfüllen.'; return; }
-  if (neuPw.length < 6) { errEl.textContent = 'Neues Passwort muss mindestens 6 Zeichen haben.'; return; }
+  if (neuPw.length < 8) { errEl.textContent = 'Neues Passwort muss mindestens 8 Zeichen haben.'; return; }
   if (neuPw !== neuPw2) { errEl.textContent = 'Die neuen Passwörter stimmen nicht überein.'; return; }
   if (neuPw === altPw) { errEl.textContent = 'Das neue Passwort muss sich vom alten unterscheiden.'; return; }
 
@@ -10216,6 +10226,48 @@ async function loescheSchuelerBegleitdaten(studentId) {
   } catch(e) { console.warn('Loeschen protokoll:', e); }
 
   console.info('Begleitdaten geloescht fuer', studentId, '- Codes:', codeIds.length);
+  offeneLoeschungAbhaken(studentId);
+}
+
+// ── DSGVO-FIX: Aufraeumen ueberlebt das Schliessen der App ──────────
+// Die endgueltige Loeschung der Begleitdaten (Chatverlauf, Fotos, Protokoll)
+// lief bisher NUR in einem setTimeout von 60 Sekunden. Schloss der Fahrlehrer
+// die App in dieser Minute - auf dem Handy der Normalfall: loeschen, App
+// weglegen - lief sie nie, und die personenbezogenen Daten des geloeschten
+// Schuelers blieben dauerhaft gespeichert. Die offene Loeschung wird deshalb
+// zusaetzlich lokal vorgemerkt und beim naechsten Start nachgeholt.
+const OFFENE_LOESCHUNGEN_KEY = 'adk_offene_loeschungen';
+
+function offeneLoeschungenLesen() {
+  try { return JSON.parse(localStorage.getItem(OFFENE_LOESCHUNGEN_KEY) || '[]'); }
+  catch(e) { return []; }
+}
+function offeneLoeschungVormerken(studentId) {
+  try {
+    const offen = offeneLoeschungenLesen();
+    if (!offen.includes(studentId)) offen.push(studentId);
+    localStorage.setItem(OFFENE_LOESCHUNGEN_KEY, JSON.stringify(offen));
+  } catch(e) { /* ohne lokalen Speicher bleibt es beim Timer-Weg */ }
+}
+function offeneLoeschungAbhaken(studentId) {
+  try {
+    localStorage.setItem(OFFENE_LOESCHUNGEN_KEY,
+      JSON.stringify(offeneLoeschungenLesen().filter(id => id !== studentId)));
+  } catch(e) { /* nicht kritisch */ }
+}
+async function holeOffeneLoeschungenNach() {
+  const offen = offeneLoeschungenLesen();
+  if (!offen.length || !currentUser) return;
+  for (const studentId of offen) {
+    // Wurde der Schueler per Rueckgaengig wiederhergestellt, darf nichts
+    // geloescht werden - dann nur den Vormerker entfernen.
+    try {
+      const noch = await getDoc(doc(db, 'students', studentId));
+      if (noch.exists()) { offeneLoeschungAbhaken(studentId); continue; }
+    } catch(e) { continue; }
+    try { await loescheSchuelerBegleitdaten(studentId); }
+    catch(e) { console.warn('Nachgeholte Loeschung:', e); }
+  }
 }
 
 
