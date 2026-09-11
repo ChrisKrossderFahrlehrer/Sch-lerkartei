@@ -427,11 +427,17 @@ service cloud.firestore {
                     && request.resource.data.teacherUid == request.auth.uid;
       allow delete: if isSuperAdmin()
                     || (isAuth() && userDocExists() && resource.data.teacherUid == request.auth.uid);
+      // FIX: 'studentLastRead' fehlte in dieser Liste, obwohl das Portal den
+      // Wert beim Lesen der Nachrichten schreibt. Der Schreibvorgang wurde
+      // deshalb immer abgewiesen (und im Client stillschweigend
+      // weggefangen) - der Ungelesen-Zaehler des Schuelers konnte nie
+      // zuruecksetzen. Gegenstueck zu 'teacherLastRead', das der Fahrlehrer
+      // ueber den regulaeren Lehrer-Zweig oben schreibt.
       allow update: if isSuperAdmin()
                     || (isAuth() && userDocExists() && resource.data.teacherUid == request.auth.uid)
                     || (request.resource.data.diff(resource.data)
                           .affectedKeys()
-                          .hasOnly(['messages', 'plannedLessons', 'lernziele'])
+                          .hasOnly(['messages', 'plannedLessons', 'lernziele', 'studentLastRead'])
                         && (!('expiresAt' in resource.data)
                             || resource.data.expiresAt > request.time.toMillis()));
     }

@@ -454,6 +454,11 @@ let codeData       = null;   // Aktueller Snapshot des accessCode-Dokuments
 let unsubLive      = null;   // Live-Listener
 let schuelerName   = '';
 let lastReadMsgTs  = 0;
+// Heutiges Datum als YYYY-MM-DD in ORTSZEIT. Die UTC-Umrechnung von
+// Date.toISOString liefert in deutscher Sommerzeit zwischen 00:00 und 02:00
+// den Vortag - eine Fahrstunde von gestern galt dann als "naechster Termin"
+// und liess sich noch bestaetigen oder absagen.
+const heuteLokal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 const ADK_FARBEN   = ['#555','#f85149','#f0b429','#f0b429','#3fb950','#3fb950','#f0b429'];
 const STUFEN_NAME  = ['–','Noch nicht','Kaum','Manchmal','Meistens','Sicher','⭐ Sehr sicher'];
 
@@ -471,9 +476,37 @@ setTimeout(() => {
   const saved = localStorage.getItem('adk_portal_code_doc') || sessionStorage.getItem('adk_portal_code_doc');
   if (saved) {
     const { docId, code } = JSON.parse(saved);
-    startLiveSession(docId, code);
+    // FIX: Hier fehlte die Ablaufpruefung, die doLogin() macht. Bei einem
+    // abgelaufenen Code lief der Einstieg direkt in den Live-Listener, den
+    // die Firestore-Regel dann ablehnt - der Schueler sah die technische
+    // Meldung "Live-Verbindung abgelehnt (permission-denied)" statt eines
+    // verstaendlichen Hinweises, und zwar bei jedem Aufruf erneut, weil der
+    // gespeicherte Eintrag nie entfernt wurde.
+    pruefeUndStarteSitzung(docId, code);
   }
 }, 300);
+
+async function pruefeUndStarteSitzung(docId, code) {
+  try {
+    const snap = await getDoc(doc(db, 'accessCodes', docId));
+    const data = snap.exists() ? snap.data() : null;
+    if (!data || (data.expiresAt && data.expiresAt < Date.now())) {
+      try { localStorage.removeItem('adk_portal_code_doc'); } catch(e) {}
+      try { sessionStorage.removeItem('adk_portal_code_doc'); } catch(e) {}
+      const errEl = document.getElementById('login-error');
+      if (errEl) errEl.textContent = 'Code abgelaufen – neuen Code beim Fahrlehrer holen.';
+      return;
+    }
+    startLiveSession(docId, code);
+  } catch(e) {
+    // Zugriff verweigert (z.B. Code inzwischen geloescht): sauber abmelden,
+    // statt den Schueler in einer Fehlermeldungsschleife festzuhalten.
+    try { localStorage.removeItem('adk_portal_code_doc'); } catch(_) {}
+    try { sessionStorage.removeItem('adk_portal_code_doc'); } catch(_) {}
+    const errEl = document.getElementById('login-error');
+    if (errEl) errEl.textContent = 'Bitte Code erneut eingeben.';
+  }
+}
 
 // ── Login ──────────────────────────────────────────────────────
 window.doLogin = async () => {
@@ -556,6 +589,13 @@ function startLiveSession(docId, code) {
   unsubLive = onSnapshot(doc(db,'accessCodes',docId), (snap) => {
     if (!snap.exists()) { doLogout(); return; }
     codeData = snap.data();
+    // FIX: lastReadMsgTs startete bei jedem Laden wieder bei 0 und wurde nie
+    // aus dem gespeicherten Lesestand wiederhergestellt. Dadurch galten nach
+    // jedem Neuladen des Portals ALLE je empfangenen Nachrichten wieder als
+    // ungelesen ("18 neue Nachrichten", dauerhaft). Nur beim ersten Snapshot
+    // uebernehmen, damit ein spaeteres Lesen in dieser Sitzung nicht
+    // ueberschrieben wird.
+    if (!lastReadMsgTs && codeData.studentLastRead) lastReadMsgTs = codeData.studentLastRead;
     onDataUpdate();
   }, (snapErr) => {
     console.error('DIAGNOSE onSnapshot accessCodes:', snapErr);
@@ -579,7 +619,7 @@ function onDataUpdate() {
 
   // Ungelesene Nachrichten
   const msgs   = codeData.messages || [];
-  const unread = msgs.filter(m => m.sender === 'fahrlehrer' && m.timestamp > lastReadMsgTs).length;
+  const unread = msgs.filter(m => m.sender === 'fahrlehrer' && (m.timestamp || m.createdAt || 0) > lastReadMsgTs).length;
   const badge  = document.getElementById('chat-badge');
   badge.textContent = unread;
   badge.style.display = unread > 0 ? 'flex' : 'none';
@@ -649,8 +689,8 @@ function renderDashboard() {
     .sort((a,b) => a.datum.localeCompare(b.datum));
 
   const pct      = Math.min(100, Math.round(((s.fahrstunden||0) / (s.zielStunden||30)) * 100));
-  const nextLesson = lessons.find(l => l.datum >= new Date().toISOString().split('T')[0]);
-  const unreadMsg  = msgs.filter(m => m.sender === 'fahrlehrer' && m.timestamp > lastReadMsgTs).length;
+  const nextLesson = lessons.find(l => l.datum >= heuteLokal());
+  const unreadMsg  = msgs.filter(m => m.sender === 'fahrlehrer' && (m.timestamp || m.createdAt || 0) > lastReadMsgTs).length;
 
   // Kommentar
   const kommentarHTML = s.pruefKommentar
@@ -803,7 +843,11 @@ window.toggleLernziel = async (index) => {
 
 // ── Chat ───────────────────────────────────────────────────────
 function renderChat() {
-  const msgs = (codeData.messages || []).sort((a,b) => a.timestamp - b.timestamp);
+  // Bereits gespeicherte Bildnachrichten des Fahrlehrers tragen nur
+  // 'createdAt' (siehe sendeChatBild) - ohne Rueckfall sortiert das hier
+  // per NaN und zeigt darunter "Invalid Date".
+  const zeitVon = (m) => m.timestamp || m.createdAt || 0;
+  const msgs = (codeData.messages || []).slice().sort((a,b) => zeitVon(a) - zeitVon(b));
   const wrap = document.getElementById('chat-messages');
 
   if (msgs.length === 0) {
@@ -822,12 +866,13 @@ function renderChat() {
   let __letzterTagPortal = null;
   wrap.innerHTML = msgs.map(m => {
     const isFL = m.sender === 'fahrlehrer';
-    const time = new Date(m.timestamp).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+    const zs = zeitVon(m);
+    const time = zs ? new Date(zs).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}) : '';
     let trenner = '';
-    const tagSchluessel = new Date(m.timestamp).toDateString();
-    if (tagSchluessel !== __letzterTagPortal) {
+    const tagSchluessel = zs ? new Date(zs).toDateString() : '';
+    if (zs && tagSchluessel !== __letzterTagPortal) {
       __letzterTagPortal = tagSchluessel;
-      trenner = `<div style="text-align:center;margin:14px 0 8px;font-size:0.72rem;color:var(--muted);font-weight:600">— ${tagLabelPortal(m.timestamp)} —</div>`;
+      trenner = `<div style="text-align:center;margin:14px 0 8px;font-size:0.72rem;color:var(--muted);font-weight:600">— ${tagLabelPortal(zs)} —</div>`;
     }
     const bildQuelle = m.imagePath || m.imageUrl;
     const inhalt = bildQuelle
@@ -886,7 +931,7 @@ window.sendMessage = async () => {
 
 // ── Planner ────────────────────────────────────────────────────
 function renderPlanner() {
-  const heute   = new Date().toISOString().split('T')[0];
+  const heute   = heuteLokal();
   const lessons = (codeData.plannedLessons || []).sort((a,b) => a.datum.localeCompare(b.datum));
   const upcoming = lessons.filter(l => l.datum >= heute);
   const past     = lessons.filter(l => l.datum <  heute);

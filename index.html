@@ -10219,9 +10219,16 @@ window.sendeChatBild = async (datei) => {
     const pfad = `chat-images/${docRef.id}/${Date.now()}.jpg`;
     const storage = getStorage(app, "gs://fahrschule-ebc65-eu-storage");
     await uploadBytes(ref(storage, pfad), blob, { contentType: 'image/jpeg' });
+    // FIX: Bildnachrichten des Fahrlehrers trugen bisher NUR 'createdAt'.
+    // Textnachrichten und die Bilder des Schuelers nutzen aber 'timestamp' -
+    // im Schueler-Portal blieb ein gesendetes Bild deshalb ohne Uhrzeit
+    // ("Invalid Date"), loeste nie den Ungelesen-Zaehler aus und landete
+    // beim Sortieren an unbestimmter Stelle. Beide Felder schreiben, damit
+    // alte wie neue Ansichten die Nachricht korrekt einordnen.
+    const jetzt = Date.now();
     const neueNachricht = {
-      id: Date.now().toString(), sender: 'fahrlehrer', senderName: currentUser.displayName || 'Fahrlehrer',
-      imagePath: pfad, createdAt: Date.now()
+      id: jetzt.toString(), sender: 'fahrlehrer', senderName: currentUser.displayName || 'Fahrlehrer',
+      imagePath: pfad, createdAt: jetzt, timestamp: jetzt
     };
     const bestehend = docRef.data().messages || [];
     await dbUpd(doc(db,'accessCodes',docRef.id), { messages: [...bestehend.slice(-49), neueNachricht] });

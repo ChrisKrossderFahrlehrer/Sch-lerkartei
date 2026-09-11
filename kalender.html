@@ -603,6 +603,10 @@ function fmt(ts){if(!ts)return'—';const d=ts.toDate?ts.toDate():new Date(ts);r
 function fmtTime(ts){if(!ts)return'—';const d=ts.toDate?ts.toDate():new Date(ts);return d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});}
 function fmtDatetime(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});}
 function escHtml(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+// Datum als YYYY-MM-DD in ORTSZEIT. toISOString() rechnet nach UTC um und
+// liefert in deutscher Sommerzeit zwischen 00:00 und 02:00 den Vortag - genau
+// die Stunden, in denen abends noch gearbeitet wird.
+function alsLokalesDatum(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function generateCode(){return Math.random().toString(36).substring(2,8).toUpperCase();}
 function show(screen){
   document.getElementById('splash').style.display=screen==='splash'?'flex':'none';
@@ -1446,8 +1450,10 @@ pages['admin-auslastung']=async function(el){
     <button class="btn btn-primary" onclick="loadAuslastung()">Auswerten</button>
   </div><div id="auslastung-content"></div></div>`;
   const now=new Date();
-  document.getElementById('aus-von').value=new Date(now.getFullYear(),now.getMonth(),1).toISOString().slice(0,10);
-  document.getElementById('aus-bis').value=new Date(now.getFullYear(),now.getMonth()+1,0).toISOString().slice(0,10);
+  // FIX: toISOString() rechnet nach UTC um - der 01.09. um 00:00 Ortszeit ist
+  // dort der 31.08., der Zeitraum lag also um einen Tag daneben.
+  document.getElementById('aus-von').value=alsLokalesDatum(new Date(now.getFullYear(),now.getMonth(),1));
+  document.getElementById('aus-bis').value=alsLokalesDatum(new Date(now.getFullYear(),now.getMonth()+1,0));
   await loadAuslastung();
 };
 window.loadAuslastung=async function(){
@@ -1736,8 +1742,12 @@ pages['lehrer-kalender']=function(el){
   liveOn(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid)),()=>renderCal());
 };
 window.setCalView=function(v){calView=v;document.querySelectorAll('.cal-view-btn').forEach(b=>b.classList.toggle('active',b.textContent.trim()===(v==='month'?'Monat':'Woche')));renderCal();};
-window.calPrev=function(){if(calView==='month')calDate.setMonth(calDate.getMonth()-1);else weekStart=new Date(weekStart.getFullYear(),weekStart.getMonth(),weekStart.getDate()-7);renderCal();};
-window.calNext=function(){if(calView==='month')calDate.setMonth(calDate.getMonth()+1);else weekStart=new Date(weekStart.getFullYear(),weekStart.getMonth(),weekStart.getDate()+7);renderCal();};
+// FIX: setMonth() behielt den Tag im Monat bei - vom 31.05. aus landete
+// "ein Monat zurueck" auf dem 31. April, den es nicht gibt, und damit
+// wieder im Mai: der Kalender blieb haengen. Ueber den 1. des Monats
+// navigieren umgeht das.
+window.calPrev=function(){if(calView==='month')calDate=new Date(calDate.getFullYear(),calDate.getMonth()-1,1);else weekStart=new Date(weekStart.getFullYear(),weekStart.getMonth(),weekStart.getDate()-7);renderCal();};
+window.calNext=function(){if(calView==='month')calDate=new Date(calDate.getFullYear(),calDate.getMonth()+1,1);else weekStart=new Date(weekStart.getFullYear(),weekStart.getMonth(),weekStart.getDate()+7);renderCal();};
 
 async function renderCal(){
   const label=document.getElementById('cal-month-label'),grid=document.getElementById('cal-grid');
@@ -2008,7 +2018,11 @@ window.addSlot=async function(year,month,day){
   if(bd<15)return toast('Dauer mindestens 15 Minuten.','error');
   const[fh,fm]=from.split(':').map(Number);const tot=fh*60+fm+bd;
   const st=Timestamp.fromDate(new Date(year,month,day,fh,fm));
-  const et=Timestamp.fromDate(new Date(year,month,day,Math.floor(tot/60)%24,tot%60));
+  // FIX: Math.floor(tot/60)%24 kappte die Stunde, ohne den Tag zu erhoehen -
+  // ein Slot am 12.11. um 23:30 mit 60 Minuten bekam als Ende den 12.11.
+  // 00:30, also 23 Stunden VOR dem Start. Minuten direkt uebergeben:
+  // JavaScript rollt den Tag dann selbst korrekt weiter.
+  const et=Timestamp.fromDate(new Date(year,month,day,0,fh*60+fm+bd));
   try{
     await addDoc(collection(db,'slots'),{lehrerUid:currentUser.uid,type,startTime:st,endTime:et,bookedBy:null,schoolId:currentSchoolId,createdAt:serverTimestamp()});
   }catch(e){
@@ -2099,11 +2113,22 @@ async function publishMyBookingLink(){
   try{
     const snap=await getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid)));
     let _blocks=[];try{const _bs=await getDocs(query(collection(db,'blocked'),where('lehrerUid','==',currentUser.uid)));_blocks=_bs.docs.map(d=>({id:d.id,...d.data()}));}catch(e){}
+    // FIX: Hier wurden bisher NUR die 'blocked'-Zeiten beruecksichtigt, nicht
+    // aber Urlaub und schulweite Sperrtage - beide werden im Kalender des
+    // Fahrlehrers sonst ueberall geprueft. Ein vor dem Urlaub angelegter Slot
+    // blieb dadurch im oeffentlichen Buchungslink sichtbar und buchbar,
+    // obwohl der Fahrlehrer nachweislich im Urlaub ist.
+    let _urlaub=[];try{const _us=await getDocs(query(collection(db,'urlaub'),where('lehrerUid','==',currentUser.uid)));_urlaub=_us.docs.map(d=>d.data());}catch(e){}
+    const _sperrtage=new Set();
+    try{
+      const _gs=await getDocs(query(collection(db,'globalBlocked'),where('schoolId','==',currentSchoolId||'__none__')));
+      _gs.docs.forEach(d=>{const b=d.data();_sperrtage.add(b.year+'-'+b.month+'-'+b.day);});
+    }catch(e){}
     const nowMs=Date.now();
     const _dayKey=dt=>dt.getFullYear()+'-'+dt.getMonth()+'-'+dt.getDate();
     const _committedByDay={};
     snap.docs.forEach(d=>{const s=d.data();if(!s.startTime||!s.startTime.toDate||!s.endTime||!s.endTime.toDate)return;if(!(s.bookedBy||s.auto!==true))return;const a=s.startTime.toDate();_committedByDay[_dayKey(a)]=(_committedByDay[_dayKey(a)]||0)+Math.round((s.endTime.toDate()-a)/60000);});
-    const freieSlots=snap.docs.filter(d=>{const s=d.data();if(s.bookedBy||!s.startTime||s.startTime.toDate().getTime()<nowMs)return false;const _sd=s.startTime.toDate(),_ed=s.endTime.toDate();if(_slotBlocked(_sd,_sd.getHours()*60+_sd.getMinutes(),_ed.getHours()*60+_ed.getMinutes(),_blocks))return false;const _dur=Math.round((_ed-_sd)/60000);const _wouldBe=(_committedByDay[_dayKey(_sd)]||0)+(s.auto===true?_dur:0);if(_wouldBe>MAX_FAHRZEIT_MIN)return false;return true;})
+    const freieSlots=snap.docs.filter(d=>{const s=d.data();if(s.bookedBy||!s.startTime||s.startTime.toDate().getTime()<nowMs)return false;const _sd=s.startTime.toDate(),_ed=s.endTime.toDate();if(_slotBlocked(_sd,_sd.getHours()*60+_sd.getMinutes(),_ed.getHours()*60+_ed.getMinutes(),_blocks))return false;if(urlaubCoversDate(_urlaub,_sd))return false;if(_sperrtage.has(_sd.getFullYear()+'-'+_sd.getMonth()+'-'+_sd.getDate()))return false;const _dur=Math.round((_ed-_sd)/60000);const _wouldBe=(_committedByDay[_dayKey(_sd)]||0)+(s.auto===true?_dur:0);if(_wouldBe>MAX_FAHRZEIT_MIN)return false;return true;})
       .map(d=>{const s=d.data();return{id:d.id,start:s.startTime.toDate().toISOString(),ende:s.endTime.toDate().toISOString(),type:s.type||'fahrstunde'};});
     const lehrerName=(((currentProfile&&currentProfile.fname)||'')+' '+((currentProfile&&currentProfile.lname)||'')).trim();
     let aktiv=true;
