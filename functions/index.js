@@ -1375,3 +1375,59 @@ exports.taeglichesAufraeumen = onSchedule(
     console.log('Taegliches Aufraeumen fertig:', JSON.stringify(bericht));
   }
 );
+
+// ═══════════════════════════════════════════════════════════════════
+// BUCHUNGSZAEHLER (bookedCount) SERVERSEITIG FUEHREN
+//
+// Bisher zaehlte der CLIENT: beim Bestaetigen einer Anfrage hoch, beim
+// Stornieren durch den Fahrlehrer wieder runter. Der Schueler-Selbststorno
+// (kalender.html, storniereMeinen) konnte das gar nicht - er ist nicht
+// angemeldet und darf das schueler-Dokument nach den Regeln nicht
+// beschreiben. Folge: Storniert ein Schueler fristgerecht, bleibt sein
+// Kontingent verbraucht. Nach 12 Buchungen und 6 Stornos stand 12/20,
+// gefahren waren 6 - und bei 20 war der Buchungslink gesperrt, obwohl nur
+// 14 Stunden stattfanden.
+//
+// Dieser Trigger haengt am Slot selbst und deckt damit ALLE Wege ab
+// (Fahrlehrer, Schueler, Tausch). Die Zaehlung im Client wurde im Gegenzug
+// entfernt - sonst wuerde doppelt gezaehlt. Die Transaktion klammert den
+// Wert zusaetzlich bei 0, damit bereits entstandene Abweichungen sich mit
+// der Zeit von selbst auswachsen statt ins Negative zu laufen.
+// ═══════════════════════════════════════════════════════════════════
+exports.syncBookedCount = onDocumentUpdated('slots/{slotId}', async (event) => {
+  const vorher  = event.data.before.data();
+  const nachher = event.data.after.data();
+  if (!vorher || !nachher) return;
+  const vonId = vorher.bookedBy || null;
+  const nachId = nachher.bookedBy || null;
+  if (vonId === nachId) return; // keine Buchungsaenderung
+
+  const db = admin.firestore();
+  const schritte = [];
+  if (vonId)  schritte.push([vonId, -1]);
+  if (nachId) schritte.push([nachId, +1]);
+
+  for (const [schuelerId, delta] of schritte) {
+    try {
+      const neuerStand = await db.runTransaction(async (tx) => {
+        const ref = db.doc(`schueler/${schuelerId}`);
+        const snap = await tx.get(ref);
+        if (!snap.exists) return null;
+        const wert = Math.max(0, (snap.data().bookedCount || 0) + delta);
+        tx.update(ref, { bookedCount: wert });
+        return wert;
+      });
+      // Der Client veroeffentlicht den Zaehler direkt nach seiner Aenderung an
+      // das Schueler-Portal (bookingStudents) - zu diesem Zeitpunkt ist dieser
+      // Trigger aber unter Umstaenden noch gar nicht gelaufen, der Schueler
+      // saehe also den alten Stand. Deshalb hier nachziehen.
+      if (neuerStand !== null) {
+        await db.doc(`bookingStudents/${schuelerId}`)
+          .set({ bookedCount: neuerStand }, { merge: true })
+          .catch(() => {});
+      }
+    } catch (e) {
+      console.warn('bookedCount fuer', schuelerId, 'fehlgeschlagen:', e.message);
+    }
+  }
+});

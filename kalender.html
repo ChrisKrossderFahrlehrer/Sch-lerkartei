@@ -405,7 +405,7 @@ tr:last-child td{border-bottom:none;}
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, collection, query, where, orderBy, serverTimestamp, Timestamp, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, collection, query, where, orderBy, serverTimestamp, Timestamp, onSnapshot, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
 
@@ -1615,6 +1615,27 @@ window.deleteUrlaub=async function(id){
   const fu=currentRole==='lehrer'?currentUser.uid:null;
   await renderUrlaubList(fu);
 };
+// Bereits gestellte Terminanfragen ueberdauern das Neuladen der Seite.
+// Schluessel pro Schueler-Link, damit sich mehrere Links auf einem Geraet
+// nicht in die Quere kommen.
+//
+// Bewusst mit Verfallsdatum: Lehnt der Fahrlehrer eine Anfrage ab, erfaehrt
+// der Schueler das nicht (er darf bookingRequests nach den Regeln nicht
+// lesen). Ohne Verfall bliebe der Termin fuer ihn dauerhaft unsichtbar,
+// obwohl er wieder frei ist. Nach 48 Stunden taucht er wieder auf.
+const ANFRAGE_MERK_MS = 48*60*60*1000;
+function anfragenSchluessel(schuelerId){return 'fs_anfragen_'+schuelerId;}
+function ladeAnfragenLokal(schuelerId){
+  try{
+    const roh=JSON.parse(localStorage.getItem(anfragenSchluessel(schuelerId))||'{}');
+    const grenze=Date.now()-ANFRAGE_MERK_MS;const frisch={};
+    for(const[slotId,ts]of Object.entries(roh)){if(typeof ts==='number'&&ts>grenze)frisch[slotId]=ts;}
+    return frisch;
+  }catch(e){return {};}
+}
+function merkeAnfrageLokal(schuelerId,slotId){
+  try{const a=ladeAnfragenLokal(schuelerId);a[slotId]=Date.now();localStorage.setItem(anfragenSchluessel(schuelerId),JSON.stringify(a));}catch(e){}
+}
 function urlaubCoversDate(list,date){
   for(const u of list){const v=new Date(u.von+'T00:00:00'),b=new Date(u.bis+'T23:59:59');if(date>=v&&date<=b)return u;}return null;
 }
@@ -2241,12 +2262,32 @@ window.bestaetigeBuchung=async function(reqId){
       const _neu=slotsTotalMin(_dayS)+(_ss.auto===true?_dur:0);
       if(_neu>MAX_FAHRZEIT_MIN){await updateDoc(doc(db,'bookingRequests',reqId),{status:'abgelehnt',grund:'Tagesgrenze von '+MAX_FAHRZEIT_MIN+' Min erreicht',bearbeitetAt:serverTimestamp()});toast('Tagesgrenze von '+MAX_FAHRZEIT_MIN+' Min erreicht – nicht bestätigt.','error');renderBookingRequests();renderBestaetigteBuchungen();return;}
     }catch(e){console.warn('495-check',e);}
-    await updateDoc(doc(db,'slots',req.slotId),{bookedBy:req.schuelerId,bookedAt:serverTimestamp()});
+    // FIX: Das war bisher ein reines updateDoc ohne Prüfung. Zwischen dem
+    // Laden der Anfrage und diesem Schreibvorgang konnte der Slot längst
+    // anderweitig vergeben sein - zwei Schüler bekamen denselben Termin, und
+    // ein doppelter Tipp auf "✓" zählte den Zähler zweimal hoch. Die
+    // Transaktion prüft unmittelbar vor dem Schreiben, dass der Slot noch
+    // frei ist, und bricht sonst sauber ab.
+    try{
+      await runTransaction(db, async (tx)=>{
+        const ref=doc(db,'slots',req.slotId);
+        const akt=await tx.get(ref);
+        if(!akt.exists())throw new Error('Der Termin existiert nicht mehr.');
+        const belegt=akt.data().bookedBy;
+        if(belegt && belegt!==req.schuelerId)throw new Error('Der Termin ist bereits vergeben.');
+        if(belegt===req.schuelerId)return; // schon gebucht, nichts zu tun
+        tx.update(ref,{bookedBy:req.schuelerId,bookedAt:serverTimestamp()});
+      });
+    }catch(txErr){
+      toast(txErr.message||'Termin konnte nicht gebucht werden.','error');
+      renderBookingRequests();renderBestaetigteBuchungen();return;
+    }
     if(req.tausch && req.swapSlotId){
       try{const oldSnap=await getDoc(doc(db,'slots',req.swapSlotId));if(oldSnap.exists()&&oldSnap.data().bookedBy===req.schuelerId){await updateDoc(doc(db,'slots',req.swapSlotId),{bookedBy:null,bookedAt:null});}}catch(e){}
-    } else {
-      try{const sc=await getDoc(doc(db,SCHUELER_COLL,req.schuelerId));if(sc.exists())await updateDoc(doc(db,SCHUELER_COLL,req.schuelerId),{bookedCount:(sc.data().bookedCount||0)+1});}catch(e){}
     }
+    // bookedCount wird NICHT mehr hier gezählt - das übernimmt jetzt der
+    // Trigger syncBookedCount serverseitig, der auch den Schüler-Selbststorno
+    // mit abdeckt (den der Client gar nicht zählen konnte).
     await updateDoc(doc(db,'bookingRequests',reqId),{status:'bestätigt',bearbeitetAt:serverTimestamp()});
     await publishMyBookingLink();
     try{await publishStudentBookings(req.schuelerId);}catch(e){}
@@ -2275,7 +2316,8 @@ async function renderBestaetigteBuchungen(){
 window.cancelBookingLehrer=async function(id){
   const[sSnap,lSnap]=await Promise.all([getDoc(doc(db,'slots',id)),getDoc(doc(db,'kalenderUsers',currentUser.uid))]);
   const slot=sSnap.data();await updateDoc(doc(db,'slots',id),{bookedBy:null,bookedAt:null});
-  if(slot.bookedBy){const scSnap=await getDoc(doc(db,SCHUELER_COLL,slot.bookedBy));if(scSnap.exists())await updateDoc(doc(db,SCHUELER_COLL,slot.bookedBy),{bookedCount:Math.max(0,(scSnap.data().bookedCount||1)-1)});}
+  // bookedCount wird jetzt vom Trigger syncBookedCount serverseitig gepflegt -
+  // hier nicht mehr mitzählen, sonst würde doppelt heruntergezählt.
   await triggerEmail('stornierung_freigeworden',{datum:slot.startTime.toDate().toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}),von:fmtTime(slot.startTime),bis:fmtTime(slot.endTime),typ:typeLabel(slot.type),lehrerName:lSnap.data().fname+' '+lSnap.data().lname,lehrerUid:currentUser.uid,slotId:id});
   try{await publishMyBookingLink();}catch(e){}
   if(slot.bookedBy){try{await publishStudentBookings(slot.bookedBy);}catch(e){}}
@@ -2741,6 +2783,7 @@ function renderBookingPageContent(schuelerId,lehrerUid,linkData,stud,complete,wl
   const meine=((stud&&stud.meineTermine)||[]).filter(t=>t&&t.start).sort((a,b)=>a.start.localeCompare(b.start));
   window.__bookingMeine=meine;window.__bookingStud=stud;
   const aktiv=!!(linkData&&linkData.aktiv!==false);
+  window.__meineAnfragen=Object.assign({}, ladeAnfragenLokal(schuelerId), window.__meineAnfragen||{});
   const slots=aktiv?((linkData.freieSlots||[]).filter(s=>s&&s.start&&new Date(s.start).getTime()>Date.now()).filter(s=>!(window.__meineAnfragen&&window.__meineAnfragen[s.id])).sort((a,b)=>a.start.localeCompare(b.start))):[];
   window.__bookingCtx={schuelerId,lehrerUid,vorname,slots};
   const _freeIds=slots.map(s=>s.id).filter(Boolean);
@@ -2904,7 +2947,12 @@ window.sendeBuchungsanfrage=async function(schuelerId,lehrerUid,vorname,slot){
   const content=document.getElementById('booking-content');
   try{
     await addDoc(collection(db,'bookingRequests'),{lehrerUid,schuelerId,vorname:vorname||'',slotId:slot.id,start:slot.start,ende:slot.ende,type:slot.type||'fahrstunde',status:'angefragt',createdAt:serverTimestamp()});
+    // FIX: __meineAnfragen lebte nur im Speicher. Nach einem Neuladen der
+    // Seite sah der Schueler denselben Slot wieder als frei und fragte ihn
+    // ein zweites Mal an - beim Fahrlehrer landeten zwei Anfragen fuer
+    // denselben Termin. Jetzt zusaetzlich lokal gemerkt.
     ((window.__meineAnfragen = window.__meineAnfragen || {})[slot.id] = true);
+    merkeAnfrageLokal(schuelerId, slot.id);
     __bookingUnsub.forEach(u=>{try{u();}catch(e){}});__bookingUnsub=[];
     if(content)content.innerHTML='<div class="booking-card" style="text-align:center;padding:34px 20px"><div style="font-size:2.8rem;margin-bottom:14px">✅</div><h2 style="margin:0 0 8px;font-size:1.2rem">Anfrage gesendet!</h2><p class="text-muted" style="line-height:1.5">Dein Fahrlehrer bekommt deine Terminanfrage und bestätigt sie in Kürze. Du kannst diese Seite jetzt schließen.</p><button class="btn btn-secondary" style="margin-top:16px" onclick="zurBuchungsUebersicht()">Zurück zur Übersicht</button></div>';
   }catch(e){console.warn(e);toast('Anfrage fehlgeschlagen. Bitte erneut versuchen.','error');}
