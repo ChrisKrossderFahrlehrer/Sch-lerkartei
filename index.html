@@ -570,6 +570,142 @@ body.punkte-brutal .stufe-form {
   box-shadow: 0 4px 14px rgba(0,0,0,0.25) !important;
 }
 
+/* Stil "Editorial" - der ruhige, erwachsene Gegenentwurf zu den drei
+   bisherigen Stilen. Das Prinzip ist bewusst Weglassen: keine Verlaeufe,
+   kein Leuchten, keine versetzten 3D-Schatten, kein Plastik. Uebrig bleiben
+   Papier, Haarlinie und Schrift - wie im Satzspiegel einer guten Zeitschrift.
+   Wichtig dabei: Es soll GLEICHMAESSIG wirken. Deshalb bekommt hier wirklich
+   jede Flaeche denselben Radius, denselben 1px-Rand und gar keinen Schatten -
+   im Standard-Look sind Radien und Schatten je nach Bauteil unterschiedlich
+   (8px bis 20px, mal hart versetzt, mal weich), was lebendig aussieht, aber
+   eben nicht ruhig. Die Akzentfarbe traegt allein, sie wird sparsam gesetzt. */
+.style-editorial {
+  --bg: #0f0f10;
+  --surface: #151517;
+  --surface2: #1b1b1e;
+  --border: #2c2c30;
+  --text: #ece9e4;
+  --muted: #8b8b92;
+  --accent: #e3b04b;
+  --accent2: #7fa88c;
+  --blue: #92a9d4;
+  --danger: #e0685c;
+  --radius: 6px;
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lift: 0 10px 40px rgba(0,0,0,0.5);
+}
+.style-editorial.light {
+  --bg: #f5f3ef;
+  --surface: #fffefb;
+  --surface2: #eceae4;
+  --border: #dcd7ce;
+  --text: #17171a;
+  --muted: #6d6960;
+  --accent: #8a5f12;
+  --accent2: #3d6a49;
+  --blue: #2f4f8f;
+  --danger: #a5382a;
+  --shadow-lift: 0 10px 40px rgba(23,23,26,0.14);
+}
+/* Alle Flaechen nach exakt demselben Rezept: ein Radius, eine Haarlinie,
+   kein Schatten. Das !important ist noetig, weil einzelne Bauteile ihre
+   Schatten mit hoeherer Spezifitaet setzen (z.B. body.light .student-card). */
+.style-editorial .card, .style-editorial .list-item, .style-editorial .modal-sheet,
+.style-editorial .preview-tile, .style-editorial .student-card, .style-editorial .tile,
+.style-editorial .stat-chip, .style-editorial .section-block {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+}
+/* Bauteile, deren Hintergrund einen ZUSTAND anzeigt (erledigt, angehakt),
+   bekommen nur die Geometrie - die Farbe muessen sie behalten duerfen,
+   sonst ist z.B. an einer erledigten Sonderfahrt nichts mehr zu sehen. */
+.style-editorial .sonder-item, .style-editorial .custom-field-row,
+.style-editorial .thema-row {
+  border-radius: 6px !important;
+  box-shadow: none !important;
+}
+.style-editorial .modal-sheet { border-radius: 6px 6px 0 0 !important; }
+@media (hover:hover) {
+  .style-editorial .student-card:hover { transform: none; border-color: var(--accent) !important; }
+}
+.style-editorial .student-card:active { transform: none; }
+/* Hauptknoepfe: flache Flaeche in der Akzentfarbe, kein Verlauf, kein
+   Versatz beim Druecken - gedrueckt wird nur die Deckkraft zurueckgenommen. */
+.style-editorial .btn-main, .style-editorial .btn-sheet-ok, .style-editorial .fab {
+  background: var(--accent);
+  color: #14140f;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  box-shadow: none;
+}
+/* Im hellen Modus ist die Akzentfarbe ein dunkles Bronze - darauf muss die
+   Schrift weiss sein, sonst reicht der Kontrast nicht (WCAG AA). */
+.style-editorial.light .btn-main, .style-editorial.light .btn-sheet-ok,
+.style-editorial.light .fab { color: #fffefb; }
+.style-editorial .btn-main:active, .style-editorial .btn-sheet-ok:active,
+.style-editorial .fab:active {
+  transform: none; box-shadow: none; opacity: 0.82;
+}
+@media (hover:hover) {
+  .style-editorial .fab:hover { transform: none; box-shadow: none; opacity: 0.9; }
+}
+/* Neben-Bedienelemente und Eingabefelder: gleiche Kante, gleicher Radius. */
+.style-editorial .btn-back, .style-editorial .btn-icon-sm, .style-editorial .scope-btn,
+.style-editorial .klasse-choice-btn, .style-editorial .btn-sheet-cancel,
+.style-editorial .step-btn, .style-editorial .s-btn, .style-editorial .dot-btn,
+.style-editorial .form-input, .style-editorial .search-input,
+.style-editorial .notes-textarea, .style-editorial .save-btn,
+.style-editorial .delete-btn, .style-editorial .btn-add-field,
+.style-editorial .tab-btn, .style-editorial .custom-checkbox {
+  border-radius: 6px;
+  box-shadow: none;
+}
+.style-editorial .btn-back:active, .style-editorial .btn-icon-sm:active,
+.style-editorial .scope-btn:active, .style-editorial .klasse-choice-btn:active,
+.style-editorial .btn-sheet-cancel:active {
+  transform: none; box-shadow: none; opacity: 0.82;
+}
+/* Der Fokus-Rahmen muss bleiben: Das pauschale box-shadow:none oben wuerde
+   sonst auch den Ring um das gerade aktive Eingabefeld verschlucken - fuer
+   Tastatur-Bedienung waere das ein Rueckschritt. Hier also derselbe Ring
+   fuer alle Felder, nur ruhiger als im Standard-Look. */
+.style-editorial .form-input:focus, .style-editorial .search-input:focus,
+.style-editorial .notes-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 32%, transparent);
+}
+/* Ausgewaehlte Filter/Auswahlknoepfe folgen der Akzentfarbe des Stils
+   statt dem fest eingebauten Gold des Standard-Looks. */
+.style-editorial .scope-btn.active {
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  border-color: var(--accent);
+  color: var(--accent);
+}
+/* Runde Bildpunkte bleiben rund - aber ohne die eingepraegten Glanzlichter,
+   die im Standard-Look fuer Plastik sorgen. */
+.style-editorial .avatar, .style-editorial .list-avatar {
+  box-shadow: none; text-shadow: none;
+}
+/* Die Schrift traegt den Stil: Titel enger gesetzt, Rubriken als gesperrte
+   Versalien mit klarem Kontrast statt als graue Nebensache. */
+.style-editorial .app-title, .style-editorial .header-title,
+.style-editorial .profile-name, .style-editorial .sheet-title,
+.style-editorial .stunden-big, .style-editorial .stat-val {
+  letter-spacing: -0.03em;
+}
+.style-editorial .section-title {
+  letter-spacing: 0.16em;
+  font-weight: 700;
+  color: var(--text);
+}
+.style-editorial .chat-bubble {
+  border-radius: 6px !important;
+  box-shadow: none !important;
+}
+
 .empty-state { text-align:center; padding:60px 24px; color:var(--muted); }
 .empty-state .ei { font-size:3rem; margin-bottom:12px; }
 .empty-state p { font-size:0.9rem; line-height:1.6; }
@@ -10004,16 +10140,21 @@ window.saveNameAendern = async () => {
 // gelten dadurch schon in der Vorschau, ganz ohne Sonderfall-Code.
 const STILE = [
   { id: '',              name: 'Standard',      beschreibung: 'Der bisherige Look, unveraendert.' },
-  { id: 'style-strasse', name: 'Neubrutalism',  beschreibung: 'Kraeftige Farben, dicke Kanten, harter Schatten.' },
+  { id: 'style-strasse', name: 'Neubrutalism',  beschreibung: 'Kraeftige Farben, dicke Kanten, harter Schatten.', punkt: '3px' },
   { id: 'style-modern',  name: 'Modern',        beschreibung: 'Glasig, mehr Tiefe, dezentes Leuchten.' },
   { id: 'style-neumorph',name: 'Neumorphism',   beschreibung: 'Weich, wie aus einem Guss, kaum Kanten.' },
+  { id: 'style-editorial',name:'Editorial',     beschreibung: 'Ruhig und gleichmaessig: Papier, Haarlinie, Schrift.', punkt: '4px' },
 ];
 
 function previewKachel(stil) {
   const aktiv = (localStorage.getItem('fs_stil') || '') === stil.id;
-  return `<div class="${stil.id}" onclick="waehleStil('${stil.id}')" style="cursor:pointer;border:2px solid ${aktiv ? 'var(--accent)' : 'var(--border)'};border-radius:14px;padding:14px;display:flex;align-items:center;gap:14px;background:var(--bg)">
+  // FIX: Die Vorschau bekam bisher nur die Stil-Klasse, nie die Klasse 'light'.
+  // Im hellen Modus zeigten alle Kacheln deshalb die DUNKLE Variante des
+  // jeweiligen Stils - man waehlte also etwas anderes aus, als man sah.
+  const hell = document.body.classList.contains('light') ? ' light' : '';
+  return `<div class="${stil.id}${hell}" onclick="waehleStil('${stil.id}')" style="cursor:pointer;border:2px solid ${aktiv ? 'var(--accent)' : 'var(--border)'};border-radius:14px;padding:14px;display:flex;align-items:center;gap:14px;background:var(--bg)">
     <div class="preview-tile" style="width:64px;height:56px;flex-shrink:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;gap:5px">
-      <div class="preview-dot active" style="width:16px;height:16px;border-radius:${stil.id==='style-strasse' ? '3px' : '50%'};background:var(--accent)"></div>
+      <div class="preview-dot active" style="width:16px;height:16px;border-radius:${stil.punkt || '50%'};background:var(--accent)"></div>
       <div style="width:20px;height:5px;border-radius:3px;background:var(--border)"></div>
     </div>
     <div style="flex:1">
@@ -10029,7 +10170,12 @@ window.openStilAuswahl = () => {
 };
 
 window.waehleStil = (id) => {
-  document.body.classList.remove('style-strasse', 'style-modern');
+  // FIX: Die zu entfernenden Klassen standen hier von Hand drin - und
+  // 'style-neumorph' fehlte. Wer diesen Stil einmal gewaehlt hatte, wurde ihn
+  // nie wieder los: Die Klasse blieb am body kleben und ueberlagerte sich mit
+  // jedem weiteren Stil, auch mit "Standard". Die Liste kommt jetzt aus STILE
+  // selbst, damit sie bei neuen Stilen nicht wieder auseinanderlaufen kann.
+  STILE.forEach(s => { if (s.id) document.body.classList.remove(s.id); });
   if (id) document.body.classList.add(id);
   localStorage.setItem('fs_stil', id);
   document.getElementById('stil-liste').innerHTML = STILE.map(previewKachel).join('');
