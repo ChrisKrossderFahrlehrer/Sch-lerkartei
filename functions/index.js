@@ -685,11 +685,24 @@ async function stripeVerlaengerungsRechnung(invoice, stripeEventId) {
   // Nur echte Verlaengerungen - die allererste Zahlung laeuft bereits ueber
   // checkout.session.completed/stripeAboAktivierenUndRechnung; wuerde man
   // sie hier zusaetzlich verarbeiten, entstuenden doppelte Rechnungen.
-  if (invoice.billing_reason !== 'subscription_cycle' || !invoice.subscription) return;
+  if (invoice.billing_reason !== 'subscription_cycle') return;
   if (!invoice.amount_paid) return;
 
+  // Stripe hat mit der API-Version 2025-03-31 ("basil") umgebaut: Das
+  // zugehoerige Abo steht seither nicht mehr unter invoice.subscription,
+  // sondern unter invoice.parent.subscription_details.subscription. Wird nur
+  // das alte Feld gelesen, ueberspringt diese Funktion auf neueren
+  // API-Versionen STILLSCHWEIGEND jede Verlaengerung - es entstuende nie
+  // wieder eine Rechnung. Beide Formen lesen, damit es unabhaengig von der
+  // im Stripe-Konto eingestellten Version funktioniert.
+  const abo = (invoice.parent &&
+               invoice.parent.subscription_details &&
+               invoice.parent.subscription_details.subscription)
+            || invoice.subscription;
+  if (!abo) return;
+
   const stripe = new Stripe(STRIPE_SECRET_KEY.value());
-  const subId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription.id;
+  const subId = typeof abo === 'string' ? abo : abo.id;
   const sub = await stripe.subscriptions.retrieve(subId);
   const { billingColl, billingId, plan, planer } = sub.metadata || {};
   if (!billingColl || !billingId || !plan) return;
