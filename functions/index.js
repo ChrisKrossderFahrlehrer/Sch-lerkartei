@@ -760,8 +760,14 @@ exports.stripeWebhook = onRequest(
         // SEPA-Lastschrift wurde jetzt tatsaechlich bestaetigt.
         const session = event.data.object;
         await stripeAboAktivierenUndRechnung(session, event.id, 'SEPA-Lastschrift');
-      } else if (event.type === 'invoice.paid') {
+      } else if (event.type === 'invoice.paid' || event.type === 'invoice.payment_succeeded') {
         // Monatliche Abo-Verlaengerung (siehe stripeVerlaengerungsRechnung).
+        // Stripe kennt zwei Ereignisse fuer dieselbe Sache; welches davon sich
+        // im Dashboard auswaehlen laesst, haengt von der Oberflaeche und der
+        // API-Version ab. Beide werden akzeptiert - sind versehentlich BEIDE
+        // aktiviert, entsteht trotzdem nur eine Rechnung, weil die
+        // Dokument-Kennung aus der Rechnungs-ID abgeleitet ist und der zweite
+        // Versuch an ALREADY_EXISTS scheitert.
         await stripeVerlaengerungsRechnung(event.data.object, event.id);
       } else if (event.type === 'checkout.session.async_payment_failed') {
         const session = event.data.object;
