@@ -780,11 +780,56 @@ exports.stripeWebhook = onRequest(
 // umgeht Rules) und gibt NUR die Dokument-ID zurueck, wenn Code + Ablauf
 // passen - der Client liest die eigentlichen Daten danach ganz normal per
 // get() (bereits durch die bestehende accessCodes/get-Regel erlaubt).
+// Einfache Versuchsbremse pro Absender-Adresse. Bewusst "fail-open": Geht
+// beim Zaehlen selbst etwas schief, wird der Zugang NICHT verweigert - ein
+// kaputter Zaehler darf keine Schueler aussperren.
+async function versuchErlaubt(kennung, maxProStunde) {
+  if (!kennung) return true;
+  const FENSTER_MS = 60 * 60 * 1000;
+  // Adresse nicht im Klartext ablegen (waere selbst wieder ein
+  // personenbezogenes Datum) - eine gekuerzte Pruefsumme genuegt zum Zaehlen.
+  const id = require('crypto').createHash('sha256').update(String(kennung)).digest('hex').slice(0, 32);
+  try {
+    return await admin.firestore().runTransaction(async (tx) => {
+      const ref = admin.firestore().doc(`rateLimits/${id}`);
+      const snap = await tx.get(ref);
+      const jetzt = Date.now();
+      const d = snap.exists ? snap.data() : null;
+      if (!d || (jetzt - (d.fensterStart || 0)) > FENSTER_MS) {
+        tx.set(ref, { fensterStart: jetzt, anzahl: 1 });
+        return true;
+      }
+      if ((d.anzahl || 0) >= maxProStunde) return false;
+      tx.update(ref, { anzahl: (d.anzahl || 0) + 1 });
+      return true;
+    });
+  } catch (e) {
+    console.warn('Versuchsbremse nicht auswertbar:', e.message);
+    return true;
+  }
+}
+
 exports.findeAltenZugangscode = onCall(async (request) => {
   const { code } = request.data || {};
   if (!code || typeof code !== 'string' || code.length < 4 || code.length > 40) {
     throw new HttpsError('invalid-argument', 'Ungueltiger Code.');
   }
+  // SICHERHEITS-AUDIT (eigener Fund): Diese Funktion ist bewusst ohne
+  // Anmeldung erreichbar - der Schueler hat ja kein Konto. Damit war sie
+  // aber auch ein unbegrenzt oft abfragbares Orakel, um Zugangscodes
+  // durchzuprobieren: ein Treffer liefert die Dokument-ID, und damit sind
+  // ueber die accessCodes-Leseregel Name, Lernstand und Chatverlauf des
+  // Schuelers abrufbar. 20 Versuche pro Stunde und Absender reichen fuer
+  // jeden echten Schueler, machen systematisches Durchprobieren aber
+  // unbrauchbar.
+  const absender = request.rawRequest && (
+    (request.rawRequest.headers && request.rawRequest.headers['x-forwarded-for']) ||
+    request.rawRequest.ip);
+  const ersteAdresse = String(absender || '').split(',')[0].trim();
+  if (!(await versuchErlaubt('code:' + ersteAdresse, 20))) {
+    throw new HttpsError('resource-exhausted', 'Zu viele Versuche. Bitte spaeter erneut versuchen.');
+  }
+
   const snap = await admin.firestore().collection('accessCodes')
     .where('code', '==', code).limit(1).get();
   if (snap.empty) return { found: false };

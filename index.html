@@ -3990,7 +3990,14 @@ onAuthStateChanged(auth, async (user) => {
         // Nachträglich angelegte Konten (nacherstellt) sind BESTEHENDE Nutzer
         // und werden NICHT auf den Warte-Bildschirm geschickt – nur echte
         // Neu-Registrierungen (ohne nacherstellt) warten auf Freigabe.
-        if (!istSuperadmin && effektiverStatus === 'ausstehend' && !profil.nacherstellt) {
+        // Die 'nacherstellt'-Ausnahme (selbst nachgelegtes Profil) darf nur
+        // greifen, solange das Konto für sich allein steht. Gehört es zu einer
+        // FREMDEN Fahrschule, muss der Warte-Bildschirm erscheinen: seit der
+        // Freigabe-Prüfung in den Firestore-Regeln bekäme der Nutzer sonst
+        // wortlos eine halb leere Kartei zu sehen (eigene Daten sichtbar, die
+        // der Schule nicht) und wüsste nicht, warum.
+        const gehoertZuFremderSchule = !!profil.fahrschuleId && profil.fahrschuleId !== user.uid;
+        if (!istSuperadmin && effektiverStatus === 'ausstehend' && (!profil.nacherstellt || gehoertZuFremderSchule)) {
           document.querySelectorAll('.screen').forEach(s => { s.classList.remove('active'); s.style.display=''; });
           document.getElementById('screen-warte').classList.add('active');
           document.getElementById('warte-name').textContent =
@@ -7126,11 +7133,16 @@ window.fahrschuleBeitreten = async () => {
     await dbUpd(doc(db, 'users', currentUser.uid), {
       fahrschuleId:   ziel.id,
       fahrschuleName: ziel.name || null,
-      beitrittCode:   code
+      beitrittCode:   code,
+      // Beitritt zu einer fremden Fahrschule bedeutet Zugriff auf deren
+      // komplette Kartei - das muss ein Mensch freigeben. Ohne diese Zeile
+      // behielte ein bereits freigegebenes Konto seinen 'aktiv'-Status und
+      // haette mit dem blossen Kenntnis des Fahrschul-Codes sofort Vollzugriff.
+      status:         'ausstehend'
     });
     currentUser._fahrschuleId = ziel.id;
-    if (msg) { msg.style.color='var(--accent2)'; msg.textContent='✅ Erfolgreich ' + (ziel.name || 'der Fahrschule') + ' beigetreten!'; }
-    toast('✅ Du gehörst jetzt zu ' + (ziel.name || 'der Fahrschule'));
+    if (msg) { msg.style.color='var(--accent2)'; msg.textContent='✅ Beitritt zu ' + (ziel.name || 'der Fahrschule') + ' angefragt – die Fahrschule muss dich noch freischalten.'; }
+    toast('✅ Beitritt angefragt – warte auf die Freischaltung durch die Fahrschule.');
     setTimeout(() => renderFscodeSection(), 1500);
   } catch(e) {
     console.error('fahrschuleBeitreten:', e);

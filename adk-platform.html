@@ -692,6 +692,21 @@ let alleFahrlehrer = [];   // einzelne Fahrlehrer (typ:'fahrlehrer') aus users
 // XSS-Schutz: Nutzereingaben (Namen, E-Mails) escapen, bevor sie via innerHTML
 // ins DOM kommen. Verhindert, dass z.B. ein Name mit <script> Code ausführt.
 function escHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+// Daten, die in einer JS-Zeichenkette INNERHALB eines HTML-Attributs landen
+// (z.B. onclick="tuWas('...')"), durchlaufen zwei Ebenen: Der Browser
+// dekodiert erst das Attribut, dann liest JavaScript die Zeichenkette.
+// Reines HTML-Escaping reicht dort NICHT - ein &quot; wird vor der
+// JS-Auswertung wieder zu einem echten Anfuehrungszeichen. Deshalb zuerst
+// fuer JavaScript entwerten, danach fuer HTML.
+function attrJs(s){
+  return String(s==null?'':s)
+    .replace(/\\/g,'\\\\')
+    .replace(/'/g,"\\'")
+    .replace(/&/g,'&amp;')
+    .replace(/"/g,'&quot;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;');
+}
 let unsubAlleLehrer = null;
 let passwordResets = [];
 let unsubPwResets  = null;
@@ -1304,8 +1319,8 @@ async function renderAbos() {
         <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px">
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
             <div style="flex:1;min-width:0">
-              <div style="font-weight:700;font-size:0.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${fs.name || fs.email || fs.id}</div>
-              <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">${fs.email||''} · ${created} ${ppId}</div>
+              <div style="font-weight:700;font-size:0.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(fs.name || fs.email || fs.id)}</div>
+              <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">${escHtml(fs.email||'')} · ${created} ${ppId}</div>
             </div>
             <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
               <span style="background:${aboBg[abo]||'var(--surface)'};color:${aboColor[abo]||'var(--muted)'};border-radius:8px;padding:3px 10px;font-size:0.72rem;font-weight:700">
@@ -1686,7 +1701,7 @@ async function renderSuperAdminEinst() {
       </div>
       <div class="form-group">
         <label class="form-label">Dein Name / Betreiber</label>
-        <input class="form-input" id="sa-imp-name" value="${imp.name||'Chriskoo'}" placeholder="z.B. Chriskoo">
+        <input class="form-input" id="sa-imp-name" value="${escHtml(imp.name||'Chriskoo')}" placeholder="z.B. Chriskoo">
       </div>
       <div class="form-group">
         <label class="form-label">Webseite</label>
@@ -1694,7 +1709,7 @@ async function renderSuperAdminEinst() {
       </div>
       <div class="form-group">
         <label class="form-label">E-Mail</label>
-        <input class="form-input" id="sa-imp-email" type="email" value="${imp.email||'kontakt@fahrsync.de'}" placeholder="kontakt@fahrsync.de">
+        <input class="form-input" id="sa-imp-email" type="email" value="${escHtml(imp.email||'kontakt@fahrsync.de')}" placeholder="kontakt@fahrsync.de">
       </div>
       <div class="form-group">
         <label class="form-label">PLZ</label>
@@ -2035,7 +2050,7 @@ window.openFsDetail = (fsId) => {
       <button class="btn-secondary" onclick="document.getElementById('modal-fs-detail').classList.remove('open')">Schließen</button>
       <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--danger)">
         <div style="font-size:0.7rem;color:var(--danger);text-align:center;margin-bottom:8px">⚠️ Unwiderruflich – löscht Fahrschule + alle Schüler &amp; Daten</div>
-        <button id="btn-del-fs-${fs.id}" data-armed="0" onclick="deleteFahrschuleComplete('${fs.id}','${(fs.name||'Fahrschule').replace(/'/g,'')}')" style="width:100%;background:transparent;border:1px solid var(--danger);color:var(--danger);border-radius:10px;padding:10px;font-size:0.82rem;font-weight:700;cursor:pointer">🗑️ Fahrschule löschen</button>
+        <button id="btn-del-fs-${fs.id}" data-armed="0" onclick="deleteFahrschuleComplete('${attrJs(fs.id)}','${attrJs(fs.name||'Fahrschule')}')" style="width:100%;background:transparent;border:1px solid var(--danger);color:var(--danger);border-radius:10px;padding:10px;font-size:0.82rem;font-weight:700;cursor:pointer">🗑️ Fahrschule löschen</button>
       </div>
     </div>
   `;
@@ -2275,11 +2290,11 @@ async function renderFsAdmin() {
         ${lehrer.map(l => `
           <div class="list-item" onclick="openLehrerDetail('${l.id}')">
             <div class="list-avatar" style="background:rgba(240,180,41,0.15);color:var(--accent)">
-              ${(l.name||'?').split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}
+              ${escHtml((l.name||'?').split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase())}
             </div>
             <div class="list-info">
-              <div class="list-name">${l.name}</div>
-              <div class="list-sub">${l.email}</div>
+              <div class="list-name">${escHtml(l.name)}</div>
+              <div class="list-sub">${escHtml(l.email)}</div>
             </div>
             <span class="badge badge-green">Aktiv</span>
           </div>`).join('')}

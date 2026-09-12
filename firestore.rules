@@ -61,9 +61,29 @@ service cloud.firestore {
       return isAuth() && userDocExists() && userData().rolle == 'fahrschul-admin';
     }
 
+    // SICHERHEITS-AUDIT (Cross-Tenant-Kette): Ist das Konto fuer die Fahrschule
+    // freigegeben? Der Freigabe-Status wurde bisher NUR im Bildschirm geprueft,
+    // nie in den Regeln. Wer sich mit einem Fahrschul-Code eintrug, konnte die
+    // gesamte Kartei der Schule lesen, BEVOR ihn jemand freigeschaltet hatte -
+    // und durfte sich beim Anlegen sogar selbst 'aktiv' setzen.
+    // Altkonten ohne das Feld gelten weiter als freigegeben, damit niemand
+    // ausgesperrt wird.
+    function istFreigegeben() {
+      return userDocExists() &&
+             userData().get('status', 'aktiv') != 'ausstehend' &&
+             userData().get('status', 'aktiv') != 'gesperrt';
+    }
+
     // Helper: Dokument gehört zum User (neue oder alte Struktur)
+    // Die Freigabe wird NUR verlangt, wenn man Daten einer FREMDEN Fahrschule
+    // sieht (userFsId() != eigene uid) - genau der Weg, ueber den ein
+    // erratener Fahrschul-Code sonst sofort die ganze Kartei oeffnen wuerde.
+    // Wer seine eigene Schule ist (Inhaber, Einzel-Fahrlehrer) oder auf
+    // eigene Datensaetze (uid) zugreift, ist davon nicht betroffen - so wird
+    // kein bestehendes Konto ausgesperrt.
     function docBelongsToUser(resData) {
-      return resData.fahrschuleId == userFsId() ||
+      return (resData.fahrschuleId == userFsId() &&
+              (userFsId() == request.auth.uid || istFreigegeben())) ||
              resData.uid == request.auth.uid;
     }
 
@@ -160,6 +180,14 @@ service cloud.firestore {
                     && request.resource.data.fahrschulCode == resource.data.fahrschulCode;
       allow delete: if isSuperAdmin() || (isAuth() && resource.data.fahrschuleId == userFsId());
     }
+    match /rateLimits/{id} {
+      // Versuchszaehler der Cloud Functions (Zugangscode-Suche). Wird
+      // ausschliesslich serverseitig per Admin SDK gefuehrt - waere das hier
+      // offen, koennte ein Angreifer seinen eigenen Zaehler einfach
+      // zuruecksetzen und die Bremse damit aushebeln.
+      allow read, write: if false;
+    }
+
     match /oauthStates/{stateId} {
       // Kurzlebiger CSRF-Schutz fuer den Google-Kalender-OAuth-Flow: der
       // Client legt vor der Weiterleitung zu Google einen eigenen Eintrag an,
@@ -192,7 +220,12 @@ service cloud.firestore {
       allow delete: if isAuth() && resource.data.uid == request.auth.uid;
     }
     match /schoolCodes/{code} {
-      allow get:    if isAuth();
+      // isRealAccount() statt isAuth(): Nachgeschlagen wird ein Code nur beim
+      // Beitritt einer Fahrschule - dabei ist man immer mit einem echten
+      // Konto angemeldet. Anonyme Schueler-Sitzungen (Zugangscode-Portal)
+      // haben hier nichts zu suchen und koennen jetzt nicht mehr genutzt
+      // werden, um die Code-Tabelle durchzuprobieren.
+      allow get:    if isRealAccount();
       allow list:   if isSuperAdmin();
       // Nur der Inhaber selbst (schoolId == eigene uid) oder SuperAdmin darf
       // einen Code-Eintrag anlegen/ändern. Verhindert das Fälschen von Einträgen.
@@ -269,8 +302,20 @@ service cloud.firestore {
                         request.resource.data.get('kalenderAktiv', false) == false &&
                         keineAboFelderBeiCreate(request.resource.data) &&
                         (
+                          // Eigenes Konto (Einzel-Lehrer/Inhaber): darf sich
+                          // selbst 'aktiv' setzen, es sind nur eigene Daten.
                           request.resource.data.fahrschuleId == request.auth.uid ||
-                          fahrschulCodeStimmt()
+                          // SICHERHEITS-AUDIT: Beitritt zu einer FREMDEN Schule
+                          // nur als 'ausstehend'. Vorher durfte sich der
+                          // Beitretende selbst auf 'aktiv' setzen - wer an den
+                          // Fahrschul-Code kam (FS-XXXX, nur ~1 Mio.
+                          // Moeglichkeiten und beliebig oft abfragbar), hatte
+                          // damit sofort Vollzugriff auf die komplette Kartei
+                          // der fremden Schule. Jetzt muss ein Mensch
+                          // freischalten - die App legt Beitritte ohnehin
+                          // bereits als 'ausstehend' an.
+                          (fahrschulCodeStimmt() &&
+                           request.resource.data.status == 'ausstehend')
                         )
                       )
                     );
@@ -296,13 +341,31 @@ service cloud.firestore {
                         (
                           isFsAdmin() ||
                           request.resource.data.get('status', '')
-                            == resource.data.get('status', '')
+                            == resource.data.get('status', '') ||
+                          // Einzige erlaubte Selbst-Aenderung: das Zuruecksetzen
+                          // auf 'ausstehend' beim Beitritt zu einer fremden
+                          // Schule (siehe unten). Sich selbst HOCHzustufen
+                          // bleibt ausgeschlossen.
+                          (request.resource.data.status == 'ausstehend' &&
+                           fahrschulCodeStimmt())
                         ) &&
                         (
                           isFsAdmin() ||
                           request.resource.data.fahrschuleId == resource.data.fahrschuleId ||
                           request.resource.data.fahrschuleId == request.auth.uid ||
-                          fahrschulCodeStimmt()
+                          // SICHERHEITS-AUDIT: Der nachtraegliche Beitritt zu
+                          // einer fremden Schule lief bisher komplett an der
+                          // Freigabe vorbei. Die Create-Regel verlangt zwar
+                          // 'ausstehend', ein BESTEHENDES Konto mit Status
+                          // 'aktiv' konnte seine fahrschuleId aber einfach per
+                          // Update auf eine fremde Schule umstellen (Code
+                          // genuegt) und behielt dabei 'aktiv' - damit sofort
+                          // Vollzugriff auf die fremde Kartei. Ein Wechsel in
+                          // eine fremde Schule setzt jetzt zwingend auf
+                          // 'ausstehend' zurueck; freischalten kann nur ein
+                          // Mensch.
+                          (fahrschulCodeStimmt() &&
+                           request.resource.data.status == 'ausstehend')
                         )
                       )
                     );
@@ -466,9 +529,16 @@ service cloud.firestore {
     // PLATFORM (Impressum, Einstellungen)
     // ══════════════════════════════════════════════════════
     match /platform/{docId} {
-      // Impressum/Broadcast werden gezielt per get() geladen (das Impressum
-      // MUSS öffentlich sein – rechtliche Pflicht). list() ist gesperrt.
-      allow get:   if true;
+      // Impressum/Broadcast/Werbung werden gezielt per get() geladen (das
+      // Impressum MUSS öffentlich sein – rechtliche Pflicht). list() ist
+      // gesperrt.
+      // SICHERHEITS-AUDIT: 'if true' galt vorher fuer JEDES Dokument dieser
+      // Sammlung - also auch fuer 'rechnungszaehler', den fortlaufenden
+      // Rechnungszaehler. Der war damit oeffentlich abrufbar und verriet
+      // jedem, wie viele Rechnungen insgesamt gestellt wurden. Kein Client
+      // liest ihn, nur die Cloud Functions (Admin SDK) - deshalb jetzt auf
+      // die drei tatsaechlich oeffentlichen Dokumente eingegrenzt.
+      allow get:   if docId in ['impressum', 'broadcast', 'werbung'];
       allow list:  if isAuth();
       allow write: if isSuperAdmin();
     }
