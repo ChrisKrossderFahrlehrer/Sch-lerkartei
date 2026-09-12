@@ -503,12 +503,9 @@ body.beta-dash .badge { font-size: 0.66rem; padding: 3px 9px; }
   font-size: 0.74rem; letter-spacing: 0.02em; padding: 0 6px;
   display: flex; align-items: center;
 }
-.stufe-form { display:inline-block; width:14px; height:14px; }
-.stufe-form.s1 { border-radius:50%; background:currentColor; opacity:0.55; }
-.stufe-form.s2 { clip-path:polygon(50% 4%,96% 92%,4% 92%); background:currentColor; opacity:0.6; }
-.stufe-form.s3 { clip-path:polygon(50% 4%,96% 92%,4% 92%); background:currentColor; opacity:0.85; }
-.stufe-form.s4 { border-radius:50%; background:currentColor; }
-.stufe-form.s5 { clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%); background:currentColor; }
+/* (.stufe-form - die fuenf Punkte-Formen Kreis/Dreieck/Dreieck/Kreis/Stern -
+   ist entfallen. Die Formen ergaben keine lesbare Reihenfolge; an ihre
+   Stelle ist der Stufenbalken .adk-seg weiter unten getreten.) */
 .style-neumorph {
   --bg: #1c1e24;
   --surface: #1f2128;
@@ -538,18 +535,20 @@ body.beta-dash .badge { font-size: 0.66rem; padding: 3px 9px; }
   box-shadow: inset 3px 3px 6px rgba(0,0,0,0.4), inset -3px -3px 6px rgba(255,255,255,0.04);
 }
 /* Bewertungspunkte-Stil: eigener, von style-* UNABHAENGIGER Schalter, damit
-   sich z.B. Neumorphism-Karten mit neubrutalistischen Punkten kombinieren
-   lassen. Ueberschreibt gezielt nur .stufe-form. */
-body.punkte-neumorph .stufe-form {
-  border-radius: 50% !important; clip-path: none !important;
-  box-shadow: 2px 2px 4px rgba(0,0,0,0.4), -1px -1px 3px rgba(255,255,255,0.06);
+   sich z.B. Neumorphism-Karten mit neubrutalistischen Balken kombinieren
+   lassen (Kundenwunsch). Wirkte frueher auf .stufe-form; seit die Zeilen
+   einen Stufenbalken tragen, wirkt er auf dessen Segmente - sonst haette
+   der Schalter im Einstellungen-Dialog nichts mehr bewirkt.
+   Bewusst OHNE 'body' davor: So greifen die Regeln auch in den kleinen
+   Vorschau-Kacheln des Auswahl-Dialogs, die die Klasse auf einem div
+   tragen - vorher zeigten die Kacheln alle dasselbe Bild. */
+.punkte-neumorph .adk-seg::before {
+  border: none; border-radius: 6px;
+  box-shadow: inset 2px 2px 4px rgba(0,0,0,0.35), inset -1px -1px 3px rgba(255,255,255,0.07);
 }
-body.punkte-neumorph .dot-btn.active .stufe-form {
-  box-shadow: inset 2px 2px 4px rgba(0,0,0,0.35), inset -1px -1px 3px rgba(255,255,255,0.08);
-}
-body.punkte-brutal .stufe-form {
-  border-radius: 2px !important; clip-path: none !important;
-  border: 1.5px solid #14161a; background: currentColor;
+.punkte-brutal .adk-balken { gap: 5px; }
+.punkte-brutal .adk-seg::before {
+  border: 1.5px solid #14161a; border-radius: 2px;
   box-shadow: 2px 2px 0 #14161a;
 }
 /* Chat-Sprechblasen: eigene Klasse statt fester Inline-Werte, damit sie
@@ -655,7 +654,7 @@ body.punkte-brutal .stufe-form {
 /* Neben-Bedienelemente und Eingabefelder: gleiche Kante, gleicher Radius. */
 .style-editorial .btn-back, .style-editorial .btn-icon-sm, .style-editorial .scope-btn,
 .style-editorial .klasse-choice-btn, .style-editorial .btn-sheet-cancel,
-.style-editorial .step-btn, .style-editorial .s-btn, .style-editorial .dot-btn,
+.style-editorial .step-btn, .style-editorial .s-btn,
 .style-editorial .form-input, .style-editorial .search-input,
 .style-editorial .notes-textarea, .style-editorial .save-btn,
 .style-editorial .delete-btn, .style-editorial .btn-add-field,
@@ -750,13 +749,54 @@ body.punkte-brutal .stufe-form {
 .thema-row { display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:8px; transition:background 0.15s; -webkit-user-select:none; }
 .thema-row:active { background:var(--surface2); }
 .thema-name { flex:1; font-size:0.84rem; font-weight:500; min-width:0; }
-.thema-dots { display:flex; gap:3px; flex-shrink:0; }
-.dot-btn { width:30px; height:30px; border-radius:8px; border:1.5px solid var(--border); background:var(--surface2); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:0.85rem; transition:all 0.15s; color:var(--muted); font-weight:600; }
-.dot-btn.active-1 { background:rgba(220,50,50,0.2);  border-color:#dc3232; }
-.dot-btn.active-2 { background:rgba(230,120,20,0.2); border-color:#e67814; }
-.dot-btn.active-3 { background:rgba(240,180,41,0.2); border-color:#f0b429; }
-.dot-btn.active-4 { background:rgba(63,185,80,0.2);  border-color:#3fb950; }
-.dot-btn.active-5 { background:rgba(100,210,255,0.2);border-color:#64d2ff; }
+/* ── ADK-BEWERTUNG: STUFENBALKEN ──────────────────────────────────────
+   Loest die fuenf einzelnen Punkte-Knoepfe ab (.dot-btn/.thema-dots, hier
+   mit entfernt, weil sie nirgends mehr gerendert wurden). Die hatten
+   drei Probleme, die sich erst im echten Layout zeigen:
+
+   1. BREITE: Fuenf 30px-Knoepfe plus Abstaende belegten rund zwei Drittel
+      der Zeilenbreite. Fuer den Themennamen blieb so wenig Platz, dass
+      laengere Namen auf zwei bis drei Zeilen umbrachen - die Liste wurde
+      dadurch ungleichmaessig hoch und auf dem Handy passten nur sieben
+      von ueber dreissig Themen auf den Schirm.
+   2. REIHENFOLGE: Die Formen waren Kreis, Dreieck, Dreieck, Kreis, Stern.
+      Daraus laesst sich keine Steigerung ablesen - Stufe 1 und Stufe 4
+      sahen beide wie ein Kreis aus, Stufe 2 und 3 unterschieden sich nur
+      in der Deckkraft.
+   3. LEERE ZEILEN: Eine unbewertete Zeile sah einer bewerteten fast
+      gleich, weil in beiden Faellen fuenf graue Knoepfe standen.
+
+   Der Balken sitzt jetzt unter dem Namen ueber die volle Zeilenbreite und
+   fuellt sich KUMULATIV von links: Wer Stufe 4 erreicht hat, hat 1 bis 3
+   durchlaufen. Genau so waechst auch der Eintrag auf der gedruckten
+   Ausbildungsdiagrammkarte. Laenge und Farbe sagen dasselbe aus, das
+   funktioniert also auch bei Farbenblindheit. Nebenbei ist jedes Segment
+   rund 65px statt 30px breit - ein deutlich sichereres Tippziel. */
+.adk-zeile { flex-direction:column; align-items:stretch; gap:5px; padding:7px 10px 8px; }
+.adk-kopf  { display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+.adk-kopf .thema-name { flex:1; }
+.adk-stand { font-size:0.7rem; font-weight:700; white-space:nowrap; letter-spacing:0.01em; flex-shrink:0; }
+.adk-balken { display:flex; gap:3px; }
+/* Der Knopf ist 26px hoch (Tippflaeche), der sichtbare Balken nur 10px.
+   Das min-height:26px muss sein, weil weiter oben alle button-Elemente
+   pauschal min-height:44px bekommen - das wuerde die Zeile sonst
+   unnoetig aufblaehen. */
+.adk-seg {
+  flex:1; height:26px; min-height:26px; padding:0; border:none; background:none;
+  cursor:pointer; display:flex; align-items:center;
+}
+.adk-seg::before {
+  content:''; display:block; width:100%; height:10px;
+  border:1px solid var(--border); background:var(--surface2); border-radius:3px;
+  transition:background 0.15s, border-color 0.15s;
+}
+.adk-seg.erreicht::before { background:var(--seg); border-color:var(--seg); }
+.adk-seg:first-child::before { border-top-left-radius:6px;  border-bottom-left-radius:6px; }
+.adk-seg:last-child::before  { border-top-right-radius:6px; border-bottom-right-radius:6px; }
+.adk-seg:active::before { transform:scaleY(1.4); }
+/* Selbst angelegte Themen bleiben wie bisher leicht goldig hinterlegt,
+   damit sie von den ADK-Standardthemen unterscheidbar sind. */
+.adk-zeile.eigen { background:rgba(240,180,41,0.05); }
 
 .notes-textarea { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:12px; font-family:'Manrope',sans-serif; font-size:0.88rem; color:var(--text); resize:none; min-height:100px; outline:none; line-height:1.6; }
 .notes-textarea:focus { border-color:var(--accent); }
@@ -2147,7 +2187,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       </div></div>
       <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
         <div style="font-weight:700;margin-bottom:3px">📚 ADK-Lernstand</div>
-        <div style="font-size:0.8rem;color:var(--muted)">5 Stufen pro Thema: 🔴 Nicht gezeigt → 🟠 Gezeigt → 🟡 Ausreichend → 🟢 Beherrscht → ⭐ Sehr sicher. Antippen zum Ändern.</div>
+        <div style="font-size:0.8rem;color:var(--muted)">Ein Balken pro Thema, der sich von links füllt – wie der Eintrag auf der gedruckten Ausbildungsdiagrammkarte: 1 Gezeigt &amp; erklärt → 2 Unter Anleitung geübt → 3 Fast selbstständig → 4 Selbstständig beherrscht → 5 Prüfungsreif. Antippen setzt die Stufe, nochmal antippen löscht sie. Ohne Eintrag heißt: noch nicht behandelt.</div>
       </div></div>
       <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
         <div style="font-weight:700;margin-bottom:3px">📊 ADK-Gruppen Grafik</div>
@@ -2559,6 +2599,80 @@ const SONDERFAHRTEN = [
 ];
 
 // ADK Klasse B – gegliedert nach Ausbildungsstufen
+// ── ADK-BEWERTUNGSSTUFEN — EINZIGE QUELLE DER WAHRHEIT ───────────────
+// Angelehnt an die Stufenausbildung des Curricularen Leitfadens, nach der
+// auch die gedruckte Ausbildungsdiagrammkarte der Bundesvereinigung der
+// Fahrlehrerverbaende aufgebaut ist. Die Karte haelt drei Dinge fest:
+// WELCHER Inhalt, in WELCHER Fahrstunde, und MIT WELCHEM ERFOLG. Der
+// Erfolg ist dort keine Schulnote, sondern eine Kompetenzleiter - vom
+// Vormachen ueber das Ueben unter Anleitung bis zum selbststaendigen,
+// pruefungsreifen Koennen. Genau diese Leiter bilden die fuenf Stufen ab.
+//
+// Stufe 0 bedeutet "noch nicht behandelt" und hat bewusst KEINEN Knopf:
+// Auf der Originalkarte heisst ein Eintrag immer "wurde behandelt" - eine
+// Stufe, die "nicht gezeigt" bedeutet, kann es dort gar nicht geben.
+// Frueher war Stufe 1 genau so benannt und damit ein zweiter Zustand fuer
+// dieselbe Tatsache.
+//
+// WICHTIG: Die gespeicherten Zahlen 1-5 bleiben unveraendert, damit
+// vorhandene Schuelerdaten weiter stimmen. Auch die Schwelle "erledigt"
+// liegt unveraendert bei >= 4.
+//
+// Diese Liste ist die EINZIGE Stelle, an der die Stufen benannt und
+// eingefaerbt werden. Vorher gab es drei voneinander abweichende Fassungen
+// (Fahrlehrer-Ansicht, PDF-Export, Schueler-Portal), die dieselbe
+// gespeicherte Zahl unterschiedlich benannt haben. Wer etwas aendert,
+// aendert es hier - und spiegelt es in schueler-portal.html, weil das eine
+// eigene Seite ohne gemeinsames Skript ist.
+const ADK_STUFEN = [
+  { wert: 1, kurz: 'Gezeigt',       lang: 'Gezeigt & erklärt',        farbe: 'var(--blue)'    },
+  { wert: 2, kurz: 'Geübt',         lang: 'Unter Anleitung geübt',    farbe: '#e67814'        },
+  { wert: 3, kurz: 'Fast sicher',   lang: 'Fast selbstständig',       farbe: 'var(--accent)'  },
+  { wert: 4, kurz: 'Selbstständig', lang: 'Selbstständig beherrscht', farbe: 'var(--accent2)' },
+  { wert: 5, kurz: '⭐ Prüfungsreif',lang: '⭐ Prüfungsreif',          farbe: '#56d364'        },
+];
+// Zur Farbwahl: Stufe 4 und 5 sind beide gruen, weil beide "kann er/sie"
+// bedeuten - unterschieden werden sie durch die Balkenlaenge (vier von
+// fuenf gegenueber voll). Stufe 5 darf NICHT das Marken-Gold bekommen:
+// Das ist dieselbe Farbe wie Stufe 3, und dann saehen "fast selbststaendig"
+// und "pruefungsreif" identisch aus - genau die Verwechslung, die die
+// Balken vermeiden sollen.
+const ADK_STUFE      = (v) => ADK_STUFEN[(v|0) - 1] || null;
+const ADK_STUFE_LANG = (v) => (ADK_STUFE(v) || {}).lang  || 'Noch nicht behandelt';
+const ADK_STUFE_KURZ = (v) => (ADK_STUFE(v) || {}).kurz  || '–';
+const ADK_STUFE_FARB = (v) => (ADK_STUFE(v) || {}).farbe || 'var(--muted)';
+
+// Der Stufenbalken einer Zeile. `zielOnclick` bekommt den Wert, auf den
+// getippt werden soll, und liefert den fertigen onclick-Ausdruck - so
+// koennen Standard-Themen (setThema) und eigene Themen (setCustomThema)
+// denselben Balken benutzen. Nochmal auf die erreichte Stufe tippen setzt
+// zurueck auf 0, genau wie vorher bei den Punkte-Knoepfen.
+function adkStufenBalken(val, zielOnclick) {
+  const erreichteFarbe = ADK_STUFE_FARB(val);
+  return '<div class="adk-balken">' + ADK_STUFEN.map(st => {
+    const erreicht = val >= st.wert;
+    const ziel = (val === st.wert) ? 0 : st.wert;
+    return '<button class="adk-seg' + (erreicht ? ' erreicht' : '') + '"'
+      + (erreicht ? ' style="--seg:' + erreichteFarbe + '"' : '')
+      + ' title="' + st.lang + '" aria-label="' + st.lang + '"'
+      + ' onclick="' + zielOnclick(ziel) + '"></button>';
+  }).join('') + '</div>';
+}
+
+// Eine komplette Bewertungszeile: Kopf (Name + erreichte Stufe) und
+// darunter der Balken. `nameHTML` darf beliebiges Markup enthalten, z.B.
+// das Verkehrszeichen-Bild oder die Herkunfts-Markierung eigener Themen.
+function adkThemaZeile(nameHTML, val, zielOnclick, kopfExtraHTML, zusatzKlasse) {
+  return '<div class="thema-row adk-zeile' + (zusatzKlasse ? ' ' + zusatzKlasse : '') + '">'
+    + '<div class="adk-kopf">'
+    +   '<div class="thema-name">' + nameHTML + '</div>'
+    +   (kopfExtraHTML || '')
+    +   '<div class="adk-stand" style="color:' + ADK_STUFE_FARB(val) + '">' + ADK_STUFE_KURZ(val) + '</div>'
+    + '</div>'
+    + adkStufenBalken(val, zielOnclick)
+    + '</div>';
+}
+
 const ADK_THEMEN = [
   {
     gruppe: '🚗 Grundstufe – Fahrzeugbedienung',
@@ -5122,8 +5236,10 @@ function renderDetail() {
   const myVzZeichen = customThemen.filter(t => t.typ === 'vz');
   const customThemenOhneKat = myCustomThemen.filter(t => !t.kategorie);
 
-  const STUFEN = ['<span class="stufe-form s1"></span>','<span class="stufe-form s2"></span>','<span class="stufe-form s3"></span>','<span class="stufe-form s4"></span>','<span class="stufe-form s5"></span>'];
-  const STUFEN_NAME = ['Nicht gezeigt','Gezeigt','Ausreichend','Beherrscht','Sehr sicher'];
+  // Die Stufen kommen aus ADK_STUFEN (siehe oben bei ADK_THEMEN), nicht
+  // mehr aus lokalen Kopien - die waren an fuenf Stellen dupliziert.
+  const themaZiel = (t) => (ziel) => `setThema('${t.replace(/'/g,"\\'")}',${ziel})`;
+  const customZiel = (id) => (ziel) => `setCustomThema('${id}',${ziel})`;
 
   const VZ_GRUPPE_NAME = '🚦 Verkehrszeichen';
   const vzGruppe = ADK.find(g => g.gruppe === VZ_GRUPPE_NAME);
@@ -5137,15 +5253,9 @@ function renderDetail() {
       const bildHTML = bild
         ? `<img src="./verkehrszeichen/${bild}" alt="" style="width:38px;height:38px;object-fit:contain;flex-shrink:0" loading="lazy">`
         : '<div style="width:38px;flex-shrink:0"></div>';
-      return `<div class="thema-row" style="align-items:center">
-        <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">
-          ${bildHTML}
-          <div class="thema-name" style="min-width:0">${t}</div>
-        </div>
-        <div class="thema-dots">
-          ${STUFEN.map((em,i)=>{const v=i+1;return `<button class="dot-btn${val===v?' active-'+v:''}" title="${STUFEN_NAME[i]}" onclick="setThema('${t.replace(/'/g,"\\'")}',${val===v?0:v})">${em}</button>`;}).join('')}
-        </div>
-      </div>`;
+      return adkThemaZeile(
+        `<span style="display:flex;align-items:center;gap:10px;min-width:0">${bildHTML}<span style="min-width:0">${t}</span></span>`,
+        val, themaZiel(t));
     }).join('');
     // Eigene Zeichen aus dem Katalog des Fahrlehrers anhaengen
     const eigenRows = myVzZeichen.map(z => {
@@ -5154,16 +5264,10 @@ function renderDetail() {
       const bildHTML = bildQuelle
         ? `<img src="${bildQuelle}" alt="" style="width:38px;height:38px;object-fit:contain;flex-shrink:0" loading="lazy">`
         : '<div style="width:38px;flex-shrink:0;text-align:center;font-size:1.3rem">🚧</div>';
-      return `<div class="thema-row" style="align-items:center">
-        <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">
-          ${bildHTML}
-          <div class="thema-name" style="min-width:0">${z.name}</div>
-        </div>
-        <div class="thema-dots">
-          ${STUFEN.map((em,i)=>{const v=i+1;return `<button class="dot-btn${val===v?' active-'+v:''}" title="${STUFEN_NAME[i]}" onclick="setCustomThema('${z.id}',${val===v?0:v})">${em}</button>`;}).join('')}
-          <button class="dot-btn" title="Zeichen löschen" onclick="deleteVzZeichen('${z.id}')" style="opacity:.5">🗑️</button>
-        </div>
-      </div>`;
+      return adkThemaZeile(
+        `<span style="display:flex;align-items:center;gap:10px;min-width:0">${bildHTML}<span style="min-width:0">${z.name}</span></span>`,
+        val, customZiel(z.id),
+        `<button onclick="event.stopPropagation();deleteVzZeichen('${z.id}')" title="Zeichen löschen" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:2px 4px;font-size:0.8rem;flex-shrink:0">🗑</button>`);
     }).join('');
 
     const gesamt = vzGruppe.items.length + myVzZeichen.length;
@@ -5181,12 +5285,7 @@ function renderDetail() {
   const themenHTML = ADK.filter(g => g.gruppe !== VZ_GRUPPE_NAME).map(gruppe => {
     const standardItems = gruppe.items.map(t => {
       const val = (s.themen||{})[t]||0;
-      return `<div class="thema-row">
-        <div class="thema-name">${t}</div>
-        <div class="thema-dots">
-          ${STUFEN.map((em,i)=>{const v=i+1;return `<button class="dot-btn${val===v?' active-'+v:''}" title="${STUFEN_NAME[i]}" onclick="setThema('${t.replace(/'/g,"\\'")}',${val===v?0:v})">${em}</button>`;}).join('')}
-        </div>
-      </div>`;
+      return adkThemaZeile(t, val, themaZiel(t));
     }).join('');
 
     // Eigene Themen die in diese Kategorie einsortiert wurden
@@ -5195,13 +5294,13 @@ function renderDetail() {
       const scopeTag = t.scope === 'all'
         ? '<span style="font-size:0.6rem;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1px 5px;margin-left:5px">Alle</span>'
         : '<span style="font-size:0.6rem;color:var(--blue);background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.3);border-radius:4px;padding:1px 5px;margin-left:5px">Nur dieser</span>';
-      return `<div class="thema-row" style="background:rgba(240,180,41,0.05);border-radius:8px">
-        <div class="thema-name" style="display:flex;align-items:center;flex-wrap:wrap;gap:2px">${t.name}${scopeTag}</div>
-        <div class="thema-dots" style="display:flex;gap:4px;align-items:center">
-          ${STUFEN.map((em,i)=>{const v=i+1;return `<button class="dot-btn${val===v?' active-'+v:''}" title="${STUFEN_NAME[i]}" onclick="setCustomThema('${t.id}',${v})">${em}</button>`;}).join('')}
-          <button onclick="event.stopPropagation();deleteCustomThema('${t.id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:4px;font-size:0.8rem">🗑</button>
-        </div>
-      </div>`;
+      // Hier fehlte bisher das Zuruecksetzen: Ein Tipp auf die bereits
+      // erreichte Stufe setzte sie erneut, statt sie zu loeschen - anders
+      // als bei allen anderen Zeilen. adkStufenBalken macht es ueberall gleich.
+      return adkThemaZeile(
+        `${t.name}${scopeTag}`, val, customZiel(t.id),
+        `<button onclick="event.stopPropagation();deleteCustomThema('${t.id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:2px 4px;font-size:0.8rem;flex-shrink:0">🗑</button>`,
+        'eigen');
     }).join('');
 
     const allCount = gruppe.items.length + myCustomThemen.filter(t => t.kategorie === gruppe.gruppe).length;
@@ -5233,11 +5332,9 @@ function renderDetail() {
           var scopeTag = t.scope === 'all'
             ? '<span style="font-size:0.6rem;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1px 5px;margin-left:5px">Alle</span>'
             : '<span style="font-size:0.6rem;color:var(--blue);background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.3);border-radius:4px;padding:1px 5px;margin-left:5px">Nur dieser</span>';
-          var dotsHTML = STUFEN.map(function(em, i) {
-            var v = i + 1;
-            return '<button class="dot-btn' + (ctVal === v ? ' active-' + v : '') + '" title="' + STUFEN_NAME[i] + '" onclick="setCustomThema(\'' + t.id + '\',' + v + ')">' + em + '</button>';
-          }).join('');
-          return '<div class="thema-row"><div class="thema-name" style="display:flex;align-items:center;flex-wrap:wrap;gap:2px">' + t.name + scopeTag + '</div><div class="thema-dots" style="display:flex;gap:4px;align-items:center">' + dotsHTML + '<button onclick="event.stopPropagation();deleteCustomThema(\'' + t.id + '\')" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:4px;font-size:0.8rem">🗑</button></div></div>';
+          return adkThemaZeile(
+            t.name + scopeTag, ctVal, customZiel(t.id),
+            '<button onclick="event.stopPropagation();deleteCustomThema(\'' + t.id + '\')" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:2px 4px;font-size:0.8rem;flex-shrink:0">🗑</button>');
         }).join('');
       })()}
     </div>` : '';
@@ -5370,10 +5467,12 @@ function renderDetail() {
 
       <!-- TAB 1: ADK -->
       <div id="tab-adk" style="padding:14px;display:${aktiverLernTab==='adk'?'block':'none'}">
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;font-size:0.7rem;
-             color:var(--muted);background:var(--surface2);padding:8px 12px;border-radius:8px">
-          <span>🔴 Nicht gezeigt</span><span>🟠 Gezeigt</span><span>🟡 Ausreichend</span>
-          <span>🟢 Beherrscht</span><span>⭐ Sehr sicher</span>
+        <div style="margin-bottom:14px;font-size:0.68rem;color:var(--muted);
+             background:var(--surface2);padding:9px 12px;border-radius:8px">
+          <div style="margin-bottom:6px">Der Balken füllt sich von links. Antippen setzt die Stufe, nochmal antippen löscht sie.</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            ${ADK_STUFEN.map(st => `<span style="display:inline-flex;align-items:center;gap:5px;white-space:nowrap"><span style="width:14px;height:8px;border-radius:2px;background:${st.farbe};display:inline-block"></span>${st.wert} ${st.lang}</span>`).join('')}
+          </div>
         </div>
         <div class="themen-list">${themenHTML}</div>
       </div>
@@ -5495,8 +5594,7 @@ function renderAdkGruppenChart(s) {
     return { name: g.gruppe, pct: Math.round(avg), farbe: COLORS[gi % COLORS.length] };
   });
 
-  const stufen = ['<span class="stufe-form s1"></span>','<span class="stufe-form s2"></span>','<span class="stufe-form s3"></span>','<span class="stufe-form s4"></span>','<span class="stufe-form s5"></span>'];
-  const stufenLabel = ['Nicht gezeigt','Gezeigt','Ausreichend','Beherrscht','Sehr sicher'];
+  // (Hier standen zwei Kopien der Stufen-Listen, die nie benutzt wurden.)
 
   const bars = gruppen.map(g => {
     const pct = g.pct;
@@ -7645,25 +7743,24 @@ let letzteGruppeId = '';     // Dropdown-Auswahl — überlebt Re-Render
 
 // Eine Themen-Zeile rendern
 function renderEigenThemaRow(t, s) {
-  const STUFEN = ['<span class="stufe-form s1"></span>','<span class="stufe-form s2"></span>','<span class="stufe-form s3"></span>','<span class="stufe-form s4"></span>','<span class="stufe-form s5"></span>'];
-  const STUFEN_NAME = ['Nicht gezeigt','Gezeigt','Ausreichend','Beherrscht','Sehr sicher'];
   const val  = (s.customThemen||{})[t.id] || 0;
   const done = val >= 4;
   const scopeLabel = t.scope === 'all'
     ? '<span style="font-size:0.6rem;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1px 6px">Alle</span>'
     : '<span style="font-size:0.6rem;color:var(--blue);background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.3);border-radius:4px;padding:1px 6px">Nur dieser</span>';
-  const dotsHTML = STUFEN.map(function(em,i){
-    const v=i+1;
-    return '<button class="dot-btn'+(val===v?' active-'+v:'')+'" title="'+STUFEN_NAME[i]+'" onclick="setCustomThema(\''+t.id+'\','+(val===v?0:v)+')" style="font-size:0.9rem">'+em+'</button>';
-  }).join('');
-  return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">'
+  // Auch hier der gemeinsame Stufenbalken statt einer eigenen Kopie der
+  // fuenf Punkte-Knoepfe. Der Haken links und der Papierkorb rechts bleiben.
+  return '<div style="padding:10px 0;border-bottom:1px solid var(--border)">'
+    +'<div style="display:flex;align-items:center;gap:10px">'
     +'<button onclick="toggleEigenDone(\''+t.id+'\','+val+')" style="width:28px;height:28px;border-radius:7px;border:2px solid '+(done?'var(--accent2)':'var(--border)')+';background:'+(done?'rgba(63,185,80,0.15)':'none')+';cursor:pointer;flex-shrink:0;font-size:1rem;display:flex;align-items:center;justify-content:center">'+(done?'✅':'⬜')+'</button>'
     +'<div style="flex:1;min-width:0">'
     +'<div style="font-size:0.88rem;font-weight:'+(done?'600':'400')+';color:'+(done?'var(--accent2)':'var(--text)')+'">'+escapeHtmlEigen(t.name)+'</div>'
     +'<div style="margin-top:2px">'+scopeLabel+'</div>'
     +'</div>'
-    +'<div style="display:flex;gap:3px;flex-shrink:0">'+dotsHTML+'</div>'
+    +'<div class="adk-stand" style="color:'+ADK_STUFE_FARB(val)+'">'+ADK_STUFE_KURZ(val)+'</div>'
     +'<button onclick="event.stopPropagation();deleteCustomThema(\''+t.id+'\')" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:4px;font-size:0.85rem;flex-shrink:0">🗑</button>'
+    +'</div>'
+    +'<div style="margin-top:7px">'+adkStufenBalken(val, (ziel) => 'setCustomThema(\''+t.id+'\','+ziel+')')+'</div>'
     +'</div>';
 }
 
@@ -7998,15 +8095,19 @@ function renderSchuelerAnsicht(s, protokoll) {
 
   // ADK Themen
   var ADK = klasse === 'A' ? ADK_THEMEN_A : klasse === 'BE' ? ADK_THEMEN_BE : ADK_THEMEN;
-  var STUFEN_LABEL = ['–','Noch nicht','Kaum','Manchmal','Meistens','Sicher','⭐ Sehr sicher'];
+  // FIX: Hier stand eine EIGENE, um eine Stufe verschobene Benennung
+  // ('–','Noch nicht','Kaum','Manchmal','Meistens','Sicher','⭐ Sehr sicher').
+  // Der Fahrlehrer trug also z.B. Stufe 4 ein, im Export stand daneben aber
+  // die Bezeichnung der Stufe darunter. Die Liste hatte ausserdem sieben
+  // Eintraege fuer eine fuenfstufige Skala - der letzte war unerreichbar.
+  // Jetzt kommt die Benennung wie ueberall aus ADK_STUFEN.
   var themenHTML = ADK.map(function(gruppe) {
     var doneCount = gruppe.items.filter(function(item) { return (themen[item]||0) >= 4; }).length;
     var itemsHTML = gruppe.items.map(function(item) {
       var val = themen[item] || 0;
-      var color = ['#555','#f85149','#f0b429','#f0b429','#3fb950','#3fb950','#f0b429'][val] || '#555';
       return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:0.88rem">'
         + '<span>' + item + '</span>'
-        + '<span style="color:' + color + ';font-size:0.8rem;white-space:nowrap;margin-left:8px">' + (STUFEN_LABEL[val]||'–') + '</span>'
+        + '<span style="color:' + ADK_STUFE_FARB(val) + ';font-size:0.8rem;white-space:nowrap;margin-left:8px">' + ADK_STUFE_KURZ(val) + '</span>'
         + '</div>';
     }).join('');
     return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:12px">'
@@ -9090,7 +9191,7 @@ window.exportPDF = () => {
   <div class="footer">
     <span>ADK – Digitale Kartei · fahrsync.de</span>
     <span>Erstellt am ${heute}</span>
-    <span>ADK Legende: ○ Nicht gezeigt · ◐ Gezeigt · ◕ Ausreichend · ● Beherrscht · ★ Sehr sicher</span>
+    <span>ADK-Stufen: ${ADK_STUFEN.map(st => st.wert + ' ' + st.lang).join(' · ')}</span>
   </div>
 
 </div>
@@ -10317,9 +10418,10 @@ const PUNKTE_STILE = [
 function previewPunkteKachel(stil) {
   const aktiv = (localStorage.getItem('fs_punkte_stil') || '') === stil.id;
   return `<div class="${stil.id}" onclick="waehlePunkteStil('${stil.id}')" style="cursor:pointer;border:2px solid ${aktiv ? 'var(--accent)' : 'var(--border)'};border-radius:14px;padding:14px;display:flex;align-items:center;gap:14px;background:var(--bg)">
-    <div style="display:flex;gap:5px;flex-shrink:0">
-      <span class="stufe-form s2" style="width:18px;height:18px;color:var(--accent)"></span>
-      <span class="stufe-form s4" style="width:18px;height:18px;color:var(--accent)"></span>
+    <div class="adk-balken" style="flex-shrink:0;width:62px">
+      <span class="adk-seg erreicht" style="--seg:var(--accent)"></span>
+      <span class="adk-seg erreicht" style="--seg:var(--accent)"></span>
+      <span class="adk-seg"></span>
     </div>
     <div style="flex:1">
       <div style="font-weight:700;font-size:0.88rem;color:var(--text)">${stil.name}${aktiv ? ' ✓' : ''}</div>

@@ -459,8 +459,30 @@ let lastReadMsgTs  = 0;
 // den Vortag - eine Fahrstunde von gestern galt dann als "naechster Termin"
 // und liess sich noch bestaetigen oder absagen.
 const heuteLokal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
-const ADK_FARBEN   = ['#555','#f85149','#f0b429','#f0b429','#3fb950','#3fb950','#f0b429'];
-const STUFEN_NAME  = ['–','Noch nicht','Kaum','Manchmal','Meistens','Sicher','⭐ Sehr sicher'];
+// ── ADK-BEWERTUNGSSTUFEN ─────────────────────────────────────────────
+// Spiegelbild von ADK_STUFEN in index.html. Das Portal ist eine eigene
+// Seite ohne gemeinsames Skript, deshalb die Kopie - wer dort etwas
+// aendert, muss es hier nachziehen.
+//
+// FIX: Hier standen zwei Listen, die BEIDE um eine Stufe gegen die
+// Fahrlehrer-Ansicht verschoben waren ('–','Noch nicht','Kaum','Manchmal',
+// 'Meistens','Sicher','⭐ Sehr sicher') und zudem sieben Eintraege fuer
+// eine fuenfstufige Skala hatten. Der Fahrlehrer trug also "Selbststaendig
+// beherrscht" (4) ein, der Schueler las "Meistens". Genau das darf nicht
+// passieren: § 6 FahrschAusbO verlangt den dokumentierten Ausbildungsstand,
+// und der Schueler muss denselben sehen, den der Fahrlehrer vergeben hat.
+// Die beiden alten Listen waren ausserdem nirgends mehr in Gebrauch.
+const ADK_STUFEN = [
+  { wert: 1, kurz: 'Gezeigt',       lang: 'Gezeigt & erklärt',        farbe: '#58a6ff' },
+  { wert: 2, kurz: 'Geübt',         lang: 'Unter Anleitung geübt',    farbe: '#e67814' },
+  { wert: 3, kurz: 'Fast sicher',   lang: 'Fast selbstständig',       farbe: '#f0b429' },
+  { wert: 4, kurz: 'Selbstständig', lang: 'Selbstständig beherrscht', farbe: '#3fb950' },
+  { wert: 5, kurz: '⭐ Prüfungsreif',lang: '⭐ Prüfungsreif',          farbe: '#56d364' },
+];
+const ADK_STUFE      = (v) => ADK_STUFEN[(v|0) - 1] || null;
+const ADK_STUFE_LANG = (v) => (ADK_STUFE(v) || {}).lang  || 'Noch nicht behandelt';
+const ADK_STUFE_KURZ = (v) => (ADK_STUFE(v) || {}).kurz  || '–';
+const ADK_STUFE_FARB = (v) => (ADK_STUFE(v) || {}).farbe || '#6b7fa8';
 
 // ── Loading ────────────────────────────────────────────────────
 setTimeout(() => {
@@ -784,9 +806,8 @@ function renderVerkehrszeichenCard(s) {
   const zeichen = s.verkehrszeichen || [];
   if (!zeichen.length) return '';
   // Muss exakt zur Skala der Fahrlehrer-Ansicht passen (Wert 1..5),
-  // sonst liest der Schueler etwas anderes als der Fahrlehrer eingestellt hat.
-  const STUFEN = ['⚪','🔴','🟠','🟡','🟢','⭐'];
-  const STUFEN_NAME = ['noch nicht bewertet','nicht gezeigt','gezeigt','ausreichend','beherrscht','sehr sicher'];
+  // sonst liest der Schueler etwas anderes als der Fahrlehrer eingestellt
+  // hat - deshalb jetzt aus ADK_STUFEN statt aus einer lokalen Kopie.
   const sicher = zeichen.filter(z => (z.w || 0) >= 4).length;
   const besprochen = zeichen.filter(z => (z.w || 0) > 0).length;
 
@@ -798,7 +819,7 @@ function renderVerkehrszeichenCard(s) {
     return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);opacity:${w>0?'1':'0.5'}">
         ${bild}
         <div style="flex:1;min-width:0;font-size:0.82rem">${z.n}</div>
-        <div style="font-size:0.72rem;color:var(--muted);white-space:nowrap">${STUFEN[w]||'⚪'} ${STUFEN_NAME[w]||''}</div>
+        <div style="font-size:0.72rem;color:${ADK_STUFE_FARB(w)};white-space:nowrap">${ADK_STUFE_KURZ(w)}</div>
       </div>`;
   }).join('');
 
@@ -1076,14 +1097,13 @@ function renderFortschritt() {
     byLevel[Math.min(5, Math.max(0, val||0))].push(name);
   });
 
-  const levelConfig = [
-    { level:5, label:'⭐ Sehr sicher', color:'#f0b429' },
-    { level:4, label:'✅ Sicher',      color:'#3fb950' },
-    { level:3, label:'🟡 Meistens',   color:'#f0b429' },
-    { level:2, label:'🟠 Manchmal',   color:'#e87e04' },
-    { level:1, label:'🔴 Kaum',       color:'#f85149' },
-    { level:0, label:'⚪ Noch nicht', color:'#6b7fa8' },
-  ];
+  // FIX: Diese Liste war gegen die Fahrlehrer-Ansicht um eine Stufe
+  // verschoben - Stufe 4 hiess hier "Sicher", beim Fahrlehrer aber
+  // "Beherrscht", Stufe 1 hiess hier "Kaum", beim Fahrlehrer "Nicht
+  // gezeigt". Jetzt aus ADK_STUFEN, absteigend sortiert.
+  const levelConfig = ADK_STUFEN.slice().reverse().map(st => ({
+    level: st.wert, label: st.wert + ' ' + st.lang, color: st.farbe
+  })).concat([{ level:0, label:'Noch nicht behandelt', color:'#6b7fa8' }]);
 
   const levelsHTML = levelConfig.map(({level, label, color}) =>
     byLevel[level].length === 0 ? '' : `
