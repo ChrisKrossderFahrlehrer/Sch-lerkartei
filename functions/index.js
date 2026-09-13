@@ -1419,3 +1419,91 @@ exports.syncBookedCount = onDocumentUpdated('slots/{slotId}', async (event) => {
     }
   }
 });
+
+// ── SCHUELER IN DIE FAHRSCHULE UEBERNEHMEN ───────────────────────────────
+// Ein Fahrlehrer, der sich zuerst allein angemeldet und spaeter per Code
+// einer Fahrschule angeschlossen hat, traegt seine bisherige Kartei noch
+// unter seiner EIGENEN Kennung. Die Fahrschule sieht sie deshalb nicht - und
+// genau darum geht es: Planung im Kalender und der Blick auf den Lernstand.
+//
+// Warum serverseitig? Die Firestore-Regel fahrschuleIdUnveraendert verbietet
+// dem Browser, die Fahrschul-Zuordnung eines Schuelers zu aendern. Das ist
+// richtig so: Sonst koennte jeder fremde Schueler in seine eigene Schule
+// ziehen oder eigene in eine fremde schieben. Der Umzug laeuft deshalb hier,
+// mit Admin-Rechten und nach strenger Pruefung.
+//
+// Ausgeloest wird er BEWUSST vom Fahrlehrer (Kundenentscheidung), nicht
+// automatisch: Mit der Uebernahme werden Schuelerdaten fuer die Fahrschule
+// sichtbar, und das soll niemandem unbemerkt passieren.
+//
+// Beim spaeteren Austritt bleiben die Schueler bei der Fahrschule - so ist es
+// in der Praxis, der Ausbildungsvertrag besteht mit der Fahrschule. Deshalb
+// wird nur zur Nachvollziehbarkeit vermerkt, wer sie eingebracht hat.
+exports.uebernehmeSchuelerInFahrschule = onCall(async (request) => {
+  const auth = request.auth;
+  if (!auth) throw new HttpsError('unauthenticated', 'Bitte anmelden.');
+  if (auth.token.firebase && auth.token.firebase.sign_in_provider === 'anonymous') {
+    throw new HttpsError('permission-denied', 'Nur mit echtem Konto.');
+  }
+  const uid = auth.uid;
+  const db  = admin.firestore();
+
+  const meinDoc = await db.doc(`users/${uid}`).get();
+  if (!meinDoc.exists) throw new HttpsError('failed-precondition', 'Nutzerprofil nicht gefunden.');
+  const ich = meinDoc.data();
+
+  const schulId = ich.fahrschuleId;
+  if (!schulId || schulId === uid) {
+    throw new HttpsError('failed-precondition',
+      'Du gehoerst zu keiner Fahrschule. Tritt zuerst mit dem Fahrschul-Code bei.');
+  }
+  // Erst nach der Freigabe durch einen Menschen. Sonst koennte jemand mit
+  // einem erratenen Code beitreten und sofort Daten in eine fremde Schule
+  // schieben - noch bevor dort jemand von ihm weiss.
+  if ((ich.status || 'aktiv') !== 'aktiv') {
+    throw new HttpsError('failed-precondition',
+      'Deine Fahrschule muss dich zuerst freischalten.');
+  }
+  const schulDoc = await db.doc(`fahrschulen/${schulId}`).get();
+  if (!schulDoc.exists) throw new HttpsError('failed-precondition', 'Fahrschule nicht gefunden.');
+
+  const jetzt = Date.now();
+  const ergebnis = { schueler: 0, themen: 0, protokoll: 0, termine: 0, kalenderSchueler: 0 };
+
+  // Jeweils nur, was WIRKLICH mir gehoert und noch unter meiner eigenen
+  // Kennung laeuft. Schueler, die schon zur Schule gehoeren, bleiben
+  // unberuehrt; fremde werden gar nicht erst gefunden.
+  const umhaengen = async (sammlung, besitzerFeld, zuordnungsFeld, zaehler) => {
+    const snap = await db.collection(sammlung)
+      .where(besitzerFeld, '==', uid)
+      .where(zuordnungsFeld, '==', uid)
+      .get();
+    // In Bloecken schreiben - eine Firestore-Sammelschreibung fasst 500.
+    for (let i = 0; i < snap.docs.length; i += 400) {
+      const batch = db.batch();
+      snap.docs.slice(i, i + 400).forEach(d => {
+        batch.update(d.ref, {
+          [zuordnungsFeld]: schulId,
+          uebernommenVon:   uid,
+          uebernommenAm:    jetzt,
+        });
+      });
+      await batch.commit();
+    }
+    ergebnis[zaehler] = snap.size;
+  };
+
+  await umhaengen('students',     'uid',       'fahrschuleId', 'schueler');
+  await umhaengen('customThemen', 'uid',       'fahrschuleId', 'themen');
+  await umhaengen('protokoll',    'uid',       'fahrschuleId', 'protokoll');
+  // Der Kalender ist eine eigene Welt: Er fuehrt die Schule unter 'schoolId',
+  // den Lehrer unter 'lehrerUid' und hat eine EIGENE Schuelerliste in der
+  // Sammlung 'schueler'. Beides muss mit, sonst sieht die Fahrschule zwar den
+  // Lernstand, kann aber niemanden einplanen: Ihre Kalenderansichten fragen
+  // ausschliesslich nach schoolId.
+  await umhaengen('slots',        'lehrerUid', 'schoolId',     'termine');
+  await umhaengen('schueler',     'lehrerUid', 'schoolId',     'kalenderSchueler');
+
+  console.log('Uebernahme in Fahrschule', schulId, 'durch', uid, ergebnis);
+  return { success: true, ...ergebnis };
+});

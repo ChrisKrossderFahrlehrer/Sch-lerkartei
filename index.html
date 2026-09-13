@@ -7595,10 +7595,31 @@ async function renderFscodeSection() {
     } else if (!istInhaber && fsDoc.exists()) {
       // ── FAHRLEHRER bereits zugeordnet: Fahrschule anzeigen ──
       const fsName = (fsDoc.data().name || 'deiner Fahrschule').replace(/</g,'&lt;');
+
+      // Wer sich erst allein angemeldet und spaeter angeschlossen hat, traegt
+      // seine bisherige Kartei noch unter der EIGENEN Kennung. Die Fahrschule
+      // sieht sie dadurch nicht. Hier wird sie zum Uebernehmen angeboten -
+      // bewusst als eigener Schritt, denn damit werden Schuelerdaten fuer die
+      // Fahrschule sichtbar. Gezaehlt wird aus der bereits geladenen Liste,
+      // das braucht keine zusaetzliche Abfrage.
+      const offen = (students || []).filter(s =>
+        s.uid === currentUser.uid && s.fahrschuleId === currentUser.uid).length;
+      const uebernahmeHTML = offen ? (
+        '<div style="background:rgba(240,180,41,0.08);border:1px solid rgba(240,180,41,0.35);border-radius:10px;padding:12px;margin-top:10px">'
+        + '<div style="font-size:0.85rem;font-weight:700;margin-bottom:4px">📋 ' + offen + ' Schüler noch nicht übernommen</div>'
+        + '<div style="font-size:0.76rem;color:var(--muted);line-height:1.5;margin-bottom:10px">'
+        + 'Diese Schüler hast du angelegt, bevor du dich <b>' + fsName + '</b> angeschlossen hast – sie laufen noch unter dir persönlich. '
+        + 'Beim Übernehmen sieht die Fahrschule ihren Lernstand und kann sie im Kalender einplanen. '
+        + 'Deine bestehenden Termine wandern mit.</div>'
+        + '<button onclick="schuelerInFahrschuleUebernehmen()" class="btn-main" style="margin:0">In die Fahrschule übernehmen</button>'
+        + '</div>'
+      ) : '';
+
       body.innerHTML =
         '<div style="background:rgba(63,185,80,0.08);border:1px solid rgba(63,185,80,0.3);border-radius:10px;padding:12px;font-size:0.85rem">'
         + '✅ Du gehörst zu <b>' + fsName + '</b>'
         + '</div>'
+        + uebernahmeHTML
         + '<button onclick="fahrschuleVerlassen()" style="width:100%;margin-top:10px;background:none;border:1px solid var(--border);color:var(--muted);padding:9px;border-radius:8px;font-size:0.78rem;cursor:pointer">Fahrschule verlassen</button>';
       section.style.display = 'block';
 
@@ -7666,8 +7687,44 @@ window.fahrschuleBeitreten = async () => {
   }
 };
 
+// Schueler, die noch unter der eigenen Kennung laufen, in die Fahrschule
+// uebernehmen. Der eigentliche Umzug laeuft serverseitig - der Browser darf
+// die Fahrschul-Zuordnung eines Schuelers nicht aendern, und das soll auch so
+// bleiben.
+window.schuelerInFahrschuleUebernehmen = async () => {
+  const offen = (students || []).filter(s =>
+    s.uid === currentUser.uid && s.fahrschuleId === currentUser.uid);
+  if (!offen.length) { toast('Es gibt nichts zu übernehmen.'); return; }
+  const fsName = currentUser._fsName || 'deine Fahrschule';
+  if (!confirm(
+    offen.length + ' Schüler an ' + fsName + ' übergeben?\n\n'
+    + 'Die Fahrschule sieht danach ihren Lernstand und kann sie im Kalender einplanen. '
+    + 'Deine bestehenden Termine wandern mit.\n\n'
+    + 'Wichtig: Übernommene Schüler bleiben bei der Fahrschule, auch wenn du sie später verlässt.'
+  )) return;
+  try {
+    toast('Übernahme läuft …');
+    const fn  = httpsCallable(fns, 'uebernehmeSchuelerInFahrschule');
+    const res = await fn({});
+    const d = res.data || {};
+    toast('✅ ' + (d.schueler || 0) + ' Schüler übernommen'
+      + (d.termine ? ', ' + d.termine + ' Termine' : '') + '.');
+    renderFscodeSection();
+  } catch(e) {
+    console.warn('schuelerInFahrschuleUebernehmen:', e);
+    toast('Fehler: ' + (e.message || 'unbekannt'));
+  }
+};
+
 window.fahrschuleVerlassen = async () => {
-  if (!confirm('Möchtest du die Fahrschule wirklich verlassen?\n\nDu wirst danach wieder als eigenständiger Fahrlehrer geführt. Deine Schüler bleiben erhalten.')) return;
+  // FIX: Hier stand "Deine Schüler bleiben erhalten". Das stimmte zwar
+  // technisch (gelöscht wird nichts), war aber irreführend: Schüler, die
+  // bereits zur Fahrschule gehören, bleiben BEI DER FAHRSCHULE und sind für
+  // den ausscheidenden Lehrer danach nicht mehr sichtbar.
+  if (!confirm('Möchtest du die Fahrschule wirklich verlassen?\n\n'
+    + 'Du wirst danach wieder als eigenständiger Fahrlehrer geführt.\n\n'
+    + 'Schüler, die zur Fahrschule gehören, bleiben dort – du siehst sie danach nicht mehr. '
+    + 'Nur Schüler, die noch unter dir persönlich laufen, bleiben bei dir.')) return;
   try {
     await dbUpd(doc(db, 'users', currentUser.uid), {
       fahrschuleId:   currentUser.uid,  // zurück zu eigenständig
