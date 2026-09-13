@@ -2036,7 +2036,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     <button class="btn-main" onclick="changePassword()" style="margin-bottom:12px">Passwort ändern ✓</button>
     <div style="height:1px;background:var(--border);margin:0 0 16px"></div>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openVerkehrszeichen()" style="background:var(--surface2);margin-bottom:8px">🚦 Verkehrszeichen</button>
-    <button class="btn-sheet-cancel" id="btn-test-rechnung" onclick="testRechnungErzeugen()" style="background:var(--surface2);margin-bottom:8px">🧪 Test-Rechnung erzeugen</button>
     <button class="btn-sheet-cancel" onclick="toggleTheme()" id="theme-btn-menu" style="background:var(--surface2);margin-bottom:8px">☀️ Design wechseln (hell/dunkel)</button>
     <button class="btn-sheet-cancel" onclick="starteKomplettsicherung()" style="background:var(--surface2);margin-bottom:8px">💾 Komplettsicherung herunterladen</button>
     <input type="file" id="sicherung-datei" accept=".json,application/json" style="display:none" onchange="leseSicherung(this.files[0])">
@@ -4060,16 +4059,23 @@ async function activateAbo(subscriptionId, planId) {
       ? '🎉 Zahlung erfolgreich! Kartei sofort aktiv - der Kalender wird in Kürze freigeschaltet.'
       : '🎉 Zahlung erfolgreich! Dein Abo ist aktiv.');
 
+    // Die Rechnungsadresse MUSS hier gespeichert werden: Der PayPal-Webhook
+    // erzeugt die Rechnung serverseitig und bricht ab, wenn Strasse, PLZ oder
+    // Ort fehlen - dann entsteht gar keine Rechnung.
     try {
       await speichereRechnungsadresseWennVollstaendig();
-      const fn = httpsCallable(fns, 'erstelleRechnung');
-      const res = await fn({ plan: selectedTier, planer: planerGewuenscht });
-      if (res.data && res.data.nummer) {
-        toast('🧾 Rechnung ' + res.data.nummer + ' erstellt (unter Einstellungen → Meine Rechnungen).');
-      }
-    } catch(rechErr) {
-      console.warn('Rechnungserzeugung:', rechErr);
+    } catch(adrErr) {
+      console.warn('Rechnungsadresse:', adrErr);
     }
+    // FIX: Hier wurde danach zusaetzlich erstelleRechnung aufgerufen. Das war
+    // in beiden moeglichen Faellen falsch: Fuer normale Fahrlehrer scheiterte
+    // der Aufruf immer mit permission-denied (die Funktion war nur fuer
+    // SuperAdmin freigegeben) und wurde still verschluckt - und beim
+    // SuperAdmin haette er eine ZWEITE Rechnung zur selben Zahlung angelegt,
+    // mit einer weiteren Nummer aus dem lueckenlosen Zaehler. Die echte
+    // Rechnung kommt ausschliesslich aus dem PayPal-Webhook, der sie ueber
+    // die Sale-ID gegen Doppelanlage absichert.
+    toast('🧾 Die Rechnung wird erstellt und erscheint gleich unter Einstellungen → Meine Rechnungen.');
   } catch(e) {
     toast('Fehler bei Aktivierung: ' + e.message);
   }
@@ -7421,16 +7427,6 @@ window.openSettings = async () => {
   if (emDisp && currentUser) emDisp.innerHTML = 'Aktuelle E-Mail: <b>' + (currentUser.email || '–') + '</b>';
   const disp = document.getElementById('settings-username-display');
   if (disp && currentUser) disp.textContent = '👤 Angemeldet als: ' + (currentUser.displayName || '');
-  // FIX: Der Testrechnung-Button war fuer JEDEN Fahrlehrer sichtbar, obwohl
-  // die zugehoerige Cloud Function erstelleRechnung serverseitig laengst nur
-  // fuer SuperAdmin erlaubt ist - normale Nutzer sahen also einen Button, der
-  // bei ihnen immer nur mit einer Fehlermeldung scheitert. Jetzt nur noch
-  // fuer SuperAdmin sichtbar, wie die Funktion dahinter es ohnehin verlangt.
-  const testRechnungBtn = document.getElementById('btn-test-rechnung');
-  if (testRechnungBtn) {
-    const istSuperadminHier = window.__userRolle === 'superadmin' || (currentUser && currentUser.email === 'chriskoo@mail.de');
-    testRechnungBtn.style.display = istSuperadminHier ? '' : 'none';
-  }
   document.getElementById('settings-modal').classList.add('open');
   // Fahrschul-Bereich befüllen (Code anzeigen ODER Beitritts-Feld)
   renderFscodeSection();
@@ -10279,25 +10275,12 @@ window.landGewechselt = () => {
 
 
 
-// Nur fuer chriskoo@mail.de sichtbar (siehe openSettings). Ruft dieselbe
-// Cloud Function wie eine echte PayPal-Zahlung auf - ohne Geld zu bewegen,
-// damit Rechnungserstellung getestet werden kann.
-window.testRechnungErzeugen = async () => {
-  if (!confirm('Test-Rechnung mit Tarif "Solo" erzeugen fuer ' + (currentUser ? currentUser.email : '?') + '? Es wird kein Geld bewegt.')) return;
-  try {
-    await speichereRechnungsadresseWennVollstaendig();
-    const fn = httpsCallable(fns, 'erstelleRechnung');
-    const res = await fn({ plan: 'solo', planer: false });
-    if (res.data && res.data.nummer) {
-      toast('🧾 Test-Rechnung ' + res.data.nummer + ' erstellt (Einstellungen → Meine Rechnungen)');
-    } else {
-      toast('Aufruf ok, aber keine Nummer erhalten.');
-    }
-  } catch(e) {
-    console.warn('testRechnungErzeugen:', e);
-    toast('Fehler: ' + (e.message || 'unbekannt') + (e.message && e.message.includes('Rechnungsadresse') ? ' - bitte zuerst unter Meine Rechnungen die Adresse ausfüllen.' : ''));
-  }
-};
+// (Die Test-Rechnung ist entfallen. Sie war irrefuehrend benannt: Sie hat
+//  keine Probe erzeugt, sondern eine ECHTE, fortlaufend nummerierte Rechnung
+//  angelegt - mit einer Nummer aus demselben luckenlosen Zaehler wie eine
+//  bezahlte Rechnung, und dauerhaft aufbewahrt, weil das taegliche Aufraeumen
+//  Rechnungen bewusst nie loescht (§ 14b UStG, § 147 AO). Jeder Klick hat
+//  also eine Nummer verbraucht und einen Beleg in den Buechern hinterlassen.)
 
 
 

@@ -1,4 +1,5 @@
-// Neu-Bereitstellung erzwungen (13.08.2026): Sicherheitsfix erstelleRechnung (nur SuperAdmin)
+// Neu-Bereitstellung erzwungen (13.09.2026): erstelleRechnung entfernt - beim
+// naechsten Bereitstellen wird die Funktion in Firebase mit geloescht.
 // Node.js-Laufzeit auf 22 umgestellt (11.08.2026) - dieser Kommentar erzwingt ein echtes Neu-Bereitstellen
 // FahrSync Push-Benachrichtigungen (Cloud Functions v2, Region Frankfurt)
 // Sendet data-only Nachrichten – der Service Worker zeigt sie an
@@ -349,95 +350,18 @@ function baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel, betra
   });
 }
 
-exports.erstelleRechnung = onCall(async (request) => {
-  const auth = request.auth;
-  if (!auth) throw new HttpsError('unauthenticated', 'Bitte anmelden.');
-  const uid = auth.uid;
-
-  // SuperAdmin-Pruefung: entweder per E-Mail, oder per Firestore-Rolle -
-  // dieselben zwei Wege, die auch die Firestore-Regeln selbst nutzen.
-  const istSuperAdminEmail = auth.token.email === 'chriskoo@mail.de';
-  let istSuperAdminRolle = false;
-  if (!istSuperAdminEmail) {
-    const eigenesDoc = await admin.firestore().doc(`users/${uid}`).get();
-    istSuperAdminRolle = eigenesDoc.exists && eigenesDoc.data().rolle === 'superadmin';
-  }
-  if (!istSuperAdminEmail && !istSuperAdminRolle) {
-    throw new HttpsError('permission-denied', 'Echte Rechnungen entstehen automatisch bei der Zahlung. Diese Funktion ist nur fuer Testzwecke.');
-  }
-  const { plan, planer } = request.data || {};
-  if (!plan || !RECHNUNG_PLANS[plan]) {
-    throw new HttpsError('invalid-argument', 'Unbekannter Tarif.');
-  }
-
-  const userSnap = await admin.firestore().doc(`users/${uid}`).get();
-  if (!userSnap.exists) throw new HttpsError('failed-precondition', 'Nutzerprofil nicht gefunden.');
-  const userData = userSnap.data();
-
-  // Dieselbe Ermittlung wie im Client (window.__billingDocRef): Fahrschule
-  // oder eigenstaendiger Fahrlehrer sind jeweils selbst der Rechnungsempfaenger.
-  let billingColl, billingId;
-  if (userData.typ === 'fahrschule') {
-    billingColl = 'fahrschulen'; billingId = uid;
-  } else if (!userData.fahrschuleId || userData.fahrschuleId === uid) {
-    billingColl = 'users'; billingId = uid;
-  } else {
-    throw new HttpsError('permission-denied', 'Nur der Fahrschul-Inhaber kann eine Rechnung anfordern.');
-  }
-
-  const billingSnap = await admin.firestore().doc(`${billingColl}/${billingId}`).get();
-  const b = billingSnap.exists ? billingSnap.data() : {};
-  if (!b.rechnungsStrasse || !b.rechnungsPlz || !b.rechnungsOrt) {
-    throw new HttpsError('failed-precondition', 'Bitte zuerst die Rechnungsadresse ausfüllen.');
-  }
-
-  const planInfo = RECHNUNG_PLANS[plan];
-  const betrag = planer ? planInfo.pricePlaner : planInfo.price;
-
-  // Fortlaufende, luecken- und ueberschneidungsfreie Rechnungsnummer per
-  // Transaktion - Pflicht nach § 14 UStG.
-  const counterRef = admin.firestore().doc('platform/rechnungszaehler');
-  const nummer = await admin.firestore().runTransaction(async (tx) => {
-    const c = await tx.get(counterRef);
-    const jahr = new Date().getFullYear();
-    const bisher = c.exists ? (c.data().naechsteNummer || 1) : 1;
-    tx.set(counterRef, { naechsteNummer: bisher + 1 }, { merge: true });
-    return `${jahr}-${String(bisher).padStart(5, '0')}`;
-  });
-
-  const platDoc = await admin.firestore().doc('platform/impressum').get();
-  const platImp = platDoc.exists ? platDoc.data() : {};
-  const steller = {
-    name: platImp.name || 'Chriskoo',
-    strasse: platImp.strasse || '',
-    plz: platImp.plz || '',
-    ort: platImp.ort || '',
-    email: platImp.email || 'kontakt@fahrsync.de',
-    web: platImp.web || 'fahrsync.de',
-    // Pflichtangabe nach §14 Abs.4 UStG (gilt auch fuer Kleinunternehmer):
-    // Steuernummer, seit 24.08.2026 vom Finanzamt Luckenwalde vorliegend.
-    steuernummer: platImp.steuernummer || '050/240/09485',
-  };
-  const LAENDER = { DE: '', AT: 'Österreich', CH: 'Schweiz', XX: '' };
-  const empfaenger = {
-    name: b.name || userData.name || 'Kunde',
-    strasse: b.rechnungsStrasse, plz: b.rechnungsPlz, ort: b.rechnungsOrt,
-    land: LAENDER[b.rechnungsLand || 'DE'] || '',
-  };
-  const datum = new Date().toLocaleDateString('de-DE');
-
-  const pdfBuffer = await baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel: planInfo.label, betrag });
-  const pdfBase64 = pdfBuffer.toString('base64');
-
-  const rechnungRef = admin.firestore().collection('rechnungen').doc();
-  await rechnungRef.set({
-    nummer, empfaengerId: uid, empfaengerName: empfaenger.name,
-    plan, planer: !!planer, betrag, datum, erstelltAm: Date.now(),
-    pdfBase64,
-  });
-
-  return { success: true, nummer, invoiceId: rechnungRef.id };
-});
+// (exports.erstelleRechnung ist entfallen - zusammen mit dem Knopf
+//  "Test-Rechnung erzeugen" in der App. Die Funktion war ihrem eigenen
+//  Fehlertext nach nur fuer Testzwecke gedacht, hat aber eine ECHTE,
+//  fortlaufend nummerierte Rechnung angelegt: dieselbe Nummernvergabe aus
+//  platform/rechnungszaehler wie bei einer bezahlten Rechnung, und
+//  dauerhaft aufbewahrt, weil taeglichesAufraeumen Rechnungen bewusst nie
+//  loescht (§ 14b UStG, § 147 AO).
+//  Echte Rechnungen entstehen ausschliesslich in den Webhooks:
+//  paypalWebhook (abgesichert ueber die Sale-ID) und stripeWebhook
+//  (ueber die Invoice-ID) - beide gegen Doppelanlage geschuetzt.
+//  Die Bausteine baueRechnungsPdf, RECHNUNG_PLANS und LAENDER bleiben,
+//  sie werden von genau diesen Webhooks gebraucht.
 
 exports.syncSlotToGoogleCalendar = onDocumentUpdated({ document: 'slots/{slotId}', secrets: [GOOGLE_CLIENT_SECRET] }, async (event) => {
   const before = event.data.before.data();
@@ -968,7 +892,7 @@ exports.bestaetigePaypalAbo = onCall(
     if (!userSnap.exists) throw new HttpsError('failed-precondition', 'Nutzerprofil nicht gefunden.');
     const userData = userSnap.data();
 
-    // Dieselbe Ermittlung wie in erstelleRechnung/createStripeCheckoutSession.
+    // Dieselbe Ermittlung wie in createStripeCheckoutSession.
     let billingColl, billingId;
     if (userData.typ === 'fahrschule') {
       billingColl = 'fahrschulen'; billingId = uid;
