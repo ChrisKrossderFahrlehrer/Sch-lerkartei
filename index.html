@@ -769,9 +769,23 @@ body.beta-dash .badge { font-size: 0.66rem; padding: 3px 9px; }
 .adk-seg {
   flex:1; height:26px; min-height:26px; padding:0; border:none; background:none;
   cursor:pointer; display:flex; align-items:center; justify-content:center;
+  /* Ohne min-width:0 waere die automatische Mindestbreite eines Flex-Kindes
+     seine Inhaltsbreite. Setzt eine Oberflaeche der Markierung eine feste
+     Breite (Skala "Punkte"), konnte das Feld dadurch nicht mehr schrumpfen
+     und hat die ganze Balkenleiste ueber ihre vorgegebene Breite
+     hinausgedrueckt - in der Rasterkarte standen die Spalten dann nicht mehr
+     unter der Kopfzeile. */
+  min-width:0;
 }
 .adk-seg::before {
-  content:''; display:block; width:100%; height:10px;
+  content:''; display:block; width:100%; height:12px;
+  /* box-sizing MUSS hier stehen: Der Reset ganz oben benutzt den
+     Universalselektor *, und der erfasst KEINE Pseudo-Elemente. Die
+     Markierung rechnete deshalb als einzige im Programm nach content-box -
+     jeder Rahmen, den eine Oberflaeche setzt, kam also oben drauf statt
+     hinein. Bei 1px Rahmen waren das 2px zu viel, bei der Skizze mit 2px
+     Rahmen 4px: Die Markierungen ragten still ueber ihr Feld hinaus. */
+  box-sizing:border-box;
   border:1px solid var(--border); background:var(--surface2); border-radius:3px;
   transition:background 0.15s, border-color 0.15s;
 }
@@ -818,11 +832,21 @@ body.beta-dash .badge { font-size: 0.66rem; padding: 3px 9px; }
 /* Das Stufenwort entfaellt hier: In der Rasterkarte sagen die Spalten,
    welche Stufe erreicht ist - der Text wuerde nur Breite kosten. */
 .adk-klassisch .adk-stand { display:none; }
-.adk-klassisch .adk-balken { flex:0 0 108px; gap:2px; }
-.adk-klassisch .adk-seg { height:28px; min-height:28px; }
-.adk-klassisch .adk-seg::before { height:20px; border-radius:2px; }
-.adk-klassisch .adk-seg:first-child::before,
-.adk-klassisch .adk-seg:last-child::before { border-radius:2px; }
+/* FIX: Diese Regeln galten vorher fuer JEDE Balkenleiste auf der Seite.
+   Die Zeilen im Tab "Eigene Themen" sind aber keine .adk-zeile - sie haben
+   ihren eigenen Aufbau mit Haken und Papierkorb und bekommen die
+   Rasteranordnung gar nicht. Trotzdem wurden dort die Markierungen mit
+   umgestellt: Wer auf "klassisch" schaltete, hatte im Eigene-Tab ploetzlich
+   dickere Balken, ohne das dazugehoerige Raster. Jetzt greift die
+   Rasterkarte nur noch dort, wo sie auch das Layout stellt.
+   Die Breite muss zusaetzlich fuer die Kopfzeile gelten, sonst stehen die
+   Spalten nicht mehr unter ihren Nummern - deshalb dort beide Selektoren. */
+.adk-klassisch .adk-zeile .adk-balken,
+.adk-klassisch .adk-rasterkopf .adk-balken { flex:0 0 108px; gap:2px; }
+.adk-klassisch .adk-zeile .adk-seg { height:28px; min-height:28px; }
+.adk-klassisch .adk-zeile .adk-seg::before { height:22px; border-radius:2px; }
+.adk-klassisch .adk-zeile .adk-seg:first-child::before,
+.adk-klassisch .adk-zeile .adk-seg:last-child::before { border-radius:2px; }
 .adk-klassisch .adk-zeile:last-child { border-bottom:none; }
 
 /* ── SKALA-ART: wie ein einzelnes Feld aussieht ───────────────────────
@@ -834,11 +858,11 @@ body.beta-dash .badge { font-size: 0.66rem; padding: 3px 9px; }
    soll die Skala-Art ueber die Form entscheiden, die Ansicht nur ueber
    die Anordnung. */
 .skala-punkte .adk-seg::before {
-  width:15px; height:15px; border-radius:50%;
+  width:17px; height:17px; border-radius:50%;
 }
 .skala-zahlen .adk-seg::before,
 .skala-kreuze .adk-seg::before {
-  height:22px; border-radius:3px;
+  height:24px; border-radius:3px;
   display:flex; align-items:center; justify-content:center;
   font-family:'Manrope',sans-serif; font-size:0.66rem; font-weight:700;
   color:var(--muted); line-height:1;
@@ -945,13 +969,20 @@ body.light .punkte-neon .adk-seg.erreicht::before {
   border-radius:3px 11px 4px 9px / 9px 4px 11px 3px;
 }
 .punkte-skizze .adk-seg::before {
-  height:13px; border:2px solid var(--muted); background:transparent;
+  height:17px; border:2px solid var(--muted); background:transparent;
 }
 .punkte-skizze .adk-seg.erreicht::before {
   background:var(--seg); border-color:var(--text);
 }
 .punkte-skizze .adk-seg:nth-child(3n)::before   { transform:rotate(-1.2deg); }
 .punkte-skizze .adk-seg:nth-child(3n+1)::before { transform:rotate(0.9deg); }
+/* FIX: Die Schraeglage benutzt transform - und damit dasselbe Merkmal wie
+   die allgemeine Rueckmeldung beim Antippen (.adk-seg:active::before mit
+   scaleY). Die Schraeglage war spezifischer und hat sie verschluckt: Beim
+   Skizzen-Stil gaben ausgerechnet die schiefen Felder beim Tippen keine
+   Rueckmeldung, die geraden daneben schon. Hier beides zusammen. */
+.punkte-skizze .adk-seg:nth-child(3n):active::before   { transform:rotate(-1.2deg) scaleY(1.35); }
+.punkte-skizze .adk-seg:nth-child(3n+1):active::before { transform:rotate(0.9deg) scaleY(1.35); }
 
 .notes-textarea { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:12px; font-family:'Manrope',sans-serif; font-size:0.88rem; color:var(--text); resize:none; min-height:100px; outline:none; line-height:1.6; }
 .notes-textarea:focus { border-color:var(--accent); }
