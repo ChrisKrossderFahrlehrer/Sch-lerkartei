@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "cd .. && firebase emulators:exec --only firestore --project fahrsync-test \"node tests/rules.test.mjs\""
+    "test": "cd .. && firebase emulators:exec --only firestore --project fahrsync-test \"node tests/rules.test.mjs && node tests/uebernahme.test.mjs\"",
+    "test:regeln": "cd .. && firebase emulators:exec --only firestore --project fahrsync-test \"node tests/rules.test.mjs\"",
+    "test:uebernahme": "cd .. && firebase emulators:exec --only firestore --project uebernahme \"node tests/uebernahme.test.mjs\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^3.0.4",

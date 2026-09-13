@@ -3273,7 +3273,7 @@ window.__demoWrite = (op, args) => {
   demoHinweis(); return Promise.resolve({ id:'demo-x' });
 };
 let __demoHinweisTs = 0;
-function demoHinweis(){ const n=Date.now(); if(n-__demoHinweisTs>2500){ __demoHinweisTs=n; try{ toast('\U0001F3AE Demo \u2013 wird nicht gespeichert'); }catch(e){} } }
+function demoHinweis(){ const n=Date.now(); if(n-__demoHinweisTs>2500){ __demoHinweisTs=n; try{ toast('🎮 Demo – wird nicht gespeichert'); }catch(e){} } }
 const dbAdd = (...a) => window.__DEMO ? window.__demoWrite('add', a) : addDoc(...a);
 const dbSet = (...a) => window.__DEMO ? window.__demoWrite('set', a) : setDoc(...a);
 const dbUpd = (...a) => window.__DEMO ? window.__demoWrite('upd', a) : updateDoc(...a);
@@ -3300,7 +3300,7 @@ function __demoDaten(){
 window.startDemo = () => {
   const DEMO_MS=24*60*60*1000, now=Date.now();
   let s=0; try{ s=parseInt(localStorage.getItem('demo_start')||'0',10)||0; }catch(e){}
-  if (s && now-s>DEMO_MS){ setAuthError('\U0001F3AE Dein Demo-Zeitraum (24 h) ist abgelaufen. Registriere dich kostenlos, um weiterzumachen.'); return; }
+  if (s && now-s>DEMO_MS){ setAuthError('🎮 Dein Demo-Zeitraum (24 h) ist abgelaufen. Registriere dich kostenlos, um weiterzumachen.'); return; }
   if (!s){ try{ localStorage.setItem('demo_start', String(now)); }catch(e){} }
   window.__DEMO = true;
   currentUser = { uid:'demo-user', email:'demo@fahrsync.de', displayName:'Demo-Fahrlehrer', _fahrschuleId:'demo-user', _rolle:'fahrlehrer', _fsName:'Demo-Fahrschule', _kalenderAktiv:false };
@@ -4596,13 +4596,50 @@ onAuthStateChanged(auth, async (user) => {
 function listenStudents() {
   if (window.__DEMO) { try{renderList();}catch(e){} return; }
   if (unsubSnapshot) unsubSnapshot();
-  // Multi-Tenant: Nach fahrschuleId filtern wenn vorhanden, sonst nach uid (Rückwärtskompatibilität)
   const fsId = currentUser._fahrschuleId;
-  const q = fsId
-    ? query(collection(db, 'students'), where('fahrschuleId', '==', fsId))
-    : query(collection(db, 'students'), where('uid', '==', currentUser.uid));
-  unsubSnapshot = onSnapshot(q, (snap) => {
-    students = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const eigeneUid = currentUser.uid;
+
+  // FIX: Hier stand nur EINE Abfrage - entweder nach fahrschuleId oder nach
+  // uid. Fuer einen eigenstaendigen Fahrlehrer ist beides dasselbe, sobald er
+  // aber einer Fahrschule BEITRITT, faellt seine bisherige Kartei aus der
+  // Abfrage: Seine vorhandenen Schueler tragen noch seine eigene Kennung als
+  // fahrschuleId, gesucht wird aber ab sofort nach der Kennung der Schule.
+  // Die Schueler waren dadurch von einem Moment auf den anderen aus der Liste
+  // verschwunden - nicht geloescht, nur nicht mehr gefunden. Die
+  // Firestore-Regel haette sie ihm sehr wohl gezeigt (docBelongsToUser deckt
+  // 'uid == eigene uid' mit ab); es wurde nur nicht danach gefragt.
+  //
+  // Deshalb jetzt zwei Abfragen, deren Ergebnisse zusammengelegt werden:
+  //   1. alles, was zur Fahrschule gehoert (auch von Kollegen)
+  //   2. alles, was mir selbst gehoert (meine mitgebrachte Kartei)
+  // Bewusst zwei getrennte Abfragen statt einer or()-Abfrage: Die kaeme ohne
+  // zusaetzlichen Index nicht sicher zustande, und eine leere Schuelerliste
+  // waere der schlimmste denkbare Fehler in dieser App.
+  // Der zweite Abruf laeuft nur, wenn er ueberhaupt etwas anderes liefern
+  // kann - beim eigenstaendigen Lehrer sind beide Abfragen identisch.
+  const brauchtZweite = !fsId || fsId !== eigeneUid;
+  const abfragen = [
+    query(collection(db, 'students'), where('fahrschuleId', '==', fsId || eigeneUid)),
+  ];
+  if (brauchtZweite) abfragen.push(query(collection(db, 'students'), where('uid', '==', eigeneUid)));
+
+  const teile = abfragen.map(() => []);
+  const stopper = [];
+  unsubSnapshot = () => { stopper.forEach(fn => { try { fn(); } catch(e) {} }); };
+
+  abfragen.forEach((q, i) => {
+    stopper.push(onSnapshot(q, (snap) => {
+      teile[i] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      // Zusammenlegen und doppelte entfernen - ein Schueler kann beide
+      // Bedingungen erfuellen (meiner UND zur Schule gehoerend).
+      const nachId = new Map();
+      teile.forEach(liste => liste.forEach(s => nachId.set(s.id, s)));
+      students = [...nachId.values()];
+      verarbeiteSchueler();
+    }, (err) => { console.warn('listenStudents:', err); }));
+  });
+
+  function verarbeiteSchueler() {
     if (!window.__snapResyncKick && students.length) { window.__snapResyncKick = true; setTimeout(resyncPortalSnapshotsV2, 1200); }
     students.sort((a,b) => (a.nachname||'').localeCompare(b.nachname||''));
     renderList();
@@ -4622,7 +4659,7 @@ function listenStudents() {
         }).catch(() => {}); // still scheitern lassen (z.B. Alt-Konto ohne Doc)
       }
     } catch(e) {}
-  });
+  }
 }
 
 function listenFields() {
@@ -7558,10 +7595,31 @@ async function renderFscodeSection() {
     } else if (!istInhaber && fsDoc.exists()) {
       // ── FAHRLEHRER bereits zugeordnet: Fahrschule anzeigen ──
       const fsName = (fsDoc.data().name || 'deiner Fahrschule').replace(/</g,'&lt;');
+
+      // Wer sich erst allein angemeldet und spaeter angeschlossen hat, traegt
+      // seine bisherige Kartei noch unter der EIGENEN Kennung. Die Fahrschule
+      // sieht sie dadurch nicht. Hier wird sie zum Uebernehmen angeboten -
+      // bewusst als eigener Schritt, denn damit werden Schuelerdaten fuer die
+      // Fahrschule sichtbar. Gezaehlt wird aus der bereits geladenen Liste,
+      // das braucht keine zusaetzliche Abfrage.
+      const offen = (students || []).filter(s =>
+        s.uid === currentUser.uid && s.fahrschuleId === currentUser.uid).length;
+      const uebernahmeHTML = offen ? (
+        '<div style="background:rgba(240,180,41,0.08);border:1px solid rgba(240,180,41,0.35);border-radius:10px;padding:12px;margin-top:10px">'
+        + '<div style="font-size:0.85rem;font-weight:700;margin-bottom:4px">📋 ' + offen + ' Schüler noch nicht übernommen</div>'
+        + '<div style="font-size:0.76rem;color:var(--muted);line-height:1.5;margin-bottom:10px">'
+        + 'Diese Schüler hast du angelegt, bevor du dich <b>' + fsName + '</b> angeschlossen hast – sie laufen noch unter dir persönlich. '
+        + 'Beim Übernehmen sieht die Fahrschule ihren Lernstand und kann sie im Kalender einplanen. '
+        + 'Deine bestehenden Termine wandern mit.</div>'
+        + '<button onclick="schuelerInFahrschuleUebernehmen()" class="btn-main" style="margin:0">In die Fahrschule übernehmen</button>'
+        + '</div>'
+      ) : '';
+
       body.innerHTML =
         '<div style="background:rgba(63,185,80,0.08);border:1px solid rgba(63,185,80,0.3);border-radius:10px;padding:12px;font-size:0.85rem">'
         + '✅ Du gehörst zu <b>' + fsName + '</b>'
         + '</div>'
+        + uebernahmeHTML
         + '<button onclick="fahrschuleVerlassen()" style="width:100%;margin-top:10px;background:none;border:1px solid var(--border);color:var(--muted);padding:9px;border-radius:8px;font-size:0.78rem;cursor:pointer">Fahrschule verlassen</button>';
       section.style.display = 'block';
 
@@ -7629,8 +7687,44 @@ window.fahrschuleBeitreten = async () => {
   }
 };
 
+// Schueler, die noch unter der eigenen Kennung laufen, in die Fahrschule
+// uebernehmen. Der eigentliche Umzug laeuft serverseitig - der Browser darf
+// die Fahrschul-Zuordnung eines Schuelers nicht aendern, und das soll auch so
+// bleiben.
+window.schuelerInFahrschuleUebernehmen = async () => {
+  const offen = (students || []).filter(s =>
+    s.uid === currentUser.uid && s.fahrschuleId === currentUser.uid);
+  if (!offen.length) { toast('Es gibt nichts zu übernehmen.'); return; }
+  const fsName = currentUser._fsName || 'deine Fahrschule';
+  if (!confirm(
+    offen.length + ' Schüler an ' + fsName + ' übergeben?\n\n'
+    + 'Die Fahrschule sieht danach ihren Lernstand und kann sie im Kalender einplanen. '
+    + 'Deine bestehenden Termine wandern mit.\n\n'
+    + 'Wichtig: Übernommene Schüler bleiben bei der Fahrschule, auch wenn du sie später verlässt.'
+  )) return;
+  try {
+    toast('Übernahme läuft …');
+    const fn  = httpsCallable(fns, 'uebernehmeSchuelerInFahrschule');
+    const res = await fn({});
+    const d = res.data || {};
+    toast('✅ ' + (d.schueler || 0) + ' Schüler übernommen'
+      + (d.termine ? ', ' + d.termine + ' Termine' : '') + '.');
+    renderFscodeSection();
+  } catch(e) {
+    console.warn('schuelerInFahrschuleUebernehmen:', e);
+    toast('Fehler: ' + (e.message || 'unbekannt'));
+  }
+};
+
 window.fahrschuleVerlassen = async () => {
-  if (!confirm('Möchtest du die Fahrschule wirklich verlassen?\n\nDu wirst danach wieder als eigenständiger Fahrlehrer geführt. Deine Schüler bleiben erhalten.')) return;
+  // FIX: Hier stand "Deine Schüler bleiben erhalten". Das stimmte zwar
+  // technisch (gelöscht wird nichts), war aber irreführend: Schüler, die
+  // bereits zur Fahrschule gehören, bleiben BEI DER FAHRSCHULE und sind für
+  // den ausscheidenden Lehrer danach nicht mehr sichtbar.
+  if (!confirm('Möchtest du die Fahrschule wirklich verlassen?\n\n'
+    + 'Du wirst danach wieder als eigenständiger Fahrlehrer geführt.\n\n'
+    + 'Schüler, die zur Fahrschule gehören, bleiben dort – du siehst sie danach nicht mehr. '
+    + 'Nur Schüler, die noch unter dir persönlich laufen, bleiben bei dir.')) return;
   try {
     await dbUpd(doc(db, 'users', currentUser.uid), {
       fahrschuleId:   currentUser.uid,  // zurück zu eigenständig
