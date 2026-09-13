@@ -781,6 +781,15 @@ window.doLogin = async () => {
 };
 
 // ── AUTH: REGISTRIERUNG MIT ZUSTIMMUNGSPFLICHT ───────────────
+// Fahrschul-Code im selben Format wie in index.html: FS- plus vier Zeichen
+// ohne I, O, 0 und 1, damit er am Telefon nicht verwechselt werden kann.
+function neuerFahrschulCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = 'FS-';
+  for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
 window.doRegister = async () => {
   const name    = document.getElementById('inp-reg-name').value.trim();
   const inhaber = document.getElementById('inp-reg-inhaber').value.trim();
@@ -807,25 +816,55 @@ window.doRegister = async () => {
     const cred = await createUserWithEmailAndPassword(auth, email, pw);
     await updateProfile(cred.user, { displayName: inhaber });
 
-    const fsRef = await addDoc(collection(db, 'fahrschulen'), {
+    // FIX: Diese Registrierung hat bisher halbe Konten hinterlassen. Drei
+    // Dinge passten nicht zu dem, was der Rest des Programms erwartet:
+    //
+    // 1. Die Fahrschule bekam per addDoc eine Zufalls-ID. Ueberall sonst
+    //    (index.html) ist die Fahrschul-ID die UID ihres Inhabers. Die
+    //    Firestore-Regel fuer users verlangt beim Anlegen genau das:
+    //    fahrschuleId == eigene UID, sonst braeuchte es einen Beitrittscode.
+    //    Das users-Dokument schlug dadurch fehl - Anmeldekonto und
+    //    Fahrschule entstanden, das Nutzerprofil nicht.
+    // 2. Die Rolle hiess 'fs_admin'. Gespeichert wird sie ueberall sonst als
+    //    'fahrschul-admin', und genau darauf prueft isFsAdmin() in den
+    //    Regeln. Ein so angelegter Inhaber waere nie als Inhaber erkannt
+    //    worden - und die Regel laesst diese Schreibweise gar nicht zu.
+    // 3. Es wurde kein Fahrschul-Code erzeugt. Ohne ihn kann kein Fahrlehrer
+    //    der Schule je beitreten; die Fahrschule waere eine Sackgasse.
+    const fsCode = neuerFahrschulCode();
+    const jetzt  = Date.now();
+    await setDoc(doc(db, 'fahrschulen', cred.user.uid), {
       name, inhaber, email, stadt,
       adminUid: cred.user.uid,
+      fahrschulCode: fsCode,
+      typ: 'fahrschule',
       status: 'ausstehend',
-      createdAt: Date.now(),
+      createdAt: jetzt,
       // DSGVO-Zustimmungen mit Zeitstempel speichern
       zustimmungen: {
-        agb:   { akzeptiert: true, datum: Date.now(), version: 'Januar 2025' },
-        dsgvo: { akzeptiert: true, datum: Date.now(), version: 'Januar 2025' },
-        avv:   { akzeptiert: true, datum: Date.now(), version: 'Januar 2025' },
+        agb:   { akzeptiert: true, datum: jetzt, version: 'Januar 2025' },
+        dsgvo: { akzeptiert: true, datum: jetzt, version: 'Januar 2025' },
+        avv:   { akzeptiert: true, datum: jetzt, version: 'Januar 2025' },
       },
     });
 
+    // Nachschlage-Eintrag, damit Fahrlehrer per Code beitreten koennen, ohne
+    // dass alle Fahrschulen lesbar sein muessen (wie in index.html).
+    try {
+      await setDoc(doc(db, 'schoolCodes', fsCode), {
+        schoolId: cred.user.uid, schoolName: name, createdAt: jetzt
+      });
+    } catch(scErr) { console.warn('schoolCode-Eintrag:', scErr); }
+
     await setDoc(doc(db, 'users', cred.user.uid), {
+      uid: cred.user.uid,
       name: inhaber, email,
-      rolle: 'fs_admin',
-      fahrschuleId: fsRef.id,
+      rolle: 'fahrschul-admin',
+      typ: 'fahrschule',
+      status: 'ausstehend',
+      fahrschuleId: cred.user.uid,
       fahrschuleName: name,
-      createdAt: Date.now(),
+      createdAt: jetzt,
     });
 
     okEl.textContent = '✓ Registrierung erfolgreich! Ihr Konto wird geprüft.';

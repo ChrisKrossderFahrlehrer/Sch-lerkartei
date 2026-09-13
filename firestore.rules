@@ -122,11 +122,23 @@ service cloud.firestore {
           && after.get('aboLetzteZahlungAm', null)     == before.get('aboLetzteZahlungAm', null)
           && after.get('aboZahlungsart', null)         == before.get('aboZahlungsart', null);
     }
+    // FIX: Diese Regel hat 'abo' pauschal mitverboten - und damit zwei
+    // Registrierungswege komplett blockiert, die beim Anlegen ganz harmlos
+    // 'abo: free' mitschreiben:
+    //   1. Die Fahrschul-Registrierung (schreibt fahrschulen/{uid} mit
+    //      abo:'free') - eine Fahrschule konnte sich gar nicht mehr anmelden.
+    //   2. Das Anlegen eines Fahrlehrers durch den SuperAdmin - dort wird das
+    //      users-Dokument geschrieben, WAEHREND der neue Nutzer angemeldet
+    //      ist, die SuperAdmin-Ausnahme greift also nicht.
+    // Der Schutzzweck bleibt vollstaendig erhalten: Kein bezahlter Tarif und
+    // kein einziges weiteres Abo-Feld darf beim Anlegen gesetzt werden. Nur
+    // der Wert 'free' ist erlaubt, und der verleiht nichts - er ist genau
+    // das, was ein frisches Konto ohnehin hat.
     function keineAboFelderBeiCreate(data) {
       return !data.keys().hasAny([
-        'abo','aboStatus','aboPlaner','aboMaxLehrer','aboSubscriptionId',
+        'aboStatus','aboPlaner','aboMaxLehrer','aboSubscriptionId',
         'aboPlanId','aboAktiviertAm','aboSetByAdmin','aboLetzteZahlungAm','aboZahlungsart'
-      ]);
+      ]) && data.get('abo', 'free') == 'free';
     }
 
     // Die Loeschvormerkung (DSGVO-Frist) darf ausschliesslich serverseitig
