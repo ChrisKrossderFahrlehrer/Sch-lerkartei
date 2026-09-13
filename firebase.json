@@ -8,5 +8,9 @@
   "storage": {
     "rules": "storage.rules",
     "bucket": "fahrschule-ebc65-eu-storage"
+  },
+  "emulators": {
+    "firestore": { "port": 8089 },
+    "ui": { "enabled": false }
   }
 }

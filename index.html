@@ -503,12 +503,9 @@ body.beta-dash .badge { font-size: 0.66rem; padding: 3px 9px; }
   font-size: 0.74rem; letter-spacing: 0.02em; padding: 0 6px;
   display: flex; align-items: center;
 }
-.stufe-form { display:inline-block; width:14px; height:14px; }
-.stufe-form.s1 { border-radius:50%; background:currentColor; opacity:0.55; }
-.stufe-form.s2 { clip-path:polygon(50% 4%,96% 92%,4% 92%); background:currentColor; opacity:0.6; }
-.stufe-form.s3 { clip-path:polygon(50% 4%,96% 92%,4% 92%); background:currentColor; opacity:0.85; }
-.stufe-form.s4 { border-radius:50%; background:currentColor; }
-.stufe-form.s5 { clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%); background:currentColor; }
+/* (.stufe-form - die fuenf Punkte-Formen Kreis/Dreieck/Dreieck/Kreis/Stern -
+   ist entfallen. Die Formen ergaben keine lesbare Reihenfolge; an ihre
+   Stelle ist der Stufenbalken .adk-seg weiter unten getreten.) */
 .style-neumorph {
   --bg: #1c1e24;
   --surface: #1f2128;
@@ -537,21 +534,8 @@ body.beta-dash .badge { font-size: 0.66rem; padding: 3px 9px; }
 .style-neumorph .btn-main:active, .style-neumorph .fab:active {
   box-shadow: inset 3px 3px 6px rgba(0,0,0,0.4), inset -3px -3px 6px rgba(255,255,255,0.04);
 }
-/* Bewertungspunkte-Stil: eigener, von style-* UNABHAENGIGER Schalter, damit
-   sich z.B. Neumorphism-Karten mit neubrutalistischen Punkten kombinieren
-   lassen. Ueberschreibt gezielt nur .stufe-form. */
-body.punkte-neumorph .stufe-form {
-  border-radius: 50% !important; clip-path: none !important;
-  box-shadow: 2px 2px 4px rgba(0,0,0,0.4), -1px -1px 3px rgba(255,255,255,0.06);
-}
-body.punkte-neumorph .dot-btn.active .stufe-form {
-  box-shadow: inset 2px 2px 4px rgba(0,0,0,0.35), inset -1px -1px 3px rgba(255,255,255,0.08);
-}
-body.punkte-brutal .stufe-form {
-  border-radius: 2px !important; clip-path: none !important;
-  border: 1.5px solid #14161a; background: currentColor;
-  box-shadow: 2px 2px 0 #14161a;
-}
+/* (Die Regeln des Bewertungsfelder-Schalters standen hier. Sie sind weiter
+   unten hinter die Skala-Arten gewandert - siehe die Begruendung dort.) */
 /* Chat-Sprechblasen: eigene Klasse statt fester Inline-Werte, damit sie
    auf die Design-Stile reagieren koennen (vorher immer gleich aussehend,
    unabhaengig vom gewaehlten Stil - Kundenmeldung). */
@@ -568,6 +552,142 @@ body.punkte-brutal .stufe-form {
 }
 .style-modern .chat-bubble {
   box-shadow: 0 4px 14px rgba(0,0,0,0.25) !important;
+}
+
+/* Stil "Editorial" - der ruhige, erwachsene Gegenentwurf zu den drei
+   bisherigen Stilen. Das Prinzip ist bewusst Weglassen: keine Verlaeufe,
+   kein Leuchten, keine versetzten 3D-Schatten, kein Plastik. Uebrig bleiben
+   Papier, Haarlinie und Schrift - wie im Satzspiegel einer guten Zeitschrift.
+   Wichtig dabei: Es soll GLEICHMAESSIG wirken. Deshalb bekommt hier wirklich
+   jede Flaeche denselben Radius, denselben 1px-Rand und gar keinen Schatten -
+   im Standard-Look sind Radien und Schatten je nach Bauteil unterschiedlich
+   (8px bis 20px, mal hart versetzt, mal weich), was lebendig aussieht, aber
+   eben nicht ruhig. Die Akzentfarbe traegt allein, sie wird sparsam gesetzt. */
+.style-editorial {
+  --bg: #0f0f10;
+  --surface: #151517;
+  --surface2: #1b1b1e;
+  --border: #2c2c30;
+  --text: #ece9e4;
+  --muted: #8b8b92;
+  --accent: #e3b04b;
+  --accent2: #7fa88c;
+  --blue: #92a9d4;
+  --danger: #e0685c;
+  --radius: 6px;
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lift: 0 10px 40px rgba(0,0,0,0.5);
+}
+.style-editorial.light {
+  --bg: #f5f3ef;
+  --surface: #fffefb;
+  --surface2: #eceae4;
+  --border: #dcd7ce;
+  --text: #17171a;
+  --muted: #6d6960;
+  --accent: #8a5f12;
+  --accent2: #3d6a49;
+  --blue: #2f4f8f;
+  --danger: #a5382a;
+  --shadow-lift: 0 10px 40px rgba(23,23,26,0.14);
+}
+/* Alle Flaechen nach exakt demselben Rezept: ein Radius, eine Haarlinie,
+   kein Schatten. Das !important ist noetig, weil einzelne Bauteile ihre
+   Schatten mit hoeherer Spezifitaet setzen (z.B. body.light .student-card). */
+.style-editorial .card, .style-editorial .list-item, .style-editorial .modal-sheet,
+.style-editorial .preview-tile, .style-editorial .student-card, .style-editorial .tile,
+.style-editorial .stat-chip, .style-editorial .section-block {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+}
+/* Bauteile, deren Hintergrund einen ZUSTAND anzeigt (erledigt, angehakt),
+   bekommen nur die Geometrie - die Farbe muessen sie behalten duerfen,
+   sonst ist z.B. an einer erledigten Sonderfahrt nichts mehr zu sehen. */
+.style-editorial .sonder-item, .style-editorial .custom-field-row,
+.style-editorial .thema-row {
+  border-radius: 6px !important;
+  box-shadow: none !important;
+}
+.style-editorial .modal-sheet { border-radius: 6px 6px 0 0 !important; }
+@media (hover:hover) {
+  .style-editorial .student-card:hover { transform: none; border-color: var(--accent) !important; }
+}
+.style-editorial .student-card:active { transform: none; }
+/* Hauptknoepfe: flache Flaeche in der Akzentfarbe, kein Verlauf, kein
+   Versatz beim Druecken - gedrueckt wird nur die Deckkraft zurueckgenommen. */
+.style-editorial .btn-main, .style-editorial .btn-sheet-ok, .style-editorial .fab {
+  background: var(--accent);
+  color: #14140f;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  box-shadow: none;
+}
+/* Im hellen Modus ist die Akzentfarbe ein dunkles Bronze - darauf muss die
+   Schrift weiss sein, sonst reicht der Kontrast nicht (WCAG AA). */
+.style-editorial.light .btn-main, .style-editorial.light .btn-sheet-ok,
+.style-editorial.light .fab { color: #fffefb; }
+.style-editorial .btn-main:active, .style-editorial .btn-sheet-ok:active,
+.style-editorial .fab:active {
+  transform: none; box-shadow: none; opacity: 0.82;
+}
+@media (hover:hover) {
+  .style-editorial .fab:hover { transform: none; box-shadow: none; opacity: 0.9; }
+}
+/* Neben-Bedienelemente und Eingabefelder: gleiche Kante, gleicher Radius. */
+.style-editorial .btn-back, .style-editorial .btn-icon-sm, .style-editorial .scope-btn,
+.style-editorial .klasse-choice-btn, .style-editorial .btn-sheet-cancel,
+.style-editorial .step-btn, .style-editorial .s-btn,
+.style-editorial .form-input, .style-editorial .search-input,
+.style-editorial .notes-textarea, .style-editorial .save-btn,
+.style-editorial .delete-btn, .style-editorial .btn-add-field,
+.style-editorial .tab-btn, .style-editorial .custom-checkbox {
+  border-radius: 6px;
+  box-shadow: none;
+}
+.style-editorial .btn-back:active, .style-editorial .btn-icon-sm:active,
+.style-editorial .scope-btn:active, .style-editorial .klasse-choice-btn:active,
+.style-editorial .btn-sheet-cancel:active {
+  transform: none; box-shadow: none; opacity: 0.82;
+}
+/* Der Fokus-Rahmen muss bleiben: Das pauschale box-shadow:none oben wuerde
+   sonst auch den Ring um das gerade aktive Eingabefeld verschlucken - fuer
+   Tastatur-Bedienung waere das ein Rueckschritt. Hier also derselbe Ring
+   fuer alle Felder, nur ruhiger als im Standard-Look. */
+.style-editorial .form-input:focus, .style-editorial .search-input:focus,
+.style-editorial .notes-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 32%, transparent);
+}
+/* Ausgewaehlte Filter/Auswahlknoepfe folgen der Akzentfarbe des Stils
+   statt dem fest eingebauten Gold des Standard-Looks. */
+.style-editorial .scope-btn.active {
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  border-color: var(--accent);
+  color: var(--accent);
+}
+/* Runde Bildpunkte bleiben rund - aber ohne die eingepraegten Glanzlichter,
+   die im Standard-Look fuer Plastik sorgen. */
+.style-editorial .avatar, .style-editorial .list-avatar {
+  box-shadow: none; text-shadow: none;
+}
+/* Die Schrift traegt den Stil: Titel enger gesetzt, Rubriken als gesperrte
+   Versalien mit klarem Kontrast statt als graue Nebensache. */
+.style-editorial .app-title, .style-editorial .header-title,
+.style-editorial .profile-name, .style-editorial .sheet-title,
+.style-editorial .stunden-big, .style-editorial .stat-val {
+  letter-spacing: -0.03em;
+}
+.style-editorial .section-title {
+  letter-spacing: 0.16em;
+  font-weight: 700;
+  color: var(--text);
+}
+.style-editorial .chat-bubble {
+  border-radius: 6px !important;
+  box-shadow: none !important;
 }
 
 .empty-state { text-align:center; padding:60px 24px; color:var(--muted); }
@@ -614,13 +734,255 @@ body.punkte-brutal .stufe-form {
 .thema-row { display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:8px; transition:background 0.15s; -webkit-user-select:none; }
 .thema-row:active { background:var(--surface2); }
 .thema-name { flex:1; font-size:0.84rem; font-weight:500; min-width:0; }
-.thema-dots { display:flex; gap:3px; flex-shrink:0; }
-.dot-btn { width:30px; height:30px; border-radius:8px; border:1.5px solid var(--border); background:var(--surface2); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:0.85rem; transition:all 0.15s; color:var(--muted); font-weight:600; }
-.dot-btn.active-1 { background:rgba(220,50,50,0.2);  border-color:#dc3232; }
-.dot-btn.active-2 { background:rgba(230,120,20,0.2); border-color:#e67814; }
-.dot-btn.active-3 { background:rgba(240,180,41,0.2); border-color:#f0b429; }
-.dot-btn.active-4 { background:rgba(63,185,80,0.2);  border-color:#3fb950; }
-.dot-btn.active-5 { background:rgba(100,210,255,0.2);border-color:#64d2ff; }
+/* ── ADK-BEWERTUNG: STUFENBALKEN ──────────────────────────────────────
+   Loest die fuenf einzelnen Punkte-Knoepfe ab (.dot-btn/.thema-dots, hier
+   mit entfernt, weil sie nirgends mehr gerendert wurden). Die hatten
+   drei Probleme, die sich erst im echten Layout zeigen:
+
+   1. BREITE: Fuenf 30px-Knoepfe plus Abstaende belegten rund zwei Drittel
+      der Zeilenbreite. Fuer den Themennamen blieb so wenig Platz, dass
+      laengere Namen auf zwei bis drei Zeilen umbrachen - die Liste wurde
+      dadurch ungleichmaessig hoch und auf dem Handy passten nur sieben
+      von ueber dreissig Themen auf den Schirm.
+   2. REIHENFOLGE: Die Formen waren Kreis, Dreieck, Dreieck, Kreis, Stern.
+      Daraus laesst sich keine Steigerung ablesen - Stufe 1 und Stufe 4
+      sahen beide wie ein Kreis aus, Stufe 2 und 3 unterschieden sich nur
+      in der Deckkraft.
+   3. LEERE ZEILEN: Eine unbewertete Zeile sah einer bewerteten fast
+      gleich, weil in beiden Faellen fuenf graue Knoepfe standen.
+
+   Der Balken sitzt jetzt unter dem Namen ueber die volle Zeilenbreite und
+   fuellt sich KUMULATIV von links: Wer Stufe 4 erreicht hat, hat 1 bis 3
+   durchlaufen. Genau so waechst auch der Eintrag auf der gedruckten
+   Ausbildungsdiagrammkarte. Laenge und Farbe sagen dasselbe aus, das
+   funktioniert also auch bei Farbenblindheit. Nebenbei ist jedes Segment
+   rund 65px statt 30px breit - ein deutlich sichereres Tippziel. */
+.adk-zeile { flex-direction:column; align-items:stretch; gap:5px; padding:7px 10px 8px; }
+.adk-kopf  { display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+.adk-kopf .thema-name { flex:1; }
+.adk-stand { font-size:0.7rem; font-weight:700; white-space:nowrap; letter-spacing:0.01em; flex-shrink:0; }
+.adk-balken { display:flex; gap:3px; }
+/* Der Knopf ist 26px hoch (Tippflaeche), der sichtbare Balken nur 10px.
+   Das min-height:26px muss sein, weil weiter oben alle button-Elemente
+   pauschal min-height:44px bekommen - das wuerde die Zeile sonst
+   unnoetig aufblaehen. */
+.adk-seg {
+  flex:1; height:26px; min-height:26px; padding:0; border:none; background:none;
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+  /* Ohne min-width:0 waere die automatische Mindestbreite eines Flex-Kindes
+     seine Inhaltsbreite. Setzt eine Oberflaeche der Markierung eine feste
+     Breite (Skala "Punkte"), konnte das Feld dadurch nicht mehr schrumpfen
+     und hat die ganze Balkenleiste ueber ihre vorgegebene Breite
+     hinausgedrueckt - in der Rasterkarte standen die Spalten dann nicht mehr
+     unter der Kopfzeile. */
+  min-width:0;
+}
+.adk-seg::before {
+  content:''; display:block; width:100%; height:12px;
+  /* box-sizing MUSS hier stehen: Der Reset ganz oben benutzt den
+     Universalselektor *, und der erfasst KEINE Pseudo-Elemente. Die
+     Markierung rechnete deshalb als einzige im Programm nach content-box -
+     jeder Rahmen, den eine Oberflaeche setzt, kam also oben drauf statt
+     hinein. Bei 1px Rahmen waren das 2px zu viel, bei der Skizze mit 2px
+     Rahmen 4px: Die Markierungen ragten still ueber ihr Feld hinaus. */
+  box-sizing:border-box;
+  border:1px solid var(--border); background:var(--surface2); border-radius:3px;
+  transition:background 0.15s, border-color 0.15s;
+}
+.adk-seg.erreicht::before { background:var(--seg); border-color:var(--seg); }
+.adk-seg:first-child::before { border-top-left-radius:6px;  border-bottom-left-radius:6px; }
+.adk-seg:last-child::before  { border-top-right-radius:6px; border-bottom-right-radius:6px; }
+.adk-seg:active::before { transform:scaleY(1.4); }
+/* Selbst angelegte Themen bleiben wie bisher leicht goldig hinterlegt,
+   damit sie von den ADK-Standardthemen unterscheidbar sind. */
+.adk-zeile.eigen { background:rgba(240,180,41,0.05); }
+
+/* ── ADK-ANSICHT "KLASSISCH": RASTERKARTE ────────────────────────────
+   Zweite, gleichberechtigte Ansicht derselben Daten - naeher an der
+   gedruckten Ausbildungsdiagrammkarte, die es ja nur auf Papier gibt:
+   Name links, rechts fuenf Kaestchen in festen Spalten, darueber eine
+   Kopfzeile mit den Stufennummern. Dadurch stehen die Kaestchen aller
+   Zeilen buendig untereinander und man liest die Karte spaltenweise -
+   genau das kann die Balken-Ansicht nicht, weil dort jede Zeile ihren
+   eigenen Balken ueber die volle Breite hat.
+   Der Preis ist die Breite: Fuer den Namen bleiben rund 215px statt der
+   vollen Zeile, laengere Themen brechen also um. Das ist bei der
+   Papierkarte nicht anders und hier bewusst in Kauf genommen - wer es
+   luftiger mag, nimmt die Balken-Ansicht.
+   Alles laeuft ueber dieselbe Auszeichnung, nur anders gesetzt: gleiche
+   Knoepfe, gleiche Daten, gleiches Antippen. */
+.adk-rasterkopf { display:none; }
+.adk-klassisch .adk-rasterkopf {
+  display:flex; align-items:center; gap:8px; padding:0 10px 5px;
+  border-bottom:1px solid var(--border); margin-bottom:2px;
+}
+.adk-klassisch .adk-rasterkopf-name {
+  flex:1; min-width:0; font-size:0.62rem; font-weight:700;
+  text-transform:uppercase; letter-spacing:0.08em; color:var(--muted);
+}
+.adk-seg-kopf {
+  flex:1; text-align:center; font-size:0.62rem; font-weight:700; color:var(--muted);
+}
+.adk-klassisch .themen-list { gap:0; }
+.adk-klassisch .adk-zeile {
+  flex-direction:row; align-items:center; gap:8px;
+  padding:4px 10px; border-radius:0; border-bottom:1px solid var(--border);
+}
+.adk-klassisch .adk-kopf { flex:1; min-width:0; }
+/* Das Stufenwort entfaellt hier: In der Rasterkarte sagen die Spalten,
+   welche Stufe erreicht ist - der Text wuerde nur Breite kosten. */
+.adk-klassisch .adk-stand { display:none; }
+/* FIX: Diese Regeln galten vorher fuer JEDE Balkenleiste auf der Seite.
+   Die Zeilen im Tab "Eigene Themen" sind aber keine .adk-zeile - sie haben
+   ihren eigenen Aufbau mit Haken und Papierkorb und bekommen die
+   Rasteranordnung gar nicht. Trotzdem wurden dort die Markierungen mit
+   umgestellt: Wer auf "klassisch" schaltete, hatte im Eigene-Tab ploetzlich
+   dickere Balken, ohne das dazugehoerige Raster. Jetzt greift die
+   Rasterkarte nur noch dort, wo sie auch das Layout stellt.
+   Die Breite muss zusaetzlich fuer die Kopfzeile gelten, sonst stehen die
+   Spalten nicht mehr unter ihren Nummern - deshalb dort beide Selektoren. */
+.adk-klassisch .adk-zeile .adk-balken,
+.adk-klassisch .adk-rasterkopf .adk-balken { flex:0 0 108px; gap:2px; }
+.adk-klassisch .adk-zeile .adk-seg { height:28px; min-height:28px; }
+.adk-klassisch .adk-zeile .adk-seg::before { height:22px; border-radius:2px; }
+.adk-klassisch .adk-zeile .adk-seg:first-child::before,
+.adk-klassisch .adk-zeile .adk-seg:last-child::before { border-radius:2px; }
+.adk-klassisch .adk-zeile:last-child { border-bottom:none; }
+
+/* ── SKALA-ART: wie ein einzelnes Feld aussieht ───────────────────────
+   Unabhaengig von der ADK-Ansicht oben. Die Ansicht bestimmt das LAYOUT
+   der Zeile (Balken ueber die Breite oder Raster in Spalten), die
+   Skala-Art bestimmt die MARKIERUNG darin. Beides ist frei kombinierbar,
+   genau wie Karten-Stil und Hell/Dunkel.
+   Steht bewusst NACH den .adk-klassisch-Regeln: Bei gleicher Spezifitaet
+   soll die Skala-Art ueber die Form entscheiden, die Ansicht nur ueber
+   die Anordnung. */
+.skala-punkte .adk-seg::before {
+  width:17px; height:17px; border-radius:50%;
+}
+.skala-zahlen .adk-seg::before,
+.skala-kreuze .adk-seg::before {
+  height:24px; border-radius:3px;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Manrope',sans-serif; font-size:0.66rem; font-weight:700;
+  color:var(--muted); line-height:1;
+}
+.skala-zahlen .adk-seg::before { content:attr(data-stufe); }
+.skala-kreuze .adk-seg::before { content:''; }
+/* Wie handschriftlich auf der Papierkarte: erledigte Felder bekommen ein
+   Kreuz, offene bleiben leer. */
+.skala-kreuze .adk-seg.erreicht::before { content:'✕'; }
+.skala-zahlen .adk-seg.erreicht::before,
+.skala-kreuze .adk-seg.erreicht::before {
+  background:var(--seg); border-color:var(--seg); color:#14140f;
+}
+
+/* ── FORTSCHRITT-ANZEIGE: wie die Balken gefuellt werden ──────────────
+   Wirkt auf alle Fortschrittsbalken (.bar-fill), also Themengruppen,
+   Gesamtfortschritt und Schaltstunden gleichermassen - damit es im
+   ganzen Programm einheitlich bleibt.
+   Das !important ist hier noetig und kein Versehen: Die Balken tragen
+   ihre Farbe als style-Attribut direkt im Markup, weil sie sich je nach
+   Prozentwert aendert. Eine normale Regel aus dem Stylesheet kaeme
+   dagegen nicht an - eine !important-Regel schon, ohne dass dafuer jede
+   Render-Stelle umgebaut werden muss. */
+/* Die Maske sitzt auf der BAHN, nicht auf der Fuellung. Damit sind es
+   immer genau zehn Bloecke - unabhaengig davon, wie breit der Balken
+   gerade ist und wie weit er gefuellt ist. Auf der Fuellung gerechnet
+   waeren es bei 25% zehn winzige Bloecke auf einem Viertel der Breite
+   gewesen; das sah aus wie eine gepunktete Linie statt wie "x von 10". */
+.fortschritt-segmente .bar-bg {
+  -webkit-mask-image:repeating-linear-gradient(90deg,#000 0 8.2%,transparent 8.2% 10%);
+          mask-image:repeating-linear-gradient(90deg,#000 0 8.2%,transparent 8.2% 10%);
+}
+.fortschritt-streifen .bar-fill {
+  background-image:repeating-linear-gradient(135deg,rgba(255,255,255,0.30) 0 3px,transparent 3px 7px) !important;
+}
+.fortschritt-kraeftig .bar-bg {
+  height:11px !important; border:1px solid var(--border); border-radius:7px;
+}
+
+/* ── BEWERTUNGSFELDER-OBERFLAECHE ─────────────────────────────────────
+   Eigener, von style-* und von der Skala-Art UNABHAENGIGER Schalter
+   (Kundenwunsch: frei kombinierbar). Er bestimmt die Oberflaeche eines
+   Feldes - Material, Kante, Schatten - nicht dessen Form oder Inhalt.
+
+   Steht bewusst GANZ ZUM SCHLUSS, hinter den Skala-Arten: Die Oberflaeche
+   muss das letzte Wort haben, sonst haetten Neon und Skizze bei gleicher
+   Spezifitaet gegen .skala-zahlen/.skala-kreuze verloren und waeren bei
+   diesen beiden Skalen wirkungslos geblieben.
+   Eine Ausnahme gibt es: Waehlt jemand die Skala "Punkte", sollen die
+   Felder rund bleiben. Deshalb haengt ueberall dort, wo ein Stil den
+   Radius setzt, ein :not(.skala-punkte) davor.
+
+   Bewusst OHNE 'body' davor: So greifen die Regeln auch in den kleinen
+   Vorschau-Kacheln des Auswahl-Dialogs, die die Klasse auf einem div
+   tragen - sonst zeigten die Kacheln alle dasselbe Bild. */
+.punkte-neumorph:not(.skala-punkte) .adk-seg::before { border-radius:6px; }
+.punkte-neumorph .adk-seg::before {
+  border:none;
+  box-shadow:inset 2px 2px 4px rgba(0,0,0,0.35), inset -1px -1px 3px rgba(255,255,255,0.07);
+}
+.punkte-brutal .adk-balken { gap:5px; }
+.punkte-brutal:not(.skala-punkte) .adk-seg::before { border-radius:2px; }
+.punkte-brutal .adk-seg::before {
+  border:1.5px solid #14161a;
+  box-shadow:2px 2px 0 #14161a;
+}
+
+/* Neon: leere Felder sind nur eine duenne Kontur, erreichte leuchten in
+   ihrer Stufenfarbe - wie die Kette einer Aussteuerungsanzeige. Der Schein
+   darf nur auf .erreicht stehen: --seg wird ausschliesslich dort gesetzt,
+   auf leeren Feldern waere var(--seg) ohne Wert. */
+.punkte-neon:not(.skala-punkte) .adk-seg::before { border-radius:2px; }
+.punkte-neon .adk-seg::before {
+  background:transparent; border:1.5px solid var(--border);
+}
+.punkte-neon .adk-seg.erreicht::before {
+  background:var(--seg); border-color:var(--seg);
+  box-shadow:0 0 5px var(--seg), 0 0 13px color-mix(in srgb, var(--seg) 55%, transparent);
+}
+/* Im Hellen traegt ein weiter Schein nicht - auf weissem Grund wird er nur
+   blass. Deshalb enger und kraeftiger statt weit und zart. */
+.punkte-neon.light .adk-seg.erreicht::before,
+body.light .punkte-neon .adk-seg.erreicht::before {
+  box-shadow:0 0 4px color-mix(in srgb, var(--seg) 75%, transparent);
+}
+
+/* Skizze: die Felder sehen aus wie mit der Hand ins Papier gezeichnet -
+   passend dazu, dass die Ausbildungsdiagrammkarte bis heute von Hand
+   gefuehrt wird. Die ungleichen Eck-Radien sind der uebliche Kniff fuer
+   einen "gekritzelten" Rahmen; jedes zweite Feld spiegelt sie, und jedes
+   dritte steht minimal schief, damit nicht alle Kaestchen gleich aussehen.
+   Zusammen mit der Skala "Kreuze" kommt das einer handschriftlich
+   gefuehrten Karte am naechsten. */
+.punkte-skizze .adk-balken { gap:5px; }
+/* Die Radien muessen zur Feldgroesse passen. Der uebliche Kniff arbeitet
+   mit Werten wie 255px/15px - auf einem nur 13px hohen Feld rechnet der
+   Browser die aber proportional herunter, und heraus kommt ein sauberes
+   Rechteck. Deshalb hier kleine, aber deutlich ungleiche Werte: So bleibt
+   die Schiefe auch im Kleinen sichtbar. */
+.punkte-skizze:not(.skala-punkte) .adk-seg::before {
+  border-radius:11px 3px 9px 4px / 4px 9px 3px 11px;
+}
+.punkte-skizze:not(.skala-punkte) .adk-seg:nth-child(even)::before {
+  border-radius:3px 11px 4px 9px / 9px 4px 11px 3px;
+}
+.punkte-skizze .adk-seg::before {
+  height:17px; border:2px solid var(--muted); background:transparent;
+}
+.punkte-skizze .adk-seg.erreicht::before {
+  background:var(--seg); border-color:var(--text);
+}
+.punkte-skizze .adk-seg:nth-child(3n)::before   { transform:rotate(-1.2deg); }
+.punkte-skizze .adk-seg:nth-child(3n+1)::before { transform:rotate(0.9deg); }
+/* FIX: Die Schraeglage benutzt transform - und damit dasselbe Merkmal wie
+   die allgemeine Rueckmeldung beim Antippen (.adk-seg:active::before mit
+   scaleY). Die Schraeglage war spezifischer und hat sie verschluckt: Beim
+   Skizzen-Stil gaben ausgerechnet die schiefen Felder beim Tippen keine
+   Rueckmeldung, die geraden daneben schon. Hier beides zusammen. */
+.punkte-skizze .adk-seg:nth-child(3n):active::before   { transform:rotate(-1.2deg) scaleY(1.35); }
+.punkte-skizze .adk-seg:nth-child(3n+1):active::before { transform:rotate(0.9deg) scaleY(1.35); }
 
 .notes-textarea { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:12px; font-family:'Manrope',sans-serif; font-size:0.88rem; color:var(--text); resize:none; min-height:100px; outline:none; line-height:1.6; }
 .notes-textarea:focus { border-color:var(--accent); }
@@ -1131,7 +1493,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
         <div style="font-size:0.72rem;color:var(--muted);margin-top:5px">Nur Buchstaben, Zahlen und Punkte. Damit ODER mit E-Mail anmelden.</div>
       </div>
       <div class="form-group">
-        <label class="form-label">Passwort (min. 6 Zeichen)</label>
+        <label class="form-label">Passwort (min. 8 Zeichen)</label>
         <input class="form-input" id="reg-pw" type="password" placeholder="••••••••" autocomplete="new-password">
       </div>
       <!-- Fahrschul-Code (nur für Fahrlehrer, optional) -->
@@ -1191,8 +1553,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 
       <strong style="color:var(--text)">2. Welche Daten werden verarbeitet?</strong><br>
       • Konto-Daten: E-Mail-Adresse, Name, Passwort (verschlüsselt)<br>
-      • Schüler-Daten: Name, Geburtsdatum, Ausbildungsfortschritt, Fahrstunden, Protokolle<br>
+      • Schüler-Daten: Name, Geburtsdatum, Anschrift (Straße, PLZ, Ort), Ausbildungsfortschritt, Fahrstunden, Protokolle<br>
+      • Ausbildungsnachweis: Art und Inhalt der praktischen Fahrstunden (Kategorien nach Anlage 3 zu § 6 Abs. 1 FahrschAusbO), besuchter theoretischer Unterricht (Themennummer, Datum, Dauer) – erforderlich zur gesetzlich vorgeschriebenen Ausbildungsdokumentation<br>
+      • Chat-Nachrichten und optional übermittelte Bilder zwischen Fahrlehrer und Fahrschüler, einschließlich des Zeitpunkts der letzten Kenntnisnahme (Lesestatus)<br>
       • Nutzungsdaten: Anmeldezeitpunkte, technische Verbindungsdaten<br>
+      • Push-Benachrichtigungen: Geräte-Token zur Zustellung von Benachrichtigungen (z.B. bei neuen Chat-Nachrichten)<br>
       • Bei minderjährigen Fahrschülern: Für den eigenständigen Zugang (Zugangscode) werden bewusst nur ausbildungsrelevante Daten verwendet; Geburtsdatum und interne Fahrlehrer-Kommentare werden dort nicht angezeigt.<br><br>
 
       <strong style="color:var(--text)">3. Zweck & Rechtsgrundlage (Art. 6 DSGVO)</strong><br>
@@ -1201,13 +1566,18 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       <strong style="color:var(--text)">4. Speicherort & Hosting</strong><br>
       Die Datenbank (Cloud Firestore) wird ausschließlich in Frankfurt am Main (EU, Region europe-west3) betrieben; hierfür findet keine Übermittlung in Drittländer statt. Die Nutzer-Anmeldung (Firebase Authentication) läuft technisch über die globale Infrastruktur des Anbieters Google, die auch außerhalb der EU (u.a. in den USA) verarbeiten kann. Diese Übermittlung ist über die EU-Standardvertragsklauseln (Art. 46 DSGVO) im Rahmen der Google-Auftragsverarbeitungsbedingungen abgesichert. Eine Weitergabe an unbefugte Dritte erfolgt nicht.<br><br>
 
-      <strong style="color:var(--text)">5. Weitere eingesetzte Dienstleister</strong><br>
-      Für den Versand automatischer Benachrichtigungs-E-Mails (z.B. bei Neuregistrierungen oder Passwort-Zurücksetzung) werden die Dienste EmailJS sowie das E-Mail-Postfach des Betreibers bei IONOS SE (Elgendorfer Str. 57, 56410 Montabaur) genutzt. Dabei werden lediglich die für die jeweilige Benachrichtigung notwendigen Angaben (z.B. Name, E-Mail-Adresse) übermittelt.<br><br>
+      <strong style="color:var(--text)">5. Google-Kalender-Anbindung (optionales Zusatzmodul)</strong><br>
+      Fahrlehrer können optional ihren persönlichen Google-Kalender mit FahrSync verbinden. Dabei fordert FahrSync ausschließlich die Berechtigung „Google Kalenderereignisse verwalten" (Scope: calendar.events) an; auf E-Mails, Kontakte oder andere Google-Dienste wird nicht zugegriffen. FahrSync legt vereinbarte Fahrstunden-Termine als Kalenderereignisse im Google-Kalender des Fahrlehrers an und entfernt sie bei Stornierung; eine Weitergabe an Dritte erfolgt nicht. Der Fahrlehrer kann die Verbindung jederzeit trennen.<br><br>
 
-      <strong style="color:var(--text)">6. Speicherdauer</strong><br>
-      Daten werden gespeichert, solange das Nutzungsverhältnis besteht. Nach Beendigung werden alle Daten innerhalb von 30 Tagen unwiderruflich gelöscht.<br><br>
+      <strong style="color:var(--text)">6. Weitere eingesetzte Dienstleister</strong><br>
+      Für den Versand automatischer Benachrichtigungs-E-Mails (z.B. bei Neuregistrierungen oder Passwort-Zurücksetzung) werden die Dienste EmailJS sowie das E-Mail-Postfach des Betreibers bei IONOS SE (Elgendorfer Str. 57, 56410 Montabaur) genutzt. Dabei werden lediglich die für die jeweilige Benachrichtigung notwendigen Angaben (z.B. Name, E-Mail-Adresse) übermittelt. Soweit bei EmailJS eine Verarbeitung außerhalb der EU/des EWR stattfindet, ist diese über die EU-Standardvertragsklauseln (Art. 46 DSGVO) abgesichert; Schülerdaten werden dorthin nicht übermittelt.<br><br>
 
-      <strong style="color:var(--text)">7. Ihre Rechte als betroffene Person</strong><br>
+      <strong style="color:var(--text)">7. Speicherdauer und Löschung</strong><br>
+      Daten werden gespeichert, solange das Nutzungsverhältnis besteht. Sie können die Löschung Ihres Kontos jederzeit selbst in der App auslösen (Einstellungen → „Konto und alle Daten löschen"). Nach der Beantragung läuft eine Frist von 30 Tagen, innerhalb derer die Löschung zurückgenommen werden kann; danach werden sämtliche Konto- und Schülerdaten automatisch und unwiderruflich entfernt – einschließlich Chatverlauf, Chat-Bildern, Zugangscodes und Terminen.<br>
+      Zusätzlich gelten feste Grenzen: abgelaufene Zugangscodes samt Chatverlauf und Bildern 90 Tage, Passwort-Zurücksetzungsanfragen 30 Tage, Terminanfragen und Nachrichten aus der öffentlichen Terminbuchung 90 Tage.<br>
+      Ausgenommen sind Rechnungen, solange die gesetzlichen Aufbewahrungspflichten bestehen (§ 14b UStG, § 147 AO; Art. 6 Abs. 1 lit. c DSGVO).<br><br>
+
+      <strong style="color:var(--text)">8. Ihre Rechte als betroffene Person</strong><br>
       Sie haben das Recht auf:<br>
       • Auskunft über Ihre Daten (Art. 15 DSGVO)<br>
       • Berichtigung (Art. 16 DSGVO)<br>
@@ -1217,17 +1587,29 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       • Widerspruch gegen die Verarbeitung (Art. 21 DSGVO)<br>
       • Beschwerde bei einer Aufsichtsbehörde (Art. 77 DSGVO) – zuständig ist die Datenschutz-Aufsichtsbehörde am Sitz der jeweiligen Fahrschule<br><br>
 
-      <strong style="color:var(--text)">8. Widerruf der Einwilligung</strong><br>
-      Eine erteilte Einwilligung können Sie jederzeit mit Wirkung für die Zukunft widerrufen, indem Sie Ihr Konto löschen oder den Betreiber kontaktieren.<br><br>
+      <strong style="color:var(--text)">9. Widerruf der Einwilligung</strong><br>
+      Eine erteilte Einwilligung können Sie jederzeit mit Wirkung für die Zukunft widerrufen, indem Sie Ihr Konto in der App löschen (Einstellungen → „Konto und alle Daten löschen", siehe Ziffer 7) oder den Betreiber kontaktieren.<br><br>
 
-      <strong style="color:var(--text)">9. Lokal gespeicherte Daten (§ 25 TTDSG)</strong><br>
-      Diese App speichert technische Informationen (z.B. Anmeldestatus, ausgewählte Darstellung) lokal auf Ihrem Gerät. Dies ist zur Bereitstellung der App unbedingt erforderlich und erfordert daher keine gesonderte Einwilligung nach § 25 Abs. 2 Nr. 2 TTDSG. Es werden keine Cookies oder lokalen Daten zu Werbe- oder Analysezwecken eingesetzt.<br><br>
+      <strong style="color:var(--text)">10. Lokal gespeicherte Daten (§ 25 TDDDG)</strong><br>
+      Diese App speichert technische Informationen (z.B. Anmeldestatus, ausgewählte Darstellung) lokal auf Ihrem Gerät. Dies ist zur Bereitstellung der App unbedingt erforderlich und erfordert daher keine gesonderte Einwilligung nach § 25 Abs. 2 Nr. 2 TDDDG. Es werden keine Cookies oder lokalen Daten zu Werbe- oder Analysezwecken eingesetzt.<br><br>
 
-      <strong style="color:var(--text)">10. Kontakt</strong><br>
+      <strong style="color:var(--text)">11. Bereitstellung der Daten</strong><br>
+      Konto- und Schülerdaten sind zur Erfüllung des Nutzungsvertrags bzw. zur Durchführung der Fahrausbildung erforderlich. Ohne diese Angaben kann die Software nicht bestimmungsgemäß genutzt werden.<br><br>
+
+      <strong style="color:var(--text)">12. Automatisierte Entscheidungsfindung</strong><br>
+      Eine automatisierte Entscheidungsfindung einschließlich Profiling im Sinne des Art. 22 DSGVO findet nicht statt.<br><br>
+
+      <strong style="color:var(--text)">13. Kontakt</strong><br>
       Bei Fragen zum Datenschutz wenden Sie sich an den im Impressum genannten Verantwortlichen.<br><br>
 
-      <strong style="color:var(--text)">11. Zahlungsdienstleister (PayPal)</strong><br>
+      <strong style="color:var(--text)">14. Zahlungsdienstleister (PayPal)</strong><br>
       Für kostenpflichtige Abonnements erfolgt die Zahlungsabwicklung über PayPal (Europe) S.à r.l. et Cie, S.C.A., 22–24 Boulevard Royal, L-2449 Luxemburg. Die für die Zahlung erforderlichen Daten werden direkt bei PayPal erhoben und verarbeitet; ergänzend gelten die Datenschutzhinweise von PayPal. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung). Diese App speichert keine Zahlungsdaten, sondern lediglich den Abo-Status und die PayPal-Abonnement-Kennung.<br><br>
+
+      <strong style="color:var(--text)">15. Zahlungsdienstleister (Stripe)</strong><br>
+      Für kostenpflichtige Abonnements erfolgt die Zahlungsabwicklung wahlweise auch über Stripe Payments Europe, Limited, One Wilton Park, Wilton Place, Dublin 2, D02 FX04, Irland. Die für die Zahlung erforderlichen Daten (z. B. Karten- oder Kontodaten) werden direkt bei Stripe erhoben und verarbeitet; ergänzend gelten die Datenschutzhinweise von Stripe. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung). Diese App speichert keine Zahlungsdaten, sondern lediglich den Abo-Status und eine interne Zahlungsreferenz.<br><br>
+
+      <strong style="color:var(--text)">16. Chat-Bilder</strong><br>
+      Im Chat zwischen Fahrlehrer und Fahrschüler können optional Bilder übermittelt werden. Diese werden vor dem Hochladen automatisch verkleinert und ausschließlich in Frankfurt am Main (EU, Region europe-west3) gespeichert. Der Zugriff ist technisch auf den jeweils zuständigen Fahrlehrer sowie den betreffenden Fahrschüler beschränkt.<br><br>
 
     </div>
     <button class="btn-sheet-cancel" onclick="document.getElementById('datenschutz-modal').classList.remove('open')" style="margin-top:16px">Schließen</button>
@@ -1732,7 +2114,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       <input class="form-input" id="inp-pw-alt" type="password" placeholder="••••••••" autocomplete="current-password">
     </div>
     <div class="form-group">
-      <label class="form-label">Neues Passwort (min. 6 Zeichen)</label>
+      <label class="form-label">Neues Passwort (min. 8 Zeichen)</label>
       <input class="form-input" id="inp-pw-neu" type="password" placeholder="••••••••" autocomplete="new-password">
     </div>
     <div class="form-group">
@@ -1745,14 +2127,24 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     <button class="btn-main" onclick="changePassword()" style="margin-bottom:12px">Passwort ändern ✓</button>
     <div style="height:1px;background:var(--border);margin:0 0 16px"></div>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openVerkehrszeichen()" style="background:var(--surface2);margin-bottom:8px">🚦 Verkehrszeichen</button>
-    <button class="btn-sheet-cancel" id="btn-test-rechnung" onclick="testRechnungErzeugen()" style="background:var(--surface2);margin-bottom:8px">🧪 Test-Rechnung erzeugen</button>
     <button class="btn-sheet-cancel" onclick="toggleTheme()" id="theme-btn-menu" style="background:var(--surface2);margin-bottom:8px">☀️ Design wechseln (hell/dunkel)</button>
     <button class="btn-sheet-cancel" onclick="starteKomplettsicherung()" style="background:var(--surface2);margin-bottom:8px">💾 Komplettsicherung herunterladen</button>
     <input type="file" id="sicherung-datei" accept=".json,application/json" style="display:none" onchange="leseSicherung(this.files[0])">
     <button class="btn-sheet-cancel" onclick="document.getElementById('sicherung-datei').click()" style="background:var(--surface2);margin-bottom:8px">📂 Sicherung öffnen / prüfen</button>
+    <!-- Darstellung: fuenf voneinander unabhaengige Schalter. Jeder betrifft
+         eine andere Ebene (Gesamtlook, ADK-Layout, Feld-Markierung,
+         Feld-Oberflaeche, Fortschrittsbalken) und laesst sich mit jedem
+         anderen kombinieren. Alles nur Ansicht - keiner aendert Daten. -->
+    <div style="height:1px;background:var(--border);margin:14px 0 12px"></div>
+    <div style="font-family:'Syne',sans-serif;font-size:0.75rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:4px">🎨 Darstellung</div>
+    <div style="font-size:0.7rem;color:var(--muted);line-height:1.45;margin-bottom:12px">Frei kombinierbar und jederzeit umstellbar. Gilt nur für dich – an den Bewertungen ändert sich dabei nichts.</div>
     <button class="btn-sheet-cancel" onclick="openStilAuswahl()" style="background:var(--surface2);margin-bottom:8px">🎨 Design-Stil wählen</button>
-    <button class="btn-sheet-cancel" onclick="openPunkteStilAuswahl()" style="background:var(--surface2);margin-bottom:8px">⚪ Bewertungspunkte-Stil</button>
+    <button class="btn-sheet-cancel" onclick="openAdkAnsichtAuswahl()" style="background:var(--surface2);margin-bottom:8px">📋 ADK-Ansicht &middot; klassisch oder neu</button>
+    <button class="btn-sheet-cancel" onclick="openSkalaArtAuswahl()" style="background:var(--surface2);margin-bottom:8px">🔢 Skala-Art</button>
+    <button class="btn-sheet-cancel" onclick="openPunkteStilAuswahl()" style="background:var(--surface2);margin-bottom:8px">⚪ Bewertungsfelder-Oberfläche</button>
+    <button class="btn-sheet-cancel" onclick="openFortschrittAuswahl()" style="background:var(--surface2);margin-bottom:8px">📈 Fortschritt-Anzeige</button>
     <button class="btn-sheet-cancel" onclick="toggleBetaDashboard()" id="btn-beta-dashboard" style="background:var(--surface2);margin-bottom:8px">🧪 Beta: Neues Dashboard-Design</button>
+    <div style="height:1px;background:var(--border);margin:14px 0 12px"></div>
     <button class="btn-sheet-cancel" onclick="aktivierePushADK()" id="btn-push-adk" style="background:var(--surface2);margin-bottom:4px">🔔 Benachrichtigungen aktivieren</button>
     <div style="font-size:0.68rem;color:var(--muted);padding:0 4px 12px;line-height:1.4">📱 iPhone: Safari → „Teilen" → „Zum Home-Bildschirm" → App von dort öffnen, erst dann aktivieren möglich.</div>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openDashboard()" style="background:var(--surface2);margin-bottom:8px">📊 Übersicht / Statistik</button>
@@ -1763,6 +2155,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openMeineRechnungen()" style="background:var(--surface2);margin-bottom:8px">🧾 Meine Rechnungen</button>
     <button class="btn-sheet-cancel" id="btn-invite-settings" style="display:none;background:var(--surface2);margin-bottom:8px" onclick="document.getElementById('settings-modal').classList.remove('open');openInviteModal()">👥 Fahrlehrer einladen</button>
     <button class="btn-sheet-cancel" id="btn-abo-settings" style="display:none;background:var(--surface2);margin-bottom:8px" onclick="document.getElementById('settings-modal').classList.remove('open');document.getElementById('abo-verwalten-modal').classList.add('open')">💳 Abo verwalten &amp; kündigen</button>
+    <!-- DSGVO Art. 17: Recht auf Löschung, vom Nutzer selbst auslösbar -->
+    <div style="height:1px;background:var(--border);margin:14px 0 12px"></div>
+    <div id="konto-loeschung-laeuft" style="display:none;background:rgba(248,81,73,0.1);border:1px solid var(--danger);border-radius:10px;padding:12px;margin-bottom:8px;font-size:0.78rem;line-height:1.5;color:var(--text)"></div>
+    <button class="btn-sheet-cancel" id="btn-konto-loeschen" onclick="kontoLoeschenStarten()" style="background:none;border:1px solid var(--danger);color:var(--danger);margin-bottom:8px">🗑️ Konto und alle Daten löschen</button>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open')">Schließen</button>
     <div style="text-align:center;margin-top:14px;font-size:0.7rem;color:var(--muted);opacity:0.7">
       © 2026 ChrisKross der Fahrlehrer
@@ -1987,7 +2383,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       </div></div>
       <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
         <div style="font-weight:700;margin-bottom:3px">📚 ADK-Lernstand</div>
-        <div style="font-size:0.8rem;color:var(--muted)">5 Stufen pro Thema: 🔴 Nicht gezeigt → 🟠 Gezeigt → 🟡 Ausreichend → 🟢 Beherrscht → ⭐ Sehr sicher. Antippen zum Ändern.</div>
+        <div style="font-size:0.8rem;color:var(--muted)">Ein Balken pro Thema, der sich von links füllt – wie der Eintrag auf der gedruckten Ausbildungsdiagrammkarte: 1 Gezeigt &amp; erklärt → 2 Unter Anleitung geübt → 3 Fast selbstständig → 4 Selbstständig beherrscht → 5 Prüfungsreif. Antippen setzt die Stufe, nochmal antippen löscht sie. Ohne Eintrag heißt: noch nicht behandelt.</div>
       </div></div>
       <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
         <div style="font-weight:700;margin-bottom:3px">📊 ADK-Gruppen Grafik</div>
@@ -2311,6 +2707,42 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
   </div>
 </div>
 
+<!-- ADK-ANSICHT AUSWAHL (klassische Rasterkarte oder Stufenbalken) -->
+<div class="modal-overlay" id="adk-ansicht-modal" onclick="closeModal(event)">
+  <div class="modal-sheet" style="max-width:420px">
+    <div class="sheet-title">📋 ADK-Ansicht</div>
+    <p style="font-size:0.78rem;color:var(--muted);margin:-6px 0 16px;line-height:1.5">
+      Dieselben Daten, zwei Darstellungen. Umschalten ändert nichts an den Bewertungen.
+    </p>
+    <div id="adk-ansicht-liste" style="display:flex;flex-direction:column;gap:12px"></div>
+    <button class="btn-sheet-cancel" onclick="document.getElementById('adk-ansicht-modal').classList.remove('open')" style="margin-top:16px">Fertig</button>
+  </div>
+</div>
+
+<!-- SKALA-ART AUSWAHL (Markierung eines einzelnen Bewertungsfeldes) -->
+<div class="modal-overlay" id="skala-art-modal" onclick="closeModal(event)">
+  <div class="modal-sheet" style="max-width:420px">
+    <div class="sheet-title">🔢 Skala-Art</div>
+    <p style="font-size:0.78rem;color:var(--muted);margin:-6px 0 16px;line-height:1.5">
+      Wie ein einzelnes Bewertungsfeld aussieht. Frei kombinierbar mit der ADK-Ansicht.
+    </p>
+    <div id="skala-art-liste" style="display:flex;flex-direction:column;gap:12px"></div>
+    <button class="btn-sheet-cancel" onclick="document.getElementById('skala-art-modal').classList.remove('open')" style="margin-top:16px">Fertig</button>
+  </div>
+</div>
+
+<!-- FORTSCHRITT-ANZEIGE AUSWAHL -->
+<div class="modal-overlay" id="fortschritt-modal" onclick="closeModal(event)">
+  <div class="modal-sheet" style="max-width:420px">
+    <div class="sheet-title">📈 Fortschritt-Anzeige</div>
+    <p style="font-size:0.78rem;color:var(--muted);margin:-6px 0 16px;line-height:1.5">
+      Gilt für alle Fortschrittsbalken – Themengruppen, Gesamtfortschritt und Schaltstunden.
+    </p>
+    <div id="fortschritt-liste" style="display:flex;flex-direction:column;gap:12px"></div>
+    <button class="btn-sheet-cancel" onclick="document.getElementById('fortschritt-modal').classList.remove('open')" style="margin-top:16px">Fertig</button>
+  </div>
+</div>
+
 <!-- SCHÜLER-ADRESSE MODAL (fuer Ausbildungsnachweis, Anlage 3) -->
 <div class="modal-overlay" id="adresse-modal" onclick="closeModal(event)">
   <div class="modal-sheet" style="max-width:420px">
@@ -2399,6 +2831,96 @@ const SONDERFAHRTEN = [
 ];
 
 // ADK Klasse B – gegliedert nach Ausbildungsstufen
+// ── ADK-BEWERTUNGSSTUFEN — EINZIGE QUELLE DER WAHRHEIT ───────────────
+// Angelehnt an die Stufenausbildung des Curricularen Leitfadens, nach der
+// auch die gedruckte Ausbildungsdiagrammkarte der Bundesvereinigung der
+// Fahrlehrerverbaende aufgebaut ist. Die Karte haelt drei Dinge fest:
+// WELCHER Inhalt, in WELCHER Fahrstunde, und MIT WELCHEM ERFOLG. Der
+// Erfolg ist dort keine Schulnote, sondern eine Kompetenzleiter - vom
+// Vormachen ueber das Ueben unter Anleitung bis zum selbststaendigen,
+// pruefungsreifen Koennen. Genau diese Leiter bilden die fuenf Stufen ab.
+//
+// Stufe 0 bedeutet "noch nicht behandelt" und hat bewusst KEINEN Knopf:
+// Auf der Originalkarte heisst ein Eintrag immer "wurde behandelt" - eine
+// Stufe, die "nicht gezeigt" bedeutet, kann es dort gar nicht geben.
+// Frueher war Stufe 1 genau so benannt und damit ein zweiter Zustand fuer
+// dieselbe Tatsache.
+//
+// WICHTIG: Die gespeicherten Zahlen 1-5 bleiben unveraendert, damit
+// vorhandene Schuelerdaten weiter stimmen. Auch die Schwelle "erledigt"
+// liegt unveraendert bei >= 4.
+//
+// Diese Liste ist die EINZIGE Stelle, an der die Stufen benannt und
+// eingefaerbt werden. Vorher gab es drei voneinander abweichende Fassungen
+// (Fahrlehrer-Ansicht, PDF-Export, Schueler-Portal), die dieselbe
+// gespeicherte Zahl unterschiedlich benannt haben. Wer etwas aendert,
+// aendert es hier - und spiegelt es in schueler-portal.html, weil das eine
+// eigene Seite ohne gemeinsames Skript ist.
+const ADK_STUFEN = [
+  { wert: 1, kurz: 'Gezeigt',       lang: 'Gezeigt & erklärt',        farbe: 'var(--blue)'    },
+  { wert: 2, kurz: 'Geübt',         lang: 'Unter Anleitung geübt',    farbe: '#e67814'        },
+  { wert: 3, kurz: 'Fast sicher',   lang: 'Fast selbstständig',       farbe: 'var(--accent)'  },
+  { wert: 4, kurz: 'Selbstständig', lang: 'Selbstständig beherrscht', farbe: 'var(--accent2)' },
+  { wert: 5, kurz: '⭐ Prüfungsreif',lang: '⭐ Prüfungsreif',          farbe: '#56d364'        },
+];
+// Zur Farbwahl: Stufe 4 und 5 sind beide gruen, weil beide "kann er/sie"
+// bedeuten - unterschieden werden sie durch die Balkenlaenge (vier von
+// fuenf gegenueber voll). Stufe 5 darf NICHT das Marken-Gold bekommen:
+// Das ist dieselbe Farbe wie Stufe 3, und dann saehen "fast selbststaendig"
+// und "pruefungsreif" identisch aus - genau die Verwechslung, die die
+// Balken vermeiden sollen.
+const ADK_STUFE      = (v) => ADK_STUFEN[(v|0) - 1] || null;
+const ADK_STUFE_LANG = (v) => (ADK_STUFE(v) || {}).lang  || 'Noch nicht behandelt';
+const ADK_STUFE_KURZ = (v) => (ADK_STUFE(v) || {}).kurz  || '–';
+const ADK_STUFE_FARB = (v) => (ADK_STUFE(v) || {}).farbe || 'var(--muted)';
+
+// Der Stufenbalken einer Zeile. `zielOnclick` bekommt den Wert, auf den
+// getippt werden soll, und liefert den fertigen onclick-Ausdruck - so
+// koennen Standard-Themen (setThema) und eigene Themen (setCustomThema)
+// denselben Balken benutzen. Nochmal auf die erreichte Stufe tippen setzt
+// zurueck auf 0, genau wie vorher bei den Punkte-Knoepfen.
+function adkStufenBalken(val, zielOnclick) {
+  const erreichteFarbe = ADK_STUFE_FARB(val);
+  return '<div class="adk-balken">' + ADK_STUFEN.map(st => {
+    const erreicht = val >= st.wert;
+    const ziel = (val === st.wert) ? 0 : st.wert;
+    // data-stufe traegt die Nummer ins CSS: Die Skala-Art "Zahlen" zeigt
+    // sie per content:attr(data-stufe) an, ohne dass die Auszeichnung je
+    // nach gewaehlter Darstellung anders gebaut werden muesste.
+    return '<button class="adk-seg' + (erreicht ? ' erreicht' : '') + '"'
+      + ' data-stufe="' + st.wert + '"'
+      + (erreicht ? ' style="--seg:' + erreichteFarbe + '"' : '')
+      + ' title="' + st.lang + '" aria-label="' + st.lang + '"'
+      + ' onclick="' + zielOnclick(ziel) + '"></button>';
+  }).join('') + '</div>';
+}
+
+// Kopfzeile der Rasterkarte (nur in der klassischen Ansicht sichtbar,
+// in der Balken-Ansicht blendet CSS sie aus). Sie steht einmal pro
+// Themengruppe und benennt die fuenf Spalten mit ihrer Stufennummer.
+function adkRasterKopf() {
+  return '<div class="adk-rasterkopf">'
+    + '<div class="adk-rasterkopf-name">Thema</div>'
+    + '<div class="adk-balken">'
+    +   ADK_STUFEN.map(st => '<div class="adk-seg-kopf" title="' + st.lang + '">' + st.wert + '</div>').join('')
+    + '</div>'
+    + '</div>';
+}
+
+// Eine komplette Bewertungszeile: Kopf (Name + erreichte Stufe) und
+// darunter der Balken. `nameHTML` darf beliebiges Markup enthalten, z.B.
+// das Verkehrszeichen-Bild oder die Herkunfts-Markierung eigener Themen.
+function adkThemaZeile(nameHTML, val, zielOnclick, kopfExtraHTML, zusatzKlasse) {
+  return '<div class="thema-row adk-zeile' + (zusatzKlasse ? ' ' + zusatzKlasse : '') + '">'
+    + '<div class="adk-kopf">'
+    +   '<div class="thema-name">' + nameHTML + '</div>'
+    +   (kopfExtraHTML || '')
+    +   '<div class="adk-stand" style="color:' + ADK_STUFE_FARB(val) + '">' + ADK_STUFE_KURZ(val) + '</div>'
+    + '</div>'
+    + adkStufenBalken(val, zielOnclick)
+    + '</div>';
+}
+
 const ADK_THEMEN = [
   {
     gruppe: '🚗 Grundstufe – Fahrzeugbedienung',
@@ -2959,7 +3481,10 @@ window.doRegister = async () => {
   if (!name || !email || !username || !pw) { setAuthError('Bitte alle Felder ausfüllen.'); return; }
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { setAuthError('Bitte eine gültige E-Mail-Adresse eingeben.'); return; }
   if (!validateUsername(username)) { setAuthError('Benutzername: nur Buchstaben, Zahlen, Punkte und Bindestriche (min. 3 Zeichen).'); return; }
-  if (pw.length < 6) { setAuthError('Passwort muss mindestens 6 Zeichen haben.'); return; }
+  // Art. 32 DSGVO: Diese Konten halten die personenbezogenen Daten aller
+  // Fahrschueler. 6 Zeichen waren hier zu wenig - der Rest der App (Admin-
+  // Portal, Schuelerverwaltung) verlangt ohnehin schon 8.
+  if (pw.length < 8) { setAuthError('Passwort muss mindestens 8 Zeichen haben.'); return; }
   if (!regConsentGegeben) { setAuthError('Bitte stimme der Datenschutzerklärung zu, um fortzufahren.'); return; }
   btn.disabled = true; btn.textContent = '…';
   try {
@@ -3609,14 +4134,12 @@ async function activateAbo(subscriptionId, planId) {
   try {
     if (!currentUser || !window.__billingDocRef) return;
     const p = PLANS[selectedTier];
-    await dbUpd(doc(db, window.__billingDocRef.coll, window.__billingDocRef.id), {
-      abo:               selectedTier,
-      aboPlaner:         planerGewuenscht,
-      aboMaxLehrer:      p.maxLehrer,
-      aboSubscriptionId: subscriptionId,
-      aboPlanId:         planId,
-      aboAktiviertAm:    Date.now(),
-      aboSetByAdmin:     false
+    // SICHERHEITSFIX: Vorher schrieb der Client die Abo-Felder direkt per
+    // updateDoc() in Firestore - ganz ohne Pruefung, ob wirklich bezahlt
+    // wurde. Jetzt prueft eine Cloud Function die Subscription-ID bei
+    // PayPal selbst nach und aktiviert erst dann serverseitig.
+    await httpsCallable(fns, 'bestaetigePaypalAbo')({
+      subscriptionId, plan: selectedTier, planer: planerGewuenscht
     });
     aboStatus = selectedTier;
     aboMaxLehrerAktuell = p.maxLehrer;
@@ -3627,16 +4150,23 @@ async function activateAbo(subscriptionId, planId) {
       ? '🎉 Zahlung erfolgreich! Kartei sofort aktiv - der Kalender wird in Kürze freigeschaltet.'
       : '🎉 Zahlung erfolgreich! Dein Abo ist aktiv.');
 
+    // Die Rechnungsadresse MUSS hier gespeichert werden: Der PayPal-Webhook
+    // erzeugt die Rechnung serverseitig und bricht ab, wenn Strasse, PLZ oder
+    // Ort fehlen - dann entsteht gar keine Rechnung.
     try {
       await speichereRechnungsadresseWennVollstaendig();
-      const fn = httpsCallable(fns, 'erstelleRechnung');
-      const res = await fn({ plan: selectedTier, planer: planerGewuenscht });
-      if (res.data && res.data.nummer) {
-        toast('🧾 Rechnung ' + res.data.nummer + ' erstellt (unter Einstellungen → Meine Rechnungen).');
-      }
-    } catch(rechErr) {
-      console.warn('Rechnungserzeugung:', rechErr);
+    } catch(adrErr) {
+      console.warn('Rechnungsadresse:', adrErr);
     }
+    // FIX: Hier wurde danach zusaetzlich erstelleRechnung aufgerufen. Das war
+    // in beiden moeglichen Faellen falsch: Fuer normale Fahrlehrer scheiterte
+    // der Aufruf immer mit permission-denied (die Funktion war nur fuer
+    // SuperAdmin freigegeben) und wurde still verschluckt - und beim
+    // SuperAdmin haette er eine ZWEITE Rechnung zur selben Zahlung angelegt,
+    // mit einer weiteren Nummer aus dem lueckenlosen Zaehler. Die echte
+    // Rechnung kommt ausschliesslich aus dem PayPal-Webhook, der sie ueber
+    // die Sale-ID gegen Doppelanlage absichert.
+    toast('🧾 Die Rechnung wird erstellt und erscheint gleich unter Einstellungen → Meine Rechnungen.');
   } catch(e) {
     toast('Fehler bei Aktivierung: ' + e.message);
   }
@@ -3655,7 +4185,7 @@ function friendlyError(code) {
     'auth/user-not-found': 'Kein Konto mit diesem Benutzernamen gefunden.',
     'auth/wrong-password': 'Falsches Passwort.',
     'auth/email-already-in-use': 'Dieser Benutzername ist bereits vergeben.',
-    'auth/weak-password': 'Passwort zu schwach (min. 6 Zeichen).',
+    'auth/weak-password': 'Passwort zu schwach (min. 8 Zeichen).',
     'auth/invalid-credential': 'Benutzername oder Passwort falsch.',
     'auth/too-many-requests': 'Zu viele Versuche. Bitte kurz warten.',
   };
@@ -3965,7 +4495,14 @@ onAuthStateChanged(auth, async (user) => {
         // Nachträglich angelegte Konten (nacherstellt) sind BESTEHENDE Nutzer
         // und werden NICHT auf den Warte-Bildschirm geschickt – nur echte
         // Neu-Registrierungen (ohne nacherstellt) warten auf Freigabe.
-        if (!istSuperadmin && effektiverStatus === 'ausstehend' && !profil.nacherstellt) {
+        // Die 'nacherstellt'-Ausnahme (selbst nachgelegtes Profil) darf nur
+        // greifen, solange das Konto für sich allein steht. Gehört es zu einer
+        // FREMDEN Fahrschule, muss der Warte-Bildschirm erscheinen: seit der
+        // Freigabe-Prüfung in den Firestore-Regeln bekäme der Nutzer sonst
+        // wortlos eine halb leere Kartei zu sehen (eigene Daten sichtbar, die
+        // der Schule nicht) und wüsste nicht, warum.
+        const gehoertZuFremderSchule = !!profil.fahrschuleId && profil.fahrschuleId !== user.uid;
+        if (!istSuperadmin && effektiverStatus === 'ausstehend' && (!profil.nacherstellt || gehoertZuFremderSchule)) {
           document.querySelectorAll('.screen').forEach(s => { s.classList.remove('active'); s.style.display=''; });
           document.getElementById('screen-warte').classList.add('active');
           document.getElementById('warte-name').textContent =
@@ -4020,6 +4557,9 @@ onAuthStateChanged(auth, async (user) => {
     checkFirstTime();
     loadAboStatus(user.uid);
     setTimeout(() => migrateOldAccessCodes(), 2000);
+    // Beim letzten Mal abgebrochenes DSGVO-Aufraeumen nachholen (App wurde
+    // innerhalb der Rueckgaengig-Frist geschlossen).
+    setTimeout(() => holeOffeneLoeschungenNach().catch(e => console.warn('Nachholen:', e)), 3000);
   } else {
     currentUser = null;
     students = [];
@@ -4951,8 +5491,10 @@ function renderDetail() {
   const myVzZeichen = customThemen.filter(t => t.typ === 'vz');
   const customThemenOhneKat = myCustomThemen.filter(t => !t.kategorie);
 
-  const STUFEN = ['<span class="stufe-form s1"></span>','<span class="stufe-form s2"></span>','<span class="stufe-form s3"></span>','<span class="stufe-form s4"></span>','<span class="stufe-form s5"></span>'];
-  const STUFEN_NAME = ['Nicht gezeigt','Gezeigt','Ausreichend','Beherrscht','Sehr sicher'];
+  // Die Stufen kommen aus ADK_STUFEN (siehe oben bei ADK_THEMEN), nicht
+  // mehr aus lokalen Kopien - die waren an fuenf Stellen dupliziert.
+  const themaZiel = (t) => (ziel) => `setThema('${t.replace(/'/g,"\\'")}',${ziel})`;
+  const customZiel = (id) => (ziel) => `setCustomThema('${id}',${ziel})`;
 
   const VZ_GRUPPE_NAME = '🚦 Verkehrszeichen';
   const vzGruppe = ADK.find(g => g.gruppe === VZ_GRUPPE_NAME);
@@ -4966,15 +5508,9 @@ function renderDetail() {
       const bildHTML = bild
         ? `<img src="./verkehrszeichen/${bild}" alt="" style="width:38px;height:38px;object-fit:contain;flex-shrink:0" loading="lazy">`
         : '<div style="width:38px;flex-shrink:0"></div>';
-      return `<div class="thema-row" style="align-items:center">
-        <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">
-          ${bildHTML}
-          <div class="thema-name" style="min-width:0">${t}</div>
-        </div>
-        <div class="thema-dots">
-          ${STUFEN.map((em,i)=>{const v=i+1;return `<button class="dot-btn${val===v?' active-'+v:''}" title="${STUFEN_NAME[i]}" onclick="setThema('${t.replace(/'/g,"\\'")}',${val===v?0:v})">${em}</button>`;}).join('')}
-        </div>
-      </div>`;
+      return adkThemaZeile(
+        `<span style="display:flex;align-items:center;gap:10px;min-width:0">${bildHTML}<span style="min-width:0">${t}</span></span>`,
+        val, themaZiel(t));
     }).join('');
     // Eigene Zeichen aus dem Katalog des Fahrlehrers anhaengen
     const eigenRows = myVzZeichen.map(z => {
@@ -4983,16 +5519,10 @@ function renderDetail() {
       const bildHTML = bildQuelle
         ? `<img src="${bildQuelle}" alt="" style="width:38px;height:38px;object-fit:contain;flex-shrink:0" loading="lazy">`
         : '<div style="width:38px;flex-shrink:0;text-align:center;font-size:1.3rem">🚧</div>';
-      return `<div class="thema-row" style="align-items:center">
-        <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">
-          ${bildHTML}
-          <div class="thema-name" style="min-width:0">${z.name}</div>
-        </div>
-        <div class="thema-dots">
-          ${STUFEN.map((em,i)=>{const v=i+1;return `<button class="dot-btn${val===v?' active-'+v:''}" title="${STUFEN_NAME[i]}" onclick="setCustomThema('${z.id}',${val===v?0:v})">${em}</button>`;}).join('')}
-          <button class="dot-btn" title="Zeichen löschen" onclick="deleteVzZeichen('${z.id}')" style="opacity:.5">🗑️</button>
-        </div>
-      </div>`;
+      return adkThemaZeile(
+        `<span style="display:flex;align-items:center;gap:10px;min-width:0">${bildHTML}<span style="min-width:0">${z.name}</span></span>`,
+        val, customZiel(z.id),
+        `<button onclick="event.stopPropagation();deleteVzZeichen('${z.id}')" title="Zeichen löschen" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:2px 4px;font-size:0.8rem;flex-shrink:0">🗑</button>`);
     }).join('');
 
     const gesamt = vzGruppe.items.length + myVzZeichen.length;
@@ -5000,7 +5530,7 @@ function renderDetail() {
     return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
         <div style="font-size:0.8rem;font-weight:700;color:var(--text)">🚦 Verkehrszeichen</div>
         <div style="font-size:0.7rem;color:${gesamtDone===gesamt?'var(--accent2)':'var(--muted)'}">${gesamtDone}/${gesamt}</div>
-      </div>${rows}${eigenRows}
+      </div>${adkRasterKopf()}${rows}${eigenRows}
       <div style="display:flex;gap:8px;margin-top:12px">
         <button class="btn-sheet-cancel" onclick="openZeichenKatalog()" style="background:var(--surface2);margin:0;flex:1">📖 Aus Katalog wählen</button>
         <button class="btn-sheet-cancel" onclick="openVzKatalog()" style="background:var(--surface2);margin:0;flex:1">➕ Eigenes Bild</button>
@@ -5010,12 +5540,7 @@ function renderDetail() {
   const themenHTML = ADK.filter(g => g.gruppe !== VZ_GRUPPE_NAME).map(gruppe => {
     const standardItems = gruppe.items.map(t => {
       const val = (s.themen||{})[t]||0;
-      return `<div class="thema-row">
-        <div class="thema-name">${t}</div>
-        <div class="thema-dots">
-          ${STUFEN.map((em,i)=>{const v=i+1;return `<button class="dot-btn${val===v?' active-'+v:''}" title="${STUFEN_NAME[i]}" onclick="setThema('${t.replace(/'/g,"\\'")}',${val===v?0:v})">${em}</button>`;}).join('')}
-        </div>
-      </div>`;
+      return adkThemaZeile(t, val, themaZiel(t));
     }).join('');
 
     // Eigene Themen die in diese Kategorie einsortiert wurden
@@ -5024,13 +5549,13 @@ function renderDetail() {
       const scopeTag = t.scope === 'all'
         ? '<span style="font-size:0.6rem;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1px 5px;margin-left:5px">Alle</span>'
         : '<span style="font-size:0.6rem;color:var(--blue);background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.3);border-radius:4px;padding:1px 5px;margin-left:5px">Nur dieser</span>';
-      return `<div class="thema-row" style="background:rgba(240,180,41,0.05);border-radius:8px">
-        <div class="thema-name" style="display:flex;align-items:center;flex-wrap:wrap;gap:2px">${t.name}${scopeTag}</div>
-        <div class="thema-dots" style="display:flex;gap:4px;align-items:center">
-          ${STUFEN.map((em,i)=>{const v=i+1;return `<button class="dot-btn${val===v?' active-'+v:''}" title="${STUFEN_NAME[i]}" onclick="setCustomThema('${t.id}',${v})">${em}</button>`;}).join('')}
-          <button onclick="event.stopPropagation();deleteCustomThema('${t.id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:4px;font-size:0.8rem">🗑</button>
-        </div>
-      </div>`;
+      // Hier fehlte bisher das Zuruecksetzen: Ein Tipp auf die bereits
+      // erreichte Stufe setzte sie erneut, statt sie zu loeschen - anders
+      // als bei allen anderen Zeilen. adkStufenBalken macht es ueberall gleich.
+      return adkThemaZeile(
+        `${t.name}${scopeTag}`, val, customZiel(t.id),
+        `<button onclick="event.stopPropagation();deleteCustomThema('${t.id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:2px 4px;font-size:0.8rem;flex-shrink:0">🗑</button>`,
+        'eigen');
     }).join('');
 
     const allCount = gruppe.items.length + myCustomThemen.filter(t => t.kategorie === gruppe.gruppe).length;
@@ -5047,7 +5572,7 @@ function renderDetail() {
         <div class="bar-bg" style="margin-bottom:10px;height:4px">
           <div class="bar-fill" style="width:${groupPct}%;background:${groupPct===100?'var(--accent2)':groupPct>50?'var(--accent)':'var(--blue)'}"></div>
         </div>
-        ${standardItems}${extraItems}
+        ${adkRasterKopf()}${standardItems}${extraItems}
       </div>`;
   }).join('<div style="height:1px;background:var(--border);margin:6px 0 14px"></div>');
 
@@ -5062,11 +5587,9 @@ function renderDetail() {
           var scopeTag = t.scope === 'all'
             ? '<span style="font-size:0.6rem;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1px 5px;margin-left:5px">Alle</span>'
             : '<span style="font-size:0.6rem;color:var(--blue);background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.3);border-radius:4px;padding:1px 5px;margin-left:5px">Nur dieser</span>';
-          var dotsHTML = STUFEN.map(function(em, i) {
-            var v = i + 1;
-            return '<button class="dot-btn' + (ctVal === v ? ' active-' + v : '') + '" title="' + STUFEN_NAME[i] + '" onclick="setCustomThema(\'' + t.id + '\',' + v + ')">' + em + '</button>';
-          }).join('');
-          return '<div class="thema-row"><div class="thema-name" style="display:flex;align-items:center;flex-wrap:wrap;gap:2px">' + t.name + scopeTag + '</div><div class="thema-dots" style="display:flex;gap:4px;align-items:center">' + dotsHTML + '<button onclick="event.stopPropagation();deleteCustomThema(\'' + t.id + '\')" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:4px;font-size:0.8rem">🗑</button></div></div>';
+          return adkThemaZeile(
+            t.name + scopeTag, ctVal, customZiel(t.id),
+            '<button onclick="event.stopPropagation();deleteCustomThema(\'' + t.id + '\')" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:2px 4px;font-size:0.8rem;flex-shrink:0">🗑</button>');
         }).join('');
       })()}
     </div>` : '';
@@ -5199,10 +5722,12 @@ function renderDetail() {
 
       <!-- TAB 1: ADK -->
       <div id="tab-adk" style="padding:14px;display:${aktiverLernTab==='adk'?'block':'none'}">
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;font-size:0.7rem;
-             color:var(--muted);background:var(--surface2);padding:8px 12px;border-radius:8px">
-          <span>🔴 Nicht gezeigt</span><span>🟠 Gezeigt</span><span>🟡 Ausreichend</span>
-          <span>🟢 Beherrscht</span><span>⭐ Sehr sicher</span>
+        <div style="margin-bottom:14px;font-size:0.68rem;color:var(--muted);
+             background:var(--surface2);padding:9px 12px;border-radius:8px">
+          <div style="margin-bottom:6px">Der Balken füllt sich von links. Antippen setzt die Stufe, nochmal antippen löscht sie.</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            ${ADK_STUFEN.map(st => `<span style="display:inline-flex;align-items:center;gap:5px;white-space:nowrap"><span style="width:14px;height:8px;border-radius:2px;background:${st.farbe};display:inline-block"></span>${st.wert} ${st.lang}</span>`).join('')}
+          </div>
         </div>
         <div class="themen-list">${themenHTML}</div>
       </div>
@@ -5324,8 +5849,7 @@ function renderAdkGruppenChart(s) {
     return { name: g.gruppe, pct: Math.round(avg), farbe: COLORS[gi % COLORS.length] };
   });
 
-  const stufen = ['<span class="stufe-form s1"></span>','<span class="stufe-form s2"></span>','<span class="stufe-form s3"></span>','<span class="stufe-form s4"></span>','<span class="stufe-form s5"></span>'];
-  const stufenLabel = ['Nicht gezeigt','Gezeigt','Ausreichend','Beherrscht','Sehr sicher'];
+  // (Hier standen zwei Kopien der Stufen-Listen, die nie benutzt wurden.)
 
   const bars = gruppen.map(g => {
     const pct = g.pct;
@@ -5564,6 +6088,12 @@ function initAbschlussSigPad() {
     const src = e.touches ? e.touches[0] : e;
     return { x: src.clientX - r.left, y: src.clientY - r.top };
   };
+  // FIX: Ohne diesen Guard (siehe initSignaturePad() fuer dasselbe Muster)
+  // wurden bei jedem Oeffnen des Abschluss-Unterschrift-Modals erneut
+  // pointerdown/-move/-up/-out-Listener auf demselben Canvas registriert -
+  // mit jedem erneuten Oeffnen mehr, ohne dass die alten je entfernt wurden.
+  if (aSigCanvas.__sigBound) return;
+  aSigCanvas.__sigBound = true;
   aSigCanvas.addEventListener('pointerdown', e => {
     aSigDrawing = true;
     const p = getPos(e);
@@ -6219,7 +6749,12 @@ window.openTeacherChat = async () => {
 };
 
 function renderTeacherChat() {
-  const msgs = ((teacherChatData || {}).messages || []).sort((a,b) => a.timestamp - b.timestamp);
+  // FIX: Bildnachrichten (gesendet ueber das neuere sendeChatBild()) haben
+  // kein 'timestamp'-Feld, nur 'createdAt' - ohne Fallback sortierte das
+  // hier per NaN (undefined - undefined) in unspezifizierter Reihenfolge.
+  const msgs = ((teacherChatData || {}).messages || [])
+    .slice()
+    .sort((a,b) => (a.timestamp||a.createdAt||0) - (b.timestamp||b.createdAt||0));
   const wrap = document.getElementById('teacher-chat-messages');
   if (!wrap) return;
   if (!msgs.length) {
@@ -6227,16 +6762,24 @@ function renderTeacherChat() {
     return;
   }
   wrap.innerHTML = msgs.map(m => {
-    const isFL   = m.sender === 'fahrlehrer';
-    const time   = new Date(m.timestamp).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
-    const date   = new Date(m.timestamp).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'});
+    const isFL = m.sender === 'fahrlehrer';
+    const zs   = m.timestamp || m.createdAt || 0;
+    const time = zs ? new Date(zs).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}) : '';
+    const date = zs ? new Date(zs).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}) : '';
     const bg     = isFL ? 'var(--accent)' : 'var(--surface2)';
     const color  = isFL ? '#0d1117' : 'var(--text)';
     const align  = isFL ? 'flex-end' : 'flex-start';
     const radius = isFL ? '18px 18px 4px 18px' : '18px 18px 18px 4px';
+    // FIX: Bildnachrichten (imagePath/imageUrl, kein 'text') wurden hier
+    // bisher als leere Sprechblase mit "Invalid Date" darunter angezeigt -
+    // diese aeltere Chat-Ansicht kann Bilder (anders als der neuere Chat
+    // unter openChat()) nicht laden. Zeigt jetzt wenigstens einen Hinweis.
+    const inhalt = (m.imagePath || m.imageUrl)
+      ? '📷 Bild – bitte über das 💬-Symbol öffnen, um es anzuzeigen'
+      : (m.text||'').replace(/</g,'&lt;');
     return `<div style="display:flex;flex-direction:column;align-items:${align}">
-      ${!isFL ? `<div style="font-size:0.65rem;color:var(--muted);margin-bottom:2px">${m.senderName||'Schüler'}</div>` : ''}
-      <div style="max-width:80%;background:${bg};color:${color};border-radius:${radius};padding:10px 14px;font-size:0.88rem;line-height:1.45;word-break:break-word">${(m.text||'').replace(/</g,'&lt;')}</div>
+      ${!isFL ? `<div style="font-size:0.65rem;color:var(--muted);margin-bottom:2px">${escapeHtmlEigen(m.senderName||'Schüler')}</div>` : ''}
+      <div style="max-width:80%;background:${bg};color:${color};border-radius:${radius};padding:10px 14px;font-size:0.88rem;line-height:1.45;word-break:break-word">${inhalt}</div>
       <div style="font-size:0.6rem;color:var(--muted);margin-top:2px">${date} ${time}</div>
     </div>`;
   }).join('');
@@ -6482,10 +7025,14 @@ window.deleteStudent = async () => {
     activeId = null;
     goBack();
     const geloeschteId = backup.id;
+    // Offene Aufraeum-Arbeit vormerken, falls die App vor Ablauf der
+    // Rueckgaengig-Frist geschlossen wird (siehe holeOffeneLoeschungenNach).
+    offeneLoeschungVormerken(geloeschteId);
     zeigeUndoBalken(`🗑️ ${s.vorname} ${s.nachname} gelöscht`, async () => {
       // Rückgängig: Schüler mit gleicher ID wiederherstellen
       try {
         await dbSet(doc(db,'students',backup.id), backup.data);
+        offeneLoeschungAbhaken(geloeschteId);
         toast('✓ Wiederhergestellt');
       } catch(e) { console.error('undo student:', e); toast('❌ Wiederherstellen fehlgeschlagen'); }
     }, async () => {
@@ -6902,6 +7449,56 @@ function downloadBlob(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+// ── DSGVO Art. 17: Konto selbst löschen ─────────────────────────────
+// Die Datenschutzerklärung nennt die Konto-Löschung ausdrücklich als Weg,
+// eine Einwilligung zu widerrufen - eine Funktion dafür gab es bisher nicht.
+// Gelöscht wird nicht sofort, sondern nach der in AGB/AVV zugesagten Frist
+// von 30 Tagen; bis dahin lässt sich der Vorgang zurücknehmen.
+window.kontoLoeschenStarten = async () => {
+  const istInhaber = window.__userTyp === 'fahrschule';
+  const warnung = istInhaber
+    ? 'Damit werden die gesamte Fahrschule, ALLE Fahrlehrer-Konten und ALLE Schülerdaten gelöscht.'
+    : 'Damit werden dein Konto und alle von dir angelegten Schülerdaten gelöscht.';
+  if (!confirm(`Konto wirklich löschen?\n\n${warnung}\n\nDie Löschung erfolgt endgültig nach 30 Tagen. Bis dahin kannst du sie hier wieder zurücknehmen.\n\nRechnungen bleiben aus steuerlichen Gründen (§ 14b UStG) erhalten.`)) return;
+  const kontrolle = prompt('Zur Sicherheit: Tippe LÖSCHEN ein, um fortzufahren.');
+  if ((kontrolle || '').trim().toUpperCase() !== 'LÖSCHEN') { toast('Abgebrochen.'); return; }
+  try {
+    const res = await httpsCallable(fns, 'kontoLoeschungBeantragen')({});
+    const datum = new Date(res.data.loeschungAm).toLocaleDateString('de-DE');
+    toast('Konto zur Löschung vorgemerkt (endgültig am ' + datum + ').');
+    await zeigeLoeschStatus();
+  } catch(e) { console.error('kontoLoeschenStarten:', e); toast('Fehler: ' + (e.message || e)); }
+};
+
+window.kontoLoeschenWiderrufen = async () => {
+  try {
+    await httpsCallable(fns, 'kontoLoeschungWiderrufen')({});
+    toast('✓ Löschung zurückgenommen – dein Konto bleibt bestehen.');
+    await zeigeLoeschStatus();
+  } catch(e) { console.error('kontoLoeschenWiderrufen:', e); toast('Fehler: ' + (e.message || e)); }
+};
+
+async function zeigeLoeschStatus() {
+  const box = document.getElementById('konto-loeschung-laeuft');
+  const btn = document.getElementById('btn-konto-loeschen');
+  if (!box || !currentUser) return;
+  let daten = {};
+  try {
+    const snap = await getDoc(doc(db, 'users', currentUser.uid));
+    daten = snap.exists() ? snap.data() : {};
+  } catch(e) { return; }
+  if (daten.loeschungAm) {
+    const datum = new Date(daten.loeschungAm).toLocaleDateString('de-DE');
+    box.innerHTML = `⚠️ <b>Dein Konto wird am ${datum} endgültig gelöscht.</b><br>`
+      + `<button onclick="kontoLoeschenWiderrufen()" style="margin-top:8px;background:var(--accent);color:#0d1117;border:none;border-radius:8px;padding:8px 14px;font-size:0.8rem;font-weight:700;cursor:pointer">Löschung zurücknehmen</button>`;
+    box.style.display = 'block';
+    if (btn) btn.style.display = 'none';
+  } else {
+    box.style.display = 'none';
+    if (btn) btn.style.display = '';
+  }
+}
+
 window.openSettings = async () => {
   document.getElementById('inp-pw-alt').value = '';
   document.getElementById('inp-pw-neu').value = '';
@@ -6924,6 +7521,7 @@ window.openSettings = async () => {
   document.getElementById('settings-modal').classList.add('open');
   // Fahrschul-Bereich befüllen (Code anzeigen ODER Beitritts-Feld)
   renderFscodeSection();
+  zeigeLoeschStatus();
 };
 
 async function renderFscodeSection() {
@@ -7014,11 +7612,16 @@ window.fahrschuleBeitreten = async () => {
     await dbUpd(doc(db, 'users', currentUser.uid), {
       fahrschuleId:   ziel.id,
       fahrschuleName: ziel.name || null,
-      beitrittCode:   code
+      beitrittCode:   code,
+      // Beitritt zu einer fremden Fahrschule bedeutet Zugriff auf deren
+      // komplette Kartei - das muss ein Mensch freigeben. Ohne diese Zeile
+      // behielte ein bereits freigegebenes Konto seinen 'aktiv'-Status und
+      // haette mit dem blossen Kenntnis des Fahrschul-Codes sofort Vollzugriff.
+      status:         'ausstehend'
     });
     currentUser._fahrschuleId = ziel.id;
-    if (msg) { msg.style.color='var(--accent2)'; msg.textContent='✅ Erfolgreich ' + (ziel.name || 'der Fahrschule') + ' beigetreten!'; }
-    toast('✅ Du gehörst jetzt zu ' + (ziel.name || 'der Fahrschule'));
+    if (msg) { msg.style.color='var(--accent2)'; msg.textContent='✅ Beitritt zu ' + (ziel.name || 'der Fahrschule') + ' angefragt – die Fahrschule muss dich noch freischalten.'; }
+    toast('✅ Beitritt angefragt – warte auf die Freischaltung durch die Fahrschule.');
     setTimeout(() => renderFscodeSection(), 1500);
   } catch(e) {
     console.error('fahrschuleBeitreten:', e);
@@ -7048,7 +7651,7 @@ window.changePassword = async () => {
   errEl.textContent = ''; okEl.textContent = '';
 
   if (!altPw || !neuPw || !neuPw2) { errEl.textContent = 'Bitte alle Felder ausfüllen.'; return; }
-  if (neuPw.length < 6) { errEl.textContent = 'Neues Passwort muss mindestens 6 Zeichen haben.'; return; }
+  if (neuPw.length < 8) { errEl.textContent = 'Neues Passwort muss mindestens 8 Zeichen haben.'; return; }
   if (neuPw !== neuPw2) { errEl.textContent = 'Die neuen Passwörter stimmen nicht überein.'; return; }
   if (neuPw === altPw) { errEl.textContent = 'Das neue Passwort muss sich vom alten unterscheiden.'; return; }
 
@@ -7385,25 +7988,24 @@ let letzteGruppeId = '';     // Dropdown-Auswahl — überlebt Re-Render
 
 // Eine Themen-Zeile rendern
 function renderEigenThemaRow(t, s) {
-  const STUFEN = ['<span class="stufe-form s1"></span>','<span class="stufe-form s2"></span>','<span class="stufe-form s3"></span>','<span class="stufe-form s4"></span>','<span class="stufe-form s5"></span>'];
-  const STUFEN_NAME = ['Nicht gezeigt','Gezeigt','Ausreichend','Beherrscht','Sehr sicher'];
   const val  = (s.customThemen||{})[t.id] || 0;
   const done = val >= 4;
   const scopeLabel = t.scope === 'all'
     ? '<span style="font-size:0.6rem;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1px 6px">Alle</span>'
     : '<span style="font-size:0.6rem;color:var(--blue);background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.3);border-radius:4px;padding:1px 6px">Nur dieser</span>';
-  const dotsHTML = STUFEN.map(function(em,i){
-    const v=i+1;
-    return '<button class="dot-btn'+(val===v?' active-'+v:'')+'" title="'+STUFEN_NAME[i]+'" onclick="setCustomThema(\''+t.id+'\','+(val===v?0:v)+')" style="font-size:0.9rem">'+em+'</button>';
-  }).join('');
-  return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">'
+  // Auch hier der gemeinsame Stufenbalken statt einer eigenen Kopie der
+  // fuenf Punkte-Knoepfe. Der Haken links und der Papierkorb rechts bleiben.
+  return '<div style="padding:10px 0;border-bottom:1px solid var(--border)">'
+    +'<div style="display:flex;align-items:center;gap:10px">'
     +'<button onclick="toggleEigenDone(\''+t.id+'\','+val+')" style="width:28px;height:28px;border-radius:7px;border:2px solid '+(done?'var(--accent2)':'var(--border)')+';background:'+(done?'rgba(63,185,80,0.15)':'none')+';cursor:pointer;flex-shrink:0;font-size:1rem;display:flex;align-items:center;justify-content:center">'+(done?'✅':'⬜')+'</button>'
     +'<div style="flex:1;min-width:0">'
     +'<div style="font-size:0.88rem;font-weight:'+(done?'600':'400')+';color:'+(done?'var(--accent2)':'var(--text)')+'">'+escapeHtmlEigen(t.name)+'</div>'
     +'<div style="margin-top:2px">'+scopeLabel+'</div>'
     +'</div>'
-    +'<div style="display:flex;gap:3px;flex-shrink:0">'+dotsHTML+'</div>'
+    +'<div class="adk-stand" style="color:'+ADK_STUFE_FARB(val)+'">'+ADK_STUFE_KURZ(val)+'</div>'
     +'<button onclick="event.stopPropagation();deleteCustomThema(\''+t.id+'\')" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:4px;font-size:0.85rem;flex-shrink:0">🗑</button>'
+    +'</div>'
+    +'<div style="margin-top:7px">'+adkStufenBalken(val, (ziel) => 'setCustomThema(\''+t.id+'\','+ziel+')')+'</div>'
     +'</div>';
 }
 
@@ -7738,15 +8340,19 @@ function renderSchuelerAnsicht(s, protokoll) {
 
   // ADK Themen
   var ADK = klasse === 'A' ? ADK_THEMEN_A : klasse === 'BE' ? ADK_THEMEN_BE : ADK_THEMEN;
-  var STUFEN_LABEL = ['–','Noch nicht','Kaum','Manchmal','Meistens','Sicher','⭐ Sehr sicher'];
+  // FIX: Hier stand eine EIGENE, um eine Stufe verschobene Benennung
+  // ('–','Noch nicht','Kaum','Manchmal','Meistens','Sicher','⭐ Sehr sicher').
+  // Der Fahrlehrer trug also z.B. Stufe 4 ein, im Export stand daneben aber
+  // die Bezeichnung der Stufe darunter. Die Liste hatte ausserdem sieben
+  // Eintraege fuer eine fuenfstufige Skala - der letzte war unerreichbar.
+  // Jetzt kommt die Benennung wie ueberall aus ADK_STUFEN.
   var themenHTML = ADK.map(function(gruppe) {
     var doneCount = gruppe.items.filter(function(item) { return (themen[item]||0) >= 4; }).length;
     var itemsHTML = gruppe.items.map(function(item) {
       var val = themen[item] || 0;
-      var color = ['#555','#f85149','#f0b429','#f0b429','#3fb950','#3fb950','#f0b429'][val] || '#555';
       return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:0.88rem">'
         + '<span>' + item + '</span>'
-        + '<span style="color:' + color + ';font-size:0.8rem;white-space:nowrap;margin-left:8px">' + (STUFEN_LABEL[val]||'–') + '</span>'
+        + '<span style="color:' + ADK_STUFE_FARB(val) + ';font-size:0.8rem;white-space:nowrap;margin-left:8px">' + ADK_STUFE_KURZ(val) + '</span>'
         + '</div>';
     }).join('');
     return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:12px">'
@@ -8422,23 +9028,35 @@ window.openImpressum = async () => {
           FahrSync (ADK – Digitale Kartei) stellt eine webbasierte Software zur Verwaltung von Fahrschülern und Ausbildungsnachweisen bereit. Optional kann das Zusatzmodul „Planer" (Kalender &amp; Terminplanung) gebucht werden. Die verfügbaren Preisstufen unterscheiden sich in der zulässigen Anzahl an Fahrlehrer-Konten; die jeweils gültigen Stufen und Preise sind in der App auf der Bestellseite ausgewiesen.<br><br>
           <strong style="color:var(--text)">§ 2 Geltungsbereich – Angebot nur für Unternehmer</strong><br>
           Das Angebot richtet sich ausschließlich an Unternehmer im Sinne des § 14 BGB (Fahrschulen und Fahrlehrer in Ausübung ihrer gewerblichen oder selbständigen beruflichen Tätigkeit), nicht an Verbraucher. Mit der Registrierung und dem Abschluss eines Abonnements bestätigt der Kunde, als Unternehmer zu handeln. Ein gesetzliches Widerrufsrecht für Verbraucher besteht daher nicht.<br><br>
+          <strong style="color:var(--text)">§ 2a Zielmarkt und Vertragssprache</strong><br>
+          Das Angebot ist inhaltlich auf die Fahrschulausbildung nach deutschem Recht ausgerichtet (Straßenverkehrs-Ordnung, deutsche Führerscheinklassen, amtlicher Ausbildungsrahmenplan) und richtet sich an Fahrschulen und Fahrlehrer mit Sitz in Deutschland. Vertrags- und Kommunikationssprache ist ausschließlich Deutsch; Support wird ausschließlich in deutscher Sprache erbracht. Eine Anpassung der Software an ausländische Rechtsvorschriften, Sprachen oder Ausbildungssysteme ist nicht geschuldet. Der Anbieter behält sich vor, Verträge mit Kunden außerhalb des Europäischen Wirtschaftsraums nicht abzuschließen.<br><br>
+          <strong style="color:var(--text)">§ 2b Pflichten im elektronischen Geschäftsverkehr</strong><br>
+          Da sich das Angebot ausschließlich an Unternehmer richtet, werden die Pflichten aus § 312i Abs. 1 Satz 1 Nr. 1 bis 3 sowie Satz 2 BGB (Bereitstellung technischer Mittel zur Fehlererkennung, Informationspflichten, Zugangsbestätigung) gemäß § 312i Abs. 2 BGB abbedungen. Die Speicherung des Vertragstextes erfolgt durch den Anbieter; die jeweils gültigen AGB sind jederzeit unter fahrsync.de/agb.html abrufbar.<br><br>
           <strong style="color:var(--text)">§ 3 Testphase und Vertragsschluss</strong><br>
-          Die Registrierung eines Kontos ist kostenlos. Ein kostenpflichtiges Abonnement kommt erst durch den Abschluss über den Zahlungsdienstleister PayPal zustande. Jedes Abonnement beginnt mit einer 14-tägigen kostenlosen Testphase. Nach Ablauf der Testphase verlängert sich das Abonnement automatisch als zahlungspflichtiges Monats-Abonnement zum ausgewiesenen Preis, sofern es nicht zuvor gekündigt wird. Auf die Kostenpflicht wird vor Abschluss deutlich hingewiesen.<br><br>
+          Die Registrierung eines Kontos ist kostenlos. Ein kostenpflichtiges Abonnement kommt erst durch den Abschluss über den gewählten Zahlungsdienstleister (PayPal oder Stripe) zustande. Jedes Abonnement beginnt mit einer 14-tägigen kostenlosen Testphase. Nach Ablauf der Testphase verlängert sich das Abonnement automatisch als zahlungspflichtiges Monats-Abonnement zum ausgewiesenen Preis, sofern es nicht zuvor gekündigt wird. Auf die Kostenpflicht wird vor Abschluss deutlich hingewiesen.<br><br>
           <strong style="color:var(--text)">§ 4 Preise und Zahlung</strong><br>
-          Es gelten die zum Zeitpunkt der Bestellung in der App ausgewiesenen Preise. Die Abrechnung erfolgt monatlich im Voraus über PayPal. Gemäß § 19 UStG wird keine Umsatzsteuer berechnet. Für die Stufe „Unbegrenzt" fällt zusätzlich eine einmalige, nicht erstattungsfähige Einrichtungsgebühr an, die auf der Bestellseite ausgewiesen ist. Preisänderungen werden mindestens sechs Wochen im Voraus per E-Mail oder In-App-Mitteilung angekündigt; dem Kunden steht in diesem Fall ein Sonderkündigungsrecht zum Zeitpunkt des Wirksamwerdens der Änderung zu.<br><br>
+          Es gelten die zum Zeitpunkt der Bestellung in der App ausgewiesenen Preise. Die Abrechnung erfolgt monatlich im Voraus über den vom Kunden gewählten Zahlungsdienstleister (PayPal oder Stripe). Gemäß § 19 UStG wird keine Umsatzsteuer berechnet. Für die Stufe „Unbegrenzt" fällt zusätzlich eine einmalige, nicht erstattungsfähige Einrichtungsgebühr an, die auf der Bestellseite ausgewiesen ist. Preisänderungen werden mindestens sechs Wochen im Voraus per E-Mail oder In-App-Mitteilung angekündigt; dem Kunden steht in diesem Fall ein Sonderkündigungsrecht zum Zeitpunkt des Wirksamwerdens der Änderung zu.<br><br>
           <strong style="color:var(--text)">§ 5 Laufzeit und Kündigung</strong><br>
-          Das Abonnement läuft auf unbestimmte Zeit und ist jederzeit zum Ende des laufenden Abrechnungsmonats kündbar. Die Kündigung erfolgt wahlweise direkt im PayPal-Konto des Kunden (Zahlungen → Abonnements → Kündigen) oder formlos per E-Mail an kontakt@fahrsync.de. Nach Wirksamwerden der Kündigung endet der Zugriff auf die kostenpflichtigen Funktionen; § 10 bleibt unberührt. Ein Wechsel der Preisstufe erfolgt durch Kündigung des bestehenden und Abschluss eines neuen Abonnements.<br><br>
+          Das Abonnement läuft auf unbestimmte Zeit und ist jederzeit zum Ende des laufenden Abrechnungsmonats kündbar. Bei Zahlung per PayPal erfolgt die Kündigung wahlweise direkt im PayPal-Konto des Kunden (Zahlungen → Abonnements → Kündigen); unabhängig vom gewählten Zahlungsdienstleister genügt außerdem jederzeit eine formlose Kündigung per E-Mail an kontakt@fahrsync.de. Nach Wirksamwerden der Kündigung endet der Zugriff auf die kostenpflichtigen Funktionen; § 10 bleibt unberührt. Ein Wechsel der Preisstufe erfolgt durch Kündigung des bestehenden und Abschluss eines neuen Abonnements.<br><br>
           <strong style="color:var(--text)">§ 6 Zahlungsverzug und Sperrung</strong><br>
-          Schlägt eine fällige Abbuchung fehl, wiederholt PayPal den Einzug. Bleibt die Zahlung aus, ist der Betreiber berechtigt, den Zugang bis zum Ausgleich der offenen Forderung zu sperren. Während der Sperrung bleiben die Daten des Kunden erhalten.<br><br>
+          Schlägt eine fällige Abbuchung fehl, unternimmt der jeweilige Zahlungsdienstleister (PayPal oder Stripe) automatisch weitere Einzugsversuche. Bleibt die Zahlung aus, ist der Betreiber berechtigt, den Zugang bis zum Ausgleich der offenen Forderung zu sperren. Während der Sperrung bleiben die Daten des Kunden erhalten.<br><br>
           <strong style="color:var(--text)">§ 7 Nutzungsbedingungen</strong><br>
           Die Nutzung erfolgt ausschließlich für legale Zwecke im Rahmen der Fahrausbildung. Zugangsdaten sind vertraulich zu behandeln und dürfen nicht an Dritte weitergegeben werden. Die Anzahl der Fahrlehrer-Konten richtet sich nach der gebuchten Preisstufe.<br><br>
           <strong style="color:var(--text)">§ 8 Datenverantwortung</strong><br>
           Der Nutzer ist Verantwortlicher i.S.d. Art. 4 Nr. 7 DSGVO für alle eingegebenen Schülerdaten und stellt sicher, dass eine Rechtsgrundlage für deren Verarbeitung vorliegt.<br><br>
+          <strong style="color:var(--text)">§ 8a Ausbildungsnachweis und gesetzliche Dokumentationspflichten</strong><br>
+          Die Software unterstützt bei der Erfassung und Aufbereitung von Ausbildungsdaten. Die gesetzliche Pflicht zur ordnungsgemäßen Führung, inhaltlichen Richtigkeit, Unterzeichnung und Aufbewahrung des Ausbildungsnachweises (§ 31 FahrlG, § 6 FahrschAusbO nebst Anlagen) verbleibt ausschließlich beim Nutzer bzw. der Fahrschule. Der Nutzer prüft vor Ausstellung eigenverantwortlich, ob die erfassten Angaben vollständig und zutreffend sind. Der Betreiber übernimmt keine Gewähr für die rechtliche Anerkennung erzeugter Dokumente durch Behörden oder Prüforganisationen.<br><br>
+          <strong style="color:var(--text)">§ 8b Vom Nutzer übermittelte Inhalte</strong><br>
+          Der Nutzer und seine Fahrschüler können über die Chat-Funktion Bilder übermitteln. Der Nutzer stellt sicher, dass hierbei keine rechtswidrigen Inhalte übertragen werden und dass er zur Übermittlung berechtigt ist. Der Betreiber sichtet übermittelte Inhalte nicht anlasslos, ist jedoch berechtigt, bei konkreten Hinweisen auf rechtswidrige Inhalte diese zu entfernen.<br><br>
           <strong style="color:var(--text)">§ 9 Verfügbarkeit</strong><br>
           Eine ständige Verfügbarkeit der Software wird nicht garantiert. Wartungsarbeiten können zu vorübergehenden Einschränkungen führen.<br><br>
           <strong style="color:var(--text)">§ 10 Beendigung &amp; Datenlöschung</strong><br>
-          Bei Beendigung des Nutzungsverhältnisses werden alle Daten nach 30 Tagen unwiderruflich gelöscht. Bis dahin kann der Kunde einen Export seiner Daten anfordern.<br><br>
-          <strong style="color:var(--text)">§ 11 Anwendbares Recht</strong><br>
+          Der Kunde kann die Löschung seines Kontos jederzeit selbst in der App auslösen (Einstellungen → „Konto und alle Daten löschen"). Bei Beendigung des Nutzungsverhältnisses werden alle Daten nach 30 Tagen unwiderruflich gelöscht; innerhalb dieser Frist kann die Löschung zurückgenommen werden, und der Kunde kann einen Export seiner Daten anfordern bzw. die Exportfunktion der App nutzen. Von der Löschung ausgenommen sind Rechnungen, solange gesetzliche Aufbewahrungspflichten bestehen (§ 14b UStG, § 147 AO).<br><br>
+          <strong style="color:var(--text)">§ 11 Haftung</strong><br>
+          Der Betreiber haftet unbeschränkt bei Vorsatz und grober Fahrlässigkeit sowie bei der Verletzung von Leben, Körper oder Gesundheit. Bei leicht fahrlässiger Verletzung wesentlicher Vertragspflichten (Kardinalpflichten, deren Erfüllung die ordnungsgemäße Durchführung des Vertrags erst ermöglicht und auf deren Einhaltung der Kunde regelmäßig vertrauen darf) ist die Haftung auf den bei Vertragsschluss vorhersehbaren, vertragstypischen Schaden begrenzt. Im Übrigen ist die Haftung für leicht fahrlässig verursachte Schäden ausgeschlossen. Die Haftung nach dem Produkthaftungsgesetz bleibt unberührt. Der Kunde ist für eine regelmäßige eigene Datensicherung seiner in der Software erfassten Daten selbst verantwortlich.<br><br>
+          <strong style="color:var(--text)">§ 12 Salvatorische Klausel</strong><br>
+          Sollte eine Bestimmung dieser AGB unwirksam sein oder werden, bleibt die Wirksamkeit der übrigen Bestimmungen hiervon unberührt. An die Stelle der unwirksamen Bestimmung tritt die gesetzliche Regelung.<br><br>
+          <strong style="color:var(--text)">§ 13 Anwendbares Recht</strong><br>
           Es gilt das Recht der Bundesrepublik Deutschland. Gerichtsstand ist, soweit gesetzlich zulässig, der Sitz des Betreibers.
         </div>
       </div>
@@ -8625,7 +9243,7 @@ window.exportiereDatenPDF = async () => {
     <script>window.onload=()=>window.print()<\/script>
     </body></html>`;
 
-  const w = window.open('', '_blank');
+  const w = window.open('', '_blank', 'noopener');
   if (w) { w.document.write(html); w.document.close(); }
   document.getElementById('datenexport-modal').classList.remove('open');
   toast('✓ PDF-Auskunft geöffnet');
@@ -8718,7 +9336,7 @@ window.exportPDF = () => {
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Ausbildungsnachweis – ${s.vorname} ${s.nachname}</title>
+<title>Ausbildungsnachweis – ${escapeHtmlEigen(s.vorname)} ${escapeHtmlEigen(s.nachname)}</title>
 <style>
   * { box-sizing:border-box; margin:0; padding:0; }
   body { font-family: Arial, sans-serif; font-size:11px; color:#1a1a1a; background:#fff; }
@@ -8746,7 +9364,7 @@ window.exportPDF = () => {
       <img src="./icon-192.png?v=3" alt="ADK" style="width:56px;height:56px;border-radius:50%;flex-shrink:0" onerror="this.style.display='none'">
       <div>
         <div style="font-size:10px;color:#f0b429;text-transform:uppercase;letter-spacing:1px">Ausbildungsnachweis</div>
-        <div style="font-size:18px;font-weight:bold;margin:4px 0">${s.vorname} ${s.nachname}</div>
+        <div style="font-size:18px;font-weight:bold;margin:4px 0">${escapeHtmlEigen(s.vorname)} ${escapeHtmlEigen(s.nachname)}</div>
         <div style="font-size:11px;color:#aaa">
           <span class="badge badge-gold">${klasseNamen[klasse]||klasse}</span>
           ${s.geburt ? '&nbsp;&nbsp;Geb. '+formatDate(s.geburt) : ''}
@@ -8818,7 +9436,7 @@ window.exportPDF = () => {
   <div class="footer">
     <span>ADK – Digitale Kartei · fahrsync.de</span>
     <span>Erstellt am ${heute}</span>
-    <span>ADK Legende: ○ Nicht gezeigt · ◐ Gezeigt · ◕ Ausreichend · ● Beherrscht · ★ Sehr sicher</span>
+    <span>ADK-Stufen: ${ADK_STUFEN.map(st => st.wert + ' ' + st.lang).join(' · ')}</span>
   </div>
 
 </div>
@@ -8826,7 +9444,7 @@ window.exportPDF = () => {
 </html>`;
 
   // PDF öffnen in neuem Tab → Browser-Druckdialog
-  const win = window.open('', '_blank');
+  const win = window.open('', '_blank', 'noopener');
   if (!win) { toast('⚠️ Popup blockiert – bitte erlauben'); return; }
   win.document.write(html);
   win.document.close();
@@ -9748,25 +10366,12 @@ window.landGewechselt = () => {
 
 
 
-// Nur fuer chriskoo@mail.de sichtbar (siehe openSettings). Ruft dieselbe
-// Cloud Function wie eine echte PayPal-Zahlung auf - ohne Geld zu bewegen,
-// damit Rechnungserstellung getestet werden kann.
-window.testRechnungErzeugen = async () => {
-  if (!confirm('Test-Rechnung mit Tarif "Solo" erzeugen fuer ' + (currentUser ? currentUser.email : '?') + '? Es wird kein Geld bewegt.')) return;
-  try {
-    await speichereRechnungsadresseWennVollstaendig();
-    const fn = httpsCallable(fns, 'erstelleRechnung');
-    const res = await fn({ plan: 'solo', planer: false });
-    if (res.data && res.data.nummer) {
-      toast('🧾 Test-Rechnung ' + res.data.nummer + ' erstellt (Einstellungen → Meine Rechnungen)');
-    } else {
-      toast('Aufruf ok, aber keine Nummer erhalten.');
-    }
-  } catch(e) {
-    console.warn('testRechnungErzeugen:', e);
-    toast('Fehler: ' + (e.message || 'unbekannt') + (e.message && e.message.includes('Rechnungsadresse') ? ' - bitte zuerst unter Meine Rechnungen die Adresse ausfüllen.' : ''));
-  }
-};
+// (Die Test-Rechnung ist entfallen. Sie war irrefuehrend benannt: Sie hat
+//  keine Probe erzeugt, sondern eine ECHTE, fortlaufend nummerierte Rechnung
+//  angelegt - mit einer Nummer aus demselben luckenlosen Zaehler wie eine
+//  bezahlte Rechnung, und dauerhaft aufbewahrt, weil das taegliche Aufraeumen
+//  Rechnungen bewusst nie loescht (§ 14b UStG, § 147 AO). Jeder Klick hat
+//  also eine Nummer verbraucht und einen Beleg in den Buechern hinterlassen.)
 
 
 
@@ -9868,16 +10473,21 @@ window.saveNameAendern = async () => {
 // gelten dadurch schon in der Vorschau, ganz ohne Sonderfall-Code.
 const STILE = [
   { id: '',              name: 'Standard',      beschreibung: 'Der bisherige Look, unveraendert.' },
-  { id: 'style-strasse', name: 'Neubrutalism',  beschreibung: 'Kraeftige Farben, dicke Kanten, harter Schatten.' },
+  { id: 'style-strasse', name: 'Neubrutalism',  beschreibung: 'Kraeftige Farben, dicke Kanten, harter Schatten.', punkt: '3px' },
   { id: 'style-modern',  name: 'Modern',        beschreibung: 'Glasig, mehr Tiefe, dezentes Leuchten.' },
   { id: 'style-neumorph',name: 'Neumorphism',   beschreibung: 'Weich, wie aus einem Guss, kaum Kanten.' },
+  { id: 'style-editorial',name:'Editorial',     beschreibung: 'Ruhig und gleichmaessig: Papier, Haarlinie, Schrift.', punkt: '4px' },
 ];
 
 function previewKachel(stil) {
   const aktiv = (localStorage.getItem('fs_stil') || '') === stil.id;
-  return `<div class="${stil.id}" onclick="waehleStil('${stil.id}')" style="cursor:pointer;border:2px solid ${aktiv ? 'var(--accent)' : 'var(--border)'};border-radius:14px;padding:14px;display:flex;align-items:center;gap:14px;background:var(--bg)">
+  // FIX: Die Vorschau bekam bisher nur die Stil-Klasse, nie die Klasse 'light'.
+  // Im hellen Modus zeigten alle Kacheln deshalb die DUNKLE Variante des
+  // jeweiligen Stils - man waehlte also etwas anderes aus, als man sah.
+  const hell = document.body.classList.contains('light') ? ' light' : '';
+  return `<div class="${stil.id}${hell}" onclick="waehleStil('${stil.id}')" style="cursor:pointer;border:2px solid ${aktiv ? 'var(--accent)' : 'var(--border)'};border-radius:14px;padding:14px;display:flex;align-items:center;gap:14px;background:var(--bg)">
     <div class="preview-tile" style="width:64px;height:56px;flex-shrink:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;gap:5px">
-      <div class="preview-dot active" style="width:16px;height:16px;border-radius:${stil.id==='style-strasse' ? '3px' : '50%'};background:var(--accent)"></div>
+      <div class="preview-dot active" style="width:16px;height:16px;border-radius:${stil.punkt || '50%'};background:var(--accent)"></div>
       <div style="width:20px;height:5px;border-radius:3px;background:var(--border)"></div>
     </div>
     <div style="flex:1">
@@ -9893,7 +10503,12 @@ window.openStilAuswahl = () => {
 };
 
 window.waehleStil = (id) => {
-  document.body.classList.remove('style-strasse', 'style-modern');
+  // FIX: Die zu entfernenden Klassen standen hier von Hand drin - und
+  // 'style-neumorph' fehlte. Wer diesen Stil einmal gewaehlt hatte, wurde ihn
+  // nie wieder los: Die Klasse blieb am body kleben und ueberlagerte sich mit
+  // jedem weiteren Stil, auch mit "Standard". Die Liste kommt jetzt aus STILE
+  // selbst, damit sie bei neuen Stilen nicht wieder auseinanderlaufen kann.
+  STILE.forEach(s => { if (s.id) document.body.classList.remove(s.id); });
   if (id) document.body.classList.add(id);
   localStorage.setItem('fs_stil', id);
   document.getElementById('stil-liste').innerHTML = STILE.map(previewKachel).join('');
@@ -9908,6 +10523,12 @@ window.waehleStil = (id) => {
   if (localStorage.getItem('fs_beta_dashboard') === '1') document.body.classList.add('beta-dash');
   const gespPunkteStil = localStorage.getItem('fs_punkte_stil');
   if (gespPunkteStil) document.body.classList.add(gespPunkteStil);
+  const gespAdkAnsicht = localStorage.getItem('fs_adk_ansicht');
+  if (gespAdkAnsicht) document.body.classList.add(gespAdkAnsicht);
+  const gespSkala = localStorage.getItem('fs_adk_skala');
+  if (gespSkala) document.body.classList.add(gespSkala);
+  const gespFortschritt = localStorage.getItem('fs_fortschritt');
+  if (gespFortschritt) document.body.classList.add(gespFortschritt);
 })();
 
 
@@ -10030,14 +10651,24 @@ const PUNKTE_STILE = [
   { id: '',                name: 'Standard',     beschreibung: 'Neutrale Formen, wie bisher.' },
   { id: 'punkte-neumorph', name: 'Neumorphism',  beschreibung: 'Weich, wie eingedrueckt.' },
   { id: 'punkte-brutal',   name: 'Neubrutalism', beschreibung: 'Kraeftig, mit Kante und Schatten.' },
+  { id: 'punkte-neon',     name: 'Neon',         beschreibung: 'Leere Felder nur als Kontur, erreichte leuchten – wie eine Aussteuerungsanzeige.' },
+  { id: 'punkte-skizze',   name: 'Skizze',       beschreibung: 'Wie mit der Hand gezeichnet. Zusammen mit der Skala „Kreuze" am nächsten an der Papierkarte.' },
 ];
 
 function previewPunkteKachel(stil) {
   const aktiv = (localStorage.getItem('fs_punkte_stil') || '') === stil.id;
-  return `<div class="${stil.id}" onclick="waehlePunkteStil('${stil.id}')" style="cursor:pointer;border:2px solid ${aktiv ? 'var(--accent)' : 'var(--border)'};border-radius:14px;padding:14px;display:flex;align-items:center;gap:14px;background:var(--bg)">
-    <div style="display:flex;gap:5px;flex-shrink:0">
-      <span class="stufe-form s2" style="width:18px;height:18px;color:var(--accent)"></span>
-      <span class="stufe-form s4" style="width:18px;height:18px;color:var(--accent)"></span>
+  // Die Vorschau uebernimmt Hell/Dunkel und die gewaehlte Skala-Art, damit
+  // sie zeigt, was nach dem Umschalten wirklich zu sehen ist - Neon sieht
+  // im Hellen anders aus als im Dunkeln, und mit der Skala "Punkte"
+  // bleiben die Felder rund.
+  const umgebung = (document.body.classList.contains('light') ? ' light' : '')
+    + ' ' + (localStorage.getItem('fs_adk_skala') || '');
+  return `<div class="${stil.id}${umgebung}" onclick="waehlePunkteStil('${stil.id}')" style="cursor:pointer;border:2px solid ${aktiv ? 'var(--accent)' : 'var(--border)'};border-radius:14px;padding:14px;display:flex;align-items:center;gap:14px;background:var(--bg)">
+    <div class="adk-balken" style="flex-shrink:0;width:76px">
+      <span class="adk-seg erreicht" data-stufe="1" style="--seg:var(--accent2)"></span>
+      <span class="adk-seg erreicht" data-stufe="2" style="--seg:var(--accent2)"></span>
+      <span class="adk-seg" data-stufe="3"></span>
+      <span class="adk-seg" data-stufe="4"></span>
     </div>
     <div style="flex:1">
       <div style="font-weight:700;font-size:0.88rem;color:var(--text)">${stil.name}${aktiv ? ' ✓' : ''}</div>
@@ -10052,11 +10683,153 @@ window.openPunkteStilAuswahl = () => {
 };
 
 window.waehlePunkteStil = (id) => {
-  document.body.classList.remove('punkte-neumorph', 'punkte-brutal');
+  // Die Liste kommt aus PUNKTE_STILE selbst. Vorher standen die zu
+  // entfernenden Klassen hier von Hand - bei jedem neuen Stil haette man
+  // daran denken muessen, sonst bliebe die alte Klasse am body kleben und
+  // wuerde sich mit der neuen ueberlagern (derselbe Fehler, den es beim
+  // Design-Stil schon einmal gab).
+  PUNKTE_STILE.forEach(p => { if (p.id) document.body.classList.remove(p.id); });
   if (id) document.body.classList.add(id);
   localStorage.setItem('fs_punkte_stil', id);
   document.getElementById('punkte-stil-liste').innerHTML = PUNKTE_STILE.map(previewPunkteKachel).join('');
   toast('Bewertungspunkte aktualisiert ✓');
+};
+
+// ══ ADK-ANSICHT: klassische Rasterkarte oder Stufenbalken ══════════════
+// Die gedruckte Ausbildungsdiagrammkarte gibt es nur auf Papier, einen
+// digitalen Standard gibt es nicht. Statt eine der beiden Lesarten
+// vorzuschreiben, kann jeder Fahrlehrer waehlen:
+//   - Klassisch: Raster wie auf der Karte, Kaestchen in festen Spalten,
+//     dicht gesetzt, spaltenweise lesbar.
+//   - Balken:    eine Zeile pro Thema, Balken ueber die volle Breite,
+//     luftiger und auf dem Handy besser zu treffen.
+// Beides zeigt DIESELBEN Daten und dieselben fuenf Stufen - der Schalter
+// aendert nur die Darstellung, nie eine Bewertung. Umgesetzt allein ueber
+// eine body-Klasse und CSS, deshalb wirkt das Umschalten sofort, ohne die
+// Liste neu aufzubauen.
+const ADK_ANSICHTEN = [
+  { id: '',              name: 'Neu – Stufenbalken', beschreibung: 'Ein Balken je Thema über die volle Breite. Luftig, große Tippziele.' },
+  { id: 'adk-klassisch', name: 'Klassisch – Rasterkarte', beschreibung: 'Kästchen in festen Spalten mit Kopfzeile, wie auf der Papierkarte. Dicht, spaltenweise lesbar.' },
+];
+
+function previewAdkKachel(ansicht) {
+  const aktiv = (localStorage.getItem('fs_adk_ansicht') || '') === ansicht.id;
+  const hell  = document.body.classList.contains('light') ? ' light' : '';
+  // Die Vorschau benutzt exakt dieselben Klassen wie die echte Liste,
+  // zeigt also wirklich das, was nach dem Umschalten zu sehen ist.
+  const zeile = (name, val) => {
+    const farbe = ADK_STUFE_FARB(val);
+    const segs = ADK_STUFEN.map(st => `<span class="adk-seg${val >= st.wert ? ' erreicht' : ''}"${val >= st.wert ? ` style="--seg:${farbe}"` : ''}></span>`).join('');
+    return `<div class="thema-row adk-zeile"><div class="adk-kopf">
+        <div class="thema-name" style="font-size:0.7rem">${name}</div>
+        <div class="adk-stand" style="color:${farbe};font-size:0.58rem">${ADK_STUFE_KURZ(val)}</div>
+      </div><div class="adk-balken">${segs}</div></div>`;
+  };
+  return `<div class="${ansicht.id}${hell}" onclick="waehleAdkAnsicht('${ansicht.id}')" style="cursor:pointer;border:2px solid ${aktiv ? 'var(--accent)' : 'var(--border)'};border-radius:14px;padding:14px;background:var(--bg)">
+    <div style="font-weight:700;font-size:0.88rem;color:var(--text)">${ansicht.name}${aktiv ? ' ✓' : ''}</div>
+    <div style="font-size:0.72rem;color:var(--muted);margin:2px 0 10px">${ansicht.beschreibung}</div>
+    <div class="themen-list" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 0;pointer-events:none">
+      ${adkRasterKopf()}${zeile('Anfahren &amp; Anhalten', 5)}${zeile('Schalten &amp; Gangwahl', 3)}${zeile('Überholen', 0)}
+    </div>
+  </div>`;
+}
+
+window.openAdkAnsichtAuswahl = () => {
+  document.getElementById('adk-ansicht-liste').innerHTML = ADK_ANSICHTEN.map(previewAdkKachel).join('');
+  document.getElementById('adk-ansicht-modal').classList.add('open');
+};
+
+window.waehleAdkAnsicht = (id) => {
+  ADK_ANSICHTEN.forEach(a => { if (a.id) document.body.classList.remove(a.id); });
+  if (id) document.body.classList.add(id);
+  localStorage.setItem('fs_adk_ansicht', id);
+  document.getElementById('adk-ansicht-liste').innerHTML = ADK_ANSICHTEN.map(previewAdkKachel).join('');
+  toast('ADK-Ansicht aktualisiert ✓');
+};
+
+// ══ SKALA-ART: wie ein einzelnes Bewertungsfeld markiert wird ══════════
+// Getrennt von der ADK-Ansicht: Die Ansicht bestimmt die Anordnung der
+// Zeile, die Skala-Art die Markierung darin. Beides frei kombinierbar,
+// also z.B. klassische Rasterkarte mit Kreuzen (wie handschriftlich) oder
+// Stufenbalken mit Punkten.
+const SKALA_ARTEN = [
+  { id: '',              name: 'Gefüllt',  beschreibung: 'Durchgehende Flächen. Der Fortschritt ist am weitesten aus der Ferne lesbar.' },
+  { id: 'skala-punkte',  name: 'Punkte',   beschreibung: 'Runde Punkte statt Flächen. Zurückhaltender, wirkt leichter.' },
+  { id: 'skala-zahlen',  name: 'Zahlen',   beschreibung: 'Jedes Feld zeigt seine Stufennummer. Am eindeutigsten, wenn jemand die Stufen noch lernt.' },
+  { id: 'skala-kreuze',  name: 'Kreuze',   beschreibung: 'Erledigte Felder bekommen ein Kreuz, offene bleiben leer – wie handschriftlich auf der Karte.' },
+];
+
+// ══ FORTSCHRITT-ANZEIGE: wie die Fortschrittsbalken gefuellt werden ════
+// Gilt fuer alle Balken im Programm (Themengruppen, Gesamtfortschritt,
+// Schaltstunden), damit die Darstellung ueberall dieselbe bleibt.
+const FORTSCHRITT_ARTEN = [
+  { id: '',                      name: 'Balken',   beschreibung: 'Durchgehender Balken. Ruhig und schlicht.' },
+  { id: 'fortschritt-segmente',  name: 'Segmente', beschreibung: 'In Blöcke geteilt. Man sieht den Stand eher als Anzahl denn als Fläche.' },
+  { id: 'fortschritt-streifen',  name: 'Streifen', beschreibung: 'Schraffiert wie auf einem gedruckten Formular.' },
+  { id: 'fortschritt-kraeftig',  name: 'Kräftig',  beschreibung: 'Dicker und mit Rand. Deutlich präsenter auf dem Schirm.' },
+];
+
+// Gemeinsamer Kachel-Bauer fuer beide Auswahl-Dialoge: Titel, Beschreibung
+// und darunter eine echte Vorschau, die dieselben Klassen benutzt wie das
+// Programm - man sieht also wirklich das, was man bekommt.
+function previewDarstellungKachel(eintrag, speicherSchluessel, waehlFunktion, vorschauHTML) {
+  const aktiv = (localStorage.getItem(speicherSchluessel) || '') === eintrag.id;
+  const hell  = document.body.classList.contains('light') ? ' light' : '';
+  return `<div class="${eintrag.id}${hell}" onclick="${waehlFunktion}('${eintrag.id}')" style="cursor:pointer;border:2px solid ${aktiv ? 'var(--accent)' : 'var(--border)'};border-radius:14px;padding:14px;background:var(--bg)">
+    <div style="font-weight:700;font-size:0.88rem;color:var(--text)">${eintrag.name}${aktiv ? ' ✓' : ''}</div>
+    <div style="font-size:0.72rem;color:var(--muted);margin:2px 0 10px">${eintrag.beschreibung}</div>
+    ${vorschauHTML}
+  </div>`;
+}
+
+function previewSkalaKachel(art) {
+  const zeile = (name, val) => {
+    const farbe = ADK_STUFE_FARB(val);
+    const segs = ADK_STUFEN.map(st => `<span class="adk-seg${val >= st.wert ? ' erreicht' : ''}" data-stufe="${st.wert}"${val >= st.wert ? ` style="--seg:${farbe}"` : ''}></span>`).join('');
+    return `<div class="thema-row adk-zeile"><div class="adk-kopf">
+        <div class="thema-name" style="font-size:0.7rem">${name}</div>
+        <div class="adk-stand" style="color:${farbe};font-size:0.58rem">${ADK_STUFE_KURZ(val)}</div>
+      </div><div class="adk-balken">${segs}</div></div>`;
+  };
+  return previewDarstellungKachel(art, 'fs_adk_skala', 'waehleSkalaArt',
+    `<div class="themen-list" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 0;pointer-events:none">
+      ${zeile('Anfahren &amp; Anhalten', 5)}${zeile('Schalten &amp; Gangwahl', 3)}${zeile('Überholen', 0)}
+    </div>`);
+}
+
+function previewFortschrittKachel(art) {
+  const balken = (pct, farbe) => `<div style="margin-bottom:8px">
+      <div class="bar-label-row" style="font-size:0.62rem"><span>Grundstufe</span><span>${pct}%</span></div>
+      <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:${farbe}"></div></div>
+    </div>`;
+  return previewDarstellungKachel(art, 'fs_fortschritt', 'waehleFortschrittArt',
+    `<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px 4px;pointer-events:none">
+      ${balken(100, 'var(--accent2)')}${balken(65, 'var(--accent)')}${balken(25, 'var(--blue)')}
+    </div>`);
+}
+
+window.openSkalaArtAuswahl = () => {
+  document.getElementById('skala-art-liste').innerHTML = SKALA_ARTEN.map(previewSkalaKachel).join('');
+  document.getElementById('skala-art-modal').classList.add('open');
+};
+window.waehleSkalaArt = (id) => {
+  SKALA_ARTEN.forEach(a => { if (a.id) document.body.classList.remove(a.id); });
+  if (id) document.body.classList.add(id);
+  localStorage.setItem('fs_adk_skala', id);
+  document.getElementById('skala-art-liste').innerHTML = SKALA_ARTEN.map(previewSkalaKachel).join('');
+  toast('Skala aktualisiert ✓');
+};
+
+window.openFortschrittAuswahl = () => {
+  document.getElementById('fortschritt-liste').innerHTML = FORTSCHRITT_ARTEN.map(previewFortschrittKachel).join('');
+  document.getElementById('fortschritt-modal').classList.add('open');
+};
+window.waehleFortschrittArt = (id) => {
+  FORTSCHRITT_ARTEN.forEach(a => { if (a.id) document.body.classList.remove(a.id); });
+  if (id) document.body.classList.add(id);
+  localStorage.setItem('fs_fortschritt', id);
+  document.getElementById('fortschritt-liste').innerHTML = FORTSCHRITT_ARTEN.map(previewFortschrittKachel).join('');
+  toast('Fortschritt-Anzeige aktualisiert ✓');
 };
 
 
@@ -10101,9 +10874,16 @@ window.sendeChatBild = async (datei) => {
     const pfad = `chat-images/${docRef.id}/${Date.now()}.jpg`;
     const storage = getStorage(app, "gs://fahrschule-ebc65-eu-storage");
     await uploadBytes(ref(storage, pfad), blob, { contentType: 'image/jpeg' });
+    // FIX: Bildnachrichten des Fahrlehrers trugen bisher NUR 'createdAt'.
+    // Textnachrichten und die Bilder des Schuelers nutzen aber 'timestamp' -
+    // im Schueler-Portal blieb ein gesendetes Bild deshalb ohne Uhrzeit
+    // ("Invalid Date"), loeste nie den Ungelesen-Zaehler aus und landete
+    // beim Sortieren an unbestimmter Stelle. Beide Felder schreiben, damit
+    // alte wie neue Ansichten die Nachricht korrekt einordnen.
+    const jetzt = Date.now();
     const neueNachricht = {
-      id: Date.now().toString(), sender: 'fahrlehrer', senderName: currentUser.displayName || 'Fahrlehrer',
-      imagePath: pfad, createdAt: Date.now()
+      id: jetzt.toString(), sender: 'fahrlehrer', senderName: currentUser.displayName || 'Fahrlehrer',
+      imagePath: pfad, createdAt: jetzt, timestamp: jetzt
     };
     const bestehend = docRef.data().messages || [];
     await dbUpd(doc(db,'accessCodes',docRef.id), { messages: [...bestehend.slice(-49), neueNachricht] });
@@ -10167,6 +10947,48 @@ async function loescheSchuelerBegleitdaten(studentId) {
   } catch(e) { console.warn('Loeschen protokoll:', e); }
 
   console.info('Begleitdaten geloescht fuer', studentId, '- Codes:', codeIds.length);
+  offeneLoeschungAbhaken(studentId);
+}
+
+// ── DSGVO-FIX: Aufraeumen ueberlebt das Schliessen der App ──────────
+// Die endgueltige Loeschung der Begleitdaten (Chatverlauf, Fotos, Protokoll)
+// lief bisher NUR in einem setTimeout von 60 Sekunden. Schloss der Fahrlehrer
+// die App in dieser Minute - auf dem Handy der Normalfall: loeschen, App
+// weglegen - lief sie nie, und die personenbezogenen Daten des geloeschten
+// Schuelers blieben dauerhaft gespeichert. Die offene Loeschung wird deshalb
+// zusaetzlich lokal vorgemerkt und beim naechsten Start nachgeholt.
+const OFFENE_LOESCHUNGEN_KEY = 'adk_offene_loeschungen';
+
+function offeneLoeschungenLesen() {
+  try { return JSON.parse(localStorage.getItem(OFFENE_LOESCHUNGEN_KEY) || '[]'); }
+  catch(e) { return []; }
+}
+function offeneLoeschungVormerken(studentId) {
+  try {
+    const offen = offeneLoeschungenLesen();
+    if (!offen.includes(studentId)) offen.push(studentId);
+    localStorage.setItem(OFFENE_LOESCHUNGEN_KEY, JSON.stringify(offen));
+  } catch(e) { /* ohne lokalen Speicher bleibt es beim Timer-Weg */ }
+}
+function offeneLoeschungAbhaken(studentId) {
+  try {
+    localStorage.setItem(OFFENE_LOESCHUNGEN_KEY,
+      JSON.stringify(offeneLoeschungenLesen().filter(id => id !== studentId)));
+  } catch(e) { /* nicht kritisch */ }
+}
+async function holeOffeneLoeschungenNach() {
+  const offen = offeneLoeschungenLesen();
+  if (!offen.length || !currentUser) return;
+  for (const studentId of offen) {
+    // Wurde der Schueler per Rueckgaengig wiederhergestellt, darf nichts
+    // geloescht werden - dann nur den Vormerker entfernen.
+    try {
+      const noch = await getDoc(doc(db, 'students', studentId));
+      if (noch.exists()) { offeneLoeschungAbhaken(studentId); continue; }
+    } catch(e) { continue; }
+    try { await loescheSchuelerBegleitdaten(studentId); }
+    catch(e) { console.warn('Nachgeholte Loeschung:', e); }
+  }
 }
 
 

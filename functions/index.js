@@ -1,10 +1,12 @@
-// Neu-Bereitstellung erzwungen (13.08.2026): Sicherheitsfix erstelleRechnung (nur SuperAdmin)
+// Neu-Bereitstellung erzwungen (13.09.2026): erstelleRechnung entfernt - beim
+// naechsten Bereitstellen wird die Funktion in Firebase mit geloescht.
 // Node.js-Laufzeit auf 22 umgestellt (11.08.2026) - dieser Kommentar erzwingt ein echtes Neu-Bereitstellen
 // FahrSync Push-Benachrichtigungen (Cloud Functions v2, Region Frankfurt)
 // Sendet data-only Nachrichten – der Service Worker zeigt sie an
 // (zuverlaessig auf iOS-PWA und Android/Chrome, keine Doppelanzeige).
 const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
 const { onRequest, onCall, HttpsError } = require('firebase-functions/v2/https');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { setGlobalOptions } = require('firebase-functions/v2');
 const { defineSecret } = require('firebase-functions/params');
 const Stripe = require('stripe');
@@ -274,7 +276,21 @@ const RECHNUNG_PLANS = {
   bis5:       { label: 'Fahrschule bis 5 Fahrlehrer',       price: 12.99, pricePlaner: 16.99 },
   bis10:      { label: 'Fahrschule bis 10 Fahrlehrer',      price: 20.99, pricePlaner: 25.99 },
   bis15:      { label: 'Fahrschule bis 15 Fahrlehrer',      price: 26.99, pricePlaner: 34.99 },
-  unbegrenzt: { label: 'Fahrschule unbegrenzt',             price: 34.99, pricePlaner: 40.99 },
+  // setup/setupPlaner: einmalige Einrichtungsgebuehr fuer diese Stufe (siehe
+  // agb.html § 4) - dieselben Betraege wie im Client (index.html, PLANS.unbegrenzt).
+  unbegrenzt: { label: 'Fahrschule unbegrenzt',             price: 34.99, pricePlaner: 40.99, setup: 42.99, setupPlaner: 45.99 },
+};
+
+// Echte PayPal-Plan-IDs je Tarif (Standard/mit Planer) - dieselben wie im
+// Client (index.html, Konstante PLANS). Dient NUR der serverseitigen
+// Verifikation in bestaetigePaypalAbo: eine PayPal-Subscription-ID muss zu
+// GENAU diesem Plan gehoeren, sonst wird kein Abo aktiviert.
+const PAYPAL_PLAN_IDS = {
+  solo:       { id: 'P-4NU22633BD298162DNJFEWLI', idPlaner: 'P-5WR5028990092335YNJFEXYA', maxLehrer: 1 },
+  bis5:       { id: 'P-6MT978804E871203DNJFEY6I', idPlaner: 'P-62X57828ND5677308NJFEZVA', maxLehrer: 5 },
+  bis10:      { id: 'P-6PU84465TJ206253SNJFE2GI', idPlaner: 'P-0R339159LA0608445NJFE2ZQ', maxLehrer: 10 },
+  bis15:      { id: 'P-73W48950B2092742VNJFE3KY', idPlaner: 'P-3P20164845621960ANJFE35A', maxLehrer: 15 },
+  unbegrenzt: { id: 'P-22Y05276M00023207NJFE4ZA', idPlaner: 'P-4SF532859T7264908NJFE5PQ', maxLehrer: null },
 };
 
 function baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel, betrag, zahlungsart }) {
@@ -334,95 +350,18 @@ function baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel, betra
   });
 }
 
-exports.erstelleRechnung = onCall(async (request) => {
-  const auth = request.auth;
-  if (!auth) throw new HttpsError('unauthenticated', 'Bitte anmelden.');
-  const uid = auth.uid;
-
-  // SuperAdmin-Pruefung: entweder per E-Mail, oder per Firestore-Rolle -
-  // dieselben zwei Wege, die auch die Firestore-Regeln selbst nutzen.
-  const istSuperAdminEmail = auth.token.email === 'chriskoo@mail.de';
-  let istSuperAdminRolle = false;
-  if (!istSuperAdminEmail) {
-    const eigenesDoc = await admin.firestore().doc(`users/${uid}`).get();
-    istSuperAdminRolle = eigenesDoc.exists && eigenesDoc.data().rolle === 'superadmin';
-  }
-  if (!istSuperAdminEmail && !istSuperAdminRolle) {
-    throw new HttpsError('permission-denied', 'Echte Rechnungen entstehen automatisch bei der Zahlung. Diese Funktion ist nur fuer Testzwecke.');
-  }
-  const { plan, planer } = request.data || {};
-  if (!plan || !RECHNUNG_PLANS[plan]) {
-    throw new HttpsError('invalid-argument', 'Unbekannter Tarif.');
-  }
-
-  const userSnap = await admin.firestore().doc(`users/${uid}`).get();
-  if (!userSnap.exists) throw new HttpsError('failed-precondition', 'Nutzerprofil nicht gefunden.');
-  const userData = userSnap.data();
-
-  // Dieselbe Ermittlung wie im Client (window.__billingDocRef): Fahrschule
-  // oder eigenstaendiger Fahrlehrer sind jeweils selbst der Rechnungsempfaenger.
-  let billingColl, billingId;
-  if (userData.typ === 'fahrschule') {
-    billingColl = 'fahrschulen'; billingId = uid;
-  } else if (!userData.fahrschuleId || userData.fahrschuleId === uid) {
-    billingColl = 'users'; billingId = uid;
-  } else {
-    throw new HttpsError('permission-denied', 'Nur der Fahrschul-Inhaber kann eine Rechnung anfordern.');
-  }
-
-  const billingSnap = await admin.firestore().doc(`${billingColl}/${billingId}`).get();
-  const b = billingSnap.exists ? billingSnap.data() : {};
-  if (!b.rechnungsStrasse || !b.rechnungsPlz || !b.rechnungsOrt) {
-    throw new HttpsError('failed-precondition', 'Bitte zuerst die Rechnungsadresse ausfüllen.');
-  }
-
-  const planInfo = RECHNUNG_PLANS[plan];
-  const betrag = planer ? planInfo.pricePlaner : planInfo.price;
-
-  // Fortlaufende, luecken- und ueberschneidungsfreie Rechnungsnummer per
-  // Transaktion - Pflicht nach § 14 UStG.
-  const counterRef = admin.firestore().doc('platform/rechnungszaehler');
-  const nummer = await admin.firestore().runTransaction(async (tx) => {
-    const c = await tx.get(counterRef);
-    const jahr = new Date().getFullYear();
-    const bisher = c.exists ? (c.data().naechsteNummer || 1) : 1;
-    tx.set(counterRef, { naechsteNummer: bisher + 1 }, { merge: true });
-    return `${jahr}-${String(bisher).padStart(5, '0')}`;
-  });
-
-  const platDoc = await admin.firestore().doc('platform/impressum').get();
-  const platImp = platDoc.exists ? platDoc.data() : {};
-  const steller = {
-    name: platImp.name || 'Chriskoo',
-    strasse: platImp.strasse || '',
-    plz: platImp.plz || '',
-    ort: platImp.ort || '',
-    email: platImp.email || 'kontakt@fahrsync.de',
-    web: platImp.web || 'fahrsync.de',
-    // Pflichtangabe nach §14 Abs.4 UStG (gilt auch fuer Kleinunternehmer):
-    // Steuernummer, seit 24.08.2026 vom Finanzamt Luckenwalde vorliegend.
-    steuernummer: platImp.steuernummer || '050/240/09485',
-  };
-  const LAENDER = { DE: '', AT: 'Österreich', CH: 'Schweiz', XX: '' };
-  const empfaenger = {
-    name: b.name || userData.name || 'Kunde',
-    strasse: b.rechnungsStrasse, plz: b.rechnungsPlz, ort: b.rechnungsOrt,
-    land: LAENDER[b.rechnungsLand || 'DE'] || '',
-  };
-  const datum = new Date().toLocaleDateString('de-DE');
-
-  const pdfBuffer = await baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel: planInfo.label, betrag });
-  const pdfBase64 = pdfBuffer.toString('base64');
-
-  const rechnungRef = admin.firestore().collection('rechnungen').doc();
-  await rechnungRef.set({
-    nummer, empfaengerId: uid, empfaengerName: empfaenger.name,
-    plan, planer: !!planer, betrag, datum, erstelltAm: Date.now(),
-    pdfBase64,
-  });
-
-  return { success: true, nummer, invoiceId: rechnungRef.id };
-});
+// (exports.erstelleRechnung ist entfallen - zusammen mit dem Knopf
+//  "Test-Rechnung erzeugen" in der App. Die Funktion war ihrem eigenen
+//  Fehlertext nach nur fuer Testzwecke gedacht, hat aber eine ECHTE,
+//  fortlaufend nummerierte Rechnung angelegt: dieselbe Nummernvergabe aus
+//  platform/rechnungszaehler wie bei einer bezahlten Rechnung, und
+//  dauerhaft aufbewahrt, weil taeglichesAufraeumen Rechnungen bewusst nie
+//  loescht (§ 14b UStG, § 147 AO).
+//  Echte Rechnungen entstehen ausschliesslich in den Webhooks:
+//  paypalWebhook (abgesichert ueber die Sale-ID) und stripeWebhook
+//  (ueber die Invoice-ID) - beide gegen Doppelanlage geschuetzt.
+//  Die Bausteine baueRechnungsPdf, RECHNUNG_PLANS und LAENDER bleiben,
+//  sie werden von genau diesen Webhooks gebraucht.
 
 exports.syncSlotToGoogleCalendar = onDocumentUpdated({ document: 'slots/{slotId}', secrets: [GOOGLE_CLIENT_SECRET] }, async (event) => {
   const before = event.data.before.data();
@@ -502,18 +441,51 @@ exports.createStripeCheckoutSession = onCall({ secrets: [STRIPE_SECRET_KEY] }, a
   const betrag = planer ? planInfo.pricePlaner : planInfo.price;
   const stripe = new Stripe(STRIPE_SECRET_KEY.value());
 
+  const lineItems = [{
+    price_data: {
+      currency: 'eur',
+      product_data: { name: `FahrSync – ${planInfo.label}` },
+      unit_amount: Math.round(betrag * 100),
+      recurring: { interval: 'month' },
+    },
+    quantity: 1,
+  }];
+
+  // FIX: Fuer die Stufe "Unbegrenzt" sieht die AGB (§ 4) eine einmalige,
+  // nicht erstattungsfaehige Einrichtungsgebuehr vor - die war bisher NUR im
+  // Client als Text angezeigt, aber in der Stripe-Checkout-Session nie als
+  // tatsaechliche Position enthalten. Zahlende ueber Stripe wurden die
+  // Gebuehr also nie in Rechnung gestellt. Einmalige Position (kein
+  // 'recurring') zusaetzlich zum Abo hinzufuegen, wenn vorhanden.
+  const setupGebuehr = planer ? planInfo.setupPlaner : planInfo.setup;
+  if (setupGebuehr) {
+    lineItems.push({
+      price_data: {
+        currency: 'eur',
+        product_data: { name: `FahrSync – Einrichtungsgebühr (${planInfo.label})` },
+        unit_amount: Math.round(setupGebuehr * 100),
+      },
+      quantity: 1,
+    });
+  }
+
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     payment_method_types: ['card', 'sepa_debit'],
-    line_items: [{
-      price_data: {
-        currency: 'eur',
-        product_data: { name: `FahrSync – ${planInfo.label}` },
-        unit_amount: Math.round(betrag * 100),
-        recurring: { interval: 'month' },
-      },
-      quantity: 1,
-    }],
+    line_items: lineItems,
+    // FIX: Die AGB (§ 3) und die Preis-Uebersicht im Client versprechen fuer
+    // JEDES Abonnement eine 14-taegige kostenlose Testphase ("keine
+    // automatische Abbuchung waehrend der Testphase") - ohne diesen
+    // Parameter haette Stripe (anders als die PayPal-Plaene, die die
+    // Testphase serverseitig im PayPal-Dashboard hinterlegt haben) sofort
+    // bei Checkout-Abschluss abgebucht.
+    subscription_data: {
+      trial_period_days: 14,
+      // Wird auf das entstehende Abo (nicht nur die Checkout Session)
+      // uebertragen - noetig, damit spaetere Verlaengerungs-Rechnungen
+      // (invoice.paid, siehe unten) wissen, wem die Zahlung zuzuordnen ist.
+      metadata: { plan, planer: planer ? '1' : '0', billingColl, billingId },
+    },
     client_reference_id: `${billingColl}:${billingId}`,
     metadata: { plan, planer: planer ? '1' : '0', billingColl, billingId },
     success_url: `https://fahrsync.de/index.html?stripe=erfolg${request.data.rueckkehrZusatz === '&normal=1' ? '&normal=1' : ''}`,
@@ -523,32 +495,30 @@ exports.createStripeCheckoutSession = onCall({ secrets: [STRIPE_SECRET_KEY] }, a
   return { url: session.url };
 });
 
-// Gemeinsame Aktivierung + Rechnung, genutzt von BEIDEN Webhook-Zweigen
-// (sofortige Kartenzahlung und spaeter bestaetigte SEPA-Lastschrift).
-async function stripeAboAktivierenUndRechnung(session, stripeEventId, zahlungsart) {
-  const { billingColl, billingId, plan, planer } = session.metadata || {};
-  if (!billingColl || !billingId || !plan) return;
-
-  // Idempotenz: dasselbe Stripe-Ereignis darf nicht zweimal verarbeitet werden
-  const bereits = await admin.firestore().collection('rechnungen')
-    .where('stripeSessionId', '==', session.id).limit(1).get();
-  if (!bereits.empty) return;
-
-  const planInfo = RECHNUNG_PLANS[plan];
-  if (!planInfo) return;
-
+// Setzt nur die Abo-Felder auf dem Fahrschulen-/Users-Dokument - OHNE
+// Rechnung. Wird sowohl bei sofortiger Zahlung als auch beim reinen
+// Testphase-Start (0 EUR faellig) gebraucht.
+async function stripeAboAktivieren(billingColl, billingId, plan, planer, subscriptionId) {
   const billingRef = admin.firestore().doc(`${billingColl}/${billingId}`);
   const billingSnap = await billingRef.get();
-  if (!billingSnap.exists) return;
-  const b = billingSnap.data();
-  if (!b.rechnungsStrasse || !b.rechnungsPlz || !b.rechnungsOrt) return;
-
-  await billingRef.update({
+  if (!billingSnap.exists) return null;
+  const felder = {
     abo: plan, aboPlaner: planer === '1', aboStatus: 'aktiv',
     aboZahlungsart: 'stripe', aboLetzteZahlungAm: Date.now(),
-  });
+  };
+  // Die Stripe-Abo-Kennung wurde bisher nirgends gespeichert - ohne sie
+  // laesst sich ein laufendes Abo spaeter nicht kuendigen (z.B. wenn der
+  // Kunde sein Konto loescht, siehe kuendigeLaufendesAbo).
+  if (subscriptionId) felder.aboSubscriptionId = subscriptionId;
+  await billingRef.update(felder);
+  return billingSnap.data();
+}
 
-  const betrag = planer === '1' ? planInfo.pricePlaner : planInfo.price;
+// Gemeinsame PDF-/Rechnungsnummern-Erzeugung, genutzt sowohl fuer die erste
+// Zahlung (Checkout Session) als auch fuer jede spaetere monatliche
+// Verlaengerung (Stripe-Invoice) - dieselbe Logik, nur mit unterschiedlicher
+// Herkunft von Betrag/Zahlungsart/Idempotenz-Schluessel.
+async function stripeRechnungSpeichern({ billingId, empfaengerName, b, plan, planer, planInfo, betrag, zahlungsart, docId, referenzFelder }) {
   const counterRef = admin.firestore().doc('platform/rechnungszaehler');
   const nummer = await admin.firestore().runTransaction(async (tx) => {
     const c = await tx.get(counterRef);
@@ -568,20 +538,116 @@ async function stripeAboAktivierenUndRechnung(session, stripeEventId, zahlungsar
   };
   const LAENDER = { DE: '', AT: 'Österreich', CH: 'Schweiz', XX: '' };
   const empfaenger = {
-    name: b.name || 'Kunde',
+    name: empfaengerName,
     strasse: b.rechnungsStrasse, plz: b.rechnungsPlz, ort: b.rechnungsOrt,
     land: LAENDER[b.rechnungsLand || 'DE'] || '',
   };
   const datum = new Date().toLocaleDateString('de-DE');
   const pdfBuffer = await baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel: planInfo.label, betrag, zahlungsart });
 
-  await admin.firestore().collection('rechnungen').add({
-    nummer, empfaengerId: billingId, empfaengerName: empfaenger.name,
-    plan, planer: planer === '1', betrag, datum, erstelltAm: Date.now(),
-    pdfBase64: pdfBuffer.toString('base64'),
-    stripeSessionId: session.id,
+  // FIX: Ein reiner check-then-write ("existiert schon eine Rechnung fuer
+  // dieses Ereignis?") ist bei zeitgleich zugestellten Retry-Webhooks nicht
+  // race-sicher. .create() auf einer deterministischen, aus dem jeweiligen
+  // Stripe-Ereignis abgeleiteten Dokument-ID ist dagegen atomar: der zweite
+  // Versuch schlaegt garantiert mit ALREADY_EXISTS (Code 6) fehl.
+  try {
+    await admin.firestore().collection('rechnungen').doc(docId).create({
+      nummer, empfaengerId: billingId, empfaengerName: empfaenger.name,
+      plan, planer: planer === '1', betrag, datum, erstelltAm: Date.now(),
+      pdfBase64: pdfBuffer.toString('base64'),
+      ...referenzFelder,
+    });
+  } catch (e) {
+    if (e.code === 6) { console.log('stripeWebhook: Rechnung bereits vorhanden (Retry), ignoriert'); return null; }
+    throw e;
+  }
+  return nummer;
+}
+
+// Erste Zahlung (Checkout Session), genutzt von BEIDEN Webhook-Zweigen
+// (sofortige Kartenzahlung und spaeter bestaetigte SEPA-Lastschrift).
+async function stripeAboAktivierenUndRechnung(session, stripeEventId, zahlungsart) {
+  const { billingColl, billingId, plan, planer } = session.metadata || {};
+  if (!billingColl || !billingId || !plan) return;
+  const planInfo = RECHNUNG_PLANS[plan];
+  if (!planInfo) return;
+
+  const b = await stripeAboAktivieren(billingColl, billingId, plan, planer, session.subscription);
+  if (!b) return;
+  if (!b.rechnungsStrasse || !b.rechnungsPlz || !b.rechnungsOrt) return;
+
+  // FIX: Bei einer Testphase OHNE Einrichtungsgebuehr ist beim Checkout
+  // tatsaechlich 0 EUR faellig (amount_total === 0, Stripe liefert dafuer
+  // payment_status 'no_payment_required') - das Abo wurde oben trotzdem
+  // schon freigeschaltet (die Testphase soll nutzbar sein), aber es wird
+  // bewusst KEINE Rechnung ueber den vollen Monatspreis erzeugt, da noch
+  // nichts bezahlt wurde. Die erste echte Rechnung entsteht automatisch
+  // nach Ablauf der Testphase ueber invoice.paid (stripeVerlaengerungsRechnung).
+  if (!session.amount_total) {
+    console.log('stripeWebhook: Testphase gestartet (0 EUR faellig), Abo aktiviert ohne Rechnung fuer', billingColl, billingId);
+    return;
+  }
+
+  const betrag = planer === '1' ? planInfo.pricePlaner : planInfo.price;
+  const nummer = await stripeRechnungSpeichern({
+    billingId, empfaengerName: b.name || 'Kunde', b, plan, planer, planInfo, betrag, zahlungsart,
+    docId: `stripe_${session.id}`,
+    referenzFelder: { stripeSessionId: session.id },
   });
-  console.log('stripeWebhook: Rechnung', nummer, 'erzeugt fuer', billingColl, billingId, '(Ereignis', stripeEventId, ')');
+  if (nummer) console.log('stripeWebhook: Rechnung', nummer, 'erzeugt fuer', billingColl, billingId, '(Ereignis', stripeEventId, ')');
+}
+
+// FIX: Bisher hoerte der Webhook NUR auf checkout.session.*-Ereignisse - das
+// deckt ausschliesslich die ALLERERSTE Zahlung ab. Jede folgende monatliche
+// Verlaengerung eines Stripe-Abos laeuft technisch ueber ein eigenes
+// Invoice-Objekt auf dem Abo selbst (keine neue Checkout Session) und hat
+// bisher NIE eine Rechnung erzeugt - anders als bei PayPal, wo genau dieses
+// Problem bereits ueber PAYMENT.SALE.COMPLETED im paypalWebhook geloest
+// wurde. 'invoice.paid' deckt sowohl Karten- als auch (verzoegerte)
+// SEPA-Zahlungen ab.
+async function stripeVerlaengerungsRechnung(invoice, stripeEventId) {
+  // Nur echte Verlaengerungen - die allererste Zahlung laeuft bereits ueber
+  // checkout.session.completed/stripeAboAktivierenUndRechnung; wuerde man
+  // sie hier zusaetzlich verarbeiten, entstuenden doppelte Rechnungen.
+  if (invoice.billing_reason !== 'subscription_cycle') return;
+  if (!invoice.amount_paid) return;
+
+  // Stripe hat mit der API-Version 2025-03-31 ("basil") umgebaut: Das
+  // zugehoerige Abo steht seither nicht mehr unter invoice.subscription,
+  // sondern unter invoice.parent.subscription_details.subscription. Wird nur
+  // das alte Feld gelesen, ueberspringt diese Funktion auf neueren
+  // API-Versionen STILLSCHWEIGEND jede Verlaengerung - es entstuende nie
+  // wieder eine Rechnung. Beide Formen lesen, damit es unabhaengig von der
+  // im Stripe-Konto eingestellten Version funktioniert.
+  const abo = (invoice.parent &&
+               invoice.parent.subscription_details &&
+               invoice.parent.subscription_details.subscription)
+            || invoice.subscription;
+  if (!abo) return;
+
+  const stripe = new Stripe(STRIPE_SECRET_KEY.value());
+  const subId = typeof abo === 'string' ? abo : abo.id;
+  const sub = await stripe.subscriptions.retrieve(subId);
+  const { billingColl, billingId, plan, planer } = sub.metadata || {};
+  if (!billingColl || !billingId || !plan) return;
+  const planInfo = RECHNUNG_PLANS[plan];
+  if (!planInfo) return;
+
+  const billingSnap = await admin.firestore().doc(`${billingColl}/${billingId}`).get();
+  if (!billingSnap.exists) return;
+  const b = billingSnap.data();
+  if (!b.rechnungsStrasse || !b.rechnungsPlz || !b.rechnungsOrt) return;
+
+  await admin.firestore().doc(`${billingColl}/${billingId}`).update({ aboLetzteZahlungAm: Date.now() });
+
+  const betrag = invoice.amount_paid / 100;
+  const nummer = await stripeRechnungSpeichern({
+    billingId, empfaengerName: b.name || 'Kunde', b, plan, planer, planInfo, betrag,
+    zahlungsart: 'Kreditkarte/SEPA (Verlängerung)',
+    docId: `stripe_invoice_${invoice.id}`,
+    referenzFelder: { stripeInvoiceId: invoice.id },
+  });
+  if (nummer) console.log('stripeWebhook: Verlaengerungs-Rechnung', nummer, 'erzeugt fuer', billingColl, billingId, '(Ereignis', stripeEventId, ')');
 }
 
 exports.stripeWebhook = onRequest(
@@ -602,16 +668,31 @@ exports.stripeWebhook = onRequest(
     try {
       if (event.type === 'checkout.session.completed') {
         const session = event.data.object;
-        // Nur bei SOFORT bezahlt (Karte) hier aktivieren. Bei noch
-        // schwebender SEPA-Lastschrift ('unpaid'/'no_payment_required'
-        // greift hier nicht) uebernimmt async_payment_succeeded weiter unten.
         if (session.payment_status === 'paid') {
+          // Sofort bezahlt (Karte, oder Testphase + Einrichtungsgebuehr).
           await stripeAboAktivierenUndRechnung(session, event.id, 'Kreditkarte');
+        } else if (session.payment_status === 'no_payment_required') {
+          // FIX: Testphase OHNE Einrichtungsgebuehr -> 0 EUR beim Checkout
+          // faellig. Abo trotzdem sofort freischalten (die 14-taegige
+          // Testphase soll nutzbar sein), aber ohne Rechnung.
+          const { billingColl, billingId, plan, planer } = session.metadata || {};
+          if (billingColl && billingId && plan) await stripeAboAktivieren(billingColl, billingId, plan, planer, session.subscription);
         }
+        // Bei noch schwebender SEPA-Lastschrift ('unpaid') uebernimmt
+        // async_payment_succeeded weiter unten.
       } else if (event.type === 'checkout.session.async_payment_succeeded') {
         // SEPA-Lastschrift wurde jetzt tatsaechlich bestaetigt.
         const session = event.data.object;
         await stripeAboAktivierenUndRechnung(session, event.id, 'SEPA-Lastschrift');
+      } else if (event.type === 'invoice.paid' || event.type === 'invoice.payment_succeeded') {
+        // Monatliche Abo-Verlaengerung (siehe stripeVerlaengerungsRechnung).
+        // Stripe kennt zwei Ereignisse fuer dieselbe Sache; welches davon sich
+        // im Dashboard auswaehlen laesst, haengt von der Oberflaeche und der
+        // API-Version ab. Beide werden akzeptiert - sind versehentlich BEIDE
+        // aktiviert, entsteht trotzdem nur eine Rechnung, weil die
+        // Dokument-Kennung aus der Rechnungs-ID abgeleitet ist und der zweite
+        // Versuch an ALREADY_EXISTS scheitert.
+        await stripeVerlaengerungsRechnung(event.data.object, event.id);
       } else if (event.type === 'checkout.session.async_payment_failed') {
         const session = event.data.object;
         const { billingColl, billingId } = session.metadata || {};
@@ -628,6 +709,78 @@ exports.stripeWebhook = onRequest(
     }
   }
 );
+
+// ══ ALTE ZUGANGSCODES: SICHERER LOGIN-FALLBACK ═══════════════════════
+// Vor der Umstellung auf "Code = Dokument-ID" hatten Zugangscode-Dokumente
+// eine zufaellige ID und ein eigenes 'code'-Feld. Der Login-Fallback im
+// Schueler-Portal fuer solche Alt-Codes brauchte bisher ein Client-seitiges
+// where('code','==',code) - also ein 'list()' auf accessCodes. Firestore-
+// Regeln koennen bei 'list' aber nur pruefen, WAS zurueckkommt, nicht WELCHE
+// Query gestellt wurde - ein offenes 'list' fuer diesen Zweck haette also
+// das komplette Auflisten ALLER aktiven Zugangscodes (samt Schueler-
+// Stammdaten/Chat) ermoeglicht, ganz ohne einen einzigen Code zu kennen.
+// Diese Funktion macht dieselbe Suche stattdessen serverseitig (Admin SDK,
+// umgeht Rules) und gibt NUR die Dokument-ID zurueck, wenn Code + Ablauf
+// passen - der Client liest die eigentlichen Daten danach ganz normal per
+// get() (bereits durch die bestehende accessCodes/get-Regel erlaubt).
+// Einfache Versuchsbremse pro Absender-Adresse. Bewusst "fail-open": Geht
+// beim Zaehlen selbst etwas schief, wird der Zugang NICHT verweigert - ein
+// kaputter Zaehler darf keine Schueler aussperren.
+async function versuchErlaubt(kennung, maxProStunde) {
+  if (!kennung) return true;
+  const FENSTER_MS = 60 * 60 * 1000;
+  // Adresse nicht im Klartext ablegen (waere selbst wieder ein
+  // personenbezogenes Datum) - eine gekuerzte Pruefsumme genuegt zum Zaehlen.
+  const id = require('crypto').createHash('sha256').update(String(kennung)).digest('hex').slice(0, 32);
+  try {
+    return await admin.firestore().runTransaction(async (tx) => {
+      const ref = admin.firestore().doc(`rateLimits/${id}`);
+      const snap = await tx.get(ref);
+      const jetzt = Date.now();
+      const d = snap.exists ? snap.data() : null;
+      if (!d || (jetzt - (d.fensterStart || 0)) > FENSTER_MS) {
+        tx.set(ref, { fensterStart: jetzt, anzahl: 1 });
+        return true;
+      }
+      if ((d.anzahl || 0) >= maxProStunde) return false;
+      tx.update(ref, { anzahl: (d.anzahl || 0) + 1 });
+      return true;
+    });
+  } catch (e) {
+    console.warn('Versuchsbremse nicht auswertbar:', e.message);
+    return true;
+  }
+}
+
+exports.findeAltenZugangscode = onCall(async (request) => {
+  const { code } = request.data || {};
+  if (!code || typeof code !== 'string' || code.length < 4 || code.length > 40) {
+    throw new HttpsError('invalid-argument', 'Ungueltiger Code.');
+  }
+  // SICHERHEITS-AUDIT (eigener Fund): Diese Funktion ist bewusst ohne
+  // Anmeldung erreichbar - der Schueler hat ja kein Konto. Damit war sie
+  // aber auch ein unbegrenzt oft abfragbares Orakel, um Zugangscodes
+  // durchzuprobieren: ein Treffer liefert die Dokument-ID, und damit sind
+  // ueber die accessCodes-Leseregel Name, Lernstand und Chatverlauf des
+  // Schuelers abrufbar. 20 Versuche pro Stunde und Absender reichen fuer
+  // jeden echten Schueler, machen systematisches Durchprobieren aber
+  // unbrauchbar.
+  const absender = request.rawRequest && (
+    (request.rawRequest.headers && request.rawRequest.headers['x-forwarded-for']) ||
+    request.rawRequest.ip);
+  const ersteAdresse = String(absender || '').split(',')[0].trim();
+  if (!(await versuchErlaubt('code:' + ersteAdresse, 20))) {
+    throw new HttpsError('resource-exhausted', 'Zu viele Versuche. Bitte spaeter erneut versuchen.');
+  }
+
+  const snap = await admin.firestore().collection('accessCodes')
+    .where('code', '==', code).limit(1).get();
+  if (snap.empty) return { found: false };
+  const doc = snap.docs[0];
+  const data = doc.data();
+  if (data.expiresAt && data.expiresAt < Date.now()) return { found: false };
+  return { found: true, docId: doc.id };
+});
 
 // ══ ADMIN: E-Mail manuell bestaetigen (SuperAdmin-only) ═════════
 // Fuer Testkonten, bei denen die Bestaetigungs-Mail nicht ankommt (Spam-
@@ -684,6 +837,97 @@ async function paypalAccessToken(clientId, clientSecret) {
   if (!data.access_token) throw new Error('PayPal-Zugriffstoken nicht erhalten');
   return data.access_token;
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// SICHERHEITSFIX: Abo-Aktivierung nach PayPal-Zahlung serverseitig
+//
+// Bisher schrieb der Client (activateAbo() im Browser, index.html) die
+// Felder abo/aboMaxLehrer/aboSubscriptionId/... DIREKT per updateDoc() in
+// Firestore - im onApprove-Callback von PayPal, also OHNE jede
+// serverseitige Pruefung, ob ueberhaupt eine echte Zahlung stattgefunden
+// hat. Jeder eingeloggte Nutzer haette sich per Browser-Konsole (z.B.
+// updateDoc(doc(db,'users',meineUid),{abo:'unbegrenzt',aboStatus:'aktiv'}))
+// ein kostenloses Premium-Abo selbst freischalten koennen.
+//
+// Diese Funktion ersetzt den direkten Client-Schreibzugriff: Sie fragt bei
+// PayPal selbst nach (Admin-API, server-zu-server), ob die genannte
+// Subscription-ID wirklich existiert, aktiv ist und zum angefragten Tarif
+// passt - erst DANACH aktiviert sie serverseitig (Admin SDK, umgeht die
+// Firestore-Regeln). Die Firestore-Regeln selbst verbieten Clients
+// zusaetzlich das direkte Schreiben dieser Felder (siehe firestore.rules,
+// aboFelderUnveraendert()).
+// ═══════════════════════════════════════════════════════════════════
+exports.bestaetigePaypalAbo = onCall(
+  { secrets: [PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET] },
+  async (request) => {
+    const auth = request.auth;
+    if (!auth) throw new HttpsError('unauthenticated', 'Bitte anmelden.');
+
+    const { subscriptionId, plan, planer } = request.data || {};
+    const planInfo = PAYPAL_PLAN_IDS[plan];
+    if (!subscriptionId || typeof subscriptionId !== 'string' || !planInfo) {
+      throw new HttpsError('invalid-argument', 'Ungueltiger Tarif oder Subscription-ID.');
+    }
+    const erwartetePlanId = planer ? planInfo.idPlaner : planInfo.id;
+
+    // Bei PayPal nachfragen statt dem Client zu glauben.
+    const accessToken = await paypalAccessToken(PAYPAL_CLIENT_ID.value(), PAYPAL_CLIENT_SECRET.value());
+    const subResp = await fetch(
+      `https://api-m.paypal.com/v1/billing/subscriptions/${encodeURIComponent(subscriptionId)}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (!subResp.ok) {
+      throw new HttpsError('failed-precondition', 'PayPal-Abo konnte nicht geprueft werden.');
+    }
+    const sub = await subResp.json();
+    if (sub.status !== 'ACTIVE') {
+      throw new HttpsError('failed-precondition', 'PayPal-Abo ist nicht aktiv.');
+    }
+    if (sub.plan_id !== erwartetePlanId) {
+      throw new HttpsError('failed-precondition', 'Die Subscription passt nicht zum gewaehlten Tarif.');
+    }
+
+    const uid = auth.uid;
+    const userSnap = await admin.firestore().doc(`users/${uid}`).get();
+    if (!userSnap.exists) throw new HttpsError('failed-precondition', 'Nutzerprofil nicht gefunden.');
+    const userData = userSnap.data();
+
+    // Dieselbe Ermittlung wie in createStripeCheckoutSession.
+    let billingColl, billingId;
+    if (userData.typ === 'fahrschule') {
+      billingColl = 'fahrschulen'; billingId = uid;
+    } else if (!userData.fahrschuleId || userData.fahrschuleId === uid) {
+      billingColl = 'users'; billingId = uid;
+    } else {
+      throw new HttpsError('permission-denied', 'Nur der Fahrschul-Inhaber kann ein Abo aktivieren.');
+    }
+
+    // Verhindert, dass dieselbe Subscription-ID zweimal (bei zwei
+    // verschiedenen Konten) verwendet wird, um sich mit einer fremden,
+    // echten Zahlung selbst freizuschalten.
+    for (const coll of ['fahrschulen', 'users']) {
+      const belegt = await admin.firestore().collection(coll)
+        .where('aboSubscriptionId', '==', subscriptionId).limit(1).get();
+      if (!belegt.empty && !(coll === billingColl && belegt.docs[0].id === billingId)) {
+        throw new HttpsError('failed-precondition', 'Diese Subscription ist bereits einem anderen Konto zugeordnet.');
+      }
+    }
+
+    await admin.firestore().doc(`${billingColl}/${billingId}`).set({
+      abo:               plan,
+      aboPlaner:         !!planer,
+      aboMaxLehrer:      planInfo.maxLehrer,
+      aboSubscriptionId: subscriptionId,
+      aboPlanId:         erwartetePlanId,
+      aboAktiviertAm:    Date.now(),
+      aboSetByAdmin:     false,
+      aboStatus:         'aktiv',
+      aboZahlungsart:    'paypal',
+    }, { merge: true });
+
+    return { success: true, maxLehrer: planInfo.maxLehrer };
+  }
+);
 
 exports.paypalWebhook = onRequest(
   { secrets: [PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, PAYPAL_WEBHOOK_ID] },
@@ -782,13 +1026,21 @@ exports.paypalWebhook = onRequest(
         const betrag = betragBezahlt || (billingData.aboPlaner ? planInfo.pricePlaner : planInfo.price);
         const pdfBuffer = await baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel: planInfo.label, betrag, zahlungsart: 'PayPal' });
 
-        await admin.firestore().collection('rechnungen').add({
-          nummer, empfaengerId: billingId, empfaengerName: empfaenger.name,
-          plan: billingData.abo, planer: !!billingData.aboPlaner, betrag, datum,
-          erstelltAm: Date.now(),
-          pdfBase64: pdfBuffer.toString('base64'),
-          paypalSaleId: saleId, paypalSubscriptionId: subscriptionId,
-        });
+        // FIX: derselbe Race wie beim Stripe-Webhook - PayPal stellt Events
+        // ebenfalls mehrfach zu. .create() auf deterministischer, aus der
+        // Sale-ID abgeleiteter Dokument-ID ist atomar statt check-then-write.
+        try {
+          await admin.firestore().collection('rechnungen').doc(`paypal_${saleId}`).create({
+            nummer, empfaengerId: billingId, empfaengerName: empfaenger.name,
+            plan: billingData.abo, planer: !!billingData.aboPlaner, betrag, datum,
+            erstelltAm: Date.now(),
+            pdfBase64: pdfBuffer.toString('base64'),
+            paypalSaleId: saleId, paypalSubscriptionId: subscriptionId,
+          });
+        } catch (e) {
+          if (e.code === 6) { console.log('paypalWebhook: Rechnung bereits vorhanden (Retry), ignoriert'); res.status(200).send('ok - bereits verarbeitet'); return; }
+          throw e;
+        }
         await admin.firestore().doc(`${billingColl}/${billingId}`).update({ aboLetzteZahlungAm: Date.now() });
         console.log('paypalWebhook: Rechnung', nummer, 'erzeugt fuer', billingColl, billingId);
       }
@@ -803,3 +1055,367 @@ exports.paypalWebhook = onRequest(
     }
   }
 );
+
+// ═══════════════════════════════════════════════════════════════════
+// DSGVO-LOESCHKONZEPT (Art. 17 DSGVO, § 6 Nr. 7 AVV, AGB § 10)
+//
+// Datenschutzerklaerung, AGB und AVV versprechen seit jeher: "Nach
+// Beendigung werden alle Daten innerhalb von 30 Tagen unwiderruflich
+// geloescht" - technisch gab es dafuer bisher NICHTS. Weder konnte ein
+// Nutzer sein Konto selbst loeschen (obwohl die Datenschutzerklaerung
+// genau das als Weg zum Widerruf nennt), noch lief irgendwo ein Job, der
+// die Frist umsetzt. Geloescht wurde nur, wenn der Betreiber es von Hand
+// tat. Diese drei Funktionen setzen das Versprechen technisch um:
+//
+//   kontoLoeschungBeantragen  - Nutzer stoesst die Loeschung an (Frist laeuft)
+//   kontoLoeschungWiderrufen  - Rueckzieher innerhalb der Frist
+//   taeglichesAufraeumen      - loescht nach Fristablauf endgueltig und
+//                               raeumt zusaetzlich alle uebrigen Daten mit
+//                               abgelaufener Aufbewahrung ab
+//
+// WICHTIG - was NIE geloescht wird: die Rechnungen. Fuer sie gilt die
+// gesetzliche Aufbewahrungspflicht (§ 14b UStG, § 147 AO), die der
+// Loeschpflicht ausdruecklich vorgeht (so auch § 6 Nr. 7 AVV).
+// ═══════════════════════════════════════════════════════════════════
+
+const LOESCH_FRIST_TAGE = 30;
+const TAG_MS = 24 * 60 * 60 * 1000;
+const CHAT_BUCKET = 'fahrschule-ebc65-eu-storage';
+
+// Loescht alle Dokumente einer Abfrage in Bloecken (Firestore erlaubt
+// hoechstens 500 Schreibvorgaenge pro Stapel).
+async function loescheAlle(abfrage) {
+  let geloescht = 0;
+  while (true) {
+    const snap = await abfrage.limit(400).get();
+    if (snap.empty) break;
+    const stapel = admin.firestore().batch();
+    snap.docs.forEach(d => stapel.delete(d.ref));
+    await stapel.commit();
+    geloescht += snap.size;
+    if (snap.size < 400) break;
+  }
+  return geloescht;
+}
+
+// Chat-Fotos eines Zugangscodes im Speicher entfernen. Serverseitig (Admin
+// SDK) - die Speicher-Regeln greifen hier nicht, deshalb funktioniert das
+// auch bei laengst abgelaufenen Codes.
+async function loescheChatBilderServer(codeId) {
+  try {
+    await admin.storage().bucket(CHAT_BUCKET).deleteFiles({ prefix: `chat-images/${codeId}/` });
+  } catch (e) {
+    console.warn('Chat-Bilder loeschen fehlgeschlagen fuer', codeId, e.message);
+  }
+}
+
+// Alle Zugangscodes einer Abfrage samt zugehoeriger Chat-Fotos loeschen.
+// Reihenfolge egal, da serverseitig keine Regelpruefung stattfindet.
+async function loescheZugangscodesMitBildern(abfrage) {
+  const snap = await abfrage.get();
+  for (const d of snap.docs) {
+    await loescheChatBilderServer(d.id);
+    await d.ref.delete();
+  }
+  return snap.size;
+}
+
+// Ermittelt, was zu einem Konto gehoert. Ein Fahrschul-Inhaber nimmt die
+// ganze Fahrschule mit (er ist der Verantwortliche i.S.d. DSGVO), ein
+// einzelner Fahrlehrer nur seine eigenen Daten.
+function loeschUmfang(uid, userData) {
+  const istInhaber = userData.typ === 'fahrschule';
+  return {
+    istInhaber,
+    fahrschuleId: istInhaber ? uid : (userData.fahrschuleId || uid),
+  };
+}
+
+// Harte, endgueltige Loeschung eines Kontos samt aller Daten.
+async function loescheKontoHart(uid) {
+  const db = admin.firestore();
+  const userSnap = await db.doc(`users/${uid}`).get();
+  const userData = userSnap.exists ? userSnap.data() : {};
+  const { istInhaber, fahrschuleId } = loeschUmfang(uid, userData);
+  const bericht = { uid, istInhaber, schueler: 0, codes: 0 };
+
+  // Betroffene Konten: bei einem Fahrschul-Inhaber alle Mitglieder mit.
+  let betroffeneUids = [uid];
+  if (istInhaber) {
+    const mitglieder = await db.collection('users').where('fahrschuleId', '==', fahrschuleId).get();
+    betroffeneUids = [...new Set([uid, ...mitglieder.docs.map(d => d.id)])];
+  }
+
+  // 1) Zugangscodes samt Chat-Fotos - zuerst, weil an ihnen die Bilder haengen
+  for (const einUid of betroffeneUids) {
+    bericht.codes += await loescheZugangscodesMitBildern(
+      db.collection('accessCodes').where('teacherUid', '==', einUid));
+  }
+  if (istInhaber) {
+    bericht.codes += await loescheZugangscodesMitBildern(
+      db.collection('accessCodes').where('fahrschuleId', '==', fahrschuleId));
+  }
+
+  // 2) Kartei-Daten (Schueler, Protokoll, eigene Listen)
+  for (const coll of ['students', 'protokoll', 'customFields', 'customThemen', 'customGruppen']) {
+    for (const einUid of betroffeneUids) {
+      const anzahl = await loescheAlle(db.collection(coll).where('uid', '==', einUid));
+      if (coll === 'students') bericht.schueler += anzahl;
+    }
+    if (istInhaber) {
+      const anzahl = await loescheAlle(db.collection(coll).where('fahrschuleId', '==', fahrschuleId));
+      if (coll === 'students') bericht.schueler += anzahl;
+    }
+  }
+  // Der Team-Chat fuehrt den Absender als 'senderUid' (nicht 'uid') - mit dem
+  // falschen Feldnamen bliebe er stehen.
+  for (const einUid of betroffeneUids) {
+    await loescheAlle(db.collection('chat').where('senderUid', '==', einUid));
+  }
+  if (istInhaber) {
+    await loescheAlle(db.collection('chat').where('fahrschuleId', '==', fahrschuleId));
+  }
+
+  // 3) Kalender-Modul (eigener Namensraum, haengt an lehrerUid bzw. schoolId)
+  for (const coll of ['schueler', 'slots', 'autos', 'blocked', 'globalBlocked', 'urlaub',
+                      'notizen', 'warteliste', 'pruefungen', 'theorieStunden',
+                      'bookingStudents', 'bookingRequests', 'bookingMessages', 'bookingWaitlist']) {
+    for (const einUid of betroffeneUids) {
+      await loescheAlle(db.collection(coll).where('lehrerUid', '==', einUid));
+    }
+    if (istInhaber) {
+      await loescheAlle(db.collection(coll).where('schoolId', '==', fahrschuleId));
+    }
+  }
+
+  // 4) Konto-gebundene Einzeldokumente
+  for (const einUid of betroffeneUids) {
+    for (const pfad of [`calendarTokens/${einUid}`, `calendarStatus/${einUid}`,
+                        `kalenderUsers/${einUid}`, `bookingLinks/${einUid}`,
+                        `studentSessions/${einUid}`]) {
+      await db.doc(pfad).delete().catch(() => {});
+    }
+    await loescheAlle(db.collection('fcmTokens').where('uid', '==', einUid));
+    await loescheAlle(db.collection('usernames').where('uid', '==', einUid));
+  }
+
+  // 5) Fahrschul-Ebene
+  if (istInhaber) {
+    await loescheAlle(db.collection('schoolCodes').where('schoolId', '==', fahrschuleId));
+    await loescheAlle(db.collection('invites').where('fahrschuleId', '==', fahrschuleId));
+    await db.doc(`schools/${fahrschuleId}`).delete().catch(() => {});
+    await db.doc(`fahrschulen/${fahrschuleId}`).delete().catch(() => {});
+  }
+
+  // 6) Nutzerprofile und Anmeldekonten zuletzt
+  for (const einUid of betroffeneUids) {
+    await db.doc(`users/${einUid}`).delete().catch(() => {});
+    await admin.auth().deleteUser(einUid).catch(e => {
+      if (e.code !== 'auth/user-not-found') console.warn('Auth-Konto loeschen:', einUid, e.message);
+    });
+  }
+
+  // Die Rechnungen bleiben bewusst erhalten (§ 14b UStG, § 147 AO).
+  console.log('Konto endgueltig geloescht:', JSON.stringify(bericht));
+  return bericht;
+}
+
+// Ein laufendes Abonnement beim Zahlungsdienstleister beenden. Ohne das
+// wuerde nach der Kontoloeschung munter weiter abgebucht - der Kunde haette
+// kein Konto mehr, aber weiter eine monatliche Belastung.
+async function kuendigeLaufendesAbo(billingColl, billingId) {
+  const snap = await admin.firestore().doc(`${billingColl}/${billingId}`).get();
+  if (!snap.exists) return null;
+  const b = snap.data();
+  const subId = b.aboSubscriptionId;
+  if (!subId) return null;
+  try {
+    // Stripe-Abo-Kennungen beginnen mit 'sub_', PayPal-Kennungen mit 'I-'.
+    if (b.aboZahlungsart === 'stripe' || String(subId).startsWith('sub_')) {
+      const stripe = new Stripe(STRIPE_SECRET_KEY.value());
+      await stripe.subscriptions.cancel(subId);
+      return 'stripe';
+    }
+    const token = await paypalAccessToken(PAYPAL_CLIENT_ID.value(), PAYPAL_CLIENT_SECRET.value());
+    const resp = await fetch(
+      `https://api-m.paypal.com/v1/billing/subscriptions/${encodeURIComponent(subId)}/cancel`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'Konto vom Nutzer geloescht' }),
+      });
+    if (!resp.ok) console.warn('PayPal-Kuendigung antwortete mit', resp.status);
+    return 'paypal';
+  } catch (e) {
+    console.warn('Abo-Kuendigung fehlgeschlagen fuer', billingColl, billingId, e.message);
+    return null;
+  }
+}
+
+// ── Nutzer beantragt die Loeschung seines Kontos ────────────────────
+exports.kontoLoeschungBeantragen = onCall(
+  { secrets: [STRIPE_SECRET_KEY, PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET] },
+  async (request) => {
+    const auth = request.auth;
+    if (!auth) throw new HttpsError('unauthenticated', 'Bitte anmelden.');
+    const uid = auth.uid;
+    const userSnap = await admin.firestore().doc(`users/${uid}`).get();
+    if (!userSnap.exists) throw new HttpsError('failed-precondition', 'Kein Profil gefunden.');
+    const userData = userSnap.data();
+
+    // Ein Fahrschul-Admin, der NICHT Inhaber ist, kann nur sein eigenes Konto
+    // loeschen - die Schuldaten gehoeren dem Inhaber.
+    const { istInhaber } = loeschUmfang(uid, userData);
+    const geloeschtAm = Date.now();
+    const loeschungAm = geloeschtAm + LOESCH_FRIST_TAGE * TAG_MS;
+
+    // Laufendes Abo sofort beenden (nicht erst nach Fristablauf - sonst
+    // liefen bis dahin weitere Abbuchungen auf).
+    // Ein Fahrlehrer, der nur Mitglied einer fremden Fahrschule ist, hat kein
+    // eigenes Abo - dessen users-Dokument traegt keine Abo-Kennung, es wird
+    // also nichts gekuendigt (das Abo der Schule bleibt unberuehrt).
+    const gekuendigt = await kuendigeLaufendesAbo(istInhaber ? 'fahrschulen' : 'users', uid);
+
+    await admin.firestore().doc(`users/${uid}`).update({
+      geloeschtAm, loeschungAm, aboStatus: 'gekuendigt',
+    });
+    if (istInhaber) {
+      await admin.firestore().doc(`fahrschulen/${uid}`)
+        .update({ geloeschtAm, loeschungAm, aboStatus: 'gekuendigt' }).catch(() => {});
+    }
+
+    console.log('Kontoloeschung beantragt von', uid, '- faellig am',
+      new Date(loeschungAm).toISOString(), '- Abo gekuendigt:', gekuendigt || 'keines');
+    return { success: true, loeschungAm, fristTage: LOESCH_FRIST_TAGE, istInhaber, aboGekuendigt: gekuendigt };
+  });
+
+// ── Rueckzieher innerhalb der Frist ─────────────────────────────────
+exports.kontoLoeschungWiderrufen = onCall(async (request) => {
+  const auth = request.auth;
+  if (!auth) throw new HttpsError('unauthenticated', 'Bitte anmelden.');
+  const uid = auth.uid;
+  const entfernen = {
+    geloeschtAm: admin.firestore.FieldValue.delete(),
+    loeschungAm: admin.firestore.FieldValue.delete(),
+  };
+  await admin.firestore().doc(`users/${uid}`).update(entfernen);
+  await admin.firestore().doc(`fahrschulen/${uid}`).update(entfernen).catch(() => {});
+  console.log('Kontoloeschung widerrufen von', uid);
+  return { success: true };
+});
+
+// ── Taeglicher Aufraeum-Job ─────────────────────────────────────────
+// Setzt sowohl die 30-Tage-Frist als auch alle uebrigen Aufbewahrungs-
+// grenzen durch. Laeuft nachts, wenn niemand arbeitet.
+exports.taeglichesAufraeumen = onSchedule(
+  { schedule: 'every day 03:15', timeZone: 'Europe/Berlin', timeoutSeconds: 540, memory: '512MiB' },
+  async () => {
+    const db = admin.firestore();
+    const jetzt = Date.now();
+    const bericht = { konten: 0, codes: 0, mails: 0, resets: 0, buchungen: 0, oauth: 0 };
+
+    // 1) Konten, deren 30-Tage-Frist abgelaufen ist
+    try {
+      const faellig = await db.collection('users')
+        .where('loeschungAm', '<=', jetzt).limit(20).get();
+      for (const d of faellig.docs) {
+        await loescheKontoHart(d.id);
+        bericht.konten++;
+      }
+    } catch (e) { console.error('Konto-Loeschung:', e); }
+
+    // 2) Zugangscodes, die seit ueber 90 Tagen abgelaufen sind. Darin stecken
+    // Name, Lernstand und der komplette Chatverlauf eines Schuelers - es gibt
+    // keinen Grund, das ueber das Ende der Gueltigkeit hinaus aufzubewahren.
+    try {
+      bericht.codes = await loescheZugangscodesMitBildern(
+        db.collection('accessCodes').where('expiresAt', '<=', jetzt - 90 * TAG_MS).limit(200));
+    } catch (e) { console.error('Alte Zugangscodes:', e); }
+
+    // 3) Uebrige Aufbewahrungsgrenzen
+    try {
+      bericht.mails = await loescheAlle(
+        db.collection('mailQueue').where('createdAt', '<=',
+          admin.firestore.Timestamp.fromMillis(jetzt - 90 * TAG_MS)));
+    } catch (e) { console.error('mailQueue:', e); }
+    try {
+      bericht.resets = await loescheAlle(
+        db.collection('passwordResets').where('createdAt', '<=', jetzt - 30 * TAG_MS));
+    } catch (e) { console.error('passwordResets:', e); }
+    // ACHTUNG Feldtypen: bookingRequests/bookingMessages schreiben createdAt
+    // als serverTimestamp() (Firestore-Timestamp), passwordResets und
+    // oauthStates dagegen als Date.now() (Zahl). Vergleicht man hier mit dem
+    // falschen Typ, liefert Firestore stillschweigend KEINE Treffer und der
+    // Aufraeum-Job laeuft wirkungslos ins Leere.
+    const grenzeTimestamp = admin.firestore.Timestamp.fromMillis(jetzt - 90 * TAG_MS);
+    for (const coll of ['bookingRequests', 'bookingMessages']) {
+      try {
+        bericht.buchungen += await loescheAlle(
+          db.collection(coll).where('createdAt', '<=', grenzeTimestamp));
+      } catch (e) { console.error(coll + ':', e); }
+    }
+    // Kurzlebige CSRF-Marken des Kalender-Logins (eine Stunde reicht)
+    try {
+      bericht.oauth = await loescheAlle(
+        db.collection('oauthStates').where('createdAt', '<=', jetzt - 60 * 60 * 1000));
+    } catch (e) { console.error('oauthStates:', e); }
+
+    console.log('Taegliches Aufraeumen fertig:', JSON.stringify(bericht));
+  }
+);
+
+// ═══════════════════════════════════════════════════════════════════
+// BUCHUNGSZAEHLER (bookedCount) SERVERSEITIG FUEHREN
+//
+// Bisher zaehlte der CLIENT: beim Bestaetigen einer Anfrage hoch, beim
+// Stornieren durch den Fahrlehrer wieder runter. Der Schueler-Selbststorno
+// (kalender.html, storniereMeinen) konnte das gar nicht - er ist nicht
+// angemeldet und darf das schueler-Dokument nach den Regeln nicht
+// beschreiben. Folge: Storniert ein Schueler fristgerecht, bleibt sein
+// Kontingent verbraucht. Nach 12 Buchungen und 6 Stornos stand 12/20,
+// gefahren waren 6 - und bei 20 war der Buchungslink gesperrt, obwohl nur
+// 14 Stunden stattfanden.
+//
+// Dieser Trigger haengt am Slot selbst und deckt damit ALLE Wege ab
+// (Fahrlehrer, Schueler, Tausch). Die Zaehlung im Client wurde im Gegenzug
+// entfernt - sonst wuerde doppelt gezaehlt. Die Transaktion klammert den
+// Wert zusaetzlich bei 0, damit bereits entstandene Abweichungen sich mit
+// der Zeit von selbst auswachsen statt ins Negative zu laufen.
+// ═══════════════════════════════════════════════════════════════════
+exports.syncBookedCount = onDocumentUpdated('slots/{slotId}', async (event) => {
+  const vorher  = event.data.before.data();
+  const nachher = event.data.after.data();
+  if (!vorher || !nachher) return;
+  const vonId = vorher.bookedBy || null;
+  const nachId = nachher.bookedBy || null;
+  if (vonId === nachId) return; // keine Buchungsaenderung
+
+  const db = admin.firestore();
+  const schritte = [];
+  if (vonId)  schritte.push([vonId, -1]);
+  if (nachId) schritte.push([nachId, +1]);
+
+  for (const [schuelerId, delta] of schritte) {
+    try {
+      const neuerStand = await db.runTransaction(async (tx) => {
+        const ref = db.doc(`schueler/${schuelerId}`);
+        const snap = await tx.get(ref);
+        if (!snap.exists) return null;
+        const wert = Math.max(0, (snap.data().bookedCount || 0) + delta);
+        tx.update(ref, { bookedCount: wert });
+        return wert;
+      });
+      // Der Client veroeffentlicht den Zaehler direkt nach seiner Aenderung an
+      // das Schueler-Portal (bookingStudents) - zu diesem Zeitpunkt ist dieser
+      // Trigger aber unter Umstaenden noch gar nicht gelaufen, der Schueler
+      // saehe also den alten Stand. Deshalb hier nachziehen.
+      if (neuerStand !== null) {
+        await db.doc(`bookingStudents/${schuelerId}`)
+          .set({ bookedCount: neuerStand }, { merge: true })
+          .catch(() => {});
+      }
+    } catch (e) {
+      console.warn('bookedCount fuer', schuelerId, 'fehlgeschlagen:', e.message);
+    }
+  }
+});

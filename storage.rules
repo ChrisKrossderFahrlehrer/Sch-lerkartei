@@ -6,6 +6,23 @@ service firebase.storage {
     // eine zugewiesene Fahrlehrer ODER Zugriff ueber einen noch nicht
     // abgelaufenen Code (Schueler-Portal, kein eigenes Konto noetig).
     match /chat-images/{codeId}/{fileName} {
+      // DSGVO-FIX: Ohne diesen Weg war das Loeschen von Chat-Bildern in genau
+      // den Faellen unmoeglich, in denen es noetig ist: Ist der Zugangscode
+      // abgelaufen ODER sein Dokument bereits geloescht (z.B. bei der
+      // Voll-Loeschung einer Fahrschule), schlaegt jede der Pruefungen unten
+      // fehl bzw. laeuft in einen Fehler - die Bilder blieben dann dauerhaft
+      // als nicht mehr loeschbare Dateileichen liegen. Der Betreiber
+      // (SuperAdmin) muss seine Loeschpflicht aus Art. 17 DSGVO / § 6 AVV
+      // erfuellen koennen. Steht bewusst als ERSTE Bedingung, damit die
+      // Oder-Verkettung kurzschliesst und codeDoc() gar nicht erst aufgerufen
+      // wird, wenn das Code-Dokument nicht mehr existiert.
+      function istSuperAdmin() {
+        return request.auth != null && (
+          request.auth.token.email == 'chriskoo@mail.de' ||
+          (firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+           && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.rolle == 'superadmin')
+        );
+      }
       function codeDoc() {
         return firestore.get(/databases/(default)/documents/accessCodes/$(codeId));
       }
@@ -18,7 +35,7 @@ service firebase.storage {
         return !('expiresAt' in codeDoc().data)
                || codeDoc().data.expiresAt > request.time.toMillis();
       }
-      allow read: if istZustaendigerLehrer() || codeGueltig();
+      allow read: if istSuperAdmin() || istZustaendigerLehrer() || codeGueltig();
       // Hochladen/Ersetzen: Groesse und Dateityp begrenzen.
       allow create, update: if (istZustaendigerLehrer() || codeGueltig())
                    && request.resource.size < 8 * 1024 * 1024
@@ -27,7 +44,7 @@ service firebase.storage {
       // mitgeschickt (request.resource ist null), die Groessen- und
       // Typpruefung oben wuerde deshalb IMMER fehlschlagen und das
       // DSGVO-Loeschen unmoeglich machen.
-      allow delete: if istZustaendigerLehrer() || codeGueltig();
+      allow delete: if istSuperAdmin() || istZustaendigerLehrer() || codeGueltig();
     }
     // Alles andere: standardmaessig gesperrt.
     match /{allPaths=**} {

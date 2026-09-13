@@ -405,7 +405,7 @@ tr:last-child td{border-bottom:none;}
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, collection, query, where, orderBy, serverTimestamp, Timestamp, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, collection, query, where, orderBy, serverTimestamp, Timestamp, onSnapshot, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
 
@@ -603,6 +603,10 @@ function fmt(ts){if(!ts)return'—';const d=ts.toDate?ts.toDate():new Date(ts);r
 function fmtTime(ts){if(!ts)return'—';const d=ts.toDate?ts.toDate():new Date(ts);return d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});}
 function fmtDatetime(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});}
 function escHtml(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+// Datum als YYYY-MM-DD in ORTSZEIT. toISOString() rechnet nach UTC um und
+// liefert in deutscher Sommerzeit zwischen 00:00 und 02:00 den Vortag - genau
+// die Stunden, in denen abends noch gearbeitet wird.
+function alsLokalesDatum(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function generateCode(){return Math.random().toString(36).substring(2,8).toUpperCase();}
 function show(screen){
   document.getElementById('splash').style.display=screen==='splash'?'flex':'none';
@@ -1097,7 +1101,7 @@ pages['lehrer-theorie']=async function(el){
   listEl.innerHTML = schueler.map(s => `
     <label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer">
       <input type="checkbox" class="th-schueler-check" value="${s.id}" style="width:18px;height:18px;flex-shrink:0">
-      <span>${s.fname||''} ${s.lname||''}</span>
+      <span>${escHtml(s.fname||'')} ${escHtml(s.lname||'')}</span>
     </label>`).join('');
 };
 window.setThArt = function(art){
@@ -1446,8 +1450,10 @@ pages['admin-auslastung']=async function(el){
     <button class="btn btn-primary" onclick="loadAuslastung()">Auswerten</button>
   </div><div id="auslastung-content"></div></div>`;
   const now=new Date();
-  document.getElementById('aus-von').value=new Date(now.getFullYear(),now.getMonth(),1).toISOString().slice(0,10);
-  document.getElementById('aus-bis').value=new Date(now.getFullYear(),now.getMonth()+1,0).toISOString().slice(0,10);
+  // FIX: toISOString() rechnet nach UTC um - der 01.09. um 00:00 Ortszeit ist
+  // dort der 31.08., der Zeitraum lag also um einen Tag daneben.
+  document.getElementById('aus-von').value=alsLokalesDatum(new Date(now.getFullYear(),now.getMonth(),1));
+  document.getElementById('aus-bis').value=alsLokalesDatum(new Date(now.getFullYear(),now.getMonth()+1,0));
   await loadAuslastung();
 };
 window.loadAuslastung=async function(){
@@ -1609,6 +1615,27 @@ window.deleteUrlaub=async function(id){
   const fu=currentRole==='lehrer'?currentUser.uid:null;
   await renderUrlaubList(fu);
 };
+// Bereits gestellte Terminanfragen ueberdauern das Neuladen der Seite.
+// Schluessel pro Schueler-Link, damit sich mehrere Links auf einem Geraet
+// nicht in die Quere kommen.
+//
+// Bewusst mit Verfallsdatum: Lehnt der Fahrlehrer eine Anfrage ab, erfaehrt
+// der Schueler das nicht (er darf bookingRequests nach den Regeln nicht
+// lesen). Ohne Verfall bliebe der Termin fuer ihn dauerhaft unsichtbar,
+// obwohl er wieder frei ist. Nach 48 Stunden taucht er wieder auf.
+const ANFRAGE_MERK_MS = 48*60*60*1000;
+function anfragenSchluessel(schuelerId){return 'fs_anfragen_'+schuelerId;}
+function ladeAnfragenLokal(schuelerId){
+  try{
+    const roh=JSON.parse(localStorage.getItem(anfragenSchluessel(schuelerId))||'{}');
+    const grenze=Date.now()-ANFRAGE_MERK_MS;const frisch={};
+    for(const[slotId,ts]of Object.entries(roh)){if(typeof ts==='number'&&ts>grenze)frisch[slotId]=ts;}
+    return frisch;
+  }catch(e){return {};}
+}
+function merkeAnfrageLokal(schuelerId,slotId){
+  try{const a=ladeAnfragenLokal(schuelerId);a[slotId]=Date.now();localStorage.setItem(anfragenSchluessel(schuelerId),JSON.stringify(a));}catch(e){}
+}
 function urlaubCoversDate(list,date){
   for(const u of list){const v=new Date(u.von+'T00:00:00'),b=new Date(u.bis+'T23:59:59');if(date>=v&&date<=b)return u;}return null;
 }
@@ -1736,8 +1763,12 @@ pages['lehrer-kalender']=function(el){
   liveOn(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid)),()=>renderCal());
 };
 window.setCalView=function(v){calView=v;document.querySelectorAll('.cal-view-btn').forEach(b=>b.classList.toggle('active',b.textContent.trim()===(v==='month'?'Monat':'Woche')));renderCal();};
-window.calPrev=function(){if(calView==='month')calDate.setMonth(calDate.getMonth()-1);else weekStart=new Date(weekStart.getFullYear(),weekStart.getMonth(),weekStart.getDate()-7);renderCal();};
-window.calNext=function(){if(calView==='month')calDate.setMonth(calDate.getMonth()+1);else weekStart=new Date(weekStart.getFullYear(),weekStart.getMonth(),weekStart.getDate()+7);renderCal();};
+// FIX: setMonth() behielt den Tag im Monat bei - vom 31.05. aus landete
+// "ein Monat zurueck" auf dem 31. April, den es nicht gibt, und damit
+// wieder im Mai: der Kalender blieb haengen. Ueber den 1. des Monats
+// navigieren umgeht das.
+window.calPrev=function(){if(calView==='month')calDate=new Date(calDate.getFullYear(),calDate.getMonth()-1,1);else weekStart=new Date(weekStart.getFullYear(),weekStart.getMonth(),weekStart.getDate()-7);renderCal();};
+window.calNext=function(){if(calView==='month')calDate=new Date(calDate.getFullYear(),calDate.getMonth()+1,1);else weekStart=new Date(weekStart.getFullYear(),weekStart.getMonth(),weekStart.getDate()+7);renderCal();};
 
 async function renderCal(){
   const label=document.getElementById('cal-month-label'),grid=document.getElementById('cal-grid');
@@ -2008,7 +2039,11 @@ window.addSlot=async function(year,month,day){
   if(bd<15)return toast('Dauer mindestens 15 Minuten.','error');
   const[fh,fm]=from.split(':').map(Number);const tot=fh*60+fm+bd;
   const st=Timestamp.fromDate(new Date(year,month,day,fh,fm));
-  const et=Timestamp.fromDate(new Date(year,month,day,Math.floor(tot/60)%24,tot%60));
+  // FIX: Math.floor(tot/60)%24 kappte die Stunde, ohne den Tag zu erhoehen -
+  // ein Slot am 12.11. um 23:30 mit 60 Minuten bekam als Ende den 12.11.
+  // 00:30, also 23 Stunden VOR dem Start. Minuten direkt uebergeben:
+  // JavaScript rollt den Tag dann selbst korrekt weiter.
+  const et=Timestamp.fromDate(new Date(year,month,day,0,fh*60+fm+bd));
   try{
     await addDoc(collection(db,'slots'),{lehrerUid:currentUser.uid,type,startTime:st,endTime:et,bookedBy:null,schoolId:currentSchoolId,createdAt:serverTimestamp()});
   }catch(e){
@@ -2099,11 +2134,22 @@ async function publishMyBookingLink(){
   try{
     const snap=await getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid)));
     let _blocks=[];try{const _bs=await getDocs(query(collection(db,'blocked'),where('lehrerUid','==',currentUser.uid)));_blocks=_bs.docs.map(d=>({id:d.id,...d.data()}));}catch(e){}
+    // FIX: Hier wurden bisher NUR die 'blocked'-Zeiten beruecksichtigt, nicht
+    // aber Urlaub und schulweite Sperrtage - beide werden im Kalender des
+    // Fahrlehrers sonst ueberall geprueft. Ein vor dem Urlaub angelegter Slot
+    // blieb dadurch im oeffentlichen Buchungslink sichtbar und buchbar,
+    // obwohl der Fahrlehrer nachweislich im Urlaub ist.
+    let _urlaub=[];try{const _us=await getDocs(query(collection(db,'urlaub'),where('lehrerUid','==',currentUser.uid)));_urlaub=_us.docs.map(d=>d.data());}catch(e){}
+    const _sperrtage=new Set();
+    try{
+      const _gs=await getDocs(query(collection(db,'globalBlocked'),where('schoolId','==',currentSchoolId||'__none__')));
+      _gs.docs.forEach(d=>{const b=d.data();_sperrtage.add(b.year+'-'+b.month+'-'+b.day);});
+    }catch(e){}
     const nowMs=Date.now();
     const _dayKey=dt=>dt.getFullYear()+'-'+dt.getMonth()+'-'+dt.getDate();
     const _committedByDay={};
     snap.docs.forEach(d=>{const s=d.data();if(!s.startTime||!s.startTime.toDate||!s.endTime||!s.endTime.toDate)return;if(!(s.bookedBy||s.auto!==true))return;const a=s.startTime.toDate();_committedByDay[_dayKey(a)]=(_committedByDay[_dayKey(a)]||0)+Math.round((s.endTime.toDate()-a)/60000);});
-    const freieSlots=snap.docs.filter(d=>{const s=d.data();if(s.bookedBy||!s.startTime||s.startTime.toDate().getTime()<nowMs)return false;const _sd=s.startTime.toDate(),_ed=s.endTime.toDate();if(_slotBlocked(_sd,_sd.getHours()*60+_sd.getMinutes(),_ed.getHours()*60+_ed.getMinutes(),_blocks))return false;const _dur=Math.round((_ed-_sd)/60000);const _wouldBe=(_committedByDay[_dayKey(_sd)]||0)+(s.auto===true?_dur:0);if(_wouldBe>MAX_FAHRZEIT_MIN)return false;return true;})
+    const freieSlots=snap.docs.filter(d=>{const s=d.data();if(s.bookedBy||!s.startTime||s.startTime.toDate().getTime()<nowMs)return false;const _sd=s.startTime.toDate(),_ed=s.endTime.toDate();if(_slotBlocked(_sd,_sd.getHours()*60+_sd.getMinutes(),_ed.getHours()*60+_ed.getMinutes(),_blocks))return false;if(urlaubCoversDate(_urlaub,_sd))return false;if(_sperrtage.has(_sd.getFullYear()+'-'+_sd.getMonth()+'-'+_sd.getDate()))return false;const _dur=Math.round((_ed-_sd)/60000);const _wouldBe=(_committedByDay[_dayKey(_sd)]||0)+(s.auto===true?_dur:0);if(_wouldBe>MAX_FAHRZEIT_MIN)return false;return true;})
       .map(d=>{const s=d.data();return{id:d.id,start:s.startTime.toDate().toISOString(),ende:s.endTime.toDate().toISOString(),type:s.type||'fahrstunde'};});
     const lehrerName=(((currentProfile&&currentProfile.fname)||'')+' '+((currentProfile&&currentProfile.lname)||'')).trim();
     let aktiv=true;
@@ -2216,12 +2262,32 @@ window.bestaetigeBuchung=async function(reqId){
       const _neu=slotsTotalMin(_dayS)+(_ss.auto===true?_dur:0);
       if(_neu>MAX_FAHRZEIT_MIN){await updateDoc(doc(db,'bookingRequests',reqId),{status:'abgelehnt',grund:'Tagesgrenze von '+MAX_FAHRZEIT_MIN+' Min erreicht',bearbeitetAt:serverTimestamp()});toast('Tagesgrenze von '+MAX_FAHRZEIT_MIN+' Min erreicht – nicht bestätigt.','error');renderBookingRequests();renderBestaetigteBuchungen();return;}
     }catch(e){console.warn('495-check',e);}
-    await updateDoc(doc(db,'slots',req.slotId),{bookedBy:req.schuelerId,bookedAt:serverTimestamp()});
+    // FIX: Das war bisher ein reines updateDoc ohne Prüfung. Zwischen dem
+    // Laden der Anfrage und diesem Schreibvorgang konnte der Slot längst
+    // anderweitig vergeben sein - zwei Schüler bekamen denselben Termin, und
+    // ein doppelter Tipp auf "✓" zählte den Zähler zweimal hoch. Die
+    // Transaktion prüft unmittelbar vor dem Schreiben, dass der Slot noch
+    // frei ist, und bricht sonst sauber ab.
+    try{
+      await runTransaction(db, async (tx)=>{
+        const ref=doc(db,'slots',req.slotId);
+        const akt=await tx.get(ref);
+        if(!akt.exists())throw new Error('Der Termin existiert nicht mehr.');
+        const belegt=akt.data().bookedBy;
+        if(belegt && belegt!==req.schuelerId)throw new Error('Der Termin ist bereits vergeben.');
+        if(belegt===req.schuelerId)return; // schon gebucht, nichts zu tun
+        tx.update(ref,{bookedBy:req.schuelerId,bookedAt:serverTimestamp()});
+      });
+    }catch(txErr){
+      toast(txErr.message||'Termin konnte nicht gebucht werden.','error');
+      renderBookingRequests();renderBestaetigteBuchungen();return;
+    }
     if(req.tausch && req.swapSlotId){
       try{const oldSnap=await getDoc(doc(db,'slots',req.swapSlotId));if(oldSnap.exists()&&oldSnap.data().bookedBy===req.schuelerId){await updateDoc(doc(db,'slots',req.swapSlotId),{bookedBy:null,bookedAt:null});}}catch(e){}
-    } else {
-      try{const sc=await getDoc(doc(db,SCHUELER_COLL,req.schuelerId));if(sc.exists())await updateDoc(doc(db,SCHUELER_COLL,req.schuelerId),{bookedCount:(sc.data().bookedCount||0)+1});}catch(e){}
     }
+    // bookedCount wird NICHT mehr hier gezählt - das übernimmt jetzt der
+    // Trigger syncBookedCount serverseitig, der auch den Schüler-Selbststorno
+    // mit abdeckt (den der Client gar nicht zählen konnte).
     await updateDoc(doc(db,'bookingRequests',reqId),{status:'bestätigt',bearbeitetAt:serverTimestamp()});
     await publishMyBookingLink();
     try{await publishStudentBookings(req.schuelerId);}catch(e){}
@@ -2250,7 +2316,8 @@ async function renderBestaetigteBuchungen(){
 window.cancelBookingLehrer=async function(id){
   const[sSnap,lSnap]=await Promise.all([getDoc(doc(db,'slots',id)),getDoc(doc(db,'kalenderUsers',currentUser.uid))]);
   const slot=sSnap.data();await updateDoc(doc(db,'slots',id),{bookedBy:null,bookedAt:null});
-  if(slot.bookedBy){const scSnap=await getDoc(doc(db,SCHUELER_COLL,slot.bookedBy));if(scSnap.exists())await updateDoc(doc(db,SCHUELER_COLL,slot.bookedBy),{bookedCount:Math.max(0,(scSnap.data().bookedCount||1)-1)});}
+  // bookedCount wird jetzt vom Trigger syncBookedCount serverseitig gepflegt -
+  // hier nicht mehr mitzählen, sonst würde doppelt heruntergezählt.
   await triggerEmail('stornierung_freigeworden',{datum:slot.startTime.toDate().toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}),von:fmtTime(slot.startTime),bis:fmtTime(slot.endTime),typ:typeLabel(slot.type),lehrerName:lSnap.data().fname+' '+lSnap.data().lname,lehrerUid:currentUser.uid,slotId:id});
   try{await publishMyBookingLink();}catch(e){}
   if(slot.bookedBy){try{await publishStudentBookings(slot.bookedBy);}catch(e){}}
@@ -2716,6 +2783,7 @@ function renderBookingPageContent(schuelerId,lehrerUid,linkData,stud,complete,wl
   const meine=((stud&&stud.meineTermine)||[]).filter(t=>t&&t.start).sort((a,b)=>a.start.localeCompare(b.start));
   window.__bookingMeine=meine;window.__bookingStud=stud;
   const aktiv=!!(linkData&&linkData.aktiv!==false);
+  window.__meineAnfragen=Object.assign({}, ladeAnfragenLokal(schuelerId), window.__meineAnfragen||{});
   const slots=aktiv?((linkData.freieSlots||[]).filter(s=>s&&s.start&&new Date(s.start).getTime()>Date.now()).filter(s=>!(window.__meineAnfragen&&window.__meineAnfragen[s.id])).sort((a,b)=>a.start.localeCompare(b.start))):[];
   window.__bookingCtx={schuelerId,lehrerUid,vorname,slots};
   const _freeIds=slots.map(s=>s.id).filter(Boolean);
@@ -2879,7 +2947,12 @@ window.sendeBuchungsanfrage=async function(schuelerId,lehrerUid,vorname,slot){
   const content=document.getElementById('booking-content');
   try{
     await addDoc(collection(db,'bookingRequests'),{lehrerUid,schuelerId,vorname:vorname||'',slotId:slot.id,start:slot.start,ende:slot.ende,type:slot.type||'fahrstunde',status:'angefragt',createdAt:serverTimestamp()});
+    // FIX: __meineAnfragen lebte nur im Speicher. Nach einem Neuladen der
+    // Seite sah der Schueler denselben Slot wieder als frei und fragte ihn
+    // ein zweites Mal an - beim Fahrlehrer landeten zwei Anfragen fuer
+    // denselben Termin. Jetzt zusaetzlich lokal gemerkt.
     ((window.__meineAnfragen = window.__meineAnfragen || {})[slot.id] = true);
+    merkeAnfrageLokal(schuelerId, slot.id);
     __bookingUnsub.forEach(u=>{try{u();}catch(e){}});__bookingUnsub=[];
     if(content)content.innerHTML='<div class="booking-card" style="text-align:center;padding:34px 20px"><div style="font-size:2.8rem;margin-bottom:14px">✅</div><h2 style="margin:0 0 8px;font-size:1.2rem">Anfrage gesendet!</h2><p class="text-muted" style="line-height:1.5">Dein Fahrlehrer bekommt deine Terminanfrage und bestätigt sie in Kürze. Du kannst diese Seite jetzt schließen.</p><button class="btn btn-secondary" style="margin-top:16px" onclick="zurBuchungsUebersicht()">Zurück zur Übersicht</button></div>';
   }catch(e){console.warn(e);toast('Anfrage fehlgeschlagen. Bitte erneut versuchen.','error');}

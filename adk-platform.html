@@ -643,6 +643,7 @@ import { getFirestore, enableIndexedDbPersistence,
          collection, doc, addDoc, updateDoc, deleteDoc,
          getDoc, getDocs, setDoc,
          onSnapshot, query, where, orderBy }                     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, listAll, deleteObject }                from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 // ── FIREBASE CONFIG ──────────────────────────────────────────
 const firebaseConfig = {
@@ -691,6 +692,21 @@ let alleFahrlehrer = [];   // einzelne Fahrlehrer (typ:'fahrlehrer') aus users
 // XSS-Schutz: Nutzereingaben (Namen, E-Mails) escapen, bevor sie via innerHTML
 // ins DOM kommen. Verhindert, dass z.B. ein Name mit <script> Code ausführt.
 function escHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+// Daten, die in einer JS-Zeichenkette INNERHALB eines HTML-Attributs landen
+// (z.B. onclick="tuWas('...')"), durchlaufen zwei Ebenen: Der Browser
+// dekodiert erst das Attribut, dann liest JavaScript die Zeichenkette.
+// Reines HTML-Escaping reicht dort NICHT - ein &quot; wird vor der
+// JS-Auswertung wieder zu einem echten Anfuehrungszeichen. Deshalb zuerst
+// fuer JavaScript entwerten, danach fuer HTML.
+function attrJs(s){
+  return String(s==null?'':s)
+    .replace(/\\/g,'\\\\')
+    .replace(/'/g,"\\'")
+    .replace(/&/g,'&amp;')
+    .replace(/"/g,'&quot;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;');
+}
 let unsubAlleLehrer = null;
 let passwordResets = [];
 let unsubPwResets  = null;
@@ -765,6 +781,15 @@ window.doLogin = async () => {
 };
 
 // ── AUTH: REGISTRIERUNG MIT ZUSTIMMUNGSPFLICHT ───────────────
+// Fahrschul-Code im selben Format wie in index.html: FS- plus vier Zeichen
+// ohne I, O, 0 und 1, damit er am Telefon nicht verwechselt werden kann.
+function neuerFahrschulCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = 'FS-';
+  for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
 window.doRegister = async () => {
   const name    = document.getElementById('inp-reg-name').value.trim();
   const inhaber = document.getElementById('inp-reg-inhaber').value.trim();
@@ -791,25 +816,55 @@ window.doRegister = async () => {
     const cred = await createUserWithEmailAndPassword(auth, email, pw);
     await updateProfile(cred.user, { displayName: inhaber });
 
-    const fsRef = await addDoc(collection(db, 'fahrschulen'), {
+    // FIX: Diese Registrierung hat bisher halbe Konten hinterlassen. Drei
+    // Dinge passten nicht zu dem, was der Rest des Programms erwartet:
+    //
+    // 1. Die Fahrschule bekam per addDoc eine Zufalls-ID. Ueberall sonst
+    //    (index.html) ist die Fahrschul-ID die UID ihres Inhabers. Die
+    //    Firestore-Regel fuer users verlangt beim Anlegen genau das:
+    //    fahrschuleId == eigene UID, sonst braeuchte es einen Beitrittscode.
+    //    Das users-Dokument schlug dadurch fehl - Anmeldekonto und
+    //    Fahrschule entstanden, das Nutzerprofil nicht.
+    // 2. Die Rolle hiess 'fs_admin'. Gespeichert wird sie ueberall sonst als
+    //    'fahrschul-admin', und genau darauf prueft isFsAdmin() in den
+    //    Regeln. Ein so angelegter Inhaber waere nie als Inhaber erkannt
+    //    worden - und die Regel laesst diese Schreibweise gar nicht zu.
+    // 3. Es wurde kein Fahrschul-Code erzeugt. Ohne ihn kann kein Fahrlehrer
+    //    der Schule je beitreten; die Fahrschule waere eine Sackgasse.
+    const fsCode = neuerFahrschulCode();
+    const jetzt  = Date.now();
+    await setDoc(doc(db, 'fahrschulen', cred.user.uid), {
       name, inhaber, email, stadt,
       adminUid: cred.user.uid,
+      fahrschulCode: fsCode,
+      typ: 'fahrschule',
       status: 'ausstehend',
-      createdAt: Date.now(),
+      createdAt: jetzt,
       // DSGVO-Zustimmungen mit Zeitstempel speichern
       zustimmungen: {
-        agb:   { akzeptiert: true, datum: Date.now(), version: 'Januar 2025' },
-        dsgvo: { akzeptiert: true, datum: Date.now(), version: 'Januar 2025' },
-        avv:   { akzeptiert: true, datum: Date.now(), version: 'Januar 2025' },
+        agb:   { akzeptiert: true, datum: jetzt, version: 'Januar 2025' },
+        dsgvo: { akzeptiert: true, datum: jetzt, version: 'Januar 2025' },
+        avv:   { akzeptiert: true, datum: jetzt, version: 'Januar 2025' },
       },
     });
 
+    // Nachschlage-Eintrag, damit Fahrlehrer per Code beitreten koennen, ohne
+    // dass alle Fahrschulen lesbar sein muessen (wie in index.html).
+    try {
+      await setDoc(doc(db, 'schoolCodes', fsCode), {
+        schoolId: cred.user.uid, schoolName: name, createdAt: jetzt
+      });
+    } catch(scErr) { console.warn('schoolCode-Eintrag:', scErr); }
+
     await setDoc(doc(db, 'users', cred.user.uid), {
+      uid: cred.user.uid,
       name: inhaber, email,
-      rolle: 'fs_admin',
-      fahrschuleId: fsRef.id,
+      rolle: 'fahrschul-admin',
+      typ: 'fahrschule',
+      status: 'ausstehend',
+      fahrschuleId: cred.user.uid,
       fahrschuleName: name,
-      createdAt: Date.now(),
+      createdAt: jetzt,
     });
 
     okEl.textContent = '✓ Registrierung erfolgreich! Ihr Konto wird geprüft.';
@@ -1303,8 +1358,8 @@ async function renderAbos() {
         <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px">
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
             <div style="flex:1;min-width:0">
-              <div style="font-weight:700;font-size:0.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${fs.name || fs.email || fs.id}</div>
-              <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">${fs.email||''} · ${created} ${ppId}</div>
+              <div style="font-weight:700;font-size:0.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(fs.name || fs.email || fs.id)}</div>
+              <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">${escHtml(fs.email||'')} · ${created} ${ppId}</div>
             </div>
             <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
               <span style="background:${aboBg[abo]||'var(--surface)'};color:${aboColor[abo]||'var(--muted)'};border-radius:8px;padding:3px 10px;font-size:0.72rem;font-weight:700">
@@ -1685,7 +1740,7 @@ async function renderSuperAdminEinst() {
       </div>
       <div class="form-group">
         <label class="form-label">Dein Name / Betreiber</label>
-        <input class="form-input" id="sa-imp-name" value="${imp.name||'Chriskoo'}" placeholder="z.B. Chriskoo">
+        <input class="form-input" id="sa-imp-name" value="${escHtml(imp.name||'Chriskoo')}" placeholder="z.B. Chriskoo">
       </div>
       <div class="form-group">
         <label class="form-label">Webseite</label>
@@ -1693,7 +1748,7 @@ async function renderSuperAdminEinst() {
       </div>
       <div class="form-group">
         <label class="form-label">E-Mail</label>
-        <input class="form-input" id="sa-imp-email" type="email" value="${imp.email||'kontakt@fahrsync.de'}" placeholder="kontakt@fahrsync.de">
+        <input class="form-input" id="sa-imp-email" type="email" value="${escHtml(imp.email||'kontakt@fahrsync.de')}" placeholder="kontakt@fahrsync.de">
       </div>
       <div class="form-group">
         <label class="form-label">PLZ</label>
@@ -2034,7 +2089,7 @@ window.openFsDetail = (fsId) => {
       <button class="btn-secondary" onclick="document.getElementById('modal-fs-detail').classList.remove('open')">Schließen</button>
       <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--danger)">
         <div style="font-size:0.7rem;color:var(--danger);text-align:center;margin-bottom:8px">⚠️ Unwiderruflich – löscht Fahrschule + alle Schüler &amp; Daten</div>
-        <button id="btn-del-fs-${fs.id}" data-armed="0" onclick="deleteFahrschuleComplete('${fs.id}','${(fs.name||'Fahrschule').replace(/'/g,'')}')" style="width:100%;background:transparent;border:1px solid var(--danger);color:var(--danger);border-radius:10px;padding:10px;font-size:0.82rem;font-weight:700;cursor:pointer">🗑️ Fahrschule löschen</button>
+        <button id="btn-del-fs-${fs.id}" data-armed="0" onclick="deleteFahrschuleComplete('${attrJs(fs.id)}','${attrJs(fs.name||'Fahrschule')}')" style="width:100%;background:transparent;border:1px solid var(--danger);color:var(--danger);border-radius:10px;padding:10px;font-size:0.82rem;font-weight:700;cursor:pointer">🗑️ Fahrschule löschen</button>
       </div>
     </div>
   `;
@@ -2088,10 +2143,18 @@ window.deleteFahrschuleComplete = async (fsId, fsName) => {
     for (const d of lehrerSnap.docs) { backup.push({coll:'users', id:d.id, data:d.data()}); await deleteDoc(d.ref); geloescht.lehrer++; }
 
     // 4. Weitere zugehörige Daten
+    // DSGVO-FIX: Die Zugangscode-IDs vorher merken - an ihnen haengen die
+    // Chat-Fotos im Speicher. Ohne das blieben sie nach dem Loeschen der
+    // Fahrschule dauerhaft liegen (personenbezogene Bilder ohne jeden Bezug,
+    // niemand kann sie ueber die App noch entfernen).
+    const codeIdsFuerBilder = [];
     for (const coll of ['customFields','customThemen','customGruppen','chat','accessCodes']) {
       try {
         const snap = await getDocs(query(collection(db,coll), where('fahrschuleId','==',fsId)));
-        for (const d of snap.docs) { backup.push({coll, id:d.id, data:d.data()}); await deleteDoc(d.ref); geloescht.sonstige++; }
+        for (const d of snap.docs) {
+          if (coll === 'accessCodes') codeIdsFuerBilder.push(d.id);
+          backup.push({coll, id:d.id, data:d.data()}); await deleteDoc(d.ref); geloescht.sonstige++;
+        }
       } catch(subErr) {}
     }
 
@@ -2102,7 +2165,10 @@ window.deleteFahrschuleComplete = async (fsId, fsName) => {
 
     const modalEl = document.getElementById('modal-fs-detail');
     if (modalEl) modalEl.classList.remove('open');
-    zeigeUndoBalken(`🗑️ "${fsName}" gelöscht (${geloescht.students} Schüler, ${geloescht.lehrer} Lehrer)`, backup);
+    // Bilder erst NACH Ablauf der Rueckgaengig-Frist loeschen - sie lassen
+    // sich, anders als die Firestore-Dokumente, nicht wiederherstellen.
+    zeigeUndoBalken(`🗑️ "${fsName}" gelöscht (${geloescht.students} Schüler, ${geloescht.lehrer} Lehrer)`, backup,
+      () => loescheChatBilder(codeIdsFuerBilder));
   } catch(e) {
     console.error('deleteFahrschuleComplete:', e);
     toast('❌ Fehler beim Löschen: ' + e.message);
@@ -2133,21 +2199,56 @@ window.deleteLehrerComplete = async (userId, lehrerName) => {
     const protSnap = await getDocs(query(collection(db,'protokoll'), where('fahrschuleId','==',userId)));
     for (const d of protSnap.docs) { backup.push({coll:'protokoll', id:d.id, data:d.data()}); await deleteDoc(d.ref); geloescht.protokoll++; }
 
+    // DSGVO-FIX: Zugangscodes und eigene Listen dieses Fahrlehrers wurden hier
+    // bisher gar nicht geloescht - im Zugangscode-Dokument stecken aber Name,
+    // Lernstand und der komplette Chatverlauf des Schuelers, an der Code-ID
+    // haengen zusaetzlich die Chat-Fotos. Beides blieb nach dem Loeschen des
+    // Fahrlehrers dauerhaft gespeichert.
+    const codeIdsFuerBilder = [];
+    const codesSnap = await getDocs(query(collection(db,'accessCodes'), where('teacherUid','==',userId)));
+    for (const d of codesSnap.docs) {
+      codeIdsFuerBilder.push(d.id);
+      backup.push({coll:'accessCodes', id:d.id, data:d.data()}); await deleteDoc(d.ref);
+    }
+    for (const coll of ['customFields','customThemen','customGruppen']) {
+      try {
+        const snap = await getDocs(query(collection(db,coll), where('uid','==',userId)));
+        for (const d of snap.docs) { backup.push({coll, id:d.id, data:d.data()}); await deleteDoc(d.ref); }
+      } catch(subErr) {}
+    }
+
     // Das Konto selbst
     const uSnap = await getDoc(doc(db,'users',userId));
     if (uSnap.exists()) backup.push({coll:'users', id:userId, data:uSnap.data()});
     await deleteDoc(doc(db, 'users', userId));
 
-    zeigeUndoBalken(`🗑️ "${lehrerName}" gelöscht (${geloescht.students} Schüler)`, backup);
+    zeigeUndoBalken(`🗑️ "${lehrerName}" gelöscht (${geloescht.students} Schüler)`, backup,
+      () => loescheChatBilder(codeIdsFuerBilder));
   } catch(e) {
     console.error('deleteLehrerComplete:', e);
     toast('❌ Fehler beim Löschen: ' + e.message);
   }
 };
 
+// Chat-Fotos zu den angegebenen Zugangscodes im Speicher loeschen. Die
+// Speicher-Regeln erlauben dem SuperAdmin das ausdruecklich auch dann noch,
+// wenn das zugehoerige Code-Dokument bereits weg oder abgelaufen ist.
+async function loescheChatBilder(codeIds) {
+  if (!Array.isArray(codeIds) || !codeIds.length) return;
+  const storage = getStorage(app, "gs://fahrschule-ebc65-eu-storage");
+  for (const codeId of codeIds) {
+    try {
+      const inhalt = await listAll(ref(storage, `chat-images/${codeId}`));
+      for (const datei of inhalt.items) {
+        await deleteObject(datei).catch(e => console.warn('Bild loeschen:', e));
+      }
+    } catch(e) { console.warn('Bilder auflisten:', e); }
+  }
+}
+
 // ── UNDO-BALKEN für SuperAdmin (stellt alle gesicherten Dokumente wieder her) ──
 let saUndoTimer = null;
-function zeigeUndoBalken(text, backup) {
+function zeigeUndoBalken(text, backup, nachAblaufCallback) {
   const alt = document.getElementById('undo-bar');
   if (alt) alt.remove();
   if (saUndoTimer) clearTimeout(saUndoTimer);
@@ -2180,6 +2281,9 @@ function zeigeUndoBalken(text, backup) {
   saUndoTimer = setTimeout(() => {
     const b = document.getElementById('undo-bar');
     if (b) b.remove();
+    if (typeof nachAblaufCallback === 'function') {
+      Promise.resolve(nachAblaufCallback()).catch(e => console.warn('Aufraeumen nach Loeschung:', e));
+    }
   }, 60000); // SuperAdmin: 1 Minute Bedenkzeit zum Wiederherstellen
 }
 
@@ -2225,11 +2329,11 @@ async function renderFsAdmin() {
         ${lehrer.map(l => `
           <div class="list-item" onclick="openLehrerDetail('${l.id}')">
             <div class="list-avatar" style="background:rgba(240,180,41,0.15);color:var(--accent)">
-              ${(l.name||'?').split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}
+              ${escHtml((l.name||'?').split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase())}
             </div>
             <div class="list-info">
-              <div class="list-name">${l.name}</div>
-              <div class="list-sub">${l.email}</div>
+              <div class="list-name">${escHtml(l.name)}</div>
+              <div class="list-sub">${escHtml(l.email)}</div>
             </div>
             <span class="badge badge-green">Aktiv</span>
           </div>`).join('')}
