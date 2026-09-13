@@ -252,8 +252,15 @@ tr:last-child td{border-bottom:none;}
   #toast{bottom:80px;right:10px;left:10px;max-width:100%;text-align:center;}
   #auth-screen{padding:16px;align-items:flex-start;padding-top:32px;min-height:100dvh;overflow-y:auto;}
   .auth-box{width:100%;padding:24px 16px;}
-  .topbar{padding:0 14px;height:50px;}
+  .topbar{padding:0 14px;height:50px;gap:8px;}
   .topbar-user{display:none;}
+  /* Auf dem Handy war die Kopfzeile 517px breit statt 414: die linke Gruppe
+     (Logo, Titel, Fahrschul-Abzeichen, "Zur Kartei") konnte nicht schrumpfen
+     und hat die rechte Gruppe samt Abmelden-Knopf aus dem Bild geschoben. */
+  .topbar > div:first-child{min-width:0;flex:1 1 auto;overflow:hidden;}
+  .topbar-right{flex:0 0 auto;}
+  .topbar-role{display:none;}
+  .school-badge{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .layout{flex-direction:column;}
   .mobile-nav-bar{display:flex;align-items:center;padding:8px 14px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:60;}
   .mobile-nav-toggle{display:flex;align-items:center;gap:9px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 16px;color:var(--text);font-size:14px;font-weight:700;cursor:pointer;width:100%;justify-content:center;}
@@ -296,7 +303,7 @@ tr:last-child td{border-bottom:none;}
 .bcal-title{font-family:var(--font-display);font-size:16px;font-weight:600;text-transform:capitalize;text-align:center;flex:1;}
 .bcal-nav{width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 5px rgba(0,0,0,.35),inset 0 1px 1px rgba(255,255,255,.06);transition:transform .12s;flex-shrink:0;}
 .bcal-nav:active{transform:translateY(2px);}
-.bcal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
+.bcal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;}
 .bcal-wd{text-align:center;font-size:11px;font-weight:700;color:var(--text-muted);padding:2px 0;}
 .bcal-cell{position:relative;aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:10px;font-size:14px;color:var(--text);background:var(--surface2);border:1.5px solid transparent;cursor:default;transition:transform .1s;}
 .bcal-cell.empty{background:transparent;}
@@ -1825,7 +1832,7 @@ async function renderMonthCal(label,grid){
   }
   const total=startDow+dim;const rem=total%7===0?0:7-(total%7);
   for(let i=1;i<=rem;i++)html+=`<div class="cal-day other-month"><div class="cal-day-num">${i}</div></div>`;
-  grid.style.cssText='display:grid;grid-template-columns:repeat(7,1fr);gap:5px';
+  grid.style.cssText='display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px';
   grid.innerHTML=html;
   }catch(e){console.warn('renderMonthCal',e);grid.style.cssText='';grid.innerHTML='<p class="text-muted" style="padding:24px;text-align:center;line-height:1.6">⚠️ Kalender konnte nicht geladen werden.<br>Fehler: <b>'+((e&&e.code)||(e&&e.message)||'unbekannt')+'</b><br><br>Falls „permission-denied": Firestore-Regeln in der Console veröffentlichen. Sonst App neu laden.</p>';}
 }
@@ -1844,7 +1851,7 @@ async function renderWeekCal(label,grid){
   const bSet=new Set();bSnap.docs.forEach(d=>{const b=d.data();bSet.add(`${b.year}-${b.month}-${b.day}`);});
   const slotsByDay={};sSnap.docs.forEach(d=>{const s=d.data();if(!s.startTime||!s.startTime.toDate)return;const dt=s.startTime.toDate();const k=dt.toDateString();if(!slotsByDay[k])slotsByDay[k]=[];slotsByDay[k].push({id:d.id,...s,_dt:dt});});
   const today=new Date();const HOURS=Array.from({length:14},(_,i)=>i+7);const dn=['Mo','Di','Mi','Do','Fr','Sa','So'];
-  let html=`<div style="display:grid;grid-template-columns:48px repeat(7,1fr);border:1px solid var(--border);border-radius:9px;overflow:hidden">`;
+  let html=`<div style="display:grid;grid-template-columns:48px repeat(7,minmax(0,1fr));border:1px solid var(--border);border-radius:9px;overflow:hidden">`;
   html+=`<div class="week-col-header" style="background:var(--surface2);border-bottom:1px solid var(--border)"></div>`;
   weekDays.forEach((d,i)=>{const isT=d.toDateString()===today.toDateString();html+=`<div class="week-col-header${isT?' today-col':''}" style="background:var(--surface2);border-bottom:1px solid var(--border);border-left:1px solid var(--border)"><div style="font-weight:700">${dn[i]}</div><div style="font-size:10px;color:${isT?'var(--accent)':'var(--text-muted)'}">${d.getDate()}.${d.getMonth()+1}.</div></div>`;});
   HOURS.forEach(hour=>{
@@ -2424,7 +2431,7 @@ window.viewLehrerKalender=async function(lehrerUid,lehrerName){
         <span class="cal-month" id="admin-cal-label"></span>
         <button class="btn btn-secondary btn-sm" onclick="adminCalNext()">▶</button>
       </div>
-      <div id="admin-cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px"></div>
+      <div id="admin-cal-grid" style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px"></div>
     </div>
   </div>`;
   window._adminCalDate=new Date();window._adminCalLehrerUid=lehrerUid;window._adminCalLehrerName=lehrerName;
