@@ -534,23 +534,8 @@ body.beta-dash .badge { font-size: 0.66rem; padding: 3px 9px; }
 .style-neumorph .btn-main:active, .style-neumorph .fab:active {
   box-shadow: inset 3px 3px 6px rgba(0,0,0,0.4), inset -3px -3px 6px rgba(255,255,255,0.04);
 }
-/* Bewertungspunkte-Stil: eigener, von style-* UNABHAENGIGER Schalter, damit
-   sich z.B. Neumorphism-Karten mit neubrutalistischen Balken kombinieren
-   lassen (Kundenwunsch). Wirkte frueher auf .stufe-form; seit die Zeilen
-   einen Stufenbalken tragen, wirkt er auf dessen Segmente - sonst haette
-   der Schalter im Einstellungen-Dialog nichts mehr bewirkt.
-   Bewusst OHNE 'body' davor: So greifen die Regeln auch in den kleinen
-   Vorschau-Kacheln des Auswahl-Dialogs, die die Klasse auf einem div
-   tragen - vorher zeigten die Kacheln alle dasselbe Bild. */
-.punkte-neumorph .adk-seg::before {
-  border: none; border-radius: 6px;
-  box-shadow: inset 2px 2px 4px rgba(0,0,0,0.35), inset -1px -1px 3px rgba(255,255,255,0.07);
-}
-.punkte-brutal .adk-balken { gap: 5px; }
-.punkte-brutal .adk-seg::before {
-  border: 1.5px solid #14161a; border-radius: 2px;
-  box-shadow: 2px 2px 0 #14161a;
-}
+/* (Die Regeln des Bewertungsfelder-Schalters standen hier. Sie sind weiter
+   unten hinter die Skala-Arten gewandert - siehe die Begruendung dort.) */
 /* Chat-Sprechblasen: eigene Klasse statt fester Inline-Werte, damit sie
    auf die Design-Stile reagieren koennen (vorher immer gleich aussehend,
    unabhaengig vom gewaehlten Stil - Kundenmeldung). */
@@ -892,6 +877,81 @@ body.beta-dash .badge { font-size: 0.66rem; padding: 3px 9px; }
 .fortschritt-kraeftig .bar-bg {
   height:11px !important; border:1px solid var(--border); border-radius:7px;
 }
+
+/* ── BEWERTUNGSFELDER-OBERFLAECHE ─────────────────────────────────────
+   Eigener, von style-* und von der Skala-Art UNABHAENGIGER Schalter
+   (Kundenwunsch: frei kombinierbar). Er bestimmt die Oberflaeche eines
+   Feldes - Material, Kante, Schatten - nicht dessen Form oder Inhalt.
+
+   Steht bewusst GANZ ZUM SCHLUSS, hinter den Skala-Arten: Die Oberflaeche
+   muss das letzte Wort haben, sonst haetten Neon und Skizze bei gleicher
+   Spezifitaet gegen .skala-zahlen/.skala-kreuze verloren und waeren bei
+   diesen beiden Skalen wirkungslos geblieben.
+   Eine Ausnahme gibt es: Waehlt jemand die Skala "Punkte", sollen die
+   Felder rund bleiben. Deshalb haengt ueberall dort, wo ein Stil den
+   Radius setzt, ein :not(.skala-punkte) davor.
+
+   Bewusst OHNE 'body' davor: So greifen die Regeln auch in den kleinen
+   Vorschau-Kacheln des Auswahl-Dialogs, die die Klasse auf einem div
+   tragen - sonst zeigten die Kacheln alle dasselbe Bild. */
+.punkte-neumorph:not(.skala-punkte) .adk-seg::before { border-radius:6px; }
+.punkte-neumorph .adk-seg::before {
+  border:none;
+  box-shadow:inset 2px 2px 4px rgba(0,0,0,0.35), inset -1px -1px 3px rgba(255,255,255,0.07);
+}
+.punkte-brutal .adk-balken { gap:5px; }
+.punkte-brutal:not(.skala-punkte) .adk-seg::before { border-radius:2px; }
+.punkte-brutal .adk-seg::before {
+  border:1.5px solid #14161a;
+  box-shadow:2px 2px 0 #14161a;
+}
+
+/* Neon: leere Felder sind nur eine duenne Kontur, erreichte leuchten in
+   ihrer Stufenfarbe - wie die Kette einer Aussteuerungsanzeige. Der Schein
+   darf nur auf .erreicht stehen: --seg wird ausschliesslich dort gesetzt,
+   auf leeren Feldern waere var(--seg) ohne Wert. */
+.punkte-neon:not(.skala-punkte) .adk-seg::before { border-radius:2px; }
+.punkte-neon .adk-seg::before {
+  background:transparent; border:1.5px solid var(--border);
+}
+.punkte-neon .adk-seg.erreicht::before {
+  background:var(--seg); border-color:var(--seg);
+  box-shadow:0 0 5px var(--seg), 0 0 13px color-mix(in srgb, var(--seg) 55%, transparent);
+}
+/* Im Hellen traegt ein weiter Schein nicht - auf weissem Grund wird er nur
+   blass. Deshalb enger und kraeftiger statt weit und zart. */
+.punkte-neon.light .adk-seg.erreicht::before,
+body.light .punkte-neon .adk-seg.erreicht::before {
+  box-shadow:0 0 4px color-mix(in srgb, var(--seg) 75%, transparent);
+}
+
+/* Skizze: die Felder sehen aus wie mit der Hand ins Papier gezeichnet -
+   passend dazu, dass die Ausbildungsdiagrammkarte bis heute von Hand
+   gefuehrt wird. Die ungleichen Eck-Radien sind der uebliche Kniff fuer
+   einen "gekritzelten" Rahmen; jedes zweite Feld spiegelt sie, und jedes
+   dritte steht minimal schief, damit nicht alle Kaestchen gleich aussehen.
+   Zusammen mit der Skala "Kreuze" kommt das einer handschriftlich
+   gefuehrten Karte am naechsten. */
+.punkte-skizze .adk-balken { gap:5px; }
+/* Die Radien muessen zur Feldgroesse passen. Der uebliche Kniff arbeitet
+   mit Werten wie 255px/15px - auf einem nur 13px hohen Feld rechnet der
+   Browser die aber proportional herunter, und heraus kommt ein sauberes
+   Rechteck. Deshalb hier kleine, aber deutlich ungleiche Werte: So bleibt
+   die Schiefe auch im Kleinen sichtbar. */
+.punkte-skizze:not(.skala-punkte) .adk-seg::before {
+  border-radius:11px 3px 9px 4px / 4px 9px 3px 11px;
+}
+.punkte-skizze:not(.skala-punkte) .adk-seg:nth-child(even)::before {
+  border-radius:3px 11px 4px 9px / 9px 4px 11px 3px;
+}
+.punkte-skizze .adk-seg::before {
+  height:13px; border:2px solid var(--muted); background:transparent;
+}
+.punkte-skizze .adk-seg.erreicht::before {
+  background:var(--seg); border-color:var(--text);
+}
+.punkte-skizze .adk-seg:nth-child(3n)::before   { transform:rotate(-1.2deg); }
+.punkte-skizze .adk-seg:nth-child(3n+1)::before { transform:rotate(0.9deg); }
 
 .notes-textarea { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:12px; font-family:'Manrope',sans-serif; font-size:0.88rem; color:var(--text); resize:none; min-height:100px; outline:none; line-height:1.6; }
 .notes-textarea:focus { border-color:var(--accent); }
@@ -10560,15 +10620,24 @@ const PUNKTE_STILE = [
   { id: '',                name: 'Standard',     beschreibung: 'Neutrale Formen, wie bisher.' },
   { id: 'punkte-neumorph', name: 'Neumorphism',  beschreibung: 'Weich, wie eingedrueckt.' },
   { id: 'punkte-brutal',   name: 'Neubrutalism', beschreibung: 'Kraeftig, mit Kante und Schatten.' },
+  { id: 'punkte-neon',     name: 'Neon',         beschreibung: 'Leere Felder nur als Kontur, erreichte leuchten – wie eine Aussteuerungsanzeige.' },
+  { id: 'punkte-skizze',   name: 'Skizze',       beschreibung: 'Wie mit der Hand gezeichnet. Zusammen mit der Skala „Kreuze" am nächsten an der Papierkarte.' },
 ];
 
 function previewPunkteKachel(stil) {
   const aktiv = (localStorage.getItem('fs_punkte_stil') || '') === stil.id;
-  return `<div class="${stil.id}" onclick="waehlePunkteStil('${stil.id}')" style="cursor:pointer;border:2px solid ${aktiv ? 'var(--accent)' : 'var(--border)'};border-radius:14px;padding:14px;display:flex;align-items:center;gap:14px;background:var(--bg)">
-    <div class="adk-balken" style="flex-shrink:0;width:62px">
-      <span class="adk-seg erreicht" style="--seg:var(--accent)"></span>
-      <span class="adk-seg erreicht" style="--seg:var(--accent)"></span>
-      <span class="adk-seg"></span>
+  // Die Vorschau uebernimmt Hell/Dunkel und die gewaehlte Skala-Art, damit
+  // sie zeigt, was nach dem Umschalten wirklich zu sehen ist - Neon sieht
+  // im Hellen anders aus als im Dunkeln, und mit der Skala "Punkte"
+  // bleiben die Felder rund.
+  const umgebung = (document.body.classList.contains('light') ? ' light' : '')
+    + ' ' + (localStorage.getItem('fs_adk_skala') || '');
+  return `<div class="${stil.id}${umgebung}" onclick="waehlePunkteStil('${stil.id}')" style="cursor:pointer;border:2px solid ${aktiv ? 'var(--accent)' : 'var(--border)'};border-radius:14px;padding:14px;display:flex;align-items:center;gap:14px;background:var(--bg)">
+    <div class="adk-balken" style="flex-shrink:0;width:76px">
+      <span class="adk-seg erreicht" data-stufe="1" style="--seg:var(--accent2)"></span>
+      <span class="adk-seg erreicht" data-stufe="2" style="--seg:var(--accent2)"></span>
+      <span class="adk-seg" data-stufe="3"></span>
+      <span class="adk-seg" data-stufe="4"></span>
     </div>
     <div style="flex:1">
       <div style="font-weight:700;font-size:0.88rem;color:var(--text)">${stil.name}${aktiv ? ' ✓' : ''}</div>
@@ -10583,7 +10652,12 @@ window.openPunkteStilAuswahl = () => {
 };
 
 window.waehlePunkteStil = (id) => {
-  document.body.classList.remove('punkte-neumorph', 'punkte-brutal');
+  // Die Liste kommt aus PUNKTE_STILE selbst. Vorher standen die zu
+  // entfernenden Klassen hier von Hand - bei jedem neuen Stil haette man
+  // daran denken muessen, sonst bliebe die alte Klasse am body kleben und
+  // wuerde sich mit der neuen ueberlagern (derselbe Fehler, den es beim
+  // Design-Stil schon einmal gab).
+  PUNKTE_STILE.forEach(p => { if (p.id) document.body.classList.remove(p.id); });
   if (id) document.body.classList.add(id);
   localStorage.setItem('fs_punkte_stil', id);
   document.getElementById('punkte-stil-liste').innerHTML = PUNKTE_STILE.map(previewPunkteKachel).join('');
