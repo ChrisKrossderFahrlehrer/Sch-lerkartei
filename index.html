@@ -4596,13 +4596,50 @@ onAuthStateChanged(auth, async (user) => {
 function listenStudents() {
   if (window.__DEMO) { try{renderList();}catch(e){} return; }
   if (unsubSnapshot) unsubSnapshot();
-  // Multi-Tenant: Nach fahrschuleId filtern wenn vorhanden, sonst nach uid (Rückwärtskompatibilität)
   const fsId = currentUser._fahrschuleId;
-  const q = fsId
-    ? query(collection(db, 'students'), where('fahrschuleId', '==', fsId))
-    : query(collection(db, 'students'), where('uid', '==', currentUser.uid));
-  unsubSnapshot = onSnapshot(q, (snap) => {
-    students = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const eigeneUid = currentUser.uid;
+
+  // FIX: Hier stand nur EINE Abfrage - entweder nach fahrschuleId oder nach
+  // uid. Fuer einen eigenstaendigen Fahrlehrer ist beides dasselbe, sobald er
+  // aber einer Fahrschule BEITRITT, faellt seine bisherige Kartei aus der
+  // Abfrage: Seine vorhandenen Schueler tragen noch seine eigene Kennung als
+  // fahrschuleId, gesucht wird aber ab sofort nach der Kennung der Schule.
+  // Die Schueler waren dadurch von einem Moment auf den anderen aus der Liste
+  // verschwunden - nicht geloescht, nur nicht mehr gefunden. Die
+  // Firestore-Regel haette sie ihm sehr wohl gezeigt (docBelongsToUser deckt
+  // 'uid == eigene uid' mit ab); es wurde nur nicht danach gefragt.
+  //
+  // Deshalb jetzt zwei Abfragen, deren Ergebnisse zusammengelegt werden:
+  //   1. alles, was zur Fahrschule gehoert (auch von Kollegen)
+  //   2. alles, was mir selbst gehoert (meine mitgebrachte Kartei)
+  // Bewusst zwei getrennte Abfragen statt einer or()-Abfrage: Die kaeme ohne
+  // zusaetzlichen Index nicht sicher zustande, und eine leere Schuelerliste
+  // waere der schlimmste denkbare Fehler in dieser App.
+  // Der zweite Abruf laeuft nur, wenn er ueberhaupt etwas anderes liefern
+  // kann - beim eigenstaendigen Lehrer sind beide Abfragen identisch.
+  const brauchtZweite = !fsId || fsId !== eigeneUid;
+  const abfragen = [
+    query(collection(db, 'students'), where('fahrschuleId', '==', fsId || eigeneUid)),
+  ];
+  if (brauchtZweite) abfragen.push(query(collection(db, 'students'), where('uid', '==', eigeneUid)));
+
+  const teile = abfragen.map(() => []);
+  const stopper = [];
+  unsubSnapshot = () => { stopper.forEach(fn => { try { fn(); } catch(e) {} }); };
+
+  abfragen.forEach((q, i) => {
+    stopper.push(onSnapshot(q, (snap) => {
+      teile[i] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      // Zusammenlegen und doppelte entfernen - ein Schueler kann beide
+      // Bedingungen erfuellen (meiner UND zur Schule gehoerend).
+      const nachId = new Map();
+      teile.forEach(liste => liste.forEach(s => nachId.set(s.id, s)));
+      students = [...nachId.values()];
+      verarbeiteSchueler();
+    }, (err) => { console.warn('listenStudents:', err); }));
+  });
+
+  function verarbeiteSchueler() {
     if (!window.__snapResyncKick && students.length) { window.__snapResyncKick = true; setTimeout(resyncPortalSnapshotsV2, 1200); }
     students.sort((a,b) => (a.nachname||'').localeCompare(b.nachname||''));
     renderList();
@@ -4622,7 +4659,7 @@ function listenStudents() {
         }).catch(() => {}); // still scheitern lassen (z.B. Alt-Konto ohne Doc)
       }
     } catch(e) {}
-  });
+  }
 }
 
 function listenFields() {
