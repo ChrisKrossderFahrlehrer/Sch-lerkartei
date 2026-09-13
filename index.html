@@ -3273,7 +3273,7 @@ window.__demoWrite = (op, args) => {
   demoHinweis(); return Promise.resolve({ id:'demo-x' });
 };
 let __demoHinweisTs = 0;
-function demoHinweis(){ const n=Date.now(); if(n-__demoHinweisTs>2500){ __demoHinweisTs=n; try{ toast('\U0001F3AE Demo \u2013 wird nicht gespeichert'); }catch(e){} } }
+function demoHinweis(){ const n=Date.now(); if(n-__demoHinweisTs>2500){ __demoHinweisTs=n; try{ toast('🎮 Demo – wird nicht gespeichert'); }catch(e){} } }
 const dbAdd = (...a) => window.__DEMO ? window.__demoWrite('add', a) : addDoc(...a);
 const dbSet = (...a) => window.__DEMO ? window.__demoWrite('set', a) : setDoc(...a);
 const dbUpd = (...a) => window.__DEMO ? window.__demoWrite('upd', a) : updateDoc(...a);
@@ -3300,7 +3300,7 @@ function __demoDaten(){
 window.startDemo = () => {
   const DEMO_MS=24*60*60*1000, now=Date.now();
   let s=0; try{ s=parseInt(localStorage.getItem('demo_start')||'0',10)||0; }catch(e){}
-  if (s && now-s>DEMO_MS){ setAuthError('\U0001F3AE Dein Demo-Zeitraum (24 h) ist abgelaufen. Registriere dich kostenlos, um weiterzumachen.'); return; }
+  if (s && now-s>DEMO_MS){ setAuthError('🎮 Dein Demo-Zeitraum (24 h) ist abgelaufen. Registriere dich kostenlos, um weiterzumachen.'); return; }
   if (!s){ try{ localStorage.setItem('demo_start', String(now)); }catch(e){} }
   window.__DEMO = true;
   currentUser = { uid:'demo-user', email:'demo@fahrsync.de', displayName:'Demo-Fahrlehrer', _fahrschuleId:'demo-user', _rolle:'fahrlehrer', _fsName:'Demo-Fahrschule', _kalenderAktiv:false };
