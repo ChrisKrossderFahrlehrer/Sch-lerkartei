@@ -783,7 +783,7 @@ body.beta-dash .badge { font-size: 0.66rem; padding: 3px 9px; }
    unnoetig aufblaehen. */
 .adk-seg {
   flex:1; height:26px; min-height:26px; padding:0; border:none; background:none;
-  cursor:pointer; display:flex; align-items:center;
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
 }
 .adk-seg::before {
   content:''; display:block; width:100%; height:10px;
@@ -797,6 +797,101 @@ body.beta-dash .badge { font-size: 0.66rem; padding: 3px 9px; }
 /* Selbst angelegte Themen bleiben wie bisher leicht goldig hinterlegt,
    damit sie von den ADK-Standardthemen unterscheidbar sind. */
 .adk-zeile.eigen { background:rgba(240,180,41,0.05); }
+
+/* ── ADK-ANSICHT "KLASSISCH": RASTERKARTE ────────────────────────────
+   Zweite, gleichberechtigte Ansicht derselben Daten - naeher an der
+   gedruckten Ausbildungsdiagrammkarte, die es ja nur auf Papier gibt:
+   Name links, rechts fuenf Kaestchen in festen Spalten, darueber eine
+   Kopfzeile mit den Stufennummern. Dadurch stehen die Kaestchen aller
+   Zeilen buendig untereinander und man liest die Karte spaltenweise -
+   genau das kann die Balken-Ansicht nicht, weil dort jede Zeile ihren
+   eigenen Balken ueber die volle Breite hat.
+   Der Preis ist die Breite: Fuer den Namen bleiben rund 215px statt der
+   vollen Zeile, laengere Themen brechen also um. Das ist bei der
+   Papierkarte nicht anders und hier bewusst in Kauf genommen - wer es
+   luftiger mag, nimmt die Balken-Ansicht.
+   Alles laeuft ueber dieselbe Auszeichnung, nur anders gesetzt: gleiche
+   Knoepfe, gleiche Daten, gleiches Antippen. */
+.adk-rasterkopf { display:none; }
+.adk-klassisch .adk-rasterkopf {
+  display:flex; align-items:center; gap:8px; padding:0 10px 5px;
+  border-bottom:1px solid var(--border); margin-bottom:2px;
+}
+.adk-klassisch .adk-rasterkopf-name {
+  flex:1; min-width:0; font-size:0.62rem; font-weight:700;
+  text-transform:uppercase; letter-spacing:0.08em; color:var(--muted);
+}
+.adk-seg-kopf {
+  flex:1; text-align:center; font-size:0.62rem; font-weight:700; color:var(--muted);
+}
+.adk-klassisch .themen-list { gap:0; }
+.adk-klassisch .adk-zeile {
+  flex-direction:row; align-items:center; gap:8px;
+  padding:4px 10px; border-radius:0; border-bottom:1px solid var(--border);
+}
+.adk-klassisch .adk-kopf { flex:1; min-width:0; }
+/* Das Stufenwort entfaellt hier: In der Rasterkarte sagen die Spalten,
+   welche Stufe erreicht ist - der Text wuerde nur Breite kosten. */
+.adk-klassisch .adk-stand { display:none; }
+.adk-klassisch .adk-balken { flex:0 0 108px; gap:2px; }
+.adk-klassisch .adk-seg { height:28px; min-height:28px; }
+.adk-klassisch .adk-seg::before { height:20px; border-radius:2px; }
+.adk-klassisch .adk-seg:first-child::before,
+.adk-klassisch .adk-seg:last-child::before { border-radius:2px; }
+.adk-klassisch .adk-zeile:last-child { border-bottom:none; }
+
+/* ── SKALA-ART: wie ein einzelnes Feld aussieht ───────────────────────
+   Unabhaengig von der ADK-Ansicht oben. Die Ansicht bestimmt das LAYOUT
+   der Zeile (Balken ueber die Breite oder Raster in Spalten), die
+   Skala-Art bestimmt die MARKIERUNG darin. Beides ist frei kombinierbar,
+   genau wie Karten-Stil und Hell/Dunkel.
+   Steht bewusst NACH den .adk-klassisch-Regeln: Bei gleicher Spezifitaet
+   soll die Skala-Art ueber die Form entscheiden, die Ansicht nur ueber
+   die Anordnung. */
+.skala-punkte .adk-seg::before {
+  width:15px; height:15px; border-radius:50%;
+}
+.skala-zahlen .adk-seg::before,
+.skala-kreuze .adk-seg::before {
+  height:22px; border-radius:3px;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Manrope',sans-serif; font-size:0.66rem; font-weight:700;
+  color:var(--muted); line-height:1;
+}
+.skala-zahlen .adk-seg::before { content:attr(data-stufe); }
+.skala-kreuze .adk-seg::before { content:''; }
+/* Wie handschriftlich auf der Papierkarte: erledigte Felder bekommen ein
+   Kreuz, offene bleiben leer. */
+.skala-kreuze .adk-seg.erreicht::before { content:'✕'; }
+.skala-zahlen .adk-seg.erreicht::before,
+.skala-kreuze .adk-seg.erreicht::before {
+  background:var(--seg); border-color:var(--seg); color:#14140f;
+}
+
+/* ── FORTSCHRITT-ANZEIGE: wie die Balken gefuellt werden ──────────────
+   Wirkt auf alle Fortschrittsbalken (.bar-fill), also Themengruppen,
+   Gesamtfortschritt und Schaltstunden gleichermassen - damit es im
+   ganzen Programm einheitlich bleibt.
+   Das !important ist hier noetig und kein Versehen: Die Balken tragen
+   ihre Farbe als style-Attribut direkt im Markup, weil sie sich je nach
+   Prozentwert aendert. Eine normale Regel aus dem Stylesheet kaeme
+   dagegen nicht an - eine !important-Regel schon, ohne dass dafuer jede
+   Render-Stelle umgebaut werden muss. */
+/* Die Maske sitzt auf der BAHN, nicht auf der Fuellung. Damit sind es
+   immer genau zehn Bloecke - unabhaengig davon, wie breit der Balken
+   gerade ist und wie weit er gefuellt ist. Auf der Fuellung gerechnet
+   waeren es bei 25% zehn winzige Bloecke auf einem Viertel der Breite
+   gewesen; das sah aus wie eine gepunktete Linie statt wie "x von 10". */
+.fortschritt-segmente .bar-bg {
+  -webkit-mask-image:repeating-linear-gradient(90deg,#000 0 8.2%,transparent 8.2% 10%);
+          mask-image:repeating-linear-gradient(90deg,#000 0 8.2%,transparent 8.2% 10%);
+}
+.fortschritt-streifen .bar-fill {
+  background-image:repeating-linear-gradient(135deg,rgba(255,255,255,0.30) 0 3px,transparent 3px 7px) !important;
+}
+.fortschritt-kraeftig .bar-bg {
+  height:11px !important; border:1px solid var(--border); border-radius:7px;
+}
 
 .notes-textarea { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:12px; font-family:'Manrope',sans-serif; font-size:0.88rem; color:var(--text); resize:none; min-height:100px; outline:none; line-height:1.6; }
 .notes-textarea:focus { border-color:var(--accent); }
@@ -1946,9 +2041,20 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     <button class="btn-sheet-cancel" onclick="starteKomplettsicherung()" style="background:var(--surface2);margin-bottom:8px">💾 Komplettsicherung herunterladen</button>
     <input type="file" id="sicherung-datei" accept=".json,application/json" style="display:none" onchange="leseSicherung(this.files[0])">
     <button class="btn-sheet-cancel" onclick="document.getElementById('sicherung-datei').click()" style="background:var(--surface2);margin-bottom:8px">📂 Sicherung öffnen / prüfen</button>
+    <!-- Darstellung: fuenf voneinander unabhaengige Schalter. Jeder betrifft
+         eine andere Ebene (Gesamtlook, ADK-Layout, Feld-Markierung,
+         Feld-Oberflaeche, Fortschrittsbalken) und laesst sich mit jedem
+         anderen kombinieren. Alles nur Ansicht - keiner aendert Daten. -->
+    <div style="height:1px;background:var(--border);margin:14px 0 12px"></div>
+    <div style="font-family:'Syne',sans-serif;font-size:0.75rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:4px">🎨 Darstellung</div>
+    <div style="font-size:0.7rem;color:var(--muted);line-height:1.45;margin-bottom:12px">Frei kombinierbar und jederzeit umstellbar. Gilt nur für dich – an den Bewertungen ändert sich dabei nichts.</div>
     <button class="btn-sheet-cancel" onclick="openStilAuswahl()" style="background:var(--surface2);margin-bottom:8px">🎨 Design-Stil wählen</button>
-    <button class="btn-sheet-cancel" onclick="openPunkteStilAuswahl()" style="background:var(--surface2);margin-bottom:8px">⚪ Bewertungspunkte-Stil</button>
+    <button class="btn-sheet-cancel" onclick="openAdkAnsichtAuswahl()" style="background:var(--surface2);margin-bottom:8px">📋 ADK-Ansicht &middot; klassisch oder neu</button>
+    <button class="btn-sheet-cancel" onclick="openSkalaArtAuswahl()" style="background:var(--surface2);margin-bottom:8px">🔢 Skala-Art</button>
+    <button class="btn-sheet-cancel" onclick="openPunkteStilAuswahl()" style="background:var(--surface2);margin-bottom:8px">⚪ Bewertungsfelder-Oberfläche</button>
+    <button class="btn-sheet-cancel" onclick="openFortschrittAuswahl()" style="background:var(--surface2);margin-bottom:8px">📈 Fortschritt-Anzeige</button>
     <button class="btn-sheet-cancel" onclick="toggleBetaDashboard()" id="btn-beta-dashboard" style="background:var(--surface2);margin-bottom:8px">🧪 Beta: Neues Dashboard-Design</button>
+    <div style="height:1px;background:var(--border);margin:14px 0 12px"></div>
     <button class="btn-sheet-cancel" onclick="aktivierePushADK()" id="btn-push-adk" style="background:var(--surface2);margin-bottom:4px">🔔 Benachrichtigungen aktivieren</button>
     <div style="font-size:0.68rem;color:var(--muted);padding:0 4px 12px;line-height:1.4">📱 iPhone: Safari → „Teilen" → „Zum Home-Bildschirm" → App von dort öffnen, erst dann aktivieren möglich.</div>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openDashboard()" style="background:var(--surface2);margin-bottom:8px">📊 Übersicht / Statistik</button>
@@ -2511,6 +2617,42 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
   </div>
 </div>
 
+<!-- ADK-ANSICHT AUSWAHL (klassische Rasterkarte oder Stufenbalken) -->
+<div class="modal-overlay" id="adk-ansicht-modal" onclick="closeModal(event)">
+  <div class="modal-sheet" style="max-width:420px">
+    <div class="sheet-title">📋 ADK-Ansicht</div>
+    <p style="font-size:0.78rem;color:var(--muted);margin:-6px 0 16px;line-height:1.5">
+      Dieselben Daten, zwei Darstellungen. Umschalten ändert nichts an den Bewertungen.
+    </p>
+    <div id="adk-ansicht-liste" style="display:flex;flex-direction:column;gap:12px"></div>
+    <button class="btn-sheet-cancel" onclick="document.getElementById('adk-ansicht-modal').classList.remove('open')" style="margin-top:16px">Fertig</button>
+  </div>
+</div>
+
+<!-- SKALA-ART AUSWAHL (Markierung eines einzelnen Bewertungsfeldes) -->
+<div class="modal-overlay" id="skala-art-modal" onclick="closeModal(event)">
+  <div class="modal-sheet" style="max-width:420px">
+    <div class="sheet-title">🔢 Skala-Art</div>
+    <p style="font-size:0.78rem;color:var(--muted);margin:-6px 0 16px;line-height:1.5">
+      Wie ein einzelnes Bewertungsfeld aussieht. Frei kombinierbar mit der ADK-Ansicht.
+    </p>
+    <div id="skala-art-liste" style="display:flex;flex-direction:column;gap:12px"></div>
+    <button class="btn-sheet-cancel" onclick="document.getElementById('skala-art-modal').classList.remove('open')" style="margin-top:16px">Fertig</button>
+  </div>
+</div>
+
+<!-- FORTSCHRITT-ANZEIGE AUSWAHL -->
+<div class="modal-overlay" id="fortschritt-modal" onclick="closeModal(event)">
+  <div class="modal-sheet" style="max-width:420px">
+    <div class="sheet-title">📈 Fortschritt-Anzeige</div>
+    <p style="font-size:0.78rem;color:var(--muted);margin:-6px 0 16px;line-height:1.5">
+      Gilt für alle Fortschrittsbalken – Themengruppen, Gesamtfortschritt und Schaltstunden.
+    </p>
+    <div id="fortschritt-liste" style="display:flex;flex-direction:column;gap:12px"></div>
+    <button class="btn-sheet-cancel" onclick="document.getElementById('fortschritt-modal').classList.remove('open')" style="margin-top:16px">Fertig</button>
+  </div>
+</div>
+
 <!-- SCHÜLER-ADRESSE MODAL (fuer Ausbildungsnachweis, Anlage 3) -->
 <div class="modal-overlay" id="adresse-modal" onclick="closeModal(event)">
   <div class="modal-sheet" style="max-width:420px">
@@ -2652,11 +2794,27 @@ function adkStufenBalken(val, zielOnclick) {
   return '<div class="adk-balken">' + ADK_STUFEN.map(st => {
     const erreicht = val >= st.wert;
     const ziel = (val === st.wert) ? 0 : st.wert;
+    // data-stufe traegt die Nummer ins CSS: Die Skala-Art "Zahlen" zeigt
+    // sie per content:attr(data-stufe) an, ohne dass die Auszeichnung je
+    // nach gewaehlter Darstellung anders gebaut werden muesste.
     return '<button class="adk-seg' + (erreicht ? ' erreicht' : '') + '"'
+      + ' data-stufe="' + st.wert + '"'
       + (erreicht ? ' style="--seg:' + erreichteFarbe + '"' : '')
       + ' title="' + st.lang + '" aria-label="' + st.lang + '"'
       + ' onclick="' + zielOnclick(ziel) + '"></button>';
   }).join('') + '</div>';
+}
+
+// Kopfzeile der Rasterkarte (nur in der klassischen Ansicht sichtbar,
+// in der Balken-Ansicht blendet CSS sie aus). Sie steht einmal pro
+// Themengruppe und benennt die fuenf Spalten mit ihrer Stufennummer.
+function adkRasterKopf() {
+  return '<div class="adk-rasterkopf">'
+    + '<div class="adk-rasterkopf-name">Thema</div>'
+    + '<div class="adk-balken">'
+    +   ADK_STUFEN.map(st => '<div class="adk-seg-kopf" title="' + st.lang + '">' + st.wert + '</div>').join('')
+    + '</div>'
+    + '</div>';
 }
 
 // Eine komplette Bewertungszeile: Kopf (Name + erreichte Stufe) und
@@ -5275,7 +5433,7 @@ function renderDetail() {
     return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
         <div style="font-size:0.8rem;font-weight:700;color:var(--text)">🚦 Verkehrszeichen</div>
         <div style="font-size:0.7rem;color:${gesamtDone===gesamt?'var(--accent2)':'var(--muted)'}">${gesamtDone}/${gesamt}</div>
-      </div>${rows}${eigenRows}
+      </div>${adkRasterKopf()}${rows}${eigenRows}
       <div style="display:flex;gap:8px;margin-top:12px">
         <button class="btn-sheet-cancel" onclick="openZeichenKatalog()" style="background:var(--surface2);margin:0;flex:1">📖 Aus Katalog wählen</button>
         <button class="btn-sheet-cancel" onclick="openVzKatalog()" style="background:var(--surface2);margin:0;flex:1">➕ Eigenes Bild</button>
@@ -5317,7 +5475,7 @@ function renderDetail() {
         <div class="bar-bg" style="margin-bottom:10px;height:4px">
           <div class="bar-fill" style="width:${groupPct}%;background:${groupPct===100?'var(--accent2)':groupPct>50?'var(--accent)':'var(--blue)'}"></div>
         </div>
-        ${standardItems}${extraItems}
+        ${adkRasterKopf()}${standardItems}${extraItems}
       </div>`;
   }).join('<div style="height:1px;background:var(--border);margin:6px 0 14px"></div>');
 
@@ -10291,6 +10449,12 @@ window.waehleStil = (id) => {
   if (localStorage.getItem('fs_beta_dashboard') === '1') document.body.classList.add('beta-dash');
   const gespPunkteStil = localStorage.getItem('fs_punkte_stil');
   if (gespPunkteStil) document.body.classList.add(gespPunkteStil);
+  const gespAdkAnsicht = localStorage.getItem('fs_adk_ansicht');
+  if (gespAdkAnsicht) document.body.classList.add(gespAdkAnsicht);
+  const gespSkala = localStorage.getItem('fs_adk_skala');
+  if (gespSkala) document.body.classList.add(gespSkala);
+  const gespFortschritt = localStorage.getItem('fs_fortschritt');
+  if (gespFortschritt) document.body.classList.add(gespFortschritt);
 })();
 
 
@@ -10441,6 +10605,143 @@ window.waehlePunkteStil = (id) => {
   localStorage.setItem('fs_punkte_stil', id);
   document.getElementById('punkte-stil-liste').innerHTML = PUNKTE_STILE.map(previewPunkteKachel).join('');
   toast('Bewertungspunkte aktualisiert ✓');
+};
+
+// ══ ADK-ANSICHT: klassische Rasterkarte oder Stufenbalken ══════════════
+// Die gedruckte Ausbildungsdiagrammkarte gibt es nur auf Papier, einen
+// digitalen Standard gibt es nicht. Statt eine der beiden Lesarten
+// vorzuschreiben, kann jeder Fahrlehrer waehlen:
+//   - Klassisch: Raster wie auf der Karte, Kaestchen in festen Spalten,
+//     dicht gesetzt, spaltenweise lesbar.
+//   - Balken:    eine Zeile pro Thema, Balken ueber die volle Breite,
+//     luftiger und auf dem Handy besser zu treffen.
+// Beides zeigt DIESELBEN Daten und dieselben fuenf Stufen - der Schalter
+// aendert nur die Darstellung, nie eine Bewertung. Umgesetzt allein ueber
+// eine body-Klasse und CSS, deshalb wirkt das Umschalten sofort, ohne die
+// Liste neu aufzubauen.
+const ADK_ANSICHTEN = [
+  { id: '',              name: 'Neu – Stufenbalken', beschreibung: 'Ein Balken je Thema über die volle Breite. Luftig, große Tippziele.' },
+  { id: 'adk-klassisch', name: 'Klassisch – Rasterkarte', beschreibung: 'Kästchen in festen Spalten mit Kopfzeile, wie auf der Papierkarte. Dicht, spaltenweise lesbar.' },
+];
+
+function previewAdkKachel(ansicht) {
+  const aktiv = (localStorage.getItem('fs_adk_ansicht') || '') === ansicht.id;
+  const hell  = document.body.classList.contains('light') ? ' light' : '';
+  // Die Vorschau benutzt exakt dieselben Klassen wie die echte Liste,
+  // zeigt also wirklich das, was nach dem Umschalten zu sehen ist.
+  const zeile = (name, val) => {
+    const farbe = ADK_STUFE_FARB(val);
+    const segs = ADK_STUFEN.map(st => `<span class="adk-seg${val >= st.wert ? ' erreicht' : ''}"${val >= st.wert ? ` style="--seg:${farbe}"` : ''}></span>`).join('');
+    return `<div class="thema-row adk-zeile"><div class="adk-kopf">
+        <div class="thema-name" style="font-size:0.7rem">${name}</div>
+        <div class="adk-stand" style="color:${farbe};font-size:0.58rem">${ADK_STUFE_KURZ(val)}</div>
+      </div><div class="adk-balken">${segs}</div></div>`;
+  };
+  return `<div class="${ansicht.id}${hell}" onclick="waehleAdkAnsicht('${ansicht.id}')" style="cursor:pointer;border:2px solid ${aktiv ? 'var(--accent)' : 'var(--border)'};border-radius:14px;padding:14px;background:var(--bg)">
+    <div style="font-weight:700;font-size:0.88rem;color:var(--text)">${ansicht.name}${aktiv ? ' ✓' : ''}</div>
+    <div style="font-size:0.72rem;color:var(--muted);margin:2px 0 10px">${ansicht.beschreibung}</div>
+    <div class="themen-list" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 0;pointer-events:none">
+      ${adkRasterKopf()}${zeile('Anfahren &amp; Anhalten', 5)}${zeile('Schalten &amp; Gangwahl', 3)}${zeile('Überholen', 0)}
+    </div>
+  </div>`;
+}
+
+window.openAdkAnsichtAuswahl = () => {
+  document.getElementById('adk-ansicht-liste').innerHTML = ADK_ANSICHTEN.map(previewAdkKachel).join('');
+  document.getElementById('adk-ansicht-modal').classList.add('open');
+};
+
+window.waehleAdkAnsicht = (id) => {
+  ADK_ANSICHTEN.forEach(a => { if (a.id) document.body.classList.remove(a.id); });
+  if (id) document.body.classList.add(id);
+  localStorage.setItem('fs_adk_ansicht', id);
+  document.getElementById('adk-ansicht-liste').innerHTML = ADK_ANSICHTEN.map(previewAdkKachel).join('');
+  toast('ADK-Ansicht aktualisiert ✓');
+};
+
+// ══ SKALA-ART: wie ein einzelnes Bewertungsfeld markiert wird ══════════
+// Getrennt von der ADK-Ansicht: Die Ansicht bestimmt die Anordnung der
+// Zeile, die Skala-Art die Markierung darin. Beides frei kombinierbar,
+// also z.B. klassische Rasterkarte mit Kreuzen (wie handschriftlich) oder
+// Stufenbalken mit Punkten.
+const SKALA_ARTEN = [
+  { id: '',              name: 'Gefüllt',  beschreibung: 'Durchgehende Flächen. Der Fortschritt ist am weitesten aus der Ferne lesbar.' },
+  { id: 'skala-punkte',  name: 'Punkte',   beschreibung: 'Runde Punkte statt Flächen. Zurückhaltender, wirkt leichter.' },
+  { id: 'skala-zahlen',  name: 'Zahlen',   beschreibung: 'Jedes Feld zeigt seine Stufennummer. Am eindeutigsten, wenn jemand die Stufen noch lernt.' },
+  { id: 'skala-kreuze',  name: 'Kreuze',   beschreibung: 'Erledigte Felder bekommen ein Kreuz, offene bleiben leer – wie handschriftlich auf der Karte.' },
+];
+
+// ══ FORTSCHRITT-ANZEIGE: wie die Fortschrittsbalken gefuellt werden ════
+// Gilt fuer alle Balken im Programm (Themengruppen, Gesamtfortschritt,
+// Schaltstunden), damit die Darstellung ueberall dieselbe bleibt.
+const FORTSCHRITT_ARTEN = [
+  { id: '',                      name: 'Balken',   beschreibung: 'Durchgehender Balken. Ruhig und schlicht.' },
+  { id: 'fortschritt-segmente',  name: 'Segmente', beschreibung: 'In Blöcke geteilt. Man sieht den Stand eher als Anzahl denn als Fläche.' },
+  { id: 'fortschritt-streifen',  name: 'Streifen', beschreibung: 'Schraffiert wie auf einem gedruckten Formular.' },
+  { id: 'fortschritt-kraeftig',  name: 'Kräftig',  beschreibung: 'Dicker und mit Rand. Deutlich präsenter auf dem Schirm.' },
+];
+
+// Gemeinsamer Kachel-Bauer fuer beide Auswahl-Dialoge: Titel, Beschreibung
+// und darunter eine echte Vorschau, die dieselben Klassen benutzt wie das
+// Programm - man sieht also wirklich das, was man bekommt.
+function previewDarstellungKachel(eintrag, speicherSchluessel, waehlFunktion, vorschauHTML) {
+  const aktiv = (localStorage.getItem(speicherSchluessel) || '') === eintrag.id;
+  const hell  = document.body.classList.contains('light') ? ' light' : '';
+  return `<div class="${eintrag.id}${hell}" onclick="${waehlFunktion}('${eintrag.id}')" style="cursor:pointer;border:2px solid ${aktiv ? 'var(--accent)' : 'var(--border)'};border-radius:14px;padding:14px;background:var(--bg)">
+    <div style="font-weight:700;font-size:0.88rem;color:var(--text)">${eintrag.name}${aktiv ? ' ✓' : ''}</div>
+    <div style="font-size:0.72rem;color:var(--muted);margin:2px 0 10px">${eintrag.beschreibung}</div>
+    ${vorschauHTML}
+  </div>`;
+}
+
+function previewSkalaKachel(art) {
+  const zeile = (name, val) => {
+    const farbe = ADK_STUFE_FARB(val);
+    const segs = ADK_STUFEN.map(st => `<span class="adk-seg${val >= st.wert ? ' erreicht' : ''}" data-stufe="${st.wert}"${val >= st.wert ? ` style="--seg:${farbe}"` : ''}></span>`).join('');
+    return `<div class="thema-row adk-zeile"><div class="adk-kopf">
+        <div class="thema-name" style="font-size:0.7rem">${name}</div>
+        <div class="adk-stand" style="color:${farbe};font-size:0.58rem">${ADK_STUFE_KURZ(val)}</div>
+      </div><div class="adk-balken">${segs}</div></div>`;
+  };
+  return previewDarstellungKachel(art, 'fs_adk_skala', 'waehleSkalaArt',
+    `<div class="themen-list" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 0;pointer-events:none">
+      ${zeile('Anfahren &amp; Anhalten', 5)}${zeile('Schalten &amp; Gangwahl', 3)}${zeile('Überholen', 0)}
+    </div>`);
+}
+
+function previewFortschrittKachel(art) {
+  const balken = (pct, farbe) => `<div style="margin-bottom:8px">
+      <div class="bar-label-row" style="font-size:0.62rem"><span>Grundstufe</span><span>${pct}%</span></div>
+      <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:${farbe}"></div></div>
+    </div>`;
+  return previewDarstellungKachel(art, 'fs_fortschritt', 'waehleFortschrittArt',
+    `<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px 4px;pointer-events:none">
+      ${balken(100, 'var(--accent2)')}${balken(65, 'var(--accent)')}${balken(25, 'var(--blue)')}
+    </div>`);
+}
+
+window.openSkalaArtAuswahl = () => {
+  document.getElementById('skala-art-liste').innerHTML = SKALA_ARTEN.map(previewSkalaKachel).join('');
+  document.getElementById('skala-art-modal').classList.add('open');
+};
+window.waehleSkalaArt = (id) => {
+  SKALA_ARTEN.forEach(a => { if (a.id) document.body.classList.remove(a.id); });
+  if (id) document.body.classList.add(id);
+  localStorage.setItem('fs_adk_skala', id);
+  document.getElementById('skala-art-liste').innerHTML = SKALA_ARTEN.map(previewSkalaKachel).join('');
+  toast('Skala aktualisiert ✓');
+};
+
+window.openFortschrittAuswahl = () => {
+  document.getElementById('fortschritt-liste').innerHTML = FORTSCHRITT_ARTEN.map(previewFortschrittKachel).join('');
+  document.getElementById('fortschritt-modal').classList.add('open');
+};
+window.waehleFortschrittArt = (id) => {
+  FORTSCHRITT_ARTEN.forEach(a => { if (a.id) document.body.classList.remove(a.id); });
+  if (id) document.body.classList.add(id);
+  localStorage.setItem('fs_fortschritt', id);
+  document.getElementById('fortschritt-liste').innerHTML = FORTSCHRITT_ARTEN.map(previewFortschrittKachel).join('');
+  toast('Fortschritt-Anzeige aktualisiert ✓');
 };
 
 
