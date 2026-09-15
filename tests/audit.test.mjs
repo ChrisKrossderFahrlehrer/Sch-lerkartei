@@ -75,6 +75,18 @@ await testEnv.withSecurityRulesDisabled(async (ctx) => {
     vorname: 'Lena', nachname: 'Mertens', fahrstunden: 24,
     uebernommenVon: LEHRER, uebernommenAm: Date.now(),
   });
+  // customFields fuehrt laut Regeldatei NUR 'uid', keine fahrschuleId.
+  await setDoc(doc(db, 'customFields', 'feld-ohne-fsid'), {
+    uid: LEHRER, name: 'Fuehrerscheinstelle', wert: 'Göppingen',
+  });
+  await setDoc(doc(db, 'customThemen', 'thema-ohne-fsid'), {
+    uid: LEHRER_IN_SCHULE, name: 'Anhaenger rangieren',
+  });
+  // Protokolleintrag, der bereits der Schule gehoert
+  await setDoc(doc(db, 'protokoll', 'eintrag-schule'), {
+    uid: LEHRER_IN_SCHULE, fahrschuleId: SCHULE,
+    studentId: 'uebernommener-schueler', notiz: 'Autobahn geuebt.',
+  });
   // Ein gueltiger Zugangscode, Dokument-ID = Code (so legt die App ihn an)
   await setDoc(doc(db, 'accessCodes', CODE), {
     code: CODE, studentId: 'uebernommener-schueler', teacherUid: LEHRER,
@@ -165,6 +177,25 @@ await pruefe('Lehrer IN einer Schule sieht den uebernommenen Schueler der Schule
 await pruefe('Die Fahrschule selbst sieht den uebernommenen Schueler', async () => {
   const db = als(SCHULE);
   await assertSucceeds(getDoc(doc(db, 'students', 'uebernommener-schueler')));
+});
+
+// docBelongsToUser gilt auch fuer customFields/customThemen/customGruppen.
+// customFields fuehrt laut Regeldatei NUR ein uid-Feld, gar keine
+// fahrschuleId - ohne den Vorgabewert in eigenerDatensatz() waeren damit
+// alle eigenen Felder unsichtbar geworden.
+await pruefe('Eigenes Zusatzfeld OHNE fahrschuleId bleibt lesbar', async () => {
+  const db = als(LEHRER);
+  await assertSucceeds(getDoc(doc(db, 'customFields', 'feld-ohne-fsid')));
+});
+
+await pruefe('Eigenes Thema OHNE fahrschuleId bleibt lesbar', async () => {
+  const db = als(LEHRER_IN_SCHULE);
+  await assertSucceeds(getDoc(doc(db, 'customThemen', 'thema-ohne-fsid')));
+});
+
+await pruefe('Eigener Protokolleintrag der aktuellen Schule bleibt lesbar', async () => {
+  const db = als(LEHRER_IN_SCHULE);
+  await assertSucceeds(getDoc(doc(db, 'protokoll', 'eintrag-schule')));
 });
 
 // ══════════════════════════════════════════════════════════════════
