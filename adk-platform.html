@@ -784,9 +784,20 @@ window.doLogin = async () => {
 // Fahrschul-Code im selben Format wie in index.html: FS- plus vier Zeichen
 // ohne I, O, 0 und 1, damit er am Telefon nicht verwechselt werden kann.
 function neuerFahrschulCode() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // kein I,O,0,1
+  // Gleicher Massstab wie in index.html: echter Zufallsgenerator statt
+  // Math.random(), sechs Zeichen statt vier. Dieser Code entscheidet, wer
+  // der Fahrschule beitreten darf.
   let code = 'FS-';
-  for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  const n = 6;
+  try {
+    const werte = new Uint8Array(n);
+    crypto.getRandomValues(werte);
+    for (let i = 0; i < n; i++) code += chars[werte[i] % chars.length];
+  } catch (e) {
+    console.warn('crypto.getRandomValues nicht verfuegbar:', e);
+    for (let i = 0; i < n; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  }
   return code;
 }
 

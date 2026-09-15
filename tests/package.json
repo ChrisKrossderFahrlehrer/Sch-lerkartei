@@ -3,9 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "cd .. && firebase emulators:exec --only firestore --project fahrsync-test \"node tests/rules.test.mjs && node tests/uebernahme.test.mjs\"",
+    "test": "node indizes.test.mjs && cd .. && firebase emulators:exec --only firestore --project fahrsync-test \"node tests/rules.test.mjs && node tests/uebernahme.test.mjs && node tests/audit.test.mjs && node tests/rechnung.test.mjs\"",
     "test:regeln": "cd .. && firebase emulators:exec --only firestore --project fahrsync-test \"node tests/rules.test.mjs\"",
-    "test:uebernahme": "cd .. && firebase emulators:exec --only firestore --project uebernahme \"node tests/uebernahme.test.mjs\""
+    "test:uebernahme": "cd .. && firebase emulators:exec --only firestore --project uebernahme \"node tests/uebernahme.test.mjs\"",
+    "test:audit": "cd .. && firebase emulators:exec --only firestore --project fahrsync-audit \"node tests/audit.test.mjs\"",
+    "test:rechnung": "cd .. && firebase emulators:exec --only firestore --project fahrsync-rechnung \"node tests/rechnung.test.mjs\"",
+    "test:indizes": "node indizes.test.mjs"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^3.0.4",

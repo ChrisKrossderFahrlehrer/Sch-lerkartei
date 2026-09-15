@@ -1517,11 +1517,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     <div id="schueler-form" style="display:none">
       <div style="text-align:center;margin-bottom:20px">
         <div style="font-size:2.5rem;margin-bottom:8px">🎓</div>
-        <div style="font-size:0.85rem;color:var(--muted);line-height:1.5">Gib den 6-stelligen Code ein,<br>den dein Fahrlehrer dir gegeben hat.</div>
+        <div style="font-size:0.85rem;color:var(--muted);line-height:1.5">Gib den Code ein,<br>den dein Fahrlehrer dir gegeben hat.</div>
       </div>
       <div class="form-group">
         <label class="form-label">Zugangscode</label>
-        <input class="form-input" id="inp-schueler-code" type="text" placeholder="z. B. AB1234" autocapitalize="characters" autocorrect="off" maxlength="6" style="font-size:1.4rem;letter-spacing:0.2em;text-align:center;font-family:'Syne',sans-serif;font-weight:800">
+        <input class="form-input" id="inp-schueler-code" type="text" placeholder="z. B. AB1234KLMN" autocapitalize="characters" autocorrect="off" maxlength="12" style="font-size:clamp(0.95rem,4.6vw,1.4rem);letter-spacing:0.1em;text-align:center;font-family:'Syne',sans-serif;font-weight:800">
       </div>
       <div id="schueler-code-error" style="color:var(--danger);font-size:0.8rem;text-align:center;min-height:18px;margin-bottom:8px"></div>
       <button class="btn-main" id="btn-schueler-code" onclick="doSchuelerLogin()">Akte öffnen →</button>
@@ -2395,7 +2395,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       </div></div>
       <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
         <div style="font-weight:700;margin-bottom:3px">🔑 Schüler-Zugangscode</div>
-        <div style="font-size:0.8rem;color:var(--muted)">🔑 Button in der Kartei generiert 6-stelligen Code. Schüler kann damit im Login-Bereich „Meine Akte" seine eigene Kartei (nur lesen) einsehen.</div>
+        <div style="font-size:0.8rem;color:var(--muted)">🔑 Button in der Kartei generiert einen Zugangscode. Schüler kann damit im Login-Bereich „Meine Akte" seine eigene Kartei (nur lesen) einsehen.</div>
       </div></div>
       <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
         <div style="font-weight:700;margin-bottom:3px">🎓 Prüfung bestanden</div>
@@ -2499,7 +2499,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     <div class="sheet-title">📋 Schüler-Zugangscode</div>
     <div style="text-align:center;margin:10px 0 20px">
       <div style="font-size:0.8rem;color:var(--muted);margin-bottom:16px">Dieser Code gibt dem Schüler Zugang zum Schüler-Portal.</div>
-      <div id="code-display" style="font-family:'Syne',sans-serif;font-size:2.5rem;font-weight:800;letter-spacing:0.15em;color:var(--accent);background:var(--surface2);border:2px solid var(--border);border-radius:16px;padding:20px 24px;margin-bottom:12px">––––––</div>
+      <div id="code-display" style="font-family:'Syne',sans-serif;font-size:clamp(1.4rem,7.4vw,2.5rem);font-weight:800;letter-spacing:0.08em;word-break:break-all;color:var(--accent);background:var(--surface2);border:2px solid var(--border);border-radius:16px;padding:20px 24px;margin-bottom:12px">––––––</div>
       <div id="code-valid-until" style="font-size:0.72rem;color:var(--muted)"></div>
     </div>
     <button class="btn-main" onclick="generateCode()" style="margin-bottom:8px">🔄 Neuen Code generieren</button>
@@ -3452,8 +3452,22 @@ window.setRegRole = (role) => {
 // Generiert einen lesbaren Fahrschul-Code: FS-XXXX (ohne verwechselbare Zeichen)
 function generateFahrschulCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // kein I,O,0,1
+  // SICHERHEIT: Dieser Code entscheidet, wer einer Fahrschule beitreten darf.
+  // Er stand hier auf Math.random() und vier Zeichen - waehrend direkt daneben
+  // beim Schueler-Code steht, dass Math.random() ausdruecklich nicht fuer
+  // sicherheitsrelevante Zwecke taugt. Jetzt derselbe Massstab: echter
+  // Zufallsgenerator und sechs Zeichen (32^6 statt 32^4, also das
+  // Tausendfache). Bereits vergebene Codes bleiben unveraendert gueltig.
   let code = 'FS-';
-  for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  const n = 6;
+  try {
+    const werte = new Uint8Array(n);
+    crypto.getRandomValues(werte);
+    for (let i = 0; i < n; i++) code += chars[werte[i] % chars.length];
+  } catch (e) {
+    console.warn('crypto.getRandomValues nicht verfuegbar:', e);
+    for (let i = 0; i < n; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  }
   return code;
 }
 
@@ -5458,7 +5472,7 @@ function renderDetail() {
         ${bf17DetailTag}
         ${ampelTag}
         <span onclick="openAdresseBearbeiten('${s.id}')" style="cursor:pointer;font-size:0.72rem;color:${s.strasse ? 'var(--muted)' : 'var(--danger)'};text-decoration:underline;text-decoration-style:dotted">
-          📍 ${s.strasse ? `${s.strasse}, ${s.plz||''} ${s.ort||''}` : 'Adresse fehlt (Ausbildungsnachweis)'}
+          📍 ${s.strasse ? `${escapeHtmlEigen(s.strasse)}, ${escapeHtmlEigen(s.plz||'')} ${escapeHtmlEigen(s.ort||'')}` : 'Adresse fehlt (Ausbildungsnachweis)'}
         </span>
       </div>
     </div>
@@ -5683,7 +5697,7 @@ function renderDetail() {
       <div class="section-body">
         <textarea class="notes-textarea" id="pruef-kommentar-ta"
           placeholder="z. B. Bereit für die Prüfung! Noch etwas Übung beim Einparken nötig…"
-          style="min-height:90px">${s.pruefKommentar||''}</textarea>
+          style="min-height:90px">${escapeHtmlEigen(s.pruefKommentar||'')}</textarea>
         <div style="display:flex;gap:8px;margin-top:8px">
           <button class="save-btn" onclick="savePruefKommentar()" style="flex:1">💾 Speichern</button>
           <button onclick="document.getElementById('pruef-kommentar-ta').value='';savePruefKommentar()"
@@ -6313,7 +6327,7 @@ function renderProtokollListe() {
   const eintraege = sorted.map(e => {
     const sterne = e.sterne ? '⭐'.repeat(e.sterne) : '';
     const maengelHTML = (e.maengel||[]).length
-      ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">${(e.maengel||[]).map(m=>`<span style="background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.3);color:var(--danger);border-radius:12px;padding:2px 8px;font-size:0.68rem">${m}</span>`).join('')}</div>`
+      ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">${(e.maengel||[]).map(m=>`<span style="background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.3);color:var(--danger);border-radius:12px;padding:2px 8px;font-size:0.68rem">${escapeHtmlEigen(m)}</span>`).join('')}</div>`
       : '';
     return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:4px">
       <div style="display:flex;align-items:center;justify-content:space-between">
@@ -7876,22 +7890,33 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.querySele
 // ─────────────────────────────────────────
 // SCHÜLER ZUGANGSCODE
 // ─────────────────────────────────────────
+// Laenge des Zugangscodes. SICHERHEITS-AUDIT (Befund F1): Der Code ist die
+// Dokument-ID in accessCodes, und die Leseregel laesst ein get() auf einen
+// nicht abgelaufenen Code auch ohne Anmeldung zu. Der Code ist damit das
+// einzige Geheimnis vor der kompletten Schuelerakte - Name, Lernstand,
+// Protokoll, Chat. Bei 6 Zeichen sind das 32^6 = rund 1,07 Milliarden
+// Moeglichkeiten; je mehr Codes gleichzeitig gueltig sind, desto kuerzer der
+// Weg zu einem Treffer. Mit 10 Zeichen sind es 32^10 = rund 1,1 Billiarden,
+// also das Millionenfache - Durchprobieren lohnt dann nicht mehr.
+// Bereits ausgegebene kuerzere Codes bleiben gueltig; sie laufen ueber ihre
+// Restlaufzeit aus und werden beim naechsten Erzeugen lang.
+const CODE_LAENGE = 10;
+
 function generateCodeStr() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 32 Zeichen, kein I/O/0/1
   // SICHERHEIT: bewusst crypto.getRandomValues() statt Math.random() -
   // letzteres ist ausdruecklich nicht fuer sicherheitsrelevante Zwecke
-  // gedacht und aus dem Generatorzustand vorhersagbar. Dieser Code ist der
-  // einzige Schutz der gesamten Schuelerakte. 256 ist durch 32 glatt
+  // gedacht und aus dem Generatorzustand vorhersagbar. 256 ist durch 32 glatt
   // teilbar, daher entsteht keine Verzerrung der Zeichenverteilung.
   let code = '';
   try {
-    const werte = new Uint8Array(6);
+    const werte = new Uint8Array(CODE_LAENGE);
     crypto.getRandomValues(werte);
-    for (let i = 0; i < 6; i++) code += chars[werte[i] % chars.length];
+    for (let i = 0; i < CODE_LAENGE; i++) code += chars[werte[i] % chars.length];
     return code;
   } catch (e) {
     console.warn('crypto.getRandomValues nicht verfuegbar:', e);
-    for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+    for (let i = 0; i < CODE_LAENGE; i++) code += chars[Math.floor(Math.random() * chars.length)];
     return code;
   }
 }
@@ -8930,7 +8955,7 @@ function renderProtokollScreen() {
       ? `<span style="background:rgba(88,166,255,0.15);color:var(--blue);border:1px solid rgba(88,166,255,0.35);border-radius:6px;padding:1px 7px;font-size:0.65rem;font-weight:700">📌 Planung</span>`
       : '';
     const maengelHTML = !isPlanung && (e.maengel||[]).length
-      ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px">${(e.maengel||[]).map(m=>`<span style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.25);color:var(--danger);border-radius:10px;padding:2px 9px;font-size:0.68rem">${m}</span>`).join('')}</div>`
+      ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px">${(e.maengel||[]).map(m=>`<span style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.25);color:var(--danger);border-radius:10px;padding:2px 9px;font-size:0.68rem">${escapeHtmlEigen(m)}</span>`).join('')}</div>`
       : '';
     return `<div style="background:var(--surface2);border:1px solid ${isPlanung?'rgba(88,166,255,0.3)':'var(--border)'};border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:4px;${isPlanung?'opacity:0.85':''}">
       <div style="display:flex;align-items:center;justify-content:space-between">

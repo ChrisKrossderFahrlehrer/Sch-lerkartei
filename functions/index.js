@@ -269,86 +269,7 @@ exports.trennKalenderVerbindung = onCall({ region: 'europe-west3' }, async (reqC
 // wechsel eine Rechnung - spaetere automatische Verlaengerungen ueber
 // PayPal loesen aktuell KEINE neue Rechnung aus. Fuer laufende monatliche
 // Rechnungen braeuchte es zusaetzlich einen PayPal-Webhook.
-const PDFDocument = require('pdfkit');
-
-const RECHNUNG_PLANS = {
-  solo:       { label: 'Solo (eigenstaendiger Fahrlehrer)', price: 9.99,  pricePlaner: 13.99 },
-  bis5:       { label: 'Fahrschule bis 5 Fahrlehrer',       price: 12.99, pricePlaner: 16.99 },
-  bis10:      { label: 'Fahrschule bis 10 Fahrlehrer',      price: 20.99, pricePlaner: 25.99 },
-  bis15:      { label: 'Fahrschule bis 15 Fahrlehrer',      price: 26.99, pricePlaner: 34.99 },
-  // setup/setupPlaner: einmalige Einrichtungsgebuehr fuer diese Stufe (siehe
-  // agb.html § 4) - dieselben Betraege wie im Client (index.html, PLANS.unbegrenzt).
-  unbegrenzt: { label: 'Fahrschule unbegrenzt',             price: 34.99, pricePlaner: 40.99, setup: 42.99, setupPlaner: 45.99 },
-};
-
-// Echte PayPal-Plan-IDs je Tarif (Standard/mit Planer) - dieselben wie im
-// Client (index.html, Konstante PLANS). Dient NUR der serverseitigen
-// Verifikation in bestaetigePaypalAbo: eine PayPal-Subscription-ID muss zu
-// GENAU diesem Plan gehoeren, sonst wird kein Abo aktiviert.
-const PAYPAL_PLAN_IDS = {
-  solo:       { id: 'P-4NU22633BD298162DNJFEWLI', idPlaner: 'P-5WR5028990092335YNJFEXYA', maxLehrer: 1 },
-  bis5:       { id: 'P-6MT978804E871203DNJFEY6I', idPlaner: 'P-62X57828ND5677308NJFEZVA', maxLehrer: 5 },
-  bis10:      { id: 'P-6PU84465TJ206253SNJFE2GI', idPlaner: 'P-0R339159LA0608445NJFE2ZQ', maxLehrer: 10 },
-  bis15:      { id: 'P-73W48950B2092742VNJFE3KY', idPlaner: 'P-3P20164845621960ANJFE35A', maxLehrer: 15 },
-  unbegrenzt: { id: 'P-22Y05276M00023207NJFE4ZA', idPlaner: 'P-4SF532859T7264908NJFE5PQ', maxLehrer: null },
-};
-
-function baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel, betrag, zahlungsart }) {
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 56 });
-    const chunks = [];
-    doc.on('data', c => chunks.push(c));
-    doc.on('end', () => resolve(Buffer.concat(chunks)));
-    doc.on('error', reject);
-
-    // Absenderzeile aus den tatsaechlich gefuellten Feldern bauen - vorher
-    // erzeugten leere Felder (v.a. die nie befuellte PLZ) Luecken wie
-    // "Name ·  ·  Ort" auf der Rechnung.
-    const stellerZeile = [
-      steller.name,
-      steller.strasse,
-      [steller.plz, steller.ort].filter(Boolean).join(' '),
-      steller.steuernummer ? `St-Nr. ${steller.steuernummer}` : null
-    ].map(t => String(t || '').trim()).filter(Boolean).join(' · ');
-    doc.fontSize(9).fillColor('#555').text(stellerZeile, { align: 'left' });
-    doc.moveDown(2);
-
-    doc.fontSize(11).fillColor('#000').text(empfaenger.name);
-    doc.text(empfaenger.strasse);
-    doc.text(`${empfaenger.plz} ${empfaenger.ort}`);
-    if (empfaenger.land) doc.text(empfaenger.land);
-    doc.moveDown(2);
-
-    doc.fontSize(18).fillColor('#000').text(`Rechnung Nr. ${nummer}`, { align: 'left' });
-    doc.moveDown(0.3);
-    doc.fontSize(10).fillColor('#555').text(`Rechnungsdatum: ${datum}`);
-    doc.moveDown(1.5);
-
-    const top = doc.y;
-    doc.fontSize(10).fillColor('#000');
-    doc.text('Beschreibung', 56, top, { width: 300 });
-    doc.text('Betrag', 400, top, { width: 140, align: 'right' });
-    doc.moveTo(56, top + 16).lineTo(539, top + 16).strokeColor('#ccc').stroke();
-
-    const rowY = top + 26;
-    doc.text(`${planLabel} – monatliches Abonnement`, 56, rowY, { width: 300 });
-    doc.text(`${betrag.toFixed(2).replace('.', ',')} €`, 400, rowY, { width: 140, align: 'right' });
-    doc.moveTo(56, rowY + 20).lineTo(539, rowY + 20).strokeColor('#ccc').stroke();
-
-    doc.fontSize(11).text('Gesamtbetrag', 56, rowY + 32, { width: 300 });
-    doc.font('Helvetica-Bold').text(`${betrag.toFixed(2).replace('.', ',')} €`, 400, rowY + 32, { width: 140, align: 'right' });
-    doc.font('Helvetica');
-
-    doc.moveDown(4);
-    doc.fontSize(9).fillColor('#333').text('Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.');
-    doc.moveDown(0.5);
-    doc.text(`Bezahlt per ${zahlungsart || 'PayPal'} – bereits vollständig beglichen.`);
-    doc.moveDown(2);
-    doc.fontSize(8).fillColor('#888').text(`${steller.name} · ${steller.email} · ${steller.web}`, { align: 'left' });
-
-    doc.end();
-  });
-}
+const { rechnungAnlegen, RECHNUNG_PLANS } = require('./rechnung');
 
 // (exports.erstelleRechnung ist entfallen - zusammen mit dem Knopf
 //  "Test-Rechnung erzeugen" in der App. Die Funktion war ihrem eigenen
@@ -360,8 +281,8 @@ function baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel, betra
 //  Echte Rechnungen entstehen ausschliesslich in den Webhooks:
 //  paypalWebhook (abgesichert ueber die Sale-ID) und stripeWebhook
 //  (ueber die Invoice-ID) - beide gegen Doppelanlage geschuetzt.
-//  Die Bausteine baueRechnungsPdf, RECHNUNG_PLANS und LAENDER bleiben,
-//  sie werden von genau diesen Webhooks gebraucht.
+//  Die Bausteine dafuer liegen seit dem Zusammenfuehren beider Zweige in
+//  ./rechnung.js (Nummernkreis, PDF, Ablage).
 
 exports.syncSlotToGoogleCalendar = onDocumentUpdated({ document: 'slots/{slotId}', secrets: [GOOGLE_CLIENT_SECRET] }, async (event) => {
   const before = event.data.before.data();
@@ -518,51 +439,6 @@ async function stripeAboAktivieren(billingColl, billingId, plan, planer, subscri
 // Zahlung (Checkout Session) als auch fuer jede spaetere monatliche
 // Verlaengerung (Stripe-Invoice) - dieselbe Logik, nur mit unterschiedlicher
 // Herkunft von Betrag/Zahlungsart/Idempotenz-Schluessel.
-async function stripeRechnungSpeichern({ billingId, empfaengerName, b, plan, planer, planInfo, betrag, zahlungsart, docId, referenzFelder }) {
-  const counterRef = admin.firestore().doc('platform/rechnungszaehler');
-  const nummer = await admin.firestore().runTransaction(async (tx) => {
-    const c = await tx.get(counterRef);
-    const jahr = new Date().getFullYear();
-    const bisher = c.exists ? (c.data().naechsteNummer || 1) : 1;
-    tx.set(counterRef, { naechsteNummer: bisher + 1 }, { merge: true });
-    return `${jahr}-${String(bisher).padStart(5, '0')}`;
-  });
-
-  const platDoc = await admin.firestore().doc('platform/impressum').get();
-  const platImp = platDoc.exists ? platDoc.data() : {};
-  const steller = {
-    name: platImp.name || 'Chriskoo', strasse: platImp.strasse || '',
-    plz: platImp.plz || '', ort: platImp.ort || '',
-    email: platImp.email || 'kontakt@fahrsync.de', web: platImp.web || 'fahrsync.de',
-    steuernummer: platImp.steuernummer || '050/240/09485',
-  };
-  const LAENDER = { DE: '', AT: 'Österreich', CH: 'Schweiz', XX: '' };
-  const empfaenger = {
-    name: empfaengerName,
-    strasse: b.rechnungsStrasse, plz: b.rechnungsPlz, ort: b.rechnungsOrt,
-    land: LAENDER[b.rechnungsLand || 'DE'] || '',
-  };
-  const datum = new Date().toLocaleDateString('de-DE');
-  const pdfBuffer = await baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel: planInfo.label, betrag, zahlungsart });
-
-  // FIX: Ein reiner check-then-write ("existiert schon eine Rechnung fuer
-  // dieses Ereignis?") ist bei zeitgleich zugestellten Retry-Webhooks nicht
-  // race-sicher. .create() auf einer deterministischen, aus dem jeweiligen
-  // Stripe-Ereignis abgeleiteten Dokument-ID ist dagegen atomar: der zweite
-  // Versuch schlaegt garantiert mit ALREADY_EXISTS (Code 6) fehl.
-  try {
-    await admin.firestore().collection('rechnungen').doc(docId).create({
-      nummer, empfaengerId: billingId, empfaengerName: empfaenger.name,
-      plan, planer: planer === '1', betrag, datum, erstelltAm: Date.now(),
-      pdfBase64: pdfBuffer.toString('base64'),
-      ...referenzFelder,
-    });
-  } catch (e) {
-    if (e.code === 6) { console.log('stripeWebhook: Rechnung bereits vorhanden (Retry), ignoriert'); return null; }
-    throw e;
-  }
-  return nummer;
-}
 
 // Erste Zahlung (Checkout Session), genutzt von BEIDEN Webhook-Zweigen
 // (sofortige Kartenzahlung und spaeter bestaetigte SEPA-Lastschrift).
@@ -589,10 +465,12 @@ async function stripeAboAktivierenUndRechnung(session, stripeEventId, zahlungsar
   }
 
   const betrag = planer === '1' ? planInfo.pricePlaner : planInfo.price;
-  const nummer = await stripeRechnungSpeichern({
-    billingId, empfaengerName: b.name || 'Kunde', b, plan, planer, planInfo, betrag, zahlungsart,
+  const nummer = await rechnungAnlegen({
+    billingId, empfaengerName: b.name || 'Kunde', b, plan,
+    planer: planer === '1', planInfo, betrag, zahlungsart,
     docId: `stripe_${session.id}`,
     referenzFelder: { stripeSessionId: session.id },
+    herkunft: 'stripeWebhook',
   });
   if (nummer) console.log('stripeWebhook: Rechnung', nummer, 'erzeugt fuer', billingColl, billingId, '(Ereignis', stripeEventId, ')');
 }
@@ -641,11 +519,13 @@ async function stripeVerlaengerungsRechnung(invoice, stripeEventId) {
   await admin.firestore().doc(`${billingColl}/${billingId}`).update({ aboLetzteZahlungAm: Date.now() });
 
   const betrag = invoice.amount_paid / 100;
-  const nummer = await stripeRechnungSpeichern({
-    billingId, empfaengerName: b.name || 'Kunde', b, plan, planer, planInfo, betrag,
+  const nummer = await rechnungAnlegen({
+    billingId, empfaengerName: b.name || 'Kunde', b, plan,
+    planer: planer === '1', planInfo, betrag,
     zahlungsart: 'Kreditkarte/SEPA (Verlängerung)',
     docId: `stripe_invoice_${invoice.id}`,
     referenzFelder: { stripeInvoiceId: invoice.id },
+    herkunft: 'stripeWebhook',
   });
   if (nummer) console.log('stripeWebhook: Verlaengerungs-Rechnung', nummer, 'erzeugt fuer', billingColl, billingId, '(Ereignis', stripeEventId, ')');
 }
@@ -804,8 +684,6 @@ exports.adminEmailBestaetigen = onCall(async (request) => {
   await admin.auth().updateUser(user.uid, { emailVerified: true });
   return { success: true, uid: user.uid };
 });
-
-
 
 
 // ═══════════════════════════════════════════════════════════════════
@@ -999,48 +877,17 @@ exports.paypalWebhook = onRequest(
           res.status(200).send('ok - keine Rechnungsadresse hinterlegt'); return;
         }
 
-        const counterRef = admin.firestore().doc('platform/rechnungszaehler');
-        const nummer = await admin.firestore().runTransaction(async (tx) => {
-          const c = await tx.get(counterRef);
-          const jahr = new Date().getFullYear();
-          const bisher = c.exists ? (c.data().naechsteNummer || 1) : 1;
-          tx.set(counterRef, { naechsteNummer: bisher + 1 }, { merge: true });
-          return `${jahr}-${String(bisher).padStart(5, '0')}`;
-        });
-
-        const platDoc = await admin.firestore().doc('platform/impressum').get();
-        const platImp = platDoc.exists ? platDoc.data() : {};
-        const steller = {
-          name: platImp.name || 'Chriskoo', strasse: platImp.strasse || '',
-          plz: platImp.plz || '', ort: platImp.ort || '',
-          email: platImp.email || 'kontakt@fahrsync.de', web: platImp.web || 'fahrsync.de',
-          steuernummer: platImp.steuernummer || '050/240/09485',
-        };
-        const LAENDER = { DE: '', AT: 'Österreich', CH: 'Schweiz', XX: '' };
-        const empfaenger = {
-          name: billingData.name || 'Kunde',
-          strasse: billingData.rechnungsStrasse, plz: billingData.rechnungsPlz, ort: billingData.rechnungsOrt,
-          land: LAENDER[billingData.rechnungsLand || 'DE'] || '',
-        };
-        const datum = new Date().toLocaleDateString('de-DE');
         const betrag = betragBezahlt || (billingData.aboPlaner ? planInfo.pricePlaner : planInfo.price);
-        const pdfBuffer = await baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel: planInfo.label, betrag, zahlungsart: 'PayPal' });
+        const nummer = await rechnungAnlegen({
+          billingId, empfaengerName: billingData.name || 'Kunde', b: billingData,
+          plan: billingData.abo, planer: !!billingData.aboPlaner, planInfo, betrag,
+          zahlungsart: 'PayPal',
+          docId: `paypal_${saleId}`,
+          referenzFelder: { paypalSaleId: saleId, paypalSubscriptionId: subscriptionId },
+          herkunft: 'paypalWebhook',
+        });
+        if (!nummer) { res.status(200).send('ok - bereits verarbeitet'); return; }
 
-        // FIX: derselbe Race wie beim Stripe-Webhook - PayPal stellt Events
-        // ebenfalls mehrfach zu. .create() auf deterministischer, aus der
-        // Sale-ID abgeleiteter Dokument-ID ist atomar statt check-then-write.
-        try {
-          await admin.firestore().collection('rechnungen').doc(`paypal_${saleId}`).create({
-            nummer, empfaengerId: billingId, empfaengerName: empfaenger.name,
-            plan: billingData.abo, planer: !!billingData.aboPlaner, betrag, datum,
-            erstelltAm: Date.now(),
-            pdfBase64: pdfBuffer.toString('base64'),
-            paypalSaleId: saleId, paypalSubscriptionId: subscriptionId,
-          });
-        } catch (e) {
-          if (e.code === 6) { console.log('paypalWebhook: Rechnung bereits vorhanden (Retry), ignoriert'); res.status(200).send('ok - bereits verarbeitet'); return; }
-          throw e;
-        }
         await admin.firestore().doc(`${billingColl}/${billingId}`).update({ aboLetzteZahlungAm: Date.now() });
         console.log('paypalWebhook: Rechnung', nummer, 'erzeugt fuer', billingColl, billingId);
       }

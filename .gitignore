@@ -1,3 +1,5 @@
 node_modules/
 tests/node_modules/
 *.log
+functions/node_modules/
+functions/package-lock.json

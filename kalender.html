@@ -614,7 +614,9 @@ function escHtml(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').rep
 // liefert in deutscher Sommerzeit zwischen 00:00 und 02:00 den Vortag - genau
 // die Stunden, in denen abends noch gearbeitet wird.
 function alsLokalesDatum(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
-function generateCode(){return Math.random().toString(36).substring(2,8).toUpperCase();}
+// (generateCode() entfernt - war definiert, wurde aber nirgends aufgerufen.
+//  Ein ungenutzter Generator fuer Zugangscodes auf Math.random()-Basis ist
+//  eine Falle fuer den naechsten, der ihn arglos benutzt.)
 function show(screen){
   document.getElementById('splash').style.display=screen==='splash'?'flex':'none';
   document.getElementById('auth-screen').style.display=screen==='auth'?'flex':'none';
@@ -948,7 +950,15 @@ function startCalStatusWatch() {
 window.kalenderVerbinden = async () => {
   try {
     if (!currentUser) { toast('Bitte zuerst anmelden.','error'); return; }
-    const stateId = 'st_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    // SICHERHEIT: Der state-Parameter ist der CSRF-Schutz des OAuth-Ablaufs.
+    // Waere er vorhersagbar, koennte ein Angreifer den Ruecksprung mit dem
+    // Code SEINES Google-Kontos auf einen fremden state lenken - dann haengt
+    // sein Kalender am Konto des Opfers. Math.random() ist dafuer nicht
+    // gedacht: aus wenigen Ausgaben laesst sich der Generatorzustand
+    // rekonstruieren. crypto.getRandomValues() ist es.
+    const zufall = new Uint8Array(16);
+    crypto.getRandomValues(zufall);
+    const stateId = 'st_' + Array.from(zufall, x => x.toString(16).padStart(2, '0')).join('');
     await setDoc(doc(db, 'oauthStates', stateId), { uid: currentUser.uid, createdAt: Date.now() });
     const params = new URLSearchParams({
       client_id: GOOGLE_OAUTH_CLIENT_ID,

@@ -3,14 +3,19 @@
     "source": "functions"
   },
   "firestore": {
-    "rules": "firestore.rules"
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
   },
   "storage": {
     "rules": "storage.rules",
     "bucket": "fahrschule-ebc65-eu-storage"
   },
   "emulators": {
-    "firestore": { "port": 8089 },
-    "ui": { "enabled": false }
+    "firestore": {
+      "port": 8089
+    },
+    "ui": {
+      "enabled": false
+    }
   }
 }

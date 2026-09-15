@@ -81,10 +81,28 @@ service cloud.firestore {
     // Wer seine eigene Schule ist (Inhaber, Einzel-Fahrlehrer) oder auf
     // eigene Datensaetze (uid) zugreift, ist davon nicht betroffen - so wird
     // kein bestehendes Konto ausgesperrt.
+    // SICHERHEITS-AUDIT (Befund F3, im Emulator nachgewiesen): Der zweite
+    // Zweig stand vorher allein als "resData.uid == request.auth.uid" da und
+    // galt damit unbefristet. Nach uebernehmeSchuelerInFahrschule zeigt
+    // fahrschuleId auf die Schule, uid aber weiterhin auf den alten Lehrer -
+    // verliess dieser die Schule, konnte er ihre Schueler weiterhin lesen,
+    // aendern und LOESCHEN. Jetzt gilt der uid-Zweig nur noch, solange der
+    // Datensatz auch wirklich zu ihm gehoert: entweder ihm selbst
+    // (fahrschuleId == eigene uid, der eigenstaendige Fahrlehrer) oder seiner
+    // AKTUELLEN Fahrschule. Beides deckt die Faelle ab, wegen derer der Zweig
+    // ueberhaupt existiert - eigene Schueler bleiben sichtbar, auch solche,
+    // die noch nicht in die Schule uebernommen wurden.
+    function eigenerDatensatz(resData) {
+      return resData.uid == request.auth.uid && (
+               resData.get('fahrschuleId', request.auth.uid) == request.auth.uid ||
+               resData.get('fahrschuleId', request.auth.uid) == userFsId()
+             );
+    }
+
     function docBelongsToUser(resData) {
       return (resData.fahrschuleId == userFsId() &&
               (userFsId() == request.auth.uid || istFreigegeben())) ||
-             resData.uid == request.auth.uid;
+             eigenerDatensatz(resData);
     }
 
     // SICHERHEITS-AUDIT: Cross-Tenant-Schutz fuer Schueler/Protokoll/Custom-*.
