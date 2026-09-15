@@ -5458,7 +5458,7 @@ function renderDetail() {
         ${bf17DetailTag}
         ${ampelTag}
         <span onclick="openAdresseBearbeiten('${s.id}')" style="cursor:pointer;font-size:0.72rem;color:${s.strasse ? 'var(--muted)' : 'var(--danger)'};text-decoration:underline;text-decoration-style:dotted">
-          📍 ${s.strasse ? `${s.strasse}, ${s.plz||''} ${s.ort||''}` : 'Adresse fehlt (Ausbildungsnachweis)'}
+          📍 ${s.strasse ? `${escapeHtmlEigen(s.strasse)}, ${escapeHtmlEigen(s.plz||'')} ${escapeHtmlEigen(s.ort||'')}` : 'Adresse fehlt (Ausbildungsnachweis)'}
         </span>
       </div>
     </div>
@@ -5683,7 +5683,7 @@ function renderDetail() {
       <div class="section-body">
         <textarea class="notes-textarea" id="pruef-kommentar-ta"
           placeholder="z. B. Bereit für die Prüfung! Noch etwas Übung beim Einparken nötig…"
-          style="min-height:90px">${s.pruefKommentar||''}</textarea>
+          style="min-height:90px">${escapeHtmlEigen(s.pruefKommentar||'')}</textarea>
         <div style="display:flex;gap:8px;margin-top:8px">
           <button class="save-btn" onclick="savePruefKommentar()" style="flex:1">💾 Speichern</button>
           <button onclick="document.getElementById('pruef-kommentar-ta').value='';savePruefKommentar()"
@@ -6313,7 +6313,7 @@ function renderProtokollListe() {
   const eintraege = sorted.map(e => {
     const sterne = e.sterne ? '⭐'.repeat(e.sterne) : '';
     const maengelHTML = (e.maengel||[]).length
-      ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">${(e.maengel||[]).map(m=>`<span style="background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.3);color:var(--danger);border-radius:12px;padding:2px 8px;font-size:0.68rem">${m}</span>`).join('')}</div>`
+      ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">${(e.maengel||[]).map(m=>`<span style="background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.3);color:var(--danger);border-radius:12px;padding:2px 8px;font-size:0.68rem">${escapeHtmlEigen(m)}</span>`).join('')}</div>`
       : '';
     return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:4px">
       <div style="display:flex;align-items:center;justify-content:space-between">
@@ -8930,7 +8930,7 @@ function renderProtokollScreen() {
       ? `<span style="background:rgba(88,166,255,0.15);color:var(--blue);border:1px solid rgba(88,166,255,0.35);border-radius:6px;padding:1px 7px;font-size:0.65rem;font-weight:700">📌 Planung</span>`
       : '';
     const maengelHTML = !isPlanung && (e.maengel||[]).length
-      ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px">${(e.maengel||[]).map(m=>`<span style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.25);color:var(--danger);border-radius:10px;padding:2px 9px;font-size:0.68rem">${m}</span>`).join('')}</div>`
+      ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px">${(e.maengel||[]).map(m=>`<span style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.25);color:var(--danger);border-radius:10px;padding:2px 9px;font-size:0.68rem">${escapeHtmlEigen(m)}</span>`).join('')}</div>`
       : '';
     return `<div style="background:var(--surface2);border:1px solid ${isPlanung?'rgba(88,166,255,0.3)':'var(--border)'};border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:4px;${isPlanung?'opacity:0.85':''}">
       <div style="display:flex;align-items:center;justify-content:space-between">
