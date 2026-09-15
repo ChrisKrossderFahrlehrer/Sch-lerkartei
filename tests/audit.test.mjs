@@ -19,7 +19,8 @@ const REGELN = process.env.REGELN
   || join(dirname(fileURLToPath(import.meta.url)), '..', 'firestore.rules');
 
 const SCHULE  = 'schule-uid';
-const LEHRER  = 'lehrer-uid';
+const LEHRER  = 'lehrer-uid';            // AUSGETRETEN aus der Schule
+const LEHRER_IN_SCHULE = 'lehrer2-uid';  // gehoert der Schule weiterhin an
 const FREMD   = 'fremder-uid';
 const CODE     = 'K7M4PQ';              // 6 Zeichen - so lang sind die echten
 const IN_EINEM_JAHR = Date.now() + 365 * 24 * 3600 * 1000;
@@ -51,6 +52,21 @@ await testEnv.withSecurityRulesDisabled(async (ctx) => {
   await setDoc(doc(db, 'users', FREMD), {
     uid: FREMD, rolle: 'fahrlehrer', typ: 'fahrlehrer',
     status: 'aktiv', fahrschuleId: FREMD,
+  });
+  // Ein zweiter Lehrer, der der Schule weiterhin angehoert
+  await setDoc(doc(db, 'users', LEHRER_IN_SCHULE), {
+    uid: LEHRER_IN_SCHULE, rolle: 'fahrlehrer', typ: 'fahrlehrer',
+    status: 'aktiv', fahrschuleId: SCHULE,
+  });
+  // Eigener Schueler eines eigenstaendigen Lehrers: fahrschuleId == eigene uid
+  await setDoc(doc(db, 'students', 'eigener-schueler'), {
+    uid: LEHRER, fahrschuleId: LEHRER, vorname: 'Jonas', nachname: 'Klein',
+  });
+  // Schueler eines Lehrers, der einer Schule beigetreten ist, aber noch nicht
+  // uebernommen hat: fahrschuleId zeigt weiter auf den Lehrer selbst.
+  await setDoc(doc(db, 'students', 'noch-nicht-uebernommen'), {
+    uid: LEHRER_IN_SCHULE, fahrschuleId: LEHRER_IN_SCHULE,
+    vorname: 'Mia', nachname: 'Schulz',
   });
   // Schueler wurde per uebernehmeSchuelerInFahrschule an die Schule uebergeben:
   // fahrschuleId zeigt auf die Schule, uid steht noch auf dem alten Lehrer.
@@ -105,23 +121,50 @@ await pruefe('Ein FREMDER Fahrlehrer kann das Code-Dokument ebenfalls lesen', as
 });
 
 // ══════════════════════════════════════════════════════════════════
-console.log('\nBEFUND 2 — Ausgetretener Lehrer behaelt Zugriff auf Schueler der Schule');
-console.log('  (docBelongsToUser erlaubt alles, sobald resource.data.uid == eigene uid)');
+// BEHOBEN: der uid-Zweig in docBelongsToUser gilt nur noch, solange der
+// Datensatz dem Lehrer selbst oder seiner AKTUELLEN Fahrschule gehoert.
+console.log('\nBEFUND 2 (behoben) — Ausgetretener Lehrer ist ausgesperrt');
 
-await pruefe('Ausgetretener Lehrer kann den Schueler der Schule noch LESEN', async () => {
+await pruefe('Ausgetretener Lehrer darf den Schueler der Schule NICHT mehr lesen', async () => {
   const db = als(LEHRER);
-  const snap = await assertSucceeds(getDoc(doc(db, 'students', 'uebernommener-schueler')));
-  if (!snap.exists()) throw new Error('Dokument kam nicht zurueck');
+  await assertFails(getDoc(doc(db, 'students', 'uebernommener-schueler')));
 });
 
-await pruefe('Ausgetretener Lehrer kann den Schueler der Schule noch AENDERN', async () => {
+await pruefe('Ausgetretener Lehrer darf den Schueler der Schule NICHT mehr aendern', async () => {
   const db = als(LEHRER);
-  await assertSucceeds(updateDoc(doc(db, 'students', 'uebernommener-schueler'), { fahrstunden: 99 }));
+  await assertFails(updateDoc(doc(db, 'students', 'uebernommener-schueler'), { fahrstunden: 99 }));
 });
 
-await pruefe('Ausgetretener Lehrer kann den Schueler der Schule LOESCHEN', async () => {
+await pruefe('Ausgetretener Lehrer darf den Schueler der Schule NICHT loeschen', async () => {
   const db = als(LEHRER);
-  await assertSucceeds(deleteDoc(doc(db, 'students', 'uebernommener-schueler')));
+  await assertFails(deleteDoc(doc(db, 'students', 'uebernommener-schueler')));
+});
+
+// ══════════════════════════════════════════════════════════════════
+// Die Gegenprobe zur Verschaerfung: Sie darf niemanden aussperren, der
+// rechtmaessig zugreift. Besonders heikel ist der Lehrer, der einer Schule
+// beigetreten ist, dessen Schueler aber noch NICHT uebernommen wurden -
+// deren fahrschuleId zeigt weiter auf ihn selbst.
+console.log('\nGEGENPROBE zur Verschaerfung — niemand darf ausgesperrt werden');
+
+await pruefe('Eigenstaendiger Lehrer sieht seinen eigenen Schueler', async () => {
+  const db = als(LEHRER);
+  await assertSucceeds(getDoc(doc(db, 'students', 'eigener-schueler')));
+});
+
+await pruefe('Lehrer IN einer Schule sieht seinen noch nicht uebernommenen Schueler', async () => {
+  const db = als(LEHRER_IN_SCHULE);
+  await assertSucceeds(getDoc(doc(db, 'students', 'noch-nicht-uebernommen')));
+});
+
+await pruefe('Lehrer IN einer Schule sieht den uebernommenen Schueler der Schule', async () => {
+  const db = als(LEHRER_IN_SCHULE);
+  await assertSucceeds(getDoc(doc(db, 'students', 'uebernommener-schueler')));
+});
+
+await pruefe('Die Fahrschule selbst sieht den uebernommenen Schueler', async () => {
+  const db = als(SCHULE);
+  await assertSucceeds(getDoc(doc(db, 'students', 'uebernommener-schueler')));
 });
 
 // ══════════════════════════════════════════════════════════════════
