@@ -431,7 +431,7 @@ html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--tex
 
 <script type="module">
 import { initializeApp }    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getMessaging, getToken, isSupported } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
 import { getFirestore, doc, getDoc, onSnapshot, updateDoc }
@@ -487,8 +487,46 @@ const ADK_STUFE_LANG = (v) => (ADK_STUFE(v) || {}).lang  || 'Noch nicht behandel
 const ADK_STUFE_KURZ = (v) => (ADK_STUFE(v) || {}).kurz  || '–';
 const ADK_STUFE_FARB = (v) => (ADK_STUFE(v) || {}).farbe || '#6b7fa8';
 
+// ── Sitzung ────────────────────────────────────────────────────
+// SICHERHEITS-AUDIT (Befund F1/F2, Stufe 1 von 2): Das Portal hat bisher
+// voellig OHNE Anmeldung auf accessCodes zugegriffen - signInAnonymously lief
+// nur, wenn jemand Benachrichtigungen einschaltete. Die Leseregel muss deshalb
+// bis heute einen Zweig ganz ohne isAuth() offenhalten, und ueber den kommt
+// jeder an die Schuelerakte, der eine gueltige Dokument-ID errät.
+//
+// Dieser Schritt aendert nur den Client: das Portal meldet sich still an,
+// BEVOR es irgendetwas liest oder schreibt. An den Regeln aendert sich nichts,
+// es kann also niemand ausgesperrt werden. Erst wenn diese Fassung ueberall
+// ausgeliefert ist, wird in Stufe 2 die Regel verschaerft.
+//
+// Schlaegt die Anmeldung fehl, laeuft alles weiter wie bisher - solange die
+// Regel noch beide Wege erlaubt, ist das nur ein Verlust an Schutz, kein
+// Ausfall. Ab Stufe 2 waere es ein harter Fehler, deshalb wird er protokolliert.
+let __sitzung = null;
+function sitzungSichern() {
+  if (__sitzung) return __sitzung;
+  const auth = getAuth(app);
+  __sitzung = new Promise((fertig) => {
+    // Erst abwarten, ob aus einem frueheren Besuch schon eine Sitzung im
+    // Browser liegt - sonst entstuende bei jedem Aufruf ein neues Konto.
+    const unsub = onAuthStateChanged(auth, async (nutzer) => {
+      unsub();
+      if (nutzer) { fertig(nutzer); return; }
+      try {
+        const cred = await signInAnonymously(auth);
+        fertig(cred.user);
+      } catch (e) {
+        console.warn('Anonyme Anmeldung fehlgeschlagen:', e && e.code, e && e.message);
+        fertig(null);
+      }
+    }, (e) => { unsub(); console.warn('Anmeldestatus:', e); fertig(null); });
+  });
+  return __sitzung;
+}
+
 // ── Loading ────────────────────────────────────────────────────
-setTimeout(() => {
+setTimeout(async () => {
+  await sitzungSichern();
   document.getElementById('loading-overlay').style.display = 'none';
   // Auto-Login: aus URL-Parameter oder sessionStorage
   const urlParams = new URLSearchParams(window.location.search);
@@ -513,6 +551,7 @@ setTimeout(() => {
 
 async function pruefeUndStarteSitzung(docId, code) {
   try {
+    await sitzungSichern();        // vor jedem Zugriff, siehe oben
     const snap = await getDoc(doc(db, 'accessCodes', docId));
     const data = snap.exists() ? snap.data() : null;
     if (!data || (data.expiresAt && data.expiresAt < Date.now())) {
@@ -535,6 +574,7 @@ async function pruefeUndStarteSitzung(docId, code) {
 
 // ── Login ──────────────────────────────────────────────────────
 window.doLogin = async () => {
+  await sitzungSichern();          // vor jedem Zugriff, siehe oben
   const code  = (document.getElementById('inp-code').value || '').trim().toUpperCase();
   const errEl = document.getElementById('login-error');
   errEl.textContent = '';
@@ -1234,7 +1274,10 @@ window.portalPushAktivieren = async () => {
     const supported = await isSupported().catch(() => false);
     if (!supported) { portalToast('Dieser Browser unterstützt keine Benachrichtigungen.'); return; }
 
-    const cred = await signInAnonymously(getAuth());
+    // Dieselbe Sitzung wie beim Anmelden benutzen, statt eine zweite zu oeffnen.
+    const nutzer = await sitzungSichern();
+    if (!nutzer) { portalToast('Anmeldung fehlgeschlagen – bitte Seite neu laden.'); return; }
+    const cred = { user: nutzer };
     const reg  = await navigator.serviceWorker.ready;
     const tok  = await getToken(getMessaging(), { vapidKey: VAPID_PORTAL, serviceWorkerRegistration: reg });
     if (!tok) { portalToast('Kein Token erhalten – bitte erneut versuchen.'); return; }
