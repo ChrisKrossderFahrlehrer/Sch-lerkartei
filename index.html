@@ -1517,7 +1517,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     <div id="schueler-form" style="display:none">
       <div style="text-align:center;margin-bottom:20px">
         <div style="font-size:2.5rem;margin-bottom:8px">🎓</div>
-        <div style="font-size:0.85rem;color:var(--muted);line-height:1.5">Gib den 6-stelligen Code ein,<br>den dein Fahrlehrer dir gegeben hat.</div>
+        <div style="font-size:0.85rem;color:var(--muted);line-height:1.5">Gib den Code ein,<br>den dein Fahrlehrer dir gegeben hat.</div>
       </div>
       <div class="form-group">
         <label class="form-label">Zugangscode</label>
@@ -2395,7 +2395,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       </div></div>
       <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
         <div style="font-weight:700;margin-bottom:3px">🔑 Schüler-Zugangscode</div>
-        <div style="font-size:0.8rem;color:var(--muted)">🔑 Button in der Kartei generiert 6-stelligen Code. Schüler kann damit im Login-Bereich „Meine Akte" seine eigene Kartei (nur lesen) einsehen.</div>
+        <div style="font-size:0.8rem;color:var(--muted)">🔑 Button in der Kartei generiert einen Zugangscode. Schüler kann damit im Login-Bereich „Meine Akte" seine eigene Kartei (nur lesen) einsehen.</div>
       </div></div>
       <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
         <div style="font-weight:700;margin-bottom:3px">🎓 Prüfung bestanden</div>
@@ -3452,8 +3452,22 @@ window.setRegRole = (role) => {
 // Generiert einen lesbaren Fahrschul-Code: FS-XXXX (ohne verwechselbare Zeichen)
 function generateFahrschulCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // kein I,O,0,1
+  // SICHERHEIT: Dieser Code entscheidet, wer einer Fahrschule beitreten darf.
+  // Er stand hier auf Math.random() und vier Zeichen - waehrend direkt daneben
+  // beim Schueler-Code steht, dass Math.random() ausdruecklich nicht fuer
+  // sicherheitsrelevante Zwecke taugt. Jetzt derselbe Massstab: echter
+  // Zufallsgenerator und sechs Zeichen (32^6 statt 32^4, also das
+  // Tausendfache). Bereits vergebene Codes bleiben unveraendert gueltig.
   let code = 'FS-';
-  for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  const n = 6;
+  try {
+    const werte = new Uint8Array(n);
+    crypto.getRandomValues(werte);
+    for (let i = 0; i < n; i++) code += chars[werte[i] % chars.length];
+  } catch (e) {
+    console.warn('crypto.getRandomValues nicht verfuegbar:', e);
+    for (let i = 0; i < n; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  }
   return code;
 }
 
