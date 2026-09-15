@@ -6827,7 +6827,11 @@ function renderTeacherChat() {
     // unter openChat()) nicht laden. Zeigt jetzt wenigstens einen Hinweis.
     const inhalt = (m.imagePath || m.imageUrl)
       ? '📷 Bild – bitte über das 💬-Symbol öffnen, um es anzuzeigen'
-      : (m.text||'').replace(/</g,'&lt;');
+      // FIX(Audit): hier wurde nur '<' ersetzt. Gegen eingeschleuste Tags
+      // reicht das zwar, aber ein '&' blieb stehen - eine Nachricht mit
+      // "&lt;" wurde dem Fahrlehrer als "<" angezeigt. Dieselbe Funktion
+      // wie ueberall sonst, damit es an EINER Stelle festgelegt ist.
+      : escapeHtmlEigen(m.text || '');
     return `<div style="display:flex;flex-direction:column;align-items:${align}">
       ${!isFL ? `<div style="font-size:0.65rem;color:var(--muted);margin-bottom:2px">${escapeHtmlEigen(m.senderName||'Schüler')}</div>` : ''}
       <div style="max-width:80%;background:${bg};color:${color};border-radius:${radius};padding:10px 14px;font-size:0.88rem;line-height:1.45;word-break:break-word">${inhalt}</div>
@@ -8333,87 +8337,13 @@ window.doSchuelerLogin = async () => {
     return;
   }
   errEl.textContent = '';
+  // Ab hier stand frueher eine vollstaendige zweite Umsetzung des
+  // Schueler-Logins - unerreichbar hinter einem return, seit der Einstieg
+  // auf schueler-portal.html umgestellt wurde. Sie enthielt unter anderem
+  // noch eine list()-Abfrage auf accessCodes, die die Regeln zu Recht
+  // ablehnen. Entfernt, damit sie niemand fuer den gueltigen Weg haelt -
+  // der echte Login steht in schueler-portal.html.
   window.location.href = './schueler-portal.html?code=' + encodeURIComponent(code);
-  return;
-
-  // Alten Listener aufräumen
-  if (unsubSchuelerCode) { unsubSchuelerCode(); unsubSchuelerCode = null; }
-
-  try {
-    // FIX: Code laden per Dokument-ID (get – für nicht eingeloggte Schüler erlaubt),
-    // Fallback auf Query (list – nur für eingeloggte). Bisher wurde NUR die list-Query
-    // genutzt, die die Firestore-Regeln für unangemeldete Schüler sperren → der
-    // eingebaute Schüler-Login scheiterte mit 'permission-denied'. Spiegelt jetzt
-    // schueler-portal.html (dort am 19.6. bereits so gefixt).
-    let codeDoc = null, codeData = null;
-    const direct = await getDoc(doc(db,'accessCodes', code));
-    if (direct.exists()) {
-      codeDoc = direct; codeData = direct.data();
-    } else {
-      try {
-        const q    = query(collection(db,'accessCodes'), where('code','==',code));
-        const snap = await getDocs(q);
-        if (!snap.empty) { codeDoc = snap.docs[0]; codeData = snap.docs[0].data(); }
-      } catch(_) { /* list für nicht-eingeloggte gesperrt – bleibt bei 'ungültig' */ }
-    }
-    document.getElementById('loading').style.display = 'none';
-
-    if (!codeDoc || !codeData) {
-      document.getElementById('screen-login').classList.add('active');
-      switchTab('schueler');
-      errEl.textContent = 'Ungültiger Code.';
-      return;
-    }
-
-    if (codeData.expiresAt && codeData.expiresAt < Date.now()) {
-      document.getElementById('screen-login').classList.add('active');
-      switchTab('schueler');
-      errEl.textContent = 'Code abgelaufen – bitte neuen Code holen.';
-      return;
-    }
-
-    if (!codeData.studentSnapshot) {
-      document.getElementById('screen-login').classList.add('active');
-      switchTab('schueler');
-      inp.value = code;
-      errEl.textContent = '⚠️ Bitte neuen Code beim Fahrlehrer holen.';
-      return;
-    }
-
-    try {
-      if (!auth.currentUser || auth.currentUser.isAnonymous) {
-        if (!auth.currentUser) { await signInAnonymously(auth); }
-        const sUid = auth.currentUser.uid;
-        const sessRef = doc(db, 'studentSessions', sUid);
-        const sessSnap = await getDoc(sessRef);
-        if (!sessSnap.exists()) {
-          await setDoc(sessRef, {
-            code:         codeDoc.id,
-            studentId:    codeData.studentId    || null,
-            teacherUid:   codeData.teacherUid   || null,
-            fahrschuleId: codeData.fahrschuleId || null,
-            linkedAt:     Date.now()
-          });
-        }
-      }
-    } catch(linkErr) { console.warn('Schüler-Session-Verknüpfung:', linkErr); }
-
-    // Live-Listener auf dieses Code-Dokument
-    unsubSchuelerCode = onSnapshot(doc(db,'accessCodes',codeDoc.id), (docSnap) => {
-      if (!docSnap.exists()) return;
-      const data      = docSnap.data();
-      const schueler  = { ...data.studentSnapshot, id: data.studentId };
-      const protokoll = (data.protokollSnapshot || []).sort((a,b) => (b.createdAt||0)-(a.createdAt||0));
-      renderSchuelerAnsicht(schueler, protokoll);
-    });
-
-  } catch(e) {
-    console.error('[SCHÜLER] Fehler:', e);
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('screen-login').classList.add('active');
-    switchTab('schueler');
-    errEl.textContent = 'Fehler: ' + e.message;
-  }
 };
 
 function renderSchuelerAnsicht(s, protokoll) {
@@ -9900,10 +9830,29 @@ function checkFirstTime() {
 }
 
 // ── URL CODE CHECK (wenn Schüler Link aufruft) ──────────────
+// SICHERHEITS-AUDIT (F1/F2, Stufe 1): Hier lag der ZWEITE Zugriff auf
+// accessCodes ganz ohne Anmeldung - unterhalb wird der Code direkt gelesen
+// und die Schuelerakte angezeigt, waehrend niemand angemeldet ist. Genau
+// dieser Zweig muesste in Stufe 2 aufhoeren zu funktionieren.
+//
+// Der Weg ist ohnehin veraltet: Die App verteilt seit der Umstellung
+// schueler-portal.html?code=... (siehe die beiden Stellen, die portalUrl
+// bauen), und der Login von Hand leitet ebenfalls dorthin. Nur ALTE Links
+// auf index.html?code=... landen noch hier. Sie bleiben gueltig, gehen aber
+// ins gepflegte Portal - das sich vor dem ersten Lesen anmeldet und dem
+// Schueler ausserdem Chat, Termine und Lernstand zeigt statt nur der alten
+// Nur-Lese-Ansicht.
+//
+// Die alte Ansicht darunter bleibt vorerst unveraendert stehen: sollte sich
+// die Weiterleitung als falsch erweisen, genuegt es, diese eine Zeile wieder
+// zu entfernen. Aufraeumen erst, wenn sie sich bewaehrt hat.
 async function checkUrlCode() {
   const params = new URLSearchParams(window.location.search);
   const code   = params.get('code');
   if (!code) return;
+
+  window.location.replace('./schueler-portal.html?code=' + encodeURIComponent(code.toUpperCase()));
+  return;
 
   // Login-Screen verstecken, Lade-Hinweis zeigen
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
