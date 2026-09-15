@@ -145,8 +145,11 @@ html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--tex
 .code-input {
   width:100%; background:var(--surface2); border:2px solid var(--border);
   border-radius:12px; color:var(--text); font-family:'Syne',sans-serif;
-  font-size:1.8rem; font-weight:800; text-align:center; letter-spacing:0.18em;
-  padding:16px; margin:24px 0 12px; text-transform:uppercase;
+  /* Die Schrift skaliert mit der Fensterbreite, damit auch ein 10-stelliger
+     Code auf einem schmalen Handy vollstaendig ins Feld passt. */
+  font-size:clamp(0.95rem, 4.9vw, 1.8rem);
+  font-weight:800; text-align:center; letter-spacing:0.05em;
+  padding:16px 10px; margin:24px 0 12px; text-transform:uppercase;
   outline:none; transition:border-color .2s;
 }
 .code-input:focus { border-color:var(--accent); }
@@ -337,7 +340,7 @@ html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--tex
       <div class="login-title">Schüler-Portal</div>
       <div class="login-sub">ADK – Digitale Kartei</div>
     </div>
-    <input class="code-input" id="inp-code" type="text" maxlength="8"
+    <input class="code-input" id="inp-code" type="text" maxlength="12"
       placeholder="CODE" autocomplete="off" autocorrect="off" spellcheck="false"
       oninput="this.value=this.value.toUpperCase()"
       onkeydown="if(event.key==='Enter')doLogin()">
