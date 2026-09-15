@@ -126,8 +126,9 @@ for (const f of fehlend) {
   console.log(`      where[${f.filter.map(x => x.join(' ')).join(', ') || '-'}]  orderBy[${f.sortier.join(', ') || '-'}]`);
   console.log(`      Grund: ${f.grund}\n`);
 }
-console.log('  Fehlende Indizes ergaenzen und mit "firebase deploy --only firestore:indexes"');
-console.log('  veroeffentlichen. ACHTUNG: Dieser Befehl LOESCHT Indizes, die im Projekt');
-console.log('  existieren, aber nicht in der Datei stehen - vorher mit');
-console.log('  "firebase firestore:indexes" den Ist-Stand abgleichen.\n');
+console.log('  Fehlende Indizes in firestore.indexes.json ergaenzen und mit');
+console.log('  "firebase deploy --only firestore:indexes" veroeffentlichen.');
+console.log('  Fehlende werden angelegt, vorhandene uebersprungen. Was im Projekt');
+console.log('  existiert, aber in der Datei fehlt, wird nur AUFGELISTET und auf');
+console.log('  Rueckfrage geloescht (Vorgabe: nein) - ausser bei --force.\n');
 process.exit(1);
