@@ -1,13 +1,17 @@
 {
+  "id": "/index.html",
   "name": "ADK – Digitale Kartei",
   "short_name": "ADK",
   "description": "ADK – Digitale Fahrschul-Kartei für Fahrlehrer",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait",
   "background_color": "#0d1117",
   "theme_color": "#f0b429",
   "lang": "de",
+  "dir": "ltr",
   "icons": [
     {
       "src": "./icon-192.png?v=3",
