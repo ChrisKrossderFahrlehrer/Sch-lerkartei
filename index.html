@@ -1642,6 +1642,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     </div>
     <div class="filter-row" id="filter-row">
       <button class="filter-chip active" data-filter="alle"    onclick="setFilter('alle')">Alle</button>
+      <!-- Steht bewusst GLEICH VORN, nicht am Ende der Leiste: Die Leiste
+           scrollt seitlich, und in Berlin ist dieser Filter der eigentliche
+           Arbeitsweg - dort laesst sich nichts ableiten, also braucht JEDER
+           Schueler einen Eintrag. Am Ende waere er ausserhalb des Bildschirms
+           und damit praktisch nicht vorhanden. Erscheint nur, wenn ein
+           Bundesland hinterlegt ist. -->
+      <button class="filter-chip" id="filter-chip-pruef" style="display:none" data-filter="pruefOffen" onclick="setFilter('pruefOffen')">🏁 Prüfstelle offen</button>
       <button class="filter-chip"        data-filter="klasseB"  onclick="setFilter('klasseB')">🚗 Klasse B</button>
       <button class="filter-chip"        data-filter="klasseBE" onclick="setFilter('klasseBE')">🔗 BE</button>
       <button class="filter-chip"        data-filter="klasseA"  onclick="setFilter('klasseA')">🏍️ Klasse A</button>
@@ -2108,6 +2115,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       </select>
     </div>
     <div id="pruef-org-hinweis" style="font-size:0.75rem;color:var(--muted);line-height:1.5;margin:-6px 0 12px;min-height:18px"></div>
+    <div id="pruef-org-nachtrag" style="margin-bottom:12px"></div>
     <div id="pruef-org-status" style="font-size:0.8rem;min-height:18px;text-align:center;margin-bottom:8px"></div>
     <button class="btn-main" onclick="speicherePruefOrg()" style="margin-bottom:12px">💾 Speichern</button>
 
@@ -5181,6 +5189,17 @@ window.renderList = () => {
     return matchSearch && (isArchiv ? s.archiviert : !s.archiviert);
   });
 
+  // Der Prüfstellen-Filter ist nur sinnvoll, wenn ein Bundesland hinterlegt
+  // ist - sonst gäbe es gar keine Vorgabe, gegen die etwas "offen" wäre.
+  // Steht VOR dem Filtern, damit ein nicht mehr gültiger Filter nicht noch
+  // einmal angewendet wird.
+  const pruefChip = document.getElementById('filter-chip-pruef');
+  if (pruefChip) {
+    const anzeigen = !!(currentUser && currentUser._bundesland);
+    pruefChip.style.display = anzeigen ? '' : 'none';
+    if (!anzeigen && activeFilter === 'pruefOffen') activeFilter = 'alle';
+  }
+
   // Apply active filter
   switch(activeFilter) {
     case 'klasseA':  filtered = filtered.filter(s => s.klasse === 'A'); break;
@@ -5193,6 +5212,7 @@ window.renderList = () => {
       return !SONDER.every(f => (s.sonderfahrten||{})[f.key] >= f.min);
     }); break;
     case 'reif':     filtered = filtered.filter(s => overallProgress(s) >= 90); break;
+    case 'pruefOffen': filtered = filtered.filter(s => !s.pruefOrg); break;
     case 'archiv':   break; // already handled above
   }
 
@@ -7672,6 +7692,75 @@ window.bundeslandGewaehlt = () => {
   // Nur setzen, wenn es etwas abzuleiten gibt. In Berlin bleibt die Auswahl
   // bewusst leer, statt eine der beiden Organisationen zu raten.
   document.getElementById('inp-pruef-org').value = (bl && bl.org) || '';
+  renderPruefOrgNachtrag();
+};
+
+// Schueler, die es VOR dieser Funktion schon gab, tragen noch nichts. Je nach
+// Bundesland ist das unterschiedlich viel Arbeit - deshalb zwei Wege:
+//
+//   eindeutiges Land  ->  Sammel-Knopf. Achtzig Schueler in Bayern gehen alle
+//                         zum TUEV; sie einzeln anzutippen waere Unfug.
+//   Berlin            ->  KEIN Sammel-Knopf. Dort verteilen sich die Schueler
+//                         auf beide Organisationen, ein Sammelwert waere fuer
+//                         die Haelfte schlicht falsch. Stattdessen der
+//                         Hinweis auf den Listenfilter.
+function offeneSchuelerOhnePruefOrg() {
+  return students.filter(s => !s.archiviert && !s.pruefOrg);
+}
+
+function renderPruefOrgNachtrag() {
+  const box = document.getElementById('pruef-org-nachtrag');
+  if (!box) return;
+  const bl    = bundeslandInfo(document.getElementById('inp-bundesland').value);
+  const offen = offeneSchuelerOhnePruefOrg().length;
+  if (!bl || offen === 0) { box.innerHTML = ''; return; }
+
+  if (!bl.org) {
+    box.innerHTML = `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;font-size:0.78rem;line-height:1.5;color:var(--muted)">
+      In ${bl.name} prüfen beide Organisationen – deshalb gibt es hier bewusst kein Sammel-Setzen,
+      es wäre für einen Teil deiner Schüler falsch.<br>
+      <b style="color:var(--text)">${offen} Schüler ohne Angabe.</b> In der Schülerliste findest du sie
+      über den Filter <b style="color:var(--text)">🏁 Prüfstelle offen</b>.
+    </div>`;
+    return;
+  }
+  const name = PRUEF_ORG_NAME[bl.org];
+  box.innerHTML = `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;font-size:0.78rem;line-height:1.5;color:var(--muted)">
+      <b style="color:var(--text)">${offen} Schüler ohne Angabe.</b> In ${bl.name} prüft ${bl.stelle} –
+      für alle gleich.
+      <button onclick="setzePruefOrgFuerAlleOffenen()" style="margin-top:9px;width:100%;background:transparent;border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:8px;font-size:0.78rem;font-weight:700;cursor:pointer">
+        Alle ${offen} auf ${name} setzen
+      </button>
+    </div>`;
+}
+
+window.setzePruefOrgFuerAlleOffenen = async () => {
+  const bl = bundeslandInfo(document.getElementById('inp-bundesland').value);
+  if (!bl || !bl.org) return;
+  const offen = offeneSchuelerOhnePruefOrg();
+  if (!offen.length) return;
+  const name = PRUEF_ORG_NAME[bl.org];
+  if (!confirm(`${offen.length} Schüler ohne Angabe auf ${name} setzen?\n\nSchüler, bei denen schon etwas eingetragen ist, bleiben unberührt. Einzeln ändern kannst du es danach jederzeit.`)) return;
+
+  const statusEl = document.getElementById('pruef-org-status');
+  statusEl.style.color = 'var(--muted)'; statusEl.textContent = `Wird gesetzt… (0/${offen.length})`;
+  let fertig = 0, fehler = 0;
+  for (const s of offen) {
+    try {
+      // dbUpd statt saveToFirestore: Letzteres spiegelt bei JEDER Speicherung
+      // zusaetzlich den Portal-Schnappschuss - bei achtzig Schuelern waeren das
+      // achtzig ueberfluessige Abfragen fuer ein Feld, das im Portal gar nicht
+      // vorkommt.
+      await dbUpd(doc(db, 'students', s.id), { pruefOrg: bl.org });
+      s.pruefOrg = bl.org;
+      fertig++;
+    } catch (e) { fehler++; console.warn('pruefOrg Sammelsetzen:', s.id, e); }
+    statusEl.textContent = `Wird gesetzt… (${fertig}/${offen.length})`;
+  }
+  statusEl.style.color = fehler ? 'var(--danger)' : 'var(--accent2)';
+  statusEl.textContent = fehler ? `${fertig} gesetzt, ${fehler} fehlgeschlagen` : `✓ ${fertig} Schüler auf ${name} gesetzt`;
+  renderPruefOrgNachtrag();
+  try { renderList(); } catch (e) {}
 };
 
 window.speicherePruefOrg = async () => {
@@ -7685,6 +7774,12 @@ window.speicherePruefOrg = async () => {
     currentUser._pruefOrgStandard = pruefOrgStandard;
     statusEl.style.color = 'var(--accent2)'; statusEl.textContent = '✓ Gespeichert';
     setTimeout(() => { statusEl.textContent = ''; }, 2500);
+    // Die Liste neu aufbauen: Erst dort entscheidet sich, ob der Filter
+    // "🏁 Prüfstelle offen" sichtbar ist. Ohne das erschiene er erst beim
+    // naechsten Anlass irgendwann spaeter - der Fahrlehrer speichert Berlin,
+    // schliesst das Fenster und findet den Filter nicht.
+    renderPruefOrgNachtrag();
+    try { renderList(); } catch (e) {}
   } catch (e) {
     console.warn('speicherePruefOrg:', e);
     statusEl.style.color = 'var(--danger)'; statusEl.textContent = 'Fehler beim Speichern.';
@@ -7758,6 +7853,7 @@ window.openSettings = async () => {
     if (orgSel) orgSel.value = (currentUser && currentUser._pruefOrgStandard) || '';
     document.getElementById('pruef-org-hinweis').textContent = pruefOrgHinweisText(blSel.value);
     document.getElementById('pruef-org-status').textContent = '';
+    renderPruefOrgNachtrag();
   }
   document.getElementById('settings-modal').classList.add('open');
   // Fahrschul-Bereich befüllen (Code anzeigen ODER Beitritts-Feld)
