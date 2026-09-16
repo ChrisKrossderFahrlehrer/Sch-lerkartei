@@ -2091,6 +2091,27 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     </div>
 
     <div style="height:1px;background:var(--border);margin:0 0 16px"></div>
+    <div style="font-family:'Syne',sans-serif;font-size:0.75rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:12px">🏁 Prüforganisation</div>
+    <div style="font-size:0.78rem;color:var(--muted);line-height:1.5;margin-bottom:12px">
+      Wer die Fahrerlaubnisprüfung abnimmt, hängt am Bundesland. Die Auswahl hier gilt als Vorgabe für <b>neu angelegte</b> Schüler und lässt sich bei jedem Schüler einzeln ändern.
+    </div>
+    <div class="form-group">
+      <label class="form-label">Bundesland</label>
+      <select class="form-input" id="inp-bundesland" onchange="bundeslandGewaehlt()"></select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Vorgabe für neue Schüler</label>
+      <select class="form-input" id="inp-pruef-org">
+        <option value="">— keine Vorgabe —</option>
+        <option value="TUEV">TÜV</option>
+        <option value="DEKRA">DEKRA</option>
+      </select>
+    </div>
+    <div id="pruef-org-hinweis" style="font-size:0.75rem;color:var(--muted);line-height:1.5;margin:-6px 0 12px;min-height:18px"></div>
+    <div id="pruef-org-status" style="font-size:0.8rem;min-height:18px;text-align:center;margin-bottom:8px"></div>
+    <button class="btn-main" onclick="speicherePruefOrg()" style="margin-bottom:12px">💾 Speichern</button>
+
+    <div style="height:1px;background:var(--border);margin:0 0 16px"></div>
     <div style="font-family:'Syne',sans-serif;font-size:0.75rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:12px">📧 E-Mail-Adresse ändern</div>
 
     <div style="font-size:0.78rem;color:var(--muted);line-height:1.5;margin-bottom:12px" id="email-current-display"></div>
@@ -2755,6 +2776,28 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     </div>
     <div id="adresse-status" style="font-size:0.82rem;min-height:20px;margin-bottom:8px;text-align:center;padding:8px;border-radius:8px"></div>
     <button class="btn-main" onclick="speichereAdresse()">💾 Speichern</button>
+  </div>
+</div>
+
+<!-- PRÜFORGANISATION JE SCHÜLER (TÜV / DEKRA) -->
+<div class="modal-overlay" id="pruef-org-modal" onclick="closeModal(event)">
+  <div class="modal-sheet" style="max-width:420px">
+    <div class="sheet-title">🏁 Prüforganisation</div>
+    <p id="pruef-org-modal-hinweis" style="font-size:0.75rem;color:var(--muted);margin:-6px 0 14px;line-height:1.5;text-align:center"></p>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button onclick="setzePruefOrg('TUEV')" class="klasse-choice-btn pruef-org-wahl" data-org="TUEV">
+        <div style="font-weight:700">TÜV</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">Technische Prüfstelle der TÜV-Organisationen</div>
+      </button>
+      <button onclick="setzePruefOrg('DEKRA')" class="klasse-choice-btn pruef-org-wahl" data-org="DEKRA">
+        <div style="font-weight:700">DEKRA</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">Technische Prüfstelle der DEKRA</div>
+      </button>
+      <button onclick="setzePruefOrg('')" class="klasse-choice-btn pruef-org-wahl" data-org="">
+        <div style="font-weight:700;color:var(--muted)">— keine Angabe —</div>
+      </button>
+    </div>
+    <button class="btn-sheet-cancel" onclick="document.getElementById('pruef-org-modal').classList.remove('open')" style="margin-top:16px">Abbrechen</button>
   </div>
 </div>
 
@@ -4421,6 +4464,9 @@ onAuthStateChanged(auth, async (user) => {
         currentUser._fahrschuleId = profil.fahrschuleId || null;
         currentUser._rolle        = profil.rolle || 'fahrlehrer';
         currentUser._fsName       = profil.fahrschuleName || '';
+        // Prüforganisation: Bundesland und ausdrueckliche Vorgabe des Lehrers
+        currentUser._bundesland       = profil.bundesland || '';
+        currentUser._pruefOrgStandard = profil.pruefOrgStandard || '';
 
         // ── KALENDER-MODUL: Ist der Kalender für diesen Nutzer freigeschaltet? ──
         // Entweder die FAHRSCHULE ist freigeschaltet (fahrschulen.kalenderAktiv)
@@ -5473,6 +5519,9 @@ function renderDetail() {
         ${ampelTag}
         <span onclick="openAdresseBearbeiten('${s.id}')" style="cursor:pointer;font-size:0.72rem;color:${s.strasse ? 'var(--muted)' : 'var(--danger)'};text-decoration:underline;text-decoration-style:dotted">
           📍 ${s.strasse ? `${escapeHtmlEigen(s.strasse)}, ${escapeHtmlEigen(s.plz||'')} ${escapeHtmlEigen(s.ort||'')}` : 'Adresse fehlt (Ausbildungsnachweis)'}
+        </span>
+        <span onclick="openPruefOrgBearbeiten('${s.id}')" style="cursor:pointer;font-size:0.72rem;color:var(--muted);text-decoration:underline;text-decoration-style:dotted">
+          🏁 ${s.pruefOrg ? escapeHtmlEigen(PRUEF_ORG_NAME[s.pruefOrg] || s.pruefOrg) : 'Prüfstelle eintragen'}
         </span>
       </div>
     </div>
@@ -7202,6 +7251,9 @@ window.addStudent = async () => {
       zielSchaltstunden: zielSchalt,
       fahrstunden:0, sonderfahrten:{}, themen:{}, customThemen:{}, customFields:{}, notes:'',
       schaltstunden: 0, testfahrtBestanden: false,
+      // Aus dem Bundesland abgeleitet (⚙️ Einstellungen). In Berlin bleibt es
+      // leer, weil dort TÜV und DEKRA pruefen - das traegt der Fahrlehrer ein.
+      pruefOrg: pruefOrgVorgabe(),
       createdAt: Date.now()
     });
 
@@ -7554,6 +7606,129 @@ async function zeigeLoeschStatus() {
   }
 }
 
+// ── PRÜFORGANISATION (TÜV / DEKRA) ─────────────────────────────
+// Die Fahrerlaubnispruefung nimmt nicht die Fahrschule ab, sondern eine
+// amtlich bestellte Technische Pruefstelle. Welche das ist, haengt am
+// Bundesland, und die Regel dahinter ist erstaunlich klar:
+//
+//   Neue Bundeslaender  ->  DEKRA ist dort seit 1990 als einzige Technische
+//                           Pruefstelle bestellt.
+//   Alte Bundeslaender  ->  stets eine der TUEV-Organisationen. Welche, ist
+//                           regional verschieden (SUED, NORD, Rheinland,
+//                           Hessen) - fuer die Kartei zaehlt nur "TUEV".
+//   Berlin              ->  die Ausnahme: hier pruefen TUEV Rheinland UND
+//                           DEKRA. Deshalb dort KEINE Vorauswahl; der
+//                           Fahrlehrer traegt es je Schueler ein.
+//
+// Nordrhein-Westfalen ist zwar zwischen TUEV Rheinland (Rheinland) und
+// TUEV NORD (Westfalen) aufgeteilt - fuer die Unterscheidung TUEV/DEKRA
+// bleibt es trotzdem eindeutig.
+//
+// WICHTIG: Das ist eine VORAUSWAHL, keine Festlegung. Sie laesst sich in den
+// Einstellungen und bei jedem Schueler einzeln aendern. Zustaendigkeiten
+// koennen sich aendern, und die Kartei soll dem Fahrlehrer nicht
+// widersprechen - er weiss besser, wo er seine Schueler vorstellt.
+const PRUEF_ORG_NAME = { TUEV: 'TÜV', DEKRA: 'DEKRA' };
+const BUNDESLAENDER = [
+  { code:'BW', name:'Baden-Württemberg',      org:'TUEV',  stelle:'TÜV SÜD' },
+  { code:'BY', name:'Bayern',                 org:'TUEV',  stelle:'TÜV SÜD' },
+  { code:'BE', name:'Berlin',                 org:null,    stelle:'TÜV Rheinland und DEKRA' },
+  { code:'BB', name:'Brandenburg',            org:'DEKRA', stelle:'DEKRA' },
+  { code:'HB', name:'Bremen',                 org:'TUEV',  stelle:'TÜV NORD' },
+  { code:'HH', name:'Hamburg',                org:'TUEV',  stelle:'TÜV NORD' },
+  { code:'HE', name:'Hessen',                 org:'TUEV',  stelle:'TÜV Hessen' },
+  { code:'MV', name:'Mecklenburg-Vorpommern', org:'DEKRA', stelle:'DEKRA' },
+  { code:'NI', name:'Niedersachsen',          org:'TUEV',  stelle:'TÜV NORD' },
+  { code:'NW', name:'Nordrhein-Westfalen',    org:'TUEV',  stelle:'TÜV Rheinland / TÜV NORD' },
+  { code:'RP', name:'Rheinland-Pfalz',        org:'TUEV',  stelle:'TÜV Rheinland' },
+  { code:'SL', name:'Saarland',               org:'TUEV',  stelle:'TÜV Rheinland' },
+  { code:'SN', name:'Sachsen',                org:'DEKRA', stelle:'DEKRA' },
+  { code:'ST', name:'Sachsen-Anhalt',         org:'DEKRA', stelle:'DEKRA' },
+  { code:'SH', name:'Schleswig-Holstein',     org:'TUEV',  stelle:'TÜV NORD' },
+  { code:'TH', name:'Thüringen',              org:'DEKRA', stelle:'DEKRA' },
+];
+const bundeslandInfo = (code) => BUNDESLAENDER.find(b => b.code === code) || null;
+
+// Was bekommt ein NEU angelegter Schueler? Erst die ausdrueckliche Vorgabe des
+// Fahrlehrers, sonst die Ableitung aus dem Bundesland. In Berlin bleibt es
+// leer - dort gibt es nichts abzuleiten.
+function pruefOrgVorgabe() {
+  if (currentUser && currentUser._pruefOrgStandard) return currentUser._pruefOrgStandard;
+  const bl = bundeslandInfo(currentUser && currentUser._bundesland);
+  return (bl && bl.org) || '';
+}
+
+function pruefOrgHinweisText(code) {
+  const bl = bundeslandInfo(code);
+  if (!bl) return 'Ohne Bundesland gibt es keine Vorauswahl – du kannst die Organisation trotzdem je Schüler eintragen.';
+  if (!bl.org) return `In ${bl.name} prüfen ${bl.stelle}. Weil es beide gibt, wird nichts vorausgewählt – trag es bitte bei jedem Schüler ein.`;
+  return `In ${bl.name} nimmt ${bl.stelle} die Prüfung ab. Vorausgewählt: ${PRUEF_ORG_NAME[bl.org]}.`;
+}
+
+window.bundeslandGewaehlt = () => {
+  const code = document.getElementById('inp-bundesland').value;
+  const bl   = bundeslandInfo(code);
+  document.getElementById('pruef-org-hinweis').textContent = pruefOrgHinweisText(code);
+  // Nur setzen, wenn es etwas abzuleiten gibt. In Berlin bleibt die Auswahl
+  // bewusst leer, statt eine der beiden Organisationen zu raten.
+  document.getElementById('inp-pruef-org').value = (bl && bl.org) || '';
+};
+
+window.speicherePruefOrg = async () => {
+  const statusEl = document.getElementById('pruef-org-status');
+  const bundesland      = document.getElementById('inp-bundesland').value;
+  const pruefOrgStandard = document.getElementById('inp-pruef-org').value;
+  statusEl.style.color = 'var(--muted)'; statusEl.textContent = 'Wird gespeichert…';
+  try {
+    await dbUpd(doc(db, 'users', currentUser.uid), { bundesland, pruefOrgStandard });
+    currentUser._bundesland       = bundesland;
+    currentUser._pruefOrgStandard = pruefOrgStandard;
+    statusEl.style.color = 'var(--accent2)'; statusEl.textContent = '✓ Gespeichert';
+    setTimeout(() => { statusEl.textContent = ''; }, 2500);
+  } catch (e) {
+    console.warn('speicherePruefOrg:', e);
+    statusEl.style.color = 'var(--danger)'; statusEl.textContent = 'Fehler beim Speichern.';
+  }
+};
+
+// ── Je Schueler ────────────────────────────────────────────────
+window.openPruefOrgBearbeiten = (schuelerId) => {
+  const s = getStudent(schuelerId);
+  if (!s) return;
+  window.__pruefOrgSchuelerId = schuelerId;
+  const bl = bundeslandInfo(currentUser && currentUser._bundesland);
+  const hinweis = document.getElementById('pruef-org-modal-hinweis');
+  if (hinweis) {
+    hinweis.textContent = bl
+      ? (bl.org
+          ? `${bl.name}: die Prüfung nimmt ${bl.stelle} ab.`
+          : `${bl.name}: hier prüfen ${bl.stelle} – bitte auswählen.`)
+      : 'Bundesland noch nicht hinterlegt (⚙️ Einstellungen → Prüforganisation).';
+  }
+  document.querySelectorAll('.pruef-org-wahl').forEach(b => {
+    const ist = (b.dataset.org || '') === (s.pruefOrg || '');
+    b.style.borderColor = ist ? 'var(--accent)' : 'var(--border)';
+  });
+  __modalOpenGuardTs = Date.now();
+  document.getElementById('pruef-org-modal').classList.add('open');
+};
+
+window.setzePruefOrg = async (org) => {
+  const id = window.__pruefOrgSchuelerId;
+  if (!id) return;
+  try {
+    await saveToFirestore(id, { pruefOrg: org });
+    const s = getStudent(id);
+    if (s) s.pruefOrg = org;
+    document.getElementById('pruef-org-modal').classList.remove('open');
+    openDetail(id);
+    toast(org ? `🏁 Prüfung bei ${PRUEF_ORG_NAME[org]}` : '🏁 Angabe entfernt');
+  } catch (e) {
+    console.warn('setzePruefOrg:', e);
+    toast('❌ Konnte nicht gespeichert werden.');
+  }
+};
+
 window.openSettings = async () => {
   document.getElementById('inp-pw-alt').value = '';
   document.getElementById('inp-pw-neu').value = '';
@@ -7573,6 +7748,17 @@ window.openSettings = async () => {
   if (emDisp && currentUser) emDisp.innerHTML = 'Aktuelle E-Mail: <b>' + (currentUser.email || '–') + '</b>';
   const disp = document.getElementById('settings-username-display');
   if (disp && currentUser) disp.textContent = '👤 Angemeldet als: ' + (currentUser.displayName || '');
+  // Prüforganisation: Liste füllen und aktuellen Stand anzeigen
+  const blSel = document.getElementById('inp-bundesland');
+  if (blSel) {
+    blSel.innerHTML = '<option value="">— bitte wählen —</option>'
+      + BUNDESLAENDER.map(b => `<option value="${b.code}">${b.name}</option>`).join('');
+    blSel.value = (currentUser && currentUser._bundesland) || '';
+    const orgSel = document.getElementById('inp-pruef-org');
+    if (orgSel) orgSel.value = (currentUser && currentUser._pruefOrgStandard) || '';
+    document.getElementById('pruef-org-hinweis').textContent = pruefOrgHinweisText(blSel.value);
+    document.getElementById('pruef-org-status').textContent = '';
+  }
   document.getElementById('settings-modal').classList.add('open');
   // Fahrschul-Bereich befüllen (Code anzeigen ODER Beitritts-Feld)
   renderFscodeSection();
