@@ -10454,6 +10454,144 @@ window.closeVerkehrszeichen = () => {
   document.getElementById('screen-list').classList.add('active');
 };
 
+// ═══════════════════════════════════════════════════════════════
+// WISCHGESTE: vom linken Rand nach rechts = eine Ebene zurueck
+//
+// Auf dem iPhone ist das die gewohnte Art, zurueckzugehen - in einer zum
+// Home-Bildschirm hinzugefuegten App gibt es Safaris eigene Randgeste aber
+// gar nicht mehr. Dann bleibt nur der Pfeil oben links, und der ist mit dem
+// Daumen schlecht zu erreichen.
+//
+// Die Geste ruft dieselben Funktionen auf wie die Zurueck-Pfeile. Sie fuegt
+// also keinen zweiten Weg hinzu, der eigene Fehler machen koennte, sondern
+// nur einen zweiten Ausloeser fuer den vorhandenen.
+// ═══════════════════════════════════════════════════════════════
+
+// Von oben nach unten: Was zuerst offen ist, wird zuerst geschlossen.
+// Fenster (modal-overlay) liegen ueber allen Bildschirmen.
+const ZURUECK_EBENEN = [
+  { id:'screen-protokoll',       zu:() => window.closeProtokoll() },
+  { id:'screen-chat',            zu:() => window.closeChat() },
+  { id:'screen-verkehrszeichen', zu:() => window.closeVerkehrszeichen() },
+  { id:'screen-impressum',       zu:() => window.closeImpressum() },
+  { id:'screen-help',            zu:() => window.closeHelp() },
+  { id:'screen-dashboard',       zu:() => window.closeDashboard() },
+  { id:'screen-detail',          zu:() => window.goBack() },
+];
+
+// Was liegt gerade ganz oben? Gibt zurueck, WAS sich mitbewegen soll und
+// WIE es geschlossen wird - oder null, wenn es nichts zurueckzugehen gibt
+// (Liste, Login). Dann passiert beim Wischen bewusst gar nichts.
+function obersteZurueckEbene() {
+  const offeneFenster = [...document.querySelectorAll('.modal-overlay.open')];
+  if (offeneFenster.length) {
+    const fenster = offeneFenster[offeneFenster.length - 1];
+    return {
+      // Bewegt wird das Blatt, nicht der dunkle Hintergrund - sonst wandert
+      // die Abdunklung mit und es sieht aus wie ein Fehler.
+      bewegen: fenster.querySelector('.modal-sheet') || fenster,
+      zu: () => {
+        if (fenster.id === 'teacher-chat-modal' && window.closeTeacherChat) window.closeTeacherChat();
+        else fenster.classList.remove('open');
+      },
+    };
+  }
+  for (const ebene of ZURUECK_EBENEN) {
+    const el = document.getElementById(ebene.id);
+    if (el && el.classList.contains('active')) return { bewegen: el, zu: ebene.zu };
+  }
+  return null;
+}
+
+// Liegt unter dem Finger etwas, das selbst waagerecht scrollt? Die
+// Filterleiste und die Klassen-Tabs fangen am linken Rand an - ohne diese
+// Pruefung wuerde jeder Wisch dort die App zurueckschicken, statt zu scrollen.
+function scrolltWaagerecht(ziel) {
+  let el = ziel;
+  while (el && el !== document.body) {
+    if (el.scrollWidth > el.clientWidth + 2) {
+      const ox = getComputedStyle(el).overflowX;
+      if (ox === 'auto' || ox === 'scroll') return true;
+    }
+    el = el.parentElement;
+  }
+  return false;
+}
+
+(() => {
+  const RAND      = 30;   // nur ein Start in diesem Streifen zaehlt als Geste
+  const SCHWELLE  = 70;   // so weit muss gezogen werden
+  const MINDEST   = 12;   // ab hier gilt es ueberhaupt als waagerechter Zug
+  let start = null, ebene = null, zieht = false;
+
+  const aufraeumen = (el) => {
+    if (!el) return;
+    el.style.transition = '';
+    el.style.transform  = '';
+    el.style.opacity    = '';
+  };
+
+  document.addEventListener('touchstart', (e) => {
+    start = ebene = null; zieht = false;
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    if (t.clientX > RAND) return;
+    if (scrolltWaagerecht(e.target)) return;
+    const oben = obersteZurueckEbene();
+    if (!oben) return;
+    start = { x:t.clientX, y:t.clientY, zeit:Date.now() };
+    ebene = oben;
+  }, { passive:true });
+
+  document.addEventListener('touchmove', (e) => {
+    if (!start || !ebene) return;
+    const t = e.touches[0];
+    const dx = t.clientX - start.x, dy = t.clientY - start.y;
+    if (!zieht) {
+      // Senkrecht = der Nutzer will scrollen. Geste aufgeben, nicht stoeren.
+      if (Math.abs(dy) > Math.abs(dx)) { aufraeumen(ebene.bewegen); start = null; return; }
+      if (dx < MINDEST) return;
+      zieht = true;
+      ebene.bewegen.style.transition = 'none';
+    }
+    const weg = Math.max(0, dx);
+    ebene.bewegen.style.transform = 'translateX(' + weg + 'px)';
+    ebene.bewegen.style.opacity   = String(Math.max(0.4, 1 - weg / (window.innerWidth * 1.3)));
+  }, { passive:true });
+
+  document.addEventListener('touchend', (e) => {
+    const oben = ebene, gezogen = zieht, anfang = start;
+    start = ebene = null; zieht = false;
+    if (!oben || !anfang) return;
+    if (!gezogen) { aufraeumen(oben.bewegen); return; }
+
+    const dx = e.changedTouches[0].clientX - anfang.x;
+    // Ein kurzer, schneller Wisch zaehlt auch, wenn er nicht weit kam -
+    // so fuehlt es sich auf dem Telefon richtig an.
+    const schnell = (Date.now() - anfang.zeit) < 300 && dx > 40;
+    const el = oben.bewegen;
+
+    if (dx > SCHWELLE || schnell) {
+      el.style.transition = 'transform 0.18s ease-out, opacity 0.18s ease-out';
+      el.style.transform  = 'translateX(' + window.innerWidth + 'px)';
+      el.style.opacity    = '0';
+      setTimeout(() => { aufraeumen(el); try { oben.zu(); } catch (err) { console.warn('Wischgeste:', err); } }, 175);
+    } else {
+      el.style.transition = 'transform 0.2s ease-out, opacity 0.2s ease-out';
+      el.style.transform  = '';
+      el.style.opacity    = '';
+      setTimeout(() => aufraeumen(el), 220);
+    }
+  }, { passive:true });
+
+  // Wird die Geste unterbrochen (Anruf, Benachrichtigung), darf kein halb
+  // verschobener Bildschirm stehen bleiben.
+  document.addEventListener('touchcancel', () => {
+    if (ebene) aufraeumen(ebene.bewegen);
+    start = ebene = null; zieht = false;
+  }, { passive:true });
+})();
+
 
 
 // ══ EIGENE VERKEHRSZEICHEN (Katalog) ═════════════════════════════════
