@@ -1595,15 +1595,22 @@ async function renderUrlaubList(filterUid){
   const q=filterUid?query(collection(db,'urlaub'),where('lehrerUid','==',filterUid)):query(collection(db,'urlaub'),where('schoolId','==',currentSchoolId));
   const snap=await getDocs(q);
   if(snap.empty){el.innerHTML='<p class="text-muted">Noch keine Urlaube.</p>';return;}
-  const lSnap=await getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId),where('role','==','lehrer')));
-  const lm={};lSnap.docs.forEach(d=>{const u=d.data();lm[d.id]=u.fname+' '+u.lname;});
+  // Alle Kalender-Nutzer der Fahrschule, nicht nur die mit der Rolle 'lehrer':
+  // Wer die Rolle gewechselt hat, blieb sonst namenlos, obwohl sein Eintrag da ist.
+  const lSnap=await getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId)));
+  const lm={};lSnap.docs.forEach(d=>{const u=d.data();const n=((u.fname||'')+' '+(u.lname||'')).trim();if(n)lm[d.id]=n;});
   el.innerHTML=snap.docs.map(d=>{const u=d.data();
     const von=new Date(u.von+'T12:00:00'),bis=new Date(u.bis+'T12:00:00');
     const tage=Math.round((bis-von)/(86400000))+1;
     return`<div class="auto-card">
       <div class="auto-icon">🏖️</div>
       <div class="auto-info">
-        <div class="auto-name">${u.label||'Urlaub'}${!filterUid?' – '+(lm[u.lehrerUid]||'?'):''}</div>
+        <!-- Loescht ein Fahrlehrer sein Konto, bleibt der Urlaub bei der
+             Fahrschule stehen (er gehoert ihr), sein Kalender-Profil geht
+             aber mit. Dann ist der Name nicht mehr aufloesbar. Vorher stand
+             dort ein blosses "?", was wie ein Fehler aussah - jetzt steht da,
+             was wirklich der Fall ist. -->
+        <div class="auto-name">${u.label||'Urlaub'}${!filterUid?' – '+(lm[u.lehrerUid]||'nicht mehr zugeordnet'):''}</div>
         <div class="auto-detail">${von.toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'})} – ${bis.toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'})} (${tage} Tage)</div>
       </div>
       <button class="btn btn-danger btn-sm" onclick="deleteUrlaub('${d.id}')">Löschen</button>
