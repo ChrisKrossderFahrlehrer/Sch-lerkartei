@@ -22,6 +22,8 @@ const SCHULE  = 'schule-uid';
 const LEHRER  = 'lehrer-uid';            // AUSGETRETEN aus der Schule
 const LEHRER_IN_SCHULE = 'lehrer2-uid';  // gehoert der Schule weiterhin an
 const FREMD   = 'fremder-uid';
+const FREMDER_ADMIN = 'fremdadmin-uid';  // Fahrschul-Admin einer ANDEREN Schule
+const FREMDE_SCHULE = 'fremdschule-uid';
 const CODE     = 'K7M4PQ';              // 6 Zeichen - so lang sind die echten
 const IN_EINEM_JAHR = Date.now() + 365 * 24 * 3600 * 1000;
 
@@ -57,6 +59,14 @@ await testEnv.withSecurityRulesDisabled(async (ctx) => {
   await setDoc(doc(db, 'users', LEHRER_IN_SCHULE), {
     uid: LEHRER_IN_SCHULE, rolle: 'fahrlehrer', typ: 'fahrlehrer',
     status: 'aktiv', fahrschuleId: SCHULE,
+  });
+  // Ein Fahrschul-Admin einer VOELLIG ANDEREN Fahrschule
+  await setDoc(doc(db, 'fahrschulen', FREMDE_SCHULE), {
+    name: 'Andere Schule', adminUid: FREMDER_ADMIN, typ: 'fahrschule', status: 'aktiv',
+  });
+  await setDoc(doc(db, 'users', FREMDER_ADMIN), {
+    uid: FREMDER_ADMIN, rolle: 'fahrschul-admin', typ: 'fahrschule',
+    status: 'aktiv', fahrschuleId: FREMDE_SCHULE,
   });
   // Eigener Schueler eines eigenstaendigen Lehrers: fahrschuleId == eigene uid
   await setDoc(doc(db, 'students', 'eigener-schueler'), {
@@ -209,6 +219,31 @@ await pruefe('Ein voellig Fremder kommt NICHT an die Schuelerakte (students)', a
 await pruefe('Ohne Anmeldung NICHT an die Schuelerakte (students)', async () => {
   const db = ohneAnmeldung();
   await assertFails(getDoc(doc(db, 'students', 'uebernommener-schueler')));
+});
+
+// ══════════════════════════════════════════════════════════════════
+// BEFUND 3 (behoben) — Beim Loeschen von users fehlte die Zugehoerigkeit.
+// "isFsAdmin()" prueft allein "ist irgendein Fahrschul-Admin". Lesen und
+// Aendern verlangen zusaetzlich resource.data.fahrschuleId == userFsId(),
+// beim Loeschen fehlte das - jeder Fahrschul-Admin konnte das Nutzerprofil
+// JEDES Kontos im System loeschen. Wer sein users-Dokument verliert, kommt
+// an nichts mehr heran: eine Aussperrung per Mausklick, aus einer fremden
+// Fahrschule heraus.
+console.log('\nBEFUND 3 (behoben) — Fremder Fahrschul-Admin sperrt niemanden aus');
+
+await pruefe('Fremder Fahrschul-Admin darf ein fremdes Nutzerprofil NICHT loeschen', async () => {
+  const db = als(FREMDER_ADMIN);
+  await assertFails(deleteDoc(doc(db, 'users', LEHRER_IN_SCHULE)));
+});
+
+await pruefe('Fremder Fahrschul-Admin darf das Profil der fremden Schule NICHT loeschen', async () => {
+  const db = als(FREMDER_ADMIN);
+  await assertFails(deleteDoc(doc(db, 'users', SCHULE)));
+});
+
+await pruefe('Der EIGENE Fahrschul-Admin darf sein Mitglied weiterhin loeschen', async () => {
+  const db = als(SCHULE);
+  await assertSucceeds(deleteDoc(doc(db, 'users', LEHRER_IN_SCHULE)));
 });
 
 console.log(`\n${bestanden} nachgewiesen, ${fehlgeschlagen} nicht nachweisbar\n`);

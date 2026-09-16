@@ -2221,10 +2221,21 @@ window.deleteLehrerComplete = async (userId, lehrerName) => {
       codeIdsFuerBilder.push(d.id);
       backup.push({coll:'accessCodes', id:d.id, data:d.data()}); await deleteDoc(d.ref);
     }
+    // SICHERHEITS-AUDIT: Hier wurde allein ueber 'uid' geloescht. Nach der
+    // Uebergabe an eine Fahrschule (uebernehmeSchuelerInFahrschule) zeigt
+    // 'uid' aber weiterhin auf den Fahrlehrer, der das Thema ANGELEGT hat,
+    // waehrend 'fahrschuleId' schon der Fahrschule gehoert - die haette hier
+    // ihre eigenen Themen verloren. Dieselbe Besitzfrage wie serverseitig in
+    // functions/loeschen.js: ohne Zuordnung oder Zuordnung auf den Lehrer
+    // selbst = seins. (customFields fuehrt gar keine fahrschuleId.)
     for (const coll of ['customFields','customThemen','customGruppen']) {
       try {
         const snap = await getDocs(query(collection(db,coll), where('uid','==',userId)));
-        for (const d of snap.docs) { backup.push({coll, id:d.id, data:d.data()}); await deleteDoc(d.ref); }
+        for (const d of snap.docs) {
+          const fs = d.data().fahrschuleId;
+          if (fs !== undefined && fs !== null && fs !== userId) continue;  // gehoert der Fahrschule
+          backup.push({coll, id:d.id, data:d.data()}); await deleteDoc(d.ref);
+        }
       } catch(subErr) {}
     }
 
