@@ -929,8 +929,8 @@ const LOESCH_FRIST_TAGE = 30;
 const TAG_MS = 24 * 60 * 60 * 1000;
 // Loeschen: siehe functions/loeschen.js. Ausgelagert, damit der Umfang der
 // Kontoloeschung gegen den Emulator geprueft werden kann statt nur behauptet.
-const { loescheAlle, loescheZugangscodesMitBildern, loeschUmfang, loescheKontoHart }
-  = require('./loeschen');
+const { loescheAlle, loescheZugangscodesMitBildern, loeschUmfang, loescheKontoHart,
+        gehoertNochDemKonto } = require('./loeschen');
 
 // Ein laufendes Abonnement beim Zahlungsdienstleister beenden. Ohne das
 // wuerde nach der Kontoloeschung munter weiter abgebucht - der Kunde haette
@@ -1180,20 +1180,32 @@ exports.uebernehmeSchuelerInFahrschule = onCall(async (request) => {
   if (!schulDoc.exists) throw new HttpsError('failed-precondition', 'Fahrschule nicht gefunden.');
 
   const jetzt = Date.now();
-  const ergebnis = { schueler: 0, themen: 0, protokoll: 0, termine: 0, kalenderSchueler: 0 };
+  const ergebnis = { schueler: 0, themen: 0, protokoll: 0, termine: 0, kalenderSchueler: 0, pruefungen: 0 };
 
   // Jeweils nur, was WIRKLICH mir gehoert und noch unter meiner eigenen
   // Kennung laeuft. Schueler, die schon zur Schule gehoeren, bleiben
   // unberuehrt; fremde werden gar nicht erst gefunden.
+  // SICHERHEITS-AUDIT (Datenverlust): Gesucht wurde vorher mit ZWEI
+  // Gleichheiten - Besitzerfeld == uid UND Zuordnungsfeld == uid. Eine
+  // Gleichheit findet in Firestore aber nur Dokumente, die das Feld auch
+  // HABEN. Altbestand aus der Zeit vor der Fahrschul-Funktion fuehrt gar
+  // keine fahrschuleId und wurde deshalb stillschweigend uebersprungen: Der
+  // Fahrlehrer las "12 Schueler uebernommen", waehrend die alten bei ihm
+  // liegen blieben und die Fahrschule sie nie zu sehen bekam.
+  //
+  // Jetzt wird nur noch nach dem Besitzerfeld gesucht und danach dieselbe
+  // Besitzfrage gestellt wie beim Loeschen (functions/loeschen.js): ohne
+  // Zuordnung oder Zuordnung auf mich selbst = meins, kommt mit. Was schon
+  // der Schule gehoert, bleibt unberuehrt. Damit bewegt die Uebernahme
+  // genau das, was die Kontoloeschung auch entfernen wuerde - eine
+  // Definition von Zugehoerigkeit statt zweier.
   const umhaengen = async (sammlung, besitzerFeld, zuordnungsFeld, zaehler) => {
-    const snap = await db.collection(sammlung)
-      .where(besitzerFeld, '==', uid)
-      .where(zuordnungsFeld, '==', uid)
-      .get();
+    const snap = await db.collection(sammlung).where(besitzerFeld, '==', uid).get();
+    const meine = snap.docs.filter(gehoertNochDemKonto(uid, zuordnungsFeld));
     // In Bloecken schreiben - eine Firestore-Sammelschreibung fasst 500.
-    for (let i = 0; i < snap.docs.length; i += 400) {
+    for (let i = 0; i < meine.length; i += 400) {
       const batch = db.batch();
-      snap.docs.slice(i, i + 400).forEach(d => {
+      meine.slice(i, i + 400).forEach(d => {
         batch.update(d.ref, {
           [zuordnungsFeld]: schulId,
           uebernommenVon:   uid,
@@ -1202,7 +1214,7 @@ exports.uebernehmeSchuelerInFahrschule = onCall(async (request) => {
       });
       await batch.commit();
     }
-    ergebnis[zaehler] = snap.size;
+    ergebnis[zaehler] = meine.length;
   };
 
   await umhaengen('students',     'uid',       'fahrschuleId', 'schueler');
@@ -1215,6 +1227,10 @@ exports.uebernehmeSchuelerInFahrschule = onCall(async (request) => {
   // ausschliesslich nach schoolId.
   await umhaengen('slots',        'lehrerUid', 'schoolId',     'termine');
   await umhaengen('schueler',     'lehrerUid', 'schoolId',     'kalenderSchueler');
+  // pruefungen fuehrt den Erfasser als 'eingetragenVon' (kein lehrerUid) -
+  // ohne diese Zeile blieben die Pruefungstermine beim Lehrer liegen und die
+  // Fahrschule konnte sie nicht einplanen, obwohl der Schueler ihr gehoert.
+  await umhaengen('pruefungen',   'eingetragenVon', 'schoolId', 'pruefungen');
 
   console.log('Uebernahme in Fahrschule', schulId, 'durch', uid, ergebnis);
   return { success: true, ...ergebnis };
