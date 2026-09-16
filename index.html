@@ -1642,6 +1642,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     </div>
     <div class="filter-row" id="filter-row">
       <button class="filter-chip active" data-filter="alle"    onclick="setFilter('alle')">Alle</button>
+      <!-- Steht bewusst GLEICH VORN, nicht am Ende der Leiste: Die Leiste
+           scrollt seitlich, und in Berlin ist dieser Filter der eigentliche
+           Arbeitsweg - dort laesst sich nichts ableiten, also braucht JEDER
+           Schueler einen Eintrag. Am Ende waere er ausserhalb des Bildschirms
+           und damit praktisch nicht vorhanden. Erscheint nur, wenn ein
+           Bundesland hinterlegt ist. -->
+      <button class="filter-chip" id="filter-chip-pruef" style="display:none" data-filter="pruefOffen" onclick="setFilter('pruefOffen')">🏁 Prüfstelle offen</button>
       <button class="filter-chip"        data-filter="klasseB"  onclick="setFilter('klasseB')">🚗 Klasse B</button>
       <button class="filter-chip"        data-filter="klasseBE" onclick="setFilter('klasseBE')">🔗 BE</button>
       <button class="filter-chip"        data-filter="klasseA"  onclick="setFilter('klasseA')">🏍️ Klasse A</button>
@@ -2089,6 +2096,28 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       <div style="font-family:'Syne',sans-serif;font-size:0.75rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:12px">🏫 Fahrschule</div>
       <div id="settings-fscode-body"></div>
     </div>
+
+    <div style="height:1px;background:var(--border);margin:0 0 16px"></div>
+    <div style="font-family:'Syne',sans-serif;font-size:0.75rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:12px">🏁 Prüforganisation</div>
+    <div style="font-size:0.78rem;color:var(--muted);line-height:1.5;margin-bottom:12px">
+      Wer die Fahrerlaubnisprüfung abnimmt, hängt am Bundesland. Die Auswahl hier gilt als Vorgabe für <b>neu angelegte</b> Schüler und lässt sich bei jedem Schüler einzeln ändern.
+    </div>
+    <div class="form-group">
+      <label class="form-label">Bundesland</label>
+      <select class="form-input" id="inp-bundesland" onchange="bundeslandGewaehlt()"></select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Vorgabe für neue Schüler</label>
+      <select class="form-input" id="inp-pruef-org">
+        <option value="">— keine Vorgabe —</option>
+        <option value="TUEV">TÜV</option>
+        <option value="DEKRA">DEKRA</option>
+      </select>
+    </div>
+    <div id="pruef-org-hinweis" style="font-size:0.75rem;color:var(--muted);line-height:1.5;margin:-6px 0 12px;min-height:18px"></div>
+    <div id="pruef-org-nachtrag" style="margin-bottom:12px"></div>
+    <div id="pruef-org-status" style="font-size:0.8rem;min-height:18px;text-align:center;margin-bottom:8px"></div>
+    <button class="btn-main" onclick="speicherePruefOrg()" style="margin-bottom:12px">💾 Speichern</button>
 
     <div style="height:1px;background:var(--border);margin:0 0 16px"></div>
     <div style="font-family:'Syne',sans-serif;font-size:0.75rem;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:12px">📧 E-Mail-Adresse ändern</div>
@@ -2755,6 +2784,28 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     </div>
     <div id="adresse-status" style="font-size:0.82rem;min-height:20px;margin-bottom:8px;text-align:center;padding:8px;border-radius:8px"></div>
     <button class="btn-main" onclick="speichereAdresse()">💾 Speichern</button>
+  </div>
+</div>
+
+<!-- PRÜFORGANISATION JE SCHÜLER (TÜV / DEKRA) -->
+<div class="modal-overlay" id="pruef-org-modal" onclick="closeModal(event)">
+  <div class="modal-sheet" style="max-width:420px">
+    <div class="sheet-title">🏁 Prüforganisation</div>
+    <p id="pruef-org-modal-hinweis" style="font-size:0.75rem;color:var(--muted);margin:-6px 0 14px;line-height:1.5;text-align:center"></p>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button onclick="setzePruefOrg('TUEV')" class="klasse-choice-btn pruef-org-wahl" data-org="TUEV">
+        <div style="font-weight:700">TÜV</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">Technische Prüfstelle der TÜV-Organisationen</div>
+      </button>
+      <button onclick="setzePruefOrg('DEKRA')" class="klasse-choice-btn pruef-org-wahl" data-org="DEKRA">
+        <div style="font-weight:700">DEKRA</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">Technische Prüfstelle der DEKRA</div>
+      </button>
+      <button onclick="setzePruefOrg('')" class="klasse-choice-btn pruef-org-wahl" data-org="">
+        <div style="font-weight:700;color:var(--muted)">— keine Angabe —</div>
+      </button>
+    </div>
+    <button class="btn-sheet-cancel" onclick="document.getElementById('pruef-org-modal').classList.remove('open')" style="margin-top:16px">Abbrechen</button>
   </div>
 </div>
 
@@ -4421,6 +4472,9 @@ onAuthStateChanged(auth, async (user) => {
         currentUser._fahrschuleId = profil.fahrschuleId || null;
         currentUser._rolle        = profil.rolle || 'fahrlehrer';
         currentUser._fsName       = profil.fahrschuleName || '';
+        // Prüforganisation: Bundesland und ausdrueckliche Vorgabe des Lehrers
+        currentUser._bundesland       = profil.bundesland || '';
+        currentUser._pruefOrgStandard = profil.pruefOrgStandard || '';
 
         // ── KALENDER-MODUL: Ist der Kalender für diesen Nutzer freigeschaltet? ──
         // Entweder die FAHRSCHULE ist freigeschaltet (fahrschulen.kalenderAktiv)
@@ -5135,6 +5189,17 @@ window.renderList = () => {
     return matchSearch && (isArchiv ? s.archiviert : !s.archiviert);
   });
 
+  // Der Prüfstellen-Filter ist nur sinnvoll, wenn ein Bundesland hinterlegt
+  // ist - sonst gäbe es gar keine Vorgabe, gegen die etwas "offen" wäre.
+  // Steht VOR dem Filtern, damit ein nicht mehr gültiger Filter nicht noch
+  // einmal angewendet wird.
+  const pruefChip = document.getElementById('filter-chip-pruef');
+  if (pruefChip) {
+    const anzeigen = !!(currentUser && currentUser._bundesland);
+    pruefChip.style.display = anzeigen ? '' : 'none';
+    if (!anzeigen && activeFilter === 'pruefOffen') activeFilter = 'alle';
+  }
+
   // Apply active filter
   switch(activeFilter) {
     case 'klasseA':  filtered = filtered.filter(s => s.klasse === 'A'); break;
@@ -5147,6 +5212,7 @@ window.renderList = () => {
       return !SONDER.every(f => (s.sonderfahrten||{})[f.key] >= f.min);
     }); break;
     case 'reif':     filtered = filtered.filter(s => overallProgress(s) >= 90); break;
+    case 'pruefOffen': filtered = filtered.filter(s => !s.pruefOrg); break;
     case 'archiv':   break; // already handled above
   }
 
@@ -5473,6 +5539,9 @@ function renderDetail() {
         ${ampelTag}
         <span onclick="openAdresseBearbeiten('${s.id}')" style="cursor:pointer;font-size:0.72rem;color:${s.strasse ? 'var(--muted)' : 'var(--danger)'};text-decoration:underline;text-decoration-style:dotted">
           📍 ${s.strasse ? `${escapeHtmlEigen(s.strasse)}, ${escapeHtmlEigen(s.plz||'')} ${escapeHtmlEigen(s.ort||'')}` : 'Adresse fehlt (Ausbildungsnachweis)'}
+        </span>
+        <span onclick="openPruefOrgBearbeiten('${s.id}')" style="cursor:pointer;font-size:0.72rem;color:var(--muted);text-decoration:underline;text-decoration-style:dotted">
+          🏁 ${s.pruefOrg ? escapeHtmlEigen(PRUEF_ORG_NAME[s.pruefOrg] || s.pruefOrg) : 'Prüfstelle eintragen'}
         </span>
       </div>
     </div>
@@ -6827,7 +6896,11 @@ function renderTeacherChat() {
     // unter openChat()) nicht laden. Zeigt jetzt wenigstens einen Hinweis.
     const inhalt = (m.imagePath || m.imageUrl)
       ? '📷 Bild – bitte über das 💬-Symbol öffnen, um es anzuzeigen'
-      : (m.text||'').replace(/</g,'&lt;');
+      // FIX(Audit): hier wurde nur '<' ersetzt. Gegen eingeschleuste Tags
+      // reicht das zwar, aber ein '&' blieb stehen - eine Nachricht mit
+      // "&lt;" wurde dem Fahrlehrer als "<" angezeigt. Dieselbe Funktion
+      // wie ueberall sonst, damit es an EINER Stelle festgelegt ist.
+      : escapeHtmlEigen(m.text || '');
     return `<div style="display:flex;flex-direction:column;align-items:${align}">
       ${!isFL ? `<div style="font-size:0.65rem;color:var(--muted);margin-bottom:2px">${escapeHtmlEigen(m.senderName||'Schüler')}</div>` : ''}
       <div style="max-width:80%;background:${bg};color:${color};border-radius:${radius};padding:10px 14px;font-size:0.88rem;line-height:1.45;word-break:break-word">${inhalt}</div>
@@ -7198,6 +7271,9 @@ window.addStudent = async () => {
       zielSchaltstunden: zielSchalt,
       fahrstunden:0, sonderfahrten:{}, themen:{}, customThemen:{}, customFields:{}, notes:'',
       schaltstunden: 0, testfahrtBestanden: false,
+      // Aus dem Bundesland abgeleitet (⚙️ Einstellungen). In Berlin bleibt es
+      // leer, weil dort TÜV und DEKRA pruefen - das traegt der Fahrlehrer ein.
+      pruefOrg: pruefOrgVorgabe(),
       createdAt: Date.now()
     });
 
@@ -7550,6 +7626,204 @@ async function zeigeLoeschStatus() {
   }
 }
 
+// ── PRÜFORGANISATION (TÜV / DEKRA) ─────────────────────────────
+// Die Fahrerlaubnispruefung nimmt nicht die Fahrschule ab, sondern eine
+// amtlich bestellte Technische Pruefstelle. Welche das ist, haengt am
+// Bundesland, und die Regel dahinter ist erstaunlich klar:
+//
+//   Neue Bundeslaender  ->  DEKRA ist dort seit 1990 als einzige Technische
+//                           Pruefstelle bestellt.
+//   Alte Bundeslaender  ->  stets eine der TUEV-Organisationen. Welche, ist
+//                           regional verschieden (SUED, NORD, Rheinland,
+//                           Hessen) - fuer die Kartei zaehlt nur "TUEV".
+//   Berlin              ->  die Ausnahme: hier pruefen TUEV Rheinland UND
+//                           DEKRA. Deshalb dort KEINE Vorauswahl; der
+//                           Fahrlehrer traegt es je Schueler ein.
+//
+// Nordrhein-Westfalen ist zwar zwischen TUEV Rheinland (Rheinland) und
+// TUEV NORD (Westfalen) aufgeteilt - fuer die Unterscheidung TUEV/DEKRA
+// bleibt es trotzdem eindeutig.
+//
+// WICHTIG: Das ist eine VORAUSWAHL, keine Festlegung. Sie laesst sich in den
+// Einstellungen und bei jedem Schueler einzeln aendern. Zustaendigkeiten
+// koennen sich aendern, und die Kartei soll dem Fahrlehrer nicht
+// widersprechen - er weiss besser, wo er seine Schueler vorstellt.
+const PRUEF_ORG_NAME = { TUEV: 'TÜV', DEKRA: 'DEKRA' };
+const BUNDESLAENDER = [
+  { code:'BW', name:'Baden-Württemberg',      org:'TUEV',  stelle:'TÜV SÜD' },
+  { code:'BY', name:'Bayern',                 org:'TUEV',  stelle:'TÜV SÜD' },
+  { code:'BE', name:'Berlin',                 org:null,    stelle:'TÜV Rheinland und DEKRA' },
+  { code:'BB', name:'Brandenburg',            org:'DEKRA', stelle:'DEKRA' },
+  { code:'HB', name:'Bremen',                 org:'TUEV',  stelle:'TÜV NORD' },
+  { code:'HH', name:'Hamburg',                org:'TUEV',  stelle:'TÜV NORD' },
+  { code:'HE', name:'Hessen',                 org:'TUEV',  stelle:'TÜV Hessen' },
+  { code:'MV', name:'Mecklenburg-Vorpommern', org:'DEKRA', stelle:'DEKRA' },
+  { code:'NI', name:'Niedersachsen',          org:'TUEV',  stelle:'TÜV NORD' },
+  { code:'NW', name:'Nordrhein-Westfalen',    org:'TUEV',  stelle:'TÜV Rheinland / TÜV NORD' },
+  { code:'RP', name:'Rheinland-Pfalz',        org:'TUEV',  stelle:'TÜV Rheinland' },
+  { code:'SL', name:'Saarland',               org:'TUEV',  stelle:'TÜV Rheinland' },
+  { code:'SN', name:'Sachsen',                org:'DEKRA', stelle:'DEKRA' },
+  { code:'ST', name:'Sachsen-Anhalt',         org:'DEKRA', stelle:'DEKRA' },
+  { code:'SH', name:'Schleswig-Holstein',     org:'TUEV',  stelle:'TÜV NORD' },
+  { code:'TH', name:'Thüringen',              org:'DEKRA', stelle:'DEKRA' },
+];
+const bundeslandInfo = (code) => BUNDESLAENDER.find(b => b.code === code) || null;
+
+// Was bekommt ein NEU angelegter Schueler? Erst die ausdrueckliche Vorgabe des
+// Fahrlehrers, sonst die Ableitung aus dem Bundesland. In Berlin bleibt es
+// leer - dort gibt es nichts abzuleiten.
+function pruefOrgVorgabe() {
+  if (currentUser && currentUser._pruefOrgStandard) return currentUser._pruefOrgStandard;
+  const bl = bundeslandInfo(currentUser && currentUser._bundesland);
+  return (bl && bl.org) || '';
+}
+
+function pruefOrgHinweisText(code) {
+  const bl = bundeslandInfo(code);
+  if (!bl) return 'Ohne Bundesland gibt es keine Vorauswahl – du kannst die Organisation trotzdem je Schüler eintragen.';
+  if (!bl.org) return `In ${bl.name} prüfen ${bl.stelle}. Weil es beide gibt, wird nichts vorausgewählt – trag es bitte bei jedem Schüler ein.`;
+  return `In ${bl.name} nimmt ${bl.stelle} die Prüfung ab. Vorausgewählt: ${PRUEF_ORG_NAME[bl.org]}.`;
+}
+
+window.bundeslandGewaehlt = () => {
+  const code = document.getElementById('inp-bundesland').value;
+  const bl   = bundeslandInfo(code);
+  document.getElementById('pruef-org-hinweis').textContent = pruefOrgHinweisText(code);
+  // Nur setzen, wenn es etwas abzuleiten gibt. In Berlin bleibt die Auswahl
+  // bewusst leer, statt eine der beiden Organisationen zu raten.
+  document.getElementById('inp-pruef-org').value = (bl && bl.org) || '';
+  renderPruefOrgNachtrag();
+};
+
+// Schueler, die es VOR dieser Funktion schon gab, tragen noch nichts. Je nach
+// Bundesland ist das unterschiedlich viel Arbeit - deshalb zwei Wege:
+//
+//   eindeutiges Land  ->  Sammel-Knopf. Achtzig Schueler in Bayern gehen alle
+//                         zum TUEV; sie einzeln anzutippen waere Unfug.
+//   Berlin            ->  KEIN Sammel-Knopf. Dort verteilen sich die Schueler
+//                         auf beide Organisationen, ein Sammelwert waere fuer
+//                         die Haelfte schlicht falsch. Stattdessen der
+//                         Hinweis auf den Listenfilter.
+function offeneSchuelerOhnePruefOrg() {
+  return students.filter(s => !s.archiviert && !s.pruefOrg);
+}
+
+function renderPruefOrgNachtrag() {
+  const box = document.getElementById('pruef-org-nachtrag');
+  if (!box) return;
+  const bl    = bundeslandInfo(document.getElementById('inp-bundesland').value);
+  const offen = offeneSchuelerOhnePruefOrg().length;
+  if (!bl || offen === 0) { box.innerHTML = ''; return; }
+
+  if (!bl.org) {
+    box.innerHTML = `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;font-size:0.78rem;line-height:1.5;color:var(--muted)">
+      In ${bl.name} prüfen beide Organisationen – deshalb gibt es hier bewusst kein Sammel-Setzen,
+      es wäre für einen Teil deiner Schüler falsch.<br>
+      <b style="color:var(--text)">${offen} Schüler ohne Angabe.</b> In der Schülerliste findest du sie
+      über den Filter <b style="color:var(--text)">🏁 Prüfstelle offen</b>.
+    </div>`;
+    return;
+  }
+  const name = PRUEF_ORG_NAME[bl.org];
+  box.innerHTML = `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;font-size:0.78rem;line-height:1.5;color:var(--muted)">
+      <b style="color:var(--text)">${offen} Schüler ohne Angabe.</b> In ${bl.name} prüft ${bl.stelle} –
+      für alle gleich.
+      <button onclick="setzePruefOrgFuerAlleOffenen()" style="margin-top:9px;width:100%;background:transparent;border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:8px;font-size:0.78rem;font-weight:700;cursor:pointer">
+        Alle ${offen} auf ${name} setzen
+      </button>
+    </div>`;
+}
+
+window.setzePruefOrgFuerAlleOffenen = async () => {
+  const bl = bundeslandInfo(document.getElementById('inp-bundesland').value);
+  if (!bl || !bl.org) return;
+  const offen = offeneSchuelerOhnePruefOrg();
+  if (!offen.length) return;
+  const name = PRUEF_ORG_NAME[bl.org];
+  if (!confirm(`${offen.length} Schüler ohne Angabe auf ${name} setzen?\n\nSchüler, bei denen schon etwas eingetragen ist, bleiben unberührt. Einzeln ändern kannst du es danach jederzeit.`)) return;
+
+  const statusEl = document.getElementById('pruef-org-status');
+  statusEl.style.color = 'var(--muted)'; statusEl.textContent = `Wird gesetzt… (0/${offen.length})`;
+  let fertig = 0, fehler = 0;
+  for (const s of offen) {
+    try {
+      // dbUpd statt saveToFirestore: Letzteres spiegelt bei JEDER Speicherung
+      // zusaetzlich den Portal-Schnappschuss - bei achtzig Schuelern waeren das
+      // achtzig ueberfluessige Abfragen fuer ein Feld, das im Portal gar nicht
+      // vorkommt.
+      await dbUpd(doc(db, 'students', s.id), { pruefOrg: bl.org });
+      s.pruefOrg = bl.org;
+      fertig++;
+    } catch (e) { fehler++; console.warn('pruefOrg Sammelsetzen:', s.id, e); }
+    statusEl.textContent = `Wird gesetzt… (${fertig}/${offen.length})`;
+  }
+  statusEl.style.color = fehler ? 'var(--danger)' : 'var(--accent2)';
+  statusEl.textContent = fehler ? `${fertig} gesetzt, ${fehler} fehlgeschlagen` : `✓ ${fertig} Schüler auf ${name} gesetzt`;
+  renderPruefOrgNachtrag();
+  try { renderList(); } catch (e) {}
+};
+
+window.speicherePruefOrg = async () => {
+  const statusEl = document.getElementById('pruef-org-status');
+  const bundesland      = document.getElementById('inp-bundesland').value;
+  const pruefOrgStandard = document.getElementById('inp-pruef-org').value;
+  statusEl.style.color = 'var(--muted)'; statusEl.textContent = 'Wird gespeichert…';
+  try {
+    await dbUpd(doc(db, 'users', currentUser.uid), { bundesland, pruefOrgStandard });
+    currentUser._bundesland       = bundesland;
+    currentUser._pruefOrgStandard = pruefOrgStandard;
+    statusEl.style.color = 'var(--accent2)'; statusEl.textContent = '✓ Gespeichert';
+    setTimeout(() => { statusEl.textContent = ''; }, 2500);
+    // Die Liste neu aufbauen: Erst dort entscheidet sich, ob der Filter
+    // "🏁 Prüfstelle offen" sichtbar ist. Ohne das erschiene er erst beim
+    // naechsten Anlass irgendwann spaeter - der Fahrlehrer speichert Berlin,
+    // schliesst das Fenster und findet den Filter nicht.
+    renderPruefOrgNachtrag();
+    try { renderList(); } catch (e) {}
+  } catch (e) {
+    console.warn('speicherePruefOrg:', e);
+    statusEl.style.color = 'var(--danger)'; statusEl.textContent = 'Fehler beim Speichern.';
+  }
+};
+
+// ── Je Schueler ────────────────────────────────────────────────
+window.openPruefOrgBearbeiten = (schuelerId) => {
+  const s = getStudent(schuelerId);
+  if (!s) return;
+  window.__pruefOrgSchuelerId = schuelerId;
+  const bl = bundeslandInfo(currentUser && currentUser._bundesland);
+  const hinweis = document.getElementById('pruef-org-modal-hinweis');
+  if (hinweis) {
+    hinweis.textContent = bl
+      ? (bl.org
+          ? `${bl.name}: die Prüfung nimmt ${bl.stelle} ab.`
+          : `${bl.name}: hier prüfen ${bl.stelle} – bitte auswählen.`)
+      : 'Bundesland noch nicht hinterlegt (⚙️ Einstellungen → Prüforganisation).';
+  }
+  document.querySelectorAll('.pruef-org-wahl').forEach(b => {
+    const ist = (b.dataset.org || '') === (s.pruefOrg || '');
+    b.style.borderColor = ist ? 'var(--accent)' : 'var(--border)';
+  });
+  __modalOpenGuardTs = Date.now();
+  document.getElementById('pruef-org-modal').classList.add('open');
+};
+
+window.setzePruefOrg = async (org) => {
+  const id = window.__pruefOrgSchuelerId;
+  if (!id) return;
+  try {
+    await saveToFirestore(id, { pruefOrg: org });
+    const s = getStudent(id);
+    if (s) s.pruefOrg = org;
+    document.getElementById('pruef-org-modal').classList.remove('open');
+    openDetail(id);
+    toast(org ? `🏁 Prüfung bei ${PRUEF_ORG_NAME[org]}` : '🏁 Angabe entfernt');
+  } catch (e) {
+    console.warn('setzePruefOrg:', e);
+    toast('❌ Konnte nicht gespeichert werden.');
+  }
+};
+
 window.openSettings = async () => {
   document.getElementById('inp-pw-alt').value = '';
   document.getElementById('inp-pw-neu').value = '';
@@ -7569,6 +7843,18 @@ window.openSettings = async () => {
   if (emDisp && currentUser) emDisp.innerHTML = 'Aktuelle E-Mail: <b>' + (currentUser.email || '–') + '</b>';
   const disp = document.getElementById('settings-username-display');
   if (disp && currentUser) disp.textContent = '👤 Angemeldet als: ' + (currentUser.displayName || '');
+  // Prüforganisation: Liste füllen und aktuellen Stand anzeigen
+  const blSel = document.getElementById('inp-bundesland');
+  if (blSel) {
+    blSel.innerHTML = '<option value="">— bitte wählen —</option>'
+      + BUNDESLAENDER.map(b => `<option value="${b.code}">${b.name}</option>`).join('');
+    blSel.value = (currentUser && currentUser._bundesland) || '';
+    const orgSel = document.getElementById('inp-pruef-org');
+    if (orgSel) orgSel.value = (currentUser && currentUser._pruefOrgStandard) || '';
+    document.getElementById('pruef-org-hinweis').textContent = pruefOrgHinweisText(blSel.value);
+    document.getElementById('pruef-org-status').textContent = '';
+    renderPruefOrgNachtrag();
+  }
   document.getElementById('settings-modal').classList.add('open');
   // Fahrschul-Bereich befüllen (Code anzeigen ODER Beitritts-Feld)
   renderFscodeSection();
@@ -8333,87 +8619,13 @@ window.doSchuelerLogin = async () => {
     return;
   }
   errEl.textContent = '';
+  // Ab hier stand frueher eine vollstaendige zweite Umsetzung des
+  // Schueler-Logins - unerreichbar hinter einem return, seit der Einstieg
+  // auf schueler-portal.html umgestellt wurde. Sie enthielt unter anderem
+  // noch eine list()-Abfrage auf accessCodes, die die Regeln zu Recht
+  // ablehnen. Entfernt, damit sie niemand fuer den gueltigen Weg haelt -
+  // der echte Login steht in schueler-portal.html.
   window.location.href = './schueler-portal.html?code=' + encodeURIComponent(code);
-  return;
-
-  // Alten Listener aufräumen
-  if (unsubSchuelerCode) { unsubSchuelerCode(); unsubSchuelerCode = null; }
-
-  try {
-    // FIX: Code laden per Dokument-ID (get – für nicht eingeloggte Schüler erlaubt),
-    // Fallback auf Query (list – nur für eingeloggte). Bisher wurde NUR die list-Query
-    // genutzt, die die Firestore-Regeln für unangemeldete Schüler sperren → der
-    // eingebaute Schüler-Login scheiterte mit 'permission-denied'. Spiegelt jetzt
-    // schueler-portal.html (dort am 19.6. bereits so gefixt).
-    let codeDoc = null, codeData = null;
-    const direct = await getDoc(doc(db,'accessCodes', code));
-    if (direct.exists()) {
-      codeDoc = direct; codeData = direct.data();
-    } else {
-      try {
-        const q    = query(collection(db,'accessCodes'), where('code','==',code));
-        const snap = await getDocs(q);
-        if (!snap.empty) { codeDoc = snap.docs[0]; codeData = snap.docs[0].data(); }
-      } catch(_) { /* list für nicht-eingeloggte gesperrt – bleibt bei 'ungültig' */ }
-    }
-    document.getElementById('loading').style.display = 'none';
-
-    if (!codeDoc || !codeData) {
-      document.getElementById('screen-login').classList.add('active');
-      switchTab('schueler');
-      errEl.textContent = 'Ungültiger Code.';
-      return;
-    }
-
-    if (codeData.expiresAt && codeData.expiresAt < Date.now()) {
-      document.getElementById('screen-login').classList.add('active');
-      switchTab('schueler');
-      errEl.textContent = 'Code abgelaufen – bitte neuen Code holen.';
-      return;
-    }
-
-    if (!codeData.studentSnapshot) {
-      document.getElementById('screen-login').classList.add('active');
-      switchTab('schueler');
-      inp.value = code;
-      errEl.textContent = '⚠️ Bitte neuen Code beim Fahrlehrer holen.';
-      return;
-    }
-
-    try {
-      if (!auth.currentUser || auth.currentUser.isAnonymous) {
-        if (!auth.currentUser) { await signInAnonymously(auth); }
-        const sUid = auth.currentUser.uid;
-        const sessRef = doc(db, 'studentSessions', sUid);
-        const sessSnap = await getDoc(sessRef);
-        if (!sessSnap.exists()) {
-          await setDoc(sessRef, {
-            code:         codeDoc.id,
-            studentId:    codeData.studentId    || null,
-            teacherUid:   codeData.teacherUid   || null,
-            fahrschuleId: codeData.fahrschuleId || null,
-            linkedAt:     Date.now()
-          });
-        }
-      }
-    } catch(linkErr) { console.warn('Schüler-Session-Verknüpfung:', linkErr); }
-
-    // Live-Listener auf dieses Code-Dokument
-    unsubSchuelerCode = onSnapshot(doc(db,'accessCodes',codeDoc.id), (docSnap) => {
-      if (!docSnap.exists()) return;
-      const data      = docSnap.data();
-      const schueler  = { ...data.studentSnapshot, id: data.studentId };
-      const protokoll = (data.protokollSnapshot || []).sort((a,b) => (b.createdAt||0)-(a.createdAt||0));
-      renderSchuelerAnsicht(schueler, protokoll);
-    });
-
-  } catch(e) {
-    console.error('[SCHÜLER] Fehler:', e);
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('screen-login').classList.add('active');
-    switchTab('schueler');
-    errEl.textContent = 'Fehler: ' + e.message;
-  }
 };
 
 function renderSchuelerAnsicht(s, protokoll) {
@@ -9900,10 +10112,29 @@ function checkFirstTime() {
 }
 
 // ── URL CODE CHECK (wenn Schüler Link aufruft) ──────────────
+// SICHERHEITS-AUDIT (F1/F2, Stufe 1): Hier lag der ZWEITE Zugriff auf
+// accessCodes ganz ohne Anmeldung - unterhalb wird der Code direkt gelesen
+// und die Schuelerakte angezeigt, waehrend niemand angemeldet ist. Genau
+// dieser Zweig muesste in Stufe 2 aufhoeren zu funktionieren.
+//
+// Der Weg ist ohnehin veraltet: Die App verteilt seit der Umstellung
+// schueler-portal.html?code=... (siehe die beiden Stellen, die portalUrl
+// bauen), und der Login von Hand leitet ebenfalls dorthin. Nur ALTE Links
+// auf index.html?code=... landen noch hier. Sie bleiben gueltig, gehen aber
+// ins gepflegte Portal - das sich vor dem ersten Lesen anmeldet und dem
+// Schueler ausserdem Chat, Termine und Lernstand zeigt statt nur der alten
+// Nur-Lese-Ansicht.
+//
+// Die alte Ansicht darunter bleibt vorerst unveraendert stehen: sollte sich
+// die Weiterleitung als falsch erweisen, genuegt es, diese eine Zeile wieder
+// zu entfernen. Aufraeumen erst, wenn sie sich bewaehrt hat.
 async function checkUrlCode() {
   const params = new URLSearchParams(window.location.search);
   const code   = params.get('code');
   if (!code) return;
+
+  window.location.replace('./schueler-portal.html?code=' + encodeURIComponent(code.toUpperCase()));
+  return;
 
   // Login-Screen verstecken, Lade-Hinweis zeigen
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));

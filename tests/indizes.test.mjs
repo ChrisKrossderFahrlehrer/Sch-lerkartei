@@ -20,6 +20,7 @@ const wurzel = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DATEIEN = [
   'index.html', 'kalender.html', 'adk-platform.html',
   'schueler-portal.html', 'functions/index.js', 'functions/rechnung.js',
+  'functions/loeschen.js',
 ];
 
 // ── Abfragen einsammeln ─────────────────────────────────────────────────

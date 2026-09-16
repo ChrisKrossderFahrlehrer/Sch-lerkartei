@@ -431,7 +431,7 @@ html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--tex
 
 <script type="module">
 import { initializeApp }    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getMessaging, getToken, isSupported } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
 import { getFirestore, doc, getDoc, onSnapshot, updateDoc }
@@ -487,9 +487,80 @@ const ADK_STUFE_LANG = (v) => (ADK_STUFE(v) || {}).lang  || 'Noch nicht behandel
 const ADK_STUFE_KURZ = (v) => (ADK_STUFE(v) || {}).kurz  || '–';
 const ADK_STUFE_FARB = (v) => (ADK_STUFE(v) || {}).farbe || '#6b7fa8';
 
+// ── Sitzung ────────────────────────────────────────────────────
+// SICHERHEITS-AUDIT (Befund F1/F2, Stufe 1 von 2): Das Portal hat bisher
+// voellig OHNE Anmeldung auf accessCodes zugegriffen - signInAnonymously lief
+// nur, wenn jemand Benachrichtigungen einschaltete. Die Leseregel muss deshalb
+// bis heute einen Zweig ganz ohne isAuth() offenhalten, und ueber den kommt
+// jeder an die Schuelerakte, der eine gueltige Dokument-ID errät.
+//
+// Dieser Schritt aendert nur den Client: das Portal meldet sich still an,
+// BEVOR es irgendetwas liest oder schreibt. An den Regeln aendert sich nichts,
+// es kann also niemand ausgesperrt werden. Erst wenn diese Fassung ueberall
+// ausgeliefert ist, wird in Stufe 2 die Regel verschaerft.
+//
+// Schlaegt die Anmeldung fehl, laeuft alles weiter wie bisher - solange die
+// Regel noch beide Wege erlaubt, ist das nur ein Verlust an Schutz, kein
+// Ausfall. Ab Stufe 2 waere es ein harter Fehler, deshalb wird er protokolliert.
+const SITZUNG_ZEITGRENZE = 8000;
+let __versuch = null;   // der eine echte Anmeldeversuch
+let __frist   = null;   // laeuft ab SITZUNG_ZEITGRENZE nach dem ersten Aufruf
+let __nutzer  = null;   // steht fest, sobald der Versuch durch ist
+function sitzungSichern() {
+  // Nichts darf ewig haengen: eine Anfrage, die keine Antwort bekommt (Funkloch,
+  // Hotel-WLAN mit vorgeschalteter Anmeldeseite), hat im Browser KEINE eigene
+  // Zeitgrenze - das Portal wuerde stumm stehenbleiben. Die Frist laeuft EINMAL
+  // ab dem ersten Aufruf und gilt fuer alle Aufrufer: danach geht es notfalls
+  // ohne Anmeldung weiter, was die Regel heute noch erlaubt. Der Versuch laeuft
+  // im Hintergrund weiter - meldet er sich doch noch an, holt das Firestore-SDK
+  // den Zugang von selbst nach. Ab Stufe 2 waere ein Zugriff ohne Anmeldung ein
+  // Fehler; dann zeigt die Warnung im Protokoll, woran es lag.
+  if (__versuch) return Promise.race([__versuch, __frist]);
+  const auth = getAuth(app);
+
+  __frist = new Promise((fertig) => setTimeout(() => {
+    if (!__nutzer) console.warn('Anmeldung dauert laenger als ' + SITZUNG_ZEITGRENZE + ' ms – es geht vorerst ohne weiter.');
+    fertig(__nutzer);   // was bis dahin bekannt ist: der Nutzer oder null
+  }, SITZUNG_ZEITGRENZE));
+
+  __versuch = new Promise((fertig) => {
+    // beenden() statt fertig() direkt: der Abmelder darf noch nicht zugewiesen
+    // sein, wenn der Rueckruf sofort kommt, und er darf kein zweites Mal
+    // laufen. Beides faengt das Flag ab.
+    let abmelden = null, erledigt = false;
+    const beenden = (nutzer) => {
+      if (erledigt) return;
+      erledigt = true;
+      if (abmelden) { try { abmelden(); } catch (e) {} }
+      fertig(nutzer);
+    };
+    // Erst abwarten, ob aus einem frueheren Besuch schon eine Sitzung im
+    // Browser liegt - sonst entstuende bei jedem Aufruf ein neues Konto.
+    abmelden = onAuthStateChanged(auth, async (nutzer) => {
+      if (nutzer) { beenden(nutzer); return; }
+      try {
+        const cred = await signInAnonymously(auth);
+        beenden(cred.user);
+      } catch (e) {
+        console.warn('Anonyme Anmeldung fehlgeschlagen:', e && e.code, e && e.message);
+        beenden(null);
+      }
+    }, (e) => { console.warn('Anmeldestatus:', e); beenden(null); });
+    if (erledigt && abmelden) { try { abmelden(); } catch (e) {} }
+  });
+  __versuch.then((n) => { __nutzer = n; });
+
+  return Promise.race([__versuch, __frist]);
+}
+
 // ── Loading ────────────────────────────────────────────────────
-setTimeout(() => {
+setTimeout(async () => {
+  // Das Overlay zuerst wegnehmen und erst danach auf die Anmeldung warten:
+  // Wegnehmen ist kein Datenzugriff, muss also nicht hinter der Anmeldung
+  // stehen - andersherum wuerde eine haengende Anmeldung den Schueler vor
+  // einem Ladebildschirm sitzen lassen.
   document.getElementById('loading-overlay').style.display = 'none';
+  await sitzungSichern();
   // Auto-Login: aus URL-Parameter oder sessionStorage
   const urlParams = new URLSearchParams(window.location.search);
   const urlCode   = urlParams.get('code');
@@ -513,6 +584,7 @@ setTimeout(() => {
 
 async function pruefeUndStarteSitzung(docId, code) {
   try {
+    await sitzungSichern();        // vor jedem Zugriff, siehe oben
     const snap = await getDoc(doc(db, 'accessCodes', docId));
     const data = snap.exists() ? snap.data() : null;
     if (!data || (data.expiresAt && data.expiresAt < Date.now())) {
@@ -535,6 +607,7 @@ async function pruefeUndStarteSitzung(docId, code) {
 
 // ── Login ──────────────────────────────────────────────────────
 window.doLogin = async () => {
+  await sitzungSichern();          // vor jedem Zugriff, siehe oben
   const code  = (document.getElementById('inp-code').value || '').trim().toUpperCase();
   const errEl = document.getElementById('login-error');
   errEl.textContent = '';
@@ -549,8 +622,12 @@ window.doLogin = async () => {
     try {
       direct = await getDoc(doc(db,'accessCodes', code));
     } catch(gErr) {
+      // Die technische Ursache gehoert ins Protokoll, nicht auf den Bildschirm
+      // eines Schuelers: dort stand bisher der Firestore-Fehlercode samt der
+      // Aufforderung, "die aktuelle Regel-Datei zu veroeffentlichen" - das war
+      // an den Entwickler gerichtet, gelesen hat es aber der Schueler.
       console.error('DIAGNOSE getDoc accessCodes:', gErr);
-      errEl.textContent = '🔒 Code-Abruf abgelehnt (get accessCodes: ' + (gErr.code || gErr.message) + '). Die aktiven Regeln erlauben "get" auf accessCodes nicht – bitte aktuelle Regel-Datei veröffentlichen.';
+      errEl.textContent = 'Zugriff abgelehnt. Bitte die Seite neu laden – hilft das nicht, beim Fahrlehrer einen neuen Code holen.';
       document.querySelector('.btn-login').textContent = 'Einloggen →';
       return;
     }
@@ -623,9 +700,11 @@ function startLiveSession(docId, code) {
     if (!lastReadMsgTs && codeData.studentLastRead) lastReadMsgTs = codeData.studentLastRead;
     onDataUpdate();
   }, (snapErr) => {
+    // Wie beim Anmelden: der Firestore-Fehlercode gehoert ins Protokoll, dem
+    // Schueler sagt er nichts und nennt ihm keinen naechsten Schritt.
     console.error('DIAGNOSE onSnapshot accessCodes:', snapErr);
     const el = document.getElementById('login-error');
-    if (el) el.textContent = '🔒 Live-Verbindung abgelehnt (listen accessCodes: ' + (snapErr.code || snapErr.message) + ').';
+    if (el) el.textContent = 'Verbindung unterbrochen. Bitte die Seite neu laden – hilft das nicht, beim Fahrlehrer einen neuen Code holen.';
     const so = document.getElementById('screen-login'), sa = document.getElementById('screen-app');
     if (so && sa) { sa.classList.remove('active'); so.classList.add('active'); }
   });
@@ -1234,13 +1313,15 @@ window.portalPushAktivieren = async () => {
     const supported = await isSupported().catch(() => false);
     if (!supported) { portalToast('Dieser Browser unterstützt keine Benachrichtigungen.'); return; }
 
-    const cred = await signInAnonymously(getAuth());
+    // Dieselbe Sitzung wie beim Anmelden benutzen, statt eine zweite zu oeffnen.
+    const nutzer = await sitzungSichern();
+    if (!nutzer) { portalToast('Anmeldung fehlgeschlagen – bitte Seite neu laden.'); return; }
     const reg  = await navigator.serviceWorker.ready;
     const tok  = await getToken(getMessaging(), { vapidKey: VAPID_PORTAL, serviceWorkerRegistration: reg });
     if (!tok) { portalToast('Kein Token erhalten – bitte erneut versuchen.'); return; }
 
     await setDoc(doc(db, 'fcmTokens', tok), {
-      uid:       cred.user.uid,
+      uid:       nutzer.uid,
       codeId:    codeDocId,
       rolle:     'schueler',
       ua:        navigator.userAgent.slice(0, 120),
@@ -1361,6 +1442,20 @@ const THEORIE_WISSEN = [
   },
 ];
 
+// FIX(Audit): Das Theorie-Fenster ruft im onclick seiner Flaeche closeModal()
+// auf - die Funktion gab es in dieser Datei aber gar nicht (nur in index.html).
+// Jeder Tipp auf das Fenster, auch der INNERHALB, lief damit in einen
+// ReferenceError, und der dunkle Rand liess sich nicht zum Schliessen
+// antippen. Gleiche Umsetzung wie in index.html, samt Sperre gegen den
+// Geister-Klick, den iOS direkt nach dem Oeffnen nachschiebt.
+let __modalAufTs = 0;
+window.closeModal = (e) => {
+  if (Date.now() - __modalAufTs < 500) return;
+  if (e && e.target && e.target.classList.contains('modal-overlay')) {
+    e.target.classList.remove('open');
+  }
+};
+
 window.oeffneTheorieWissen = () => {
   document.getElementById('tw-detail').style.display = 'none';
   document.getElementById('tw-liste').style.display = 'block';
@@ -1369,6 +1464,7 @@ window.oeffneTheorieWissen = () => {
       <div style="font-size:1.6rem">${t.icon}</div>
       <div style="font-weight:700">${t.titel}</div>
     </button>`).join('');
+  __modalAufTs = Date.now();
   document.getElementById('theorie-wissen-modal').classList.add('open');
 };
 window.zeigeTheorieDetail = (i) => {

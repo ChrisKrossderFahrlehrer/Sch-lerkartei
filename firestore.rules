@@ -400,7 +400,17 @@ service cloud.firestore {
                       )
                     );
 
-      allow delete: if isSuperAdmin() || isFsAdmin();
+      // SICHERHEITS-AUDIT: Hier stand nur "isSuperAdmin() || isFsAdmin()".
+      // isFsAdmin() prueft allein "ist irgendein Fahrschul-Admin", KEINE
+      // Zugehoerigkeit - jeder Fahrschul-Admin konnte damit das Nutzerprofil
+      // JEDES Kontos im System loeschen, auch das einer fremden Fahrschule.
+      // Wer sein users-Dokument verliert, kommt an nichts mehr heran
+      // (userDocExists() steht in fast jeder Regel) - das war also eine
+      // Aussperrung per Mausklick, aus einer fremden Fahrschule heraus.
+      // Lesen und Aendern pruefen die Zugehoerigkeit oben laengst; beim
+      // Loeschen fehlte sie. Jetzt gleichgezogen.
+      allow delete: if isSuperAdmin()
+                    || (isFsAdmin() && resource.data.fahrschuleId == userFsId());
     }
 
     // ══════════════════════════════════════════════════════
@@ -726,9 +736,25 @@ service cloud.firestore {
       allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || (isAuth() && resource.data.lehrerUid == request.auth.uid);
       allow create:               if kalOwnsSchool(request.resource.data.schoolId) || (isRealAccount() && request.resource.data.lehrerUid == request.auth.uid);
     }
+    // SICHERHEITS-AUDIT (Datenverlust): Diese Regel fragte nach 'lehrerUid' -
+    // ein Feld, das pruefungen GAR NICHT fuehrt. Der Client schreibt den
+    // Erfasser als 'eingetragenVon'. Der Zweig war damit fuer jedes echte
+    // Dokument tot, uebrig blieb allein kalOwnsSchool(schoolId).
+    // Folge: Ein Fahrlehrer legt Pruefungstermine an (schoolId = seine eigene
+    // uid), tritt spaeter einer Fahrschule bei - ab da zeigt sein
+    // Kalender-Profil auf die Schule, und seine ALTEN Pruefungen waren fuer
+    // ihn unsichtbar. Nicht geloescht, aber nicht mehr erreichbar, was fuer
+    // ihn dasselbe ist.
+    // 'lehrerUid' bleibt der Vollstaendigkeit halber stehen; .get() mit
+    // Vorgabe statt Direktzugriff, damit ein fehlendes Feld die Auswertung
+    // nicht in einen Fehler laufen laesst.
     match /pruefungen/{docId} {
-      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId) || (isAuth() && resource.data.lehrerUid == request.auth.uid);
-      allow create:               if kalOwnsSchool(request.resource.data.schoolId) || (isRealAccount() && request.resource.data.lehrerUid == request.auth.uid);
+      allow read, update, delete: if kalOwnsSchool(resource.data.schoolId)
+                                  || (isAuth() && resource.data.get('lehrerUid', '') == request.auth.uid)
+                                  || (isAuth() && resource.data.get('eingetragenVon', '') == request.auth.uid);
+      allow create:               if kalOwnsSchool(request.resource.data.schoolId)
+                                  || (isRealAccount() && request.resource.data.get('lehrerUid', '') == request.auth.uid)
+                                  || (isRealAccount() && request.resource.data.get('eingetragenVon', '') == request.auth.uid);
     }
     // blocked hat kein schoolId, nur lehrerUid → über den Lehrer absichern
     match /blocked/{docId} {

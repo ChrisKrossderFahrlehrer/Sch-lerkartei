@@ -927,145 +927,10 @@ exports.paypalWebhook = onRequest(
 
 const LOESCH_FRIST_TAGE = 30;
 const TAG_MS = 24 * 60 * 60 * 1000;
-const CHAT_BUCKET = 'fahrschule-ebc65-eu-storage';
-
-// Loescht alle Dokumente einer Abfrage in Bloecken (Firestore erlaubt
-// hoechstens 500 Schreibvorgaenge pro Stapel).
-async function loescheAlle(abfrage) {
-  let geloescht = 0;
-  while (true) {
-    const snap = await abfrage.limit(400).get();
-    if (snap.empty) break;
-    const stapel = admin.firestore().batch();
-    snap.docs.forEach(d => stapel.delete(d.ref));
-    await stapel.commit();
-    geloescht += snap.size;
-    if (snap.size < 400) break;
-  }
-  return geloescht;
-}
-
-// Chat-Fotos eines Zugangscodes im Speicher entfernen. Serverseitig (Admin
-// SDK) - die Speicher-Regeln greifen hier nicht, deshalb funktioniert das
-// auch bei laengst abgelaufenen Codes.
-async function loescheChatBilderServer(codeId) {
-  try {
-    await admin.storage().bucket(CHAT_BUCKET).deleteFiles({ prefix: `chat-images/${codeId}/` });
-  } catch (e) {
-    console.warn('Chat-Bilder loeschen fehlgeschlagen fuer', codeId, e.message);
-  }
-}
-
-// Alle Zugangscodes einer Abfrage samt zugehoeriger Chat-Fotos loeschen.
-// Reihenfolge egal, da serverseitig keine Regelpruefung stattfindet.
-async function loescheZugangscodesMitBildern(abfrage) {
-  const snap = await abfrage.get();
-  for (const d of snap.docs) {
-    await loescheChatBilderServer(d.id);
-    await d.ref.delete();
-  }
-  return snap.size;
-}
-
-// Ermittelt, was zu einem Konto gehoert. Ein Fahrschul-Inhaber nimmt die
-// ganze Fahrschule mit (er ist der Verantwortliche i.S.d. DSGVO), ein
-// einzelner Fahrlehrer nur seine eigenen Daten.
-function loeschUmfang(uid, userData) {
-  const istInhaber = userData.typ === 'fahrschule';
-  return {
-    istInhaber,
-    fahrschuleId: istInhaber ? uid : (userData.fahrschuleId || uid),
-  };
-}
-
-// Harte, endgueltige Loeschung eines Kontos samt aller Daten.
-async function loescheKontoHart(uid) {
-  const db = admin.firestore();
-  const userSnap = await db.doc(`users/${uid}`).get();
-  const userData = userSnap.exists ? userSnap.data() : {};
-  const { istInhaber, fahrschuleId } = loeschUmfang(uid, userData);
-  const bericht = { uid, istInhaber, schueler: 0, codes: 0 };
-
-  // Betroffene Konten: bei einem Fahrschul-Inhaber alle Mitglieder mit.
-  let betroffeneUids = [uid];
-  if (istInhaber) {
-    const mitglieder = await db.collection('users').where('fahrschuleId', '==', fahrschuleId).get();
-    betroffeneUids = [...new Set([uid, ...mitglieder.docs.map(d => d.id)])];
-  }
-
-  // 1) Zugangscodes samt Chat-Fotos - zuerst, weil an ihnen die Bilder haengen
-  for (const einUid of betroffeneUids) {
-    bericht.codes += await loescheZugangscodesMitBildern(
-      db.collection('accessCodes').where('teacherUid', '==', einUid));
-  }
-  if (istInhaber) {
-    bericht.codes += await loescheZugangscodesMitBildern(
-      db.collection('accessCodes').where('fahrschuleId', '==', fahrschuleId));
-  }
-
-  // 2) Kartei-Daten (Schueler, Protokoll, eigene Listen)
-  for (const coll of ['students', 'protokoll', 'customFields', 'customThemen', 'customGruppen']) {
-    for (const einUid of betroffeneUids) {
-      const anzahl = await loescheAlle(db.collection(coll).where('uid', '==', einUid));
-      if (coll === 'students') bericht.schueler += anzahl;
-    }
-    if (istInhaber) {
-      const anzahl = await loescheAlle(db.collection(coll).where('fahrschuleId', '==', fahrschuleId));
-      if (coll === 'students') bericht.schueler += anzahl;
-    }
-  }
-  // Der Team-Chat fuehrt den Absender als 'senderUid' (nicht 'uid') - mit dem
-  // falschen Feldnamen bliebe er stehen.
-  for (const einUid of betroffeneUids) {
-    await loescheAlle(db.collection('chat').where('senderUid', '==', einUid));
-  }
-  if (istInhaber) {
-    await loescheAlle(db.collection('chat').where('fahrschuleId', '==', fahrschuleId));
-  }
-
-  // 3) Kalender-Modul (eigener Namensraum, haengt an lehrerUid bzw. schoolId)
-  for (const coll of ['schueler', 'slots', 'autos', 'blocked', 'globalBlocked', 'urlaub',
-                      'notizen', 'warteliste', 'pruefungen', 'theorieStunden',
-                      'bookingStudents', 'bookingRequests', 'bookingMessages', 'bookingWaitlist']) {
-    for (const einUid of betroffeneUids) {
-      await loescheAlle(db.collection(coll).where('lehrerUid', '==', einUid));
-    }
-    if (istInhaber) {
-      await loescheAlle(db.collection(coll).where('schoolId', '==', fahrschuleId));
-    }
-  }
-
-  // 4) Konto-gebundene Einzeldokumente
-  for (const einUid of betroffeneUids) {
-    for (const pfad of [`calendarTokens/${einUid}`, `calendarStatus/${einUid}`,
-                        `kalenderUsers/${einUid}`, `bookingLinks/${einUid}`,
-                        `studentSessions/${einUid}`]) {
-      await db.doc(pfad).delete().catch(() => {});
-    }
-    await loescheAlle(db.collection('fcmTokens').where('uid', '==', einUid));
-    await loescheAlle(db.collection('usernames').where('uid', '==', einUid));
-  }
-
-  // 5) Fahrschul-Ebene
-  if (istInhaber) {
-    await loescheAlle(db.collection('schoolCodes').where('schoolId', '==', fahrschuleId));
-    await loescheAlle(db.collection('invites').where('fahrschuleId', '==', fahrschuleId));
-    await db.doc(`schools/${fahrschuleId}`).delete().catch(() => {});
-    await db.doc(`fahrschulen/${fahrschuleId}`).delete().catch(() => {});
-  }
-
-  // 6) Nutzerprofile und Anmeldekonten zuletzt
-  for (const einUid of betroffeneUids) {
-    await db.doc(`users/${einUid}`).delete().catch(() => {});
-    await admin.auth().deleteUser(einUid).catch(e => {
-      if (e.code !== 'auth/user-not-found') console.warn('Auth-Konto loeschen:', einUid, e.message);
-    });
-  }
-
-  // Die Rechnungen bleiben bewusst erhalten (§ 14b UStG, § 147 AO).
-  console.log('Konto endgueltig geloescht:', JSON.stringify(bericht));
-  return bericht;
-}
+// Loeschen: siehe functions/loeschen.js. Ausgelagert, damit der Umfang der
+// Kontoloeschung gegen den Emulator geprueft werden kann statt nur behauptet.
+const { loescheAlle, loescheZugangscodesMitBildern, loeschUmfang, loescheKontoHart,
+        gehoertNochDemKonto } = require('./loeschen');
 
 // Ein laufendes Abonnement beim Zahlungsdienstleister beenden. Ohne das
 // wuerde nach der Kontoloeschung munter weiter abgebucht - der Kunde haette
@@ -1315,20 +1180,32 @@ exports.uebernehmeSchuelerInFahrschule = onCall(async (request) => {
   if (!schulDoc.exists) throw new HttpsError('failed-precondition', 'Fahrschule nicht gefunden.');
 
   const jetzt = Date.now();
-  const ergebnis = { schueler: 0, themen: 0, protokoll: 0, termine: 0, kalenderSchueler: 0 };
+  const ergebnis = { schueler: 0, themen: 0, protokoll: 0, termine: 0, kalenderSchueler: 0, pruefungen: 0 };
 
   // Jeweils nur, was WIRKLICH mir gehoert und noch unter meiner eigenen
   // Kennung laeuft. Schueler, die schon zur Schule gehoeren, bleiben
   // unberuehrt; fremde werden gar nicht erst gefunden.
+  // SICHERHEITS-AUDIT (Datenverlust): Gesucht wurde vorher mit ZWEI
+  // Gleichheiten - Besitzerfeld == uid UND Zuordnungsfeld == uid. Eine
+  // Gleichheit findet in Firestore aber nur Dokumente, die das Feld auch
+  // HABEN. Altbestand aus der Zeit vor der Fahrschul-Funktion fuehrt gar
+  // keine fahrschuleId und wurde deshalb stillschweigend uebersprungen: Der
+  // Fahrlehrer las "12 Schueler uebernommen", waehrend die alten bei ihm
+  // liegen blieben und die Fahrschule sie nie zu sehen bekam.
+  //
+  // Jetzt wird nur noch nach dem Besitzerfeld gesucht und danach dieselbe
+  // Besitzfrage gestellt wie beim Loeschen (functions/loeschen.js): ohne
+  // Zuordnung oder Zuordnung auf mich selbst = meins, kommt mit. Was schon
+  // der Schule gehoert, bleibt unberuehrt. Damit bewegt die Uebernahme
+  // genau das, was die Kontoloeschung auch entfernen wuerde - eine
+  // Definition von Zugehoerigkeit statt zweier.
   const umhaengen = async (sammlung, besitzerFeld, zuordnungsFeld, zaehler) => {
-    const snap = await db.collection(sammlung)
-      .where(besitzerFeld, '==', uid)
-      .where(zuordnungsFeld, '==', uid)
-      .get();
+    const snap = await db.collection(sammlung).where(besitzerFeld, '==', uid).get();
+    const meine = snap.docs.filter(gehoertNochDemKonto(uid, zuordnungsFeld));
     // In Bloecken schreiben - eine Firestore-Sammelschreibung fasst 500.
-    for (let i = 0; i < snap.docs.length; i += 400) {
+    for (let i = 0; i < meine.length; i += 400) {
       const batch = db.batch();
-      snap.docs.slice(i, i + 400).forEach(d => {
+      meine.slice(i, i + 400).forEach(d => {
         batch.update(d.ref, {
           [zuordnungsFeld]: schulId,
           uebernommenVon:   uid,
@@ -1337,7 +1214,7 @@ exports.uebernehmeSchuelerInFahrschule = onCall(async (request) => {
       });
       await batch.commit();
     }
-    ergebnis[zaehler] = snap.size;
+    ergebnis[zaehler] = meine.length;
   };
 
   await umhaengen('students',     'uid',       'fahrschuleId', 'schueler');
@@ -1350,6 +1227,10 @@ exports.uebernehmeSchuelerInFahrschule = onCall(async (request) => {
   // ausschliesslich nach schoolId.
   await umhaengen('slots',        'lehrerUid', 'schoolId',     'termine');
   await umhaengen('schueler',     'lehrerUid', 'schoolId',     'kalenderSchueler');
+  // pruefungen fuehrt den Erfasser als 'eingetragenVon' (kein lehrerUid) -
+  // ohne diese Zeile blieben die Pruefungstermine beim Lehrer liegen und die
+  // Fahrschule konnte sie nicht einplanen, obwohl der Schueler ihr gehoert.
+  await umhaengen('pruefungen',   'eingetragenVon', 'schoolId', 'pruefungen');
 
   console.log('Uebernahme in Fahrschule', schulId, 'durch', uid, ergebnis);
   return { success: true, ...ergebnis };
