@@ -435,7 +435,14 @@ body.light .student-card { box-shadow:0 3px 0 rgba(16,24,40,0.12), 0 7px 16px rg
 .sc-right { margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
 
 .progress-ring-wrap { position:relative; width:38px; height:38px; }
-.ring-svg { transform:rotate(-90deg); }
+/* FIX: Das SVG stand fest auf 40x40, der Rahmen drumherum aber auf 38x38 -
+   und mit eingeschaltetem Beta-Dashboard sogar auf 54x54. Die Prozentzahl
+   (.ring-label, inset:0) zentriert sich im RAHMEN, der Kreis sass aber in
+   seinem eigenen 40er-Feld: normal 1 px daneben, im Beta-Dashboard 7 px.
+   Jetzt fuellt das SVG immer den Rahmen aus; ueber die viewBox skaliert der
+   Kreis proportional mit, das Verhaeltnis von Strichstaerke zu Durchmesser
+   bleibt also gleich. Mitte ist Mitte, in jeder Ansicht. */
+.ring-svg { transform:rotate(-90deg); display:block; width:100%; height:100%; }
 .ring-bg { fill:none; stroke:var(--border); stroke-width:3; }
 .ring-fill { fill:none; stroke-width:3; stroke-linecap:round; transition:stroke-dashoffset 0.4s ease; }
 .ring-label { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:0.58rem; font-weight:700; }
