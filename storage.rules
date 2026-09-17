@@ -31,9 +31,15 @@ service firebase.storage {
                && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
                && codeDoc().data.teacherUid == request.auth.uid;
       }
+      // STUFE 2 (Gegenstueck zu firestore.rules, accessCodes): Diese Pruefung
+      // galt bisher OHNE jede Anmeldung - wer eine Code-Kennung kannte, kam an
+      // die Chat-Fotos des Schuelers heran und konnte auch eigene hochladen.
+      // Seit Stufe 1 meldet sich das Portal an, bevor es zugreift; die
+      // Anmeldung kann hier also verlangt werden, ohne jemanden auszusperren.
       function codeGueltig() {
-        return !('expiresAt' in codeDoc().data)
-               || codeDoc().data.expiresAt > request.time.toMillis();
+        return request.auth != null
+               && (!('expiresAt' in codeDoc().data)
+                   || codeDoc().data.expiresAt > request.time.toMillis());
       }
       allow read: if istSuperAdmin() || istZustaendigerLehrer() || codeGueltig();
       // Hochladen/Ersetzen: Groesse und Dateityp begrenzen.

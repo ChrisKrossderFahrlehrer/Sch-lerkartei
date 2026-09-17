@@ -520,10 +520,28 @@ service cloud.firestore {
       // Zugangscodes (samt Schueler-Stammdaten/Chat) ohne jede Kenntnis
       // erlauben - siehe stattdessen die Cloud Function
       // findeAltenZugangscode fuer den Login-Fallback alter Codes.
+      // STUFE 2 (Befund F1/F2, Abschluss): Die beiden letzten Zweige galten
+      // bisher OHNE jede Anmeldung. Wer eine gueltige Dokument-Kennung erriet
+      // oder in die Finger bekam, las damit Name, Lernstand, Protokoll und
+      // Chatverlauf - ganz ohne Konto, mit einem einzigen Aufruf.
+      //
+      // Das ging nicht frueher zu schliessen: Bis zur Umstellung griff das
+      // Schueler-Portal selbst ohne Anmeldung zu. Seit Stufe 1 meldet es sich
+      // still an, BEVOR es liest (sitzungSichern() in schueler-portal.html),
+      // und der zweite offene Weg - index.html?code=... - leitet dorthin um.
+      // Erst dadurch kann isAuth() hier verlangt werden, ohne jemanden
+      // auszusperren.
+      //
+      // Der Schutz bleibt gestuft: isAuth() allein haelt niemanden auf, der
+      // sich eine anonyme Sitzung besorgt. Es endet aber der Zugriff voellig
+      // ohne Firebase-Sitzung, jeder Zugriff wird zurechenbar, und App Check
+      // kann ueberhaupt erst greifen. Die eigentliche Huerde bleibt die
+      // Code-Laenge (32^10) samt Bremse auf findeAltenZugangscode.
       allow get:  if isSuperAdmin()
                   || (isAuth() && userDocExists() && resource.data.teacherUid == request.auth.uid)
-                  || !('expiresAt' in resource.data)
-                  || resource.data.expiresAt > request.time.toMillis();
+                  || (isAuth()
+                      && (!('expiresAt' in resource.data)
+                          || resource.data.expiresAt > request.time.toMillis()));
       allow list: if isSuperAdmin() ||
                      (isAuth() && userDocExists() && resource.data.teacherUid == request.auth.uid);
       allow create: if isAuth() && userDocExists()
@@ -536,9 +554,12 @@ service cloud.firestore {
       // weggefangen) - der Ungelesen-Zaehler des Schuelers konnte nie
       // zuruecksetzen. Gegenstueck zu 'teacherLastRead', das der Fahrlehrer
       // ueber den regulaeren Lehrer-Zweig oben schreibt.
+      // STUFE 2: derselbe Zusatz wie beim Lesen. Ohne ihn konnte jeder, der
+      // die Kennung kannte, in den Chat des Schuelers schreiben.
       allow update: if isSuperAdmin()
                     || (isAuth() && userDocExists() && resource.data.teacherUid == request.auth.uid)
-                    || (request.resource.data.diff(resource.data)
+                    || (isAuth()
+                        && request.resource.data.diff(resource.data)
                           .affectedKeys()
                           .hasOnly(['messages', 'plannedLessons', 'lernziele', 'studentLastRead'])
                         && (!('expiresAt' in resource.data)

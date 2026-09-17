@@ -116,30 +116,72 @@ async function pruefe(beschreibung, fn) {
   catch (e) { fehlgeschlagen++; console.log('  ✗', beschreibung, '\n      ->', String(e.message).split('\n')[0]); }
 }
 
-// ══════════════════════════════════════════════════════════════════
-console.log('\nBEFUND 1 — Zugangscode-Dokument ohne jede Anmeldung lesbar');
-console.log('  (Dokument-ID = 6-stelliger Code, Leseregel verlangt nur "nicht abgelaufen")');
+// Das Schueler-Portal meldet sich seit Stufe 1 still an, bevor es liest.
+// So sieht seine Sitzung aus: angemeldet, aber ohne Nutzerdokument.
+const alsSchuelerSitzung = () => testEnv
+  .authenticatedContext('anon-schueler', { firebase: { sign_in_provider: 'anonymous' } })
+  .firestore();
 
-await pruefe('OHNE Anmeldung die komplette Schuelerakte lesen ist MOEGLICH', async () => {
-  const db = ohneAnmeldung();
-  const snap = await assertSucceeds(getDoc(doc(db, 'accessCodes', CODE)));
-  const d = snap.data();
-  if (!d || d.nachname !== 'Mertens') throw new Error('Daten kamen nicht durch');
-  console.log('      gelesen:', d.vorname, d.nachname,
-              '· Stunden', d.fahrstunden,
-              '· Nachrichten', (d.messages || []).length);
+// ══════════════════════════════════════════════════════════════════
+// BEFUND 1 (behoben, Stufe 2) — Der Zugriff ganz OHNE Anmeldung ist zu.
+//
+// Bis hierher waren diese beiden Tests umgekehrt formuliert: Sie wiesen nach,
+// dass das Lesen und Schreiben OHNE jedes Konto moeglich war. Genau das war
+// der Befund. Schliessen liess er sich erst, nachdem das Portal sich in
+// Stufe 1 anmeldet, bevor es zugreift - vorher waere jeder Schueler
+// ausgesperrt gewesen.
+console.log('\nBEFUND 1 (behoben) — Zugangscode-Dokument braucht jetzt eine Anmeldung');
+
+await pruefe('OHNE Anmeldung die Schuelerakte lesen ist GESPERRT', async () => {
+  await assertFails(getDoc(doc(ohneAnmeldung(), 'accessCodes', CODE)));
 });
 
-await pruefe('OHNE Anmeldung in den Chat schreiben ist MOEGLICH', async () => {
-  const db = ohneAnmeldung();
-  await assertSucceeds(updateDoc(doc(db, 'accessCodes', CODE), {
+await pruefe('OHNE Anmeldung in den Chat schreiben ist GESPERRT', async () => {
+  await assertFails(updateDoc(doc(ohneAnmeldung(), 'accessCodes', CODE), {
     messages: [{ text: 'Untergeschobene Nachricht', sender: 'schueler', timestamp: Date.now() }],
   }));
 });
 
-await pruefe('Ein FREMDER Fahrlehrer kann das Code-Dokument ebenfalls lesen', async () => {
-  const db = als(FREMD);
-  await assertSucceeds(getDoc(doc(db, 'accessCodes', CODE)));
+// ── Die Gegenprobe: der Schueler darf weiterhin ALLES, was er braucht ──
+console.log('\n  Gegenprobe - die Sitzung des Portals (angemeldet, ohne Nutzerdokument)');
+
+await pruefe('  Schueler liest seine Akte', async () => {
+  const snap = await assertSucceeds(getDoc(doc(alsSchuelerSitzung(), 'accessCodes', CODE)));
+  if (snap.data().nachname !== 'Mertens') throw new Error('Daten kamen nicht durch');
+});
+await pruefe('  Schueler schreibt eine Chatnachricht', async () => {
+  await assertSucceeds(updateDoc(doc(alsSchuelerSitzung(), 'accessCodes', CODE), {
+    messages: [{ text: 'Bin da!', sender: 'schueler', timestamp: Date.now() }],
+  }));
+});
+await pruefe('  Schueler setzt seinen Lesestand', async () => {
+  await assertSucceeds(updateDoc(doc(alsSchuelerSitzung(), 'accessCodes', CODE), { studentLastRead: Date.now() }));
+});
+await pruefe('  Schueler hakt ein Lernziel ab', async () => {
+  await assertSucceeds(updateDoc(doc(alsSchuelerSitzung(), 'accessCodes', CODE), {
+    lernziele: [{ text: 'Einparken üben', erledigt: true }],
+  }));
+});
+await pruefe('  Schueler sagt eine geplante Fahrstunde zu', async () => {
+  await assertSucceeds(updateDoc(doc(alsSchuelerSitzung(), 'accessCodes', CODE), {
+    plannedLessons: [{ id: '1', status: 'bestaetigt', respondedAt: Date.now() }],
+  }));
+});
+await pruefe('  Schueler kann NICHT die Laufzeit verlaengern', async () => {
+  await assertFails(updateDoc(doc(alsSchuelerSitzung(), 'accessCodes', CODE), { expiresAt: IN_EINEM_JAHR * 2 }));
+});
+await pruefe('  Schueler kann die Akte NICHT loeschen', async () => {
+  await assertFails(deleteDoc(doc(alsSchuelerSitzung(), 'accessCodes', CODE)));
+});
+
+// Ehrlich benannt, statt verschwiegen: isAuth() haelt niemanden auf, der sich
+// selbst eine anonyme Sitzung besorgt - der oeffentliche API-Schluessel steht
+// im HTML, das ist normal. Die eigentliche Huerde bleibt die Code-Laenge
+// (32^10) samt Bremse auf findeAltenZugangscode; App Check kann jetzt
+// zusaetzlich greifen.
+await pruefe('BEKANNTE GRENZE: ein fremder ANGEMELDETER Fahrlehrer kommt weiter durch,'
+           + '\n      wenn er die Kennung kennt', async () => {
+  await assertSucceeds(getDoc(doc(als(FREMD), 'accessCodes', CODE)));
 });
 
 // ══════════════════════════════════════════════════════════════════
