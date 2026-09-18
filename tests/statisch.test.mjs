@@ -58,7 +58,27 @@ for (const d of SEITEN) {
     }
   }
 }
-console.log(`  ${bloecke} Skriptbloecke geprueft`);
+// Eigenstaendige .js-Dateien gehoeren genauso geprueft. Sie fielen bisher
+// durchs Raster, weil dieser Test nur in HTML hineinsah - ein Syntaxfehler im
+// Service Worker faellt sonst erst beim Nutzer auf.
+const EIGENE_JS = ['sw.js'];
+let dateien = 0;
+for (const d of EIGENE_JS) {
+  const text = lies(d);
+  if (text === null) continue;
+  dateien++;
+  // Modul oder klassisches Skript? Ein 'export'/'import' am Zeilenanfang
+  // entscheidet - node --check ist da streng.
+  const istModul = /^\s*(export|import)\s/m.test(text);
+  const pfad = join(ABLAGE, d.replace(/\W/g, '_') + (istModul ? '.mjs' : '.js'));
+  writeFileSync(pfad, text);
+  try {
+    execFileSync(process.execPath, ['--check', pfad], { stdio: 'pipe' });
+  } catch (e) {
+    melde(`${d}: ` + String(e.stderr).split('\n').filter(Boolean).slice(1, 3).join(' | '));
+  }
+}
+console.log(`  ${bloecke} Skriptbloecke und ${dateien} eigene .js-Dateien geprueft`);
 
 // ══ 2 Handler ══════════════════════════════════════════════════════════
 // Nur Aufrufe ohne vorangehenden Punkt zaehlen - sonst faengt man jedes
@@ -134,6 +154,46 @@ const abgedeckt = new Set([...regeln.matchAll(/match\s+\/([A-Za-z0-9_]+)\//g)].m
 const offen = [...benutzt].filter(s => !abgedeckt.has(s)).sort();
 console.log(`  ${benutzt.size} Sammlungen im Client, ${abgedeckt.size} in den Regeln${offen.length ? '' : ' ✓'}`);
 for (const s of offen) melde(`Sammlung "${s}" hat keinen match-Block in firestore.rules`);
+
+// ══ 5 Die doppelte Zeichenliste ════════════════════════════════════════
+// Die Liste der amtlichen Verkehrszeichen steht bewusst zweimal im Projekt:
+// einmal in der Fahrlehrer-App, einmal im Schueler-Portal. Der Grund steht
+// als Kommentar an beiden Stellen - kurz: ein gemeinsames Modul waere eine
+// zweite Datei, von der die GANZE Seite abhinge; faellt sie aus, bleibt die
+// App leer. Der Preis dafuer ist die Gefahr, dass jemand ein Zeichen nur an
+// einer Stelle ergaenzt. Genau das faengt diese Pruefung ab.
+console.log('\n5) Die doppelte Zeichenliste ist in beiden Dateien gleich');
+const ZEICHEN_IN = ['index.html', 'schueler-portal.html'];
+const MARKE = /\/\/ ── ZEICHENLISTE ANFANG[^\n]*\n([\s\S]*?)\/\/ ── ZEICHENLISTE ENDE/;
+const bloeckeZeichen = new Map();
+for (const d of ZEICHEN_IN) {
+  const text = lies(d);
+  if (!text) { melde(`${d} fehlt - die Zeichenliste kann nicht verglichen werden`); continue; }
+  const treffer = text.match(MARKE);
+  if (!treffer) { melde(`${d} hat keinen Block "ZEICHENLISTE ANFANG/ENDE" mehr`); continue; }
+  // Den Kommentarkopf zwischen den Marken ueberspringen; verglichen wird
+  // ab der ersten Datenzeile, damit unterschiedliche Erklaerungen erlaubt
+  // bleiben - die Daten aber nicht.
+  const ab = treffer[1].indexOf('const ZEICHEN_KATALOG');
+  if (ab < 0) { melde(`${d}: im Block steht kein "const ZEICHEN_KATALOG"`); continue; }
+  bloeckeZeichen.set(d, treffer[1].slice(ab).trim());
+}
+if (bloeckeZeichen.size === ZEICHEN_IN.length) {
+  const [[dA, a], [dB, bText]] = [...bloeckeZeichen];
+  if (a === bText) {
+    const anzahl = (a.match(/^\s*'[^']+'\s*:\s*\[/gm) || []).length;
+    console.log(`  ${anzahl} Zeichen, in beiden Dateien wortgleich ✓`);
+  } else {
+    // Nicht nur "ungleich" melden, sondern die erste abweichende Zeile -
+    // sonst sucht man in 90 Zeilen von Hand.
+    const zA = a.split('\n'), zB = bText.split('\n');
+    let i = 0;
+    while (i < zA.length && i < zB.length && zA[i] === zB[i]) i++;
+    melde(`Die Zeichenliste laeuft auseinander, erste Abweichung in Zeile ${i + 1} des Blocks:\n`
+        + `        ${dA}: ${(zA[i] ?? '<Datei zu Ende>').trim()}\n`
+        + `        ${dB}: ${(zB[i] ?? '<Datei zu Ende>').trim()}`);
+  }
+}
 
 // ══ Ergebnis ═══════════════════════════════════════════════════════════
 console.log(befunde === 0

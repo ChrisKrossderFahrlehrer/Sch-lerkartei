@@ -10680,6 +10680,17 @@ window.deleteVzZeichen = async (id) => {
 
 
 // ══ VERKEHRSZEICHEN-KATALOG (amtliche Zeichen zum Auswaehlen) ════════
+// ── ZEICHENLISTE ANFANG ──────────────────────────────────────────
+// ACHTUNG: Diese Liste steht WORTGLEICH ein zweites Mal – in der jeweils
+// anderen Datei (index.html / schueler-portal.html). Das ist Absicht:
+// Ein `import` aus einer gemeinsamen Datei waere zwar kuerzer, macht aber
+// die GANZE Seite von einer zweiten Datei abhaengig. Faellt die aus – 404
+// nach einem halb durchgelaufenen Deploy, oder offline, weil der Service
+// Worker sie nicht vorhaelt – laedt das Modul nicht und die App bleibt
+// komplett leer. Eine reine Nachschlageliste ist diesen Ausfall nicht wert.
+// Gegen das Auseinanderlaufen der Kopien wacht tests/statisch.test.mjs:
+// Der Test vergleicht beide Bloecke Zeichen fuer Zeichen. Wer hier etwas
+// aendert, aendert es in BEIDEN Dateien.
 const ZEICHEN_KATALOG = {
     '201-50':['Andreaskreuz','vorfahrt'],
     '205':['Vorfahrt gewähren','vorfahrt'],
@@ -10780,6 +10791,7 @@ const KAT_GRUPPEN = [
   ['alle','Alle'], ['vorfahrt','Vorfahrt & Halt'], ['gefahr','Gefahrzeichen'],
   ['gebot','Gebotszeichen'], ['verbot','Verbotszeichen'], ['richt','Richtzeichen'], ['wegweiser','Wegweiser']
 ];
+// ── ZEICHENLISTE ENDE ────────────────────────────────────────────
 let katAktiveGruppe = 'alle';
 
 window.openZeichenKatalog = () => {
@@ -11803,7 +11815,9 @@ window.leseSicherung = async (datei) => {
     <div class="sheet-title">📖 Verkehrszeichen-Katalog</div>
     <input id="kat-suche" oninput="renderKatalog()" placeholder="Suchen, z.B. Halt, Tempo, Parken…"
       style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:11px 12px;font-size:0.88rem;margin-bottom:10px">
-    <div id="kat-reiter" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:8px;-webkit-overflow-scrolling:touch"></div>
+    <!-- Umbrechen statt seitlich scrollen: Von den sieben Kategorien waren nur
+         dreieinhalb zu sehen, der Rest stand ausserhalb des Bildschirms. -->
+    <div id="kat-reiter" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
     <div id="kat-liste" style="max-height:46vh;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px"></div>
     <div style="font-size:0.66rem;color:var(--muted);margin-top:10px;line-height:1.5">
       Amtliche Verkehrszeichen (Quelle: Bundesanstalt für Straßenwesen), gemeinfrei nach § 5 UrhG.
