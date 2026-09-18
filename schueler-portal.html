@@ -916,34 +916,71 @@ function renderDashboard() {
     </div>`;
 }
 
-// Verkehrszeichen, die der Fahrlehrer mit dem Schueler geuebt hat.
-// Daten kommen fertig aus dem Portal-Snapshot (Name, Bild, Bewertung 0-5).
+// Verkehrszeichen: wie weit der Schueler mit den Zeichen ist - als Grafik.
+//
+// Vorher stand hier JEDES Zeichen einzeln, mit genau der Stufe, die der
+// Fahrlehrer vergeben hat ("Stop – Geübt", "Vorfahrtstraße – Fast sicher").
+// Das ist mehr Auskunft, als der Schueler braucht: Er soll sehen, wo er
+// steht, nicht die einzelne Note zu jedem Schild nachlesen koennen. Die
+// Karte zeigt deshalb das Gesamtbild - ein gestapelter Balken ueber die
+// Stufen und darunter, wie viele Zeichen auf welcher Stufe stehen.
+//
+// Die Zeichen selbst sind dadurch nicht verschwunden: Alle 93 amtlichen
+// liegen im Theorie-Wissen zum Nachschlagen, dort aber ohne Bewertung.
+//
+// Die Stufen kommen weiter aus ADK_STUFEN, damit die Farben und Namen
+// dieselben sind wie in der Fahrlehrer-Ansicht (§ 6 FahrschAusbO: der
+// Schueler darf nichts anderes lesen, als der Fahrlehrer eingetragen hat).
 function renderVerkehrszeichenCard(s) {
   const zeichen = s.verkehrszeichen || [];
   if (!zeichen.length) return '';
-  // Muss exakt zur Skala der Fahrlehrer-Ansicht passen (Wert 1..5),
-  // sonst liest der Schueler etwas anderes als der Fahrlehrer eingestellt
-  // hat - deshalb jetzt aus ADK_STUFEN statt aus einer lokalen Kopie.
-  const sicher = zeichen.filter(z => (z.w || 0) >= 4).length;
-  const besprochen = zeichen.filter(z => (z.w || 0) > 0).length;
+  const gesamt     = zeichen.length;
+  // Werte ausserhalb 0..5 koennen aus aelteren Datensaetzen stammen -
+  // einfangen, sonst zaehlt so ein Ausreisser in keinem Topf mit und die
+  // Summe der Balkenstuecke ergibt nicht mehr die Gesamtzahl.
+  const stufeVon   = (z) => Math.min(5, Math.max(0, z.w | 0));
+  const sicher     = zeichen.filter(z => stufeVon(z) >= 4).length;
+  const besprochen = zeichen.filter(z => stufeVon(z) > 0).length;
+  const anteil     = Math.round(sicher / gesamt * 100);
 
-  const zeilen = zeichen.map(z => {
-    const w = z.w || 0;
-    const bild = z.b
-      ? `<img src="${z.b}" alt="" style="width:34px;height:34px;object-fit:contain;flex-shrink:0" loading="lazy">`
-      : '<div style="width:34px;flex-shrink:0;text-align:center;font-size:1.1rem">🚧</div>';
-    return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);opacity:${w>0?'1':'0.5'}">
-        ${bild}
-        <div style="flex:1;min-width:0;font-size:0.82rem">${z.n}</div>
-        <div style="font-size:0.72rem;color:${ADK_STUFE_FARB(w)};white-space:nowrap">${ADK_STUFE_KURZ(w)}</div>
-      </div>`;
-  }).join('');
+  // Hoechste Stufe zuerst, "noch nicht behandelt" zuletzt.
+  const toepfe = ADK_STUFEN.slice().reverse().map(st => ({
+    label: st.lang, farbe: st.farbe,
+    anzahl: zeichen.filter(z => stufeVon(z) === st.wert).length,
+  })).concat([{
+    label: 'Noch nicht behandelt', farbe: '#6b7fa8',
+    anzahl: zeichen.filter(z => stufeVon(z) === 0).length,
+  }]);
+  const belegt = toepfe.filter(t => t.anzahl > 0);
+
+  const balken = belegt.map(t =>
+    `<div style="width:${(t.anzahl / gesamt * 100).toFixed(3)}%;background:${t.farbe}"></div>`).join('');
+
+  const legende = belegt.map(t => `
+      <div style="display:flex;align-items:center;gap:8px;font-size:0.78rem;padding:3px 0">
+        <span style="width:9px;height:9px;border-radius:50%;background:${t.farbe};flex-shrink:0"></span>
+        <span style="flex:1;min-width:0;color:var(--muted)">${t.label}</span>
+        <span style="font-weight:700;font-variant-numeric:tabular-nums">${t.anzahl}</span>
+      </div>`).join('');
 
   return `
     <div class="card">
-      <div class="card-title">🚦 Verkehrszeichen <span style="font-size:0.75rem;color:var(--muted);font-weight:400">(${sicher} von ${zeichen.length} sicher)</span></div>
-      <div style="font-size:0.72rem;color:var(--muted);margin:-2px 0 8px">${besprochen} Zeichen habt ihr schon besprochen.</div>
-      ${zeilen}
+      <div class="card-title">🚦 Verkehrszeichen</div>
+      <div style="display:flex;align-items:baseline;gap:10px;margin:2px 0 10px">
+        <div class="prog-pct" style="font-size:1.5rem">${anteil}%</div>
+        <div style="font-size:0.78rem;color:var(--muted);line-height:1.4">
+          ${sicher} von ${gesamt} Zeichen sitzen sicher<br>
+          <span style="font-size:0.72rem">${besprochen} habt ihr schon besprochen</span>
+        </div>
+      </div>
+      <!-- Der gestapelte Balken IST die Grafik. Fuer Vorlesehilfen steht
+           dieselbe Auskunft noch einmal als Text im aria-label - ein
+           farbiger Balken allein sagt einem blinden Nutzer nichts. -->
+      <div role="img" aria-label="${escHtml(belegt.map(t => t.anzahl + ' ' + t.label).join(', '))}"
+           style="display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--surface2);margin-bottom:12px">
+        ${balken}
+      </div>
+      ${legende}
     </div>`;
 }
 
@@ -1207,11 +1244,24 @@ function renderFortschritt() {
   const gesamt     = themenList.length;
   const pct        = gesamt > 0 ? Math.round((sicher/gesamt)*100) : 0;
 
+  // Die Verkehrszeichen stehen in denselben Themen-Daten wie alle anderen
+  // Punkte - hier standen sie deshalb weiterhin einzeln mit ihrer genauen
+  // Stufe, obwohl die Karte auf dem Dashboard laengst nur noch das
+  // Gesamtbild zeigt. Ein Tipp auf "Lernstand" haette die Einzelnote also
+  // doch wieder verraten. Die Zeichen kommen jetzt auch hier als Grafik,
+  // und zwar als dieselbe - eine Funktion, zwei Stellen.
+  //
+  // Mitgezaehlt werden sie weiter: Beim Prozentwert oben sollen sie
+  // zaehlen, nur nicht namentlich untereinander stehen.
+  const zeichenNamen = new Set((s.verkehrszeichen || []).map(z => z.n));
+
   // Gruppiere nach Niveau
   const byLevel = {5:[], 4:[], 3:[], 2:[], 1:[], 0:[]};
   themenList.forEach(([name, val]) => {
+    if (zeichenNamen.has(name)) return;
     byLevel[Math.min(5, Math.max(0, val||0))].push(name);
   });
+  const uebrigeThemen = Object.values(byLevel).reduce((a, x) => a + x.length, 0);
 
   // FIX: Diese Liste war gegen die Fahrlehrer-Ansicht um eine Stufe
   // verschoben - Stufe 4 hiess hier "Sicher", beim Fahrlehrer aber
@@ -1254,7 +1304,8 @@ function renderFortschritt() {
       ? `<div style="text-align:center;padding:32px;color:var(--muted)">
            Noch keine Themen bewertet.<br>Dein Fahrlehrer trägt deinen Fortschritt ein.
          </div>`
-      : `<div class="card">${levelsHTML}</div>`}`;
+      : `${uebrigeThemen ? `<div class="card" style="margin-bottom:16px">${levelsHTML}</div>` : ''}
+         ${renderVerkehrszeichenCard(s)}`}`;
 }
 
 // ── Helpers ────────────────────────────────────────────────────
