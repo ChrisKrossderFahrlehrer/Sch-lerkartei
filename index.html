@@ -1390,20 +1390,51 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 
 <!-- ══ LOGIN ══ -->
 <div class="screen active" id="screen-login"><div class="zeichen-drift">
-    <img src="./verkehrszeichen/zeichen-306-vorfahrtstrasse.png" width="60" style="left:4%;animation-delay:0s;animation-duration:32s" alt="">
-    <img src="./verkehrszeichen/zeichen-205-vorfahrt-gewaehren.png" width="52" style="left:16%;animation-delay:-4s;animation-duration:27s" alt="">
-    <img src="./verkehrszeichen/zeichen-206-stop.png" width="56" style="left:28%;animation-delay:-8s;animation-duration:30s" alt="">
-    <img src="./verkehrszeichen/zeichen-220-einbahnstrasse.png" width="46" style="left:40%;animation-delay:-13s;animation-duration:25s" alt="">
-    <img src="./verkehrszeichen/zeichen-301-vorfahrt.png" width="50" style="left:52%;animation-delay:-17s;animation-duration:31s" alt="">
-    <img src="./verkehrszeichen/zeichen-325-1-verkehrsberuhigt.png" width="54" style="left:64%;animation-delay:-22s;animation-duration:28s" alt="">
-    <img src="./verkehrszeichen/zusatz-abknickende-vorfahrt.png" width="44" style="left:76%;animation-delay:-3s;animation-duration:33s" alt="">
-    <img src="./verkehrszeichen/zeichen-720-gruenpfeil.png" width="48" style="left:88%;animation-delay:-10s;animation-duration:26s" alt="">
-    <img src="./verkehrszeichen/zeichen-306-vorfahrtstrasse.png" width="40" style="left:96%;animation-delay:-15s;animation-duration:29s" alt="">
-    <img src="./verkehrszeichen/zeichen-206-stop.png" width="42" style="left:58%;animation-delay:-20s;animation-duration:34s" alt="">
-    <img src="./verkehrszeichen/zeichen-220-einbahnstrasse.png" width="38" style="left:10%;animation-delay:-25s;animation-duration:27s" alt="">
-    <img src="./verkehrszeichen/zeichen-205-vorfahrt-gewaehren.png" width="46" style="left:70%;animation-delay:-6s;animation-duration:32s" alt="">
-    <img src="./verkehrszeichen/zeichen-325-1-verkehrsberuhigt.png" width="40" style="left:34%;animation-delay:-11s;animation-duration:30s" alt="">
-    <img src="./verkehrszeichen/zeichen-720-gruenpfeil.png" width="36" style="left:82%;animation-delay:-18s;animation-duration:25s" alt="">
+    <!-- 26 Zeichen aus 16 verschiedenen Vorlagen (vorher 14 aus 8). Sie
+         liegen unter ./verkehrszeichen-flug/ und sind freigestellt: der
+         weisse Hintergrund der Katalogbilder ist weg, das Weiss INNERHALB
+         des Schildes - die STOP-Schrift, das weisse Dreieck bei "Vorfahrt
+         gewaehren" - steht noch. Bei 96 px Kantenlaenge wiegen alle 16
+         zusammen 188 KB, also etwa so viel wie die acht grossen PNG vorher.
+
+         Groesse und Tempo haengen zusammen (15 s bis 41 s): Was groesser
+         ist, wirkt naeher und zieht schneller vorbei. Die negativen
+         animation-delay sorgen dafuer, dass die Flaeche schon beim Laden
+         gefuellt ist, statt sich erst nach und nach zu beleben.
+
+         Die Startpunkte laufen von -30 % bis 55 %, nicht ueber die ganze
+         Breite. Grund: Die Bewegung verschiebt jedes Bild zusaetzlich um
+         -15vw bis +115vw, das 'left' kommt also oben drauf - wer bei 90 %
+         startet, ist fast den ganzen Durchlauf rechts ausserhalb.
+         Nachgemessen: mit 0..97 % waren im Schnitt 10,6 von 26 gleichzeitig
+         im Bild, mit -30..55 % sind es 16,6. (Ein Teil davon liegt hinter
+         der Login-Box - die soll lesbar bleiben.) -->
+    <img src="./verkehrszeichen-flug/267.png" width="42" alt="" decoding="async" fetchpriority="low" style="left:-30.7%;opacity:0.094;animation-delay:-8.5s;animation-duration:30.9s">
+    <img src="./verkehrszeichen-flug/274-50.png" width="36" alt="" decoding="async" fetchpriority="low" style="left:-26.6%;opacity:0.083;animation-delay:-33.2s;animation-duration:36.8s">
+    <img src="./verkehrszeichen-flug/101.png" width="36" alt="" decoding="async" fetchpriority="low" style="left:-23.1%;opacity:0.083;animation-delay:-5.4s;animation-duration:39.2s">
+    <img src="./verkehrszeichen-flug/142-10.png" width="36" alt="" decoding="async" fetchpriority="low" style="left:-21.6%;opacity:0.083;animation-delay:-28.2s;animation-duration:39.2s">
+    <img src="./verkehrszeichen-flug/274-50.png" width="33" alt="" decoding="async" fetchpriority="low" style="left:-18.3%;opacity:0.078;animation-delay:-32.9s;animation-duration:41.0s">
+    <img src="./verkehrszeichen-flug/205.png" width="45" alt="" decoding="async" fetchpriority="low" style="left:-14.2%;opacity:0.099;animation-delay:-8.0s;animation-duration:32.7s">
+    <img src="./verkehrszeichen-flug/123.png" width="46" alt="" decoding="async" fetchpriority="low" style="left:-9.8%;opacity:0.101;animation-delay:-1.2s;animation-duration:30.9s">
+    <img src="./verkehrszeichen-flug/131.png" width="55" alt="" decoding="async" fetchpriority="low" style="left:-7.3%;opacity:0.117;animation-delay:-9.9s;animation-duration:24.5s">
+    <img src="./verkehrszeichen-flug/239.png" width="39" alt="" decoding="async" fetchpriority="low" style="left:-3.5%;opacity:0.088;animation-delay:-31.5s;animation-duration:34.8s">
+    <img src="./verkehrszeichen-flug/250.png" width="49" alt="" decoding="async" fetchpriority="low" style="left:-0.8%;opacity:0.107;animation-delay:-13.5s;animation-duration:26.8s">
+    <img src="./verkehrszeichen-flug/142-10.png" width="32" alt="" decoding="async" fetchpriority="low" style="left:3.1%;opacity:0.076;animation-delay:-14.5s;animation-duration:39.0s">
+    <img src="./verkehrszeichen-flug/283.png" width="59" alt="" decoding="async" fetchpriority="low" style="left:7.0%;opacity:0.125;animation-delay:-8.5s;animation-duration:18.5s">
+    <img src="./verkehrszeichen-flug/250.png" width="50" alt="" decoding="async" fetchpriority="low" style="left:8.3%;opacity:0.108;animation-delay:-6.0s;animation-duration:27.0s">
+    <img src="./verkehrszeichen-flug/136-10.png" width="43" alt="" decoding="async" fetchpriority="low" style="left:13.7%;opacity:0.096;animation-delay:-13.9s;animation-duration:30.5s">
+    <img src="./verkehrszeichen-flug/237.png" width="62" alt="" decoding="async" fetchpriority="low" style="left:16.6%;opacity:0.13;animation-delay:-3.2s;animation-duration:18.1s">
+    <img src="./verkehrszeichen-flug/215.png" width="47" alt="" decoding="async" fetchpriority="low" style="left:19.7%;opacity:0.103;animation-delay:-10.0s;animation-duration:28.2s">
+    <img src="./verkehrszeichen-flug/314.png" width="36" alt="" decoding="async" fetchpriority="low" style="left:23.3%;opacity:0.083;animation-delay:-18.1s;animation-duration:36.9s">
+    <img src="./verkehrszeichen-flug/306.png" width="43" alt="" decoding="async" fetchpriority="low" style="left:26.4%;opacity:0.096;animation-delay:-3.5s;animation-duration:31.6s">
+    <img src="./verkehrszeichen-flug/237.png" width="62" alt="" decoding="async" fetchpriority="low" style="left:28.5%;opacity:0.13;animation-delay:-15.6s;animation-duration:16.7s">
+    <img src="./verkehrszeichen-flug/205.png" width="30" alt="" decoding="async" fetchpriority="low" style="left:31.8%;opacity:0.072;animation-delay:-1.8s;animation-duration:40.4s">
+    <img src="./verkehrszeichen-flug/239.png" width="61" alt="" decoding="async" fetchpriority="low" style="left:34.7%;opacity:0.128;animation-delay:-7.8s;animation-duration:15.5s">
+    <img src="./verkehrszeichen-flug/123.png" width="40" alt="" decoding="async" fetchpriority="low" style="left:37.8%;opacity:0.09;animation-delay:-28.4s;animation-duration:36.7s">
+    <img src="./verkehrszeichen-flug/250.png" width="62" alt="" decoding="async" fetchpriority="low" style="left:42.7%;opacity:0.13;animation-delay:-3.9s;animation-duration:17.8s">
+    <img src="./verkehrszeichen-flug/206.png" width="35" alt="" decoding="async" fetchpriority="low" style="left:45.3%;opacity:0.081;animation-delay:-35.3s;animation-duration:37.5s">
+    <img src="./verkehrszeichen-flug/250.png" width="46" alt="" decoding="async" fetchpriority="low" style="left:48.3%;opacity:0.101;animation-delay:-15.2s;animation-duration:29.0s">
+    <img src="./verkehrszeichen-flug/136-10.png" width="44" alt="" decoding="async" fetchpriority="low" style="left:51.6%;opacity:0.098;animation-delay:-11.3s;animation-duration:30.6s">
   </div>
   
       <div style="text-align:center;margin:4px 0 18px">
