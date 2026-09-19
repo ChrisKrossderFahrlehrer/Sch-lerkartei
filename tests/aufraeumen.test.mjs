@@ -21,6 +21,9 @@ const require = createRequire(import.meta.url);
 const hier = dirname(fileURLToPath(import.meta.url));
 
 process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8089';
+// Auth zwingend auf den Emulator: loescheAlteAnonymeKonten ruft
+// deleteUser(). Ohne diese Zeile wuerde ein Testlauf ECHTE Konten treffen.
+process.env.FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099';
 process.env.GCLOUD_PROJECT = process.env.GCLOUD_PROJECT || 'fahrsync-aufraeumen';
 
 const admin = require(join(hier, '..', 'functions', 'node_modules', 'firebase-admin'));
@@ -143,6 +146,97 @@ await pruefe('expiresAt = null gilt als fehlend', async () => {
     code: 'NUL', teacherUid: 't1', expiresAt: null,
   });
   gleich(await repariereFehlendeAblaufdaten(db, jetzt + 14 * TAG), 1, 'Anzahl');
+});
+
+// ══════════════════════════════════════════════════════════════════
+// ANONYME SITZUNGEN DES SCHUELER-PORTALS
+//
+// Das Portal meldet sich bei jedem Besuch anonym an - und bisher wurde nie
+// ein solches Konto wieder entfernt. Die eigentliche Gefahr beim Beheben ist
+// nicht, zu wenig zu loeschen, sondern ZU VIEL: Ein versehentlich geloeschtes
+// Fahrlehrer-Konto waere nicht wiederherstellbar. Darauf zielen die meisten
+// Pruefungen hier.
+console.log('\nANONYME SITZUNGEN — aufraeumen, aber nur die richtigen');
+
+const auth = admin.auth();
+const { loescheAlteAnonymeKonten, istAnonymesKonto } =
+  require(join(hier, '..', 'functions', 'loeschen.js'));
+
+const TAG_MS = 86400000;
+
+async function leereAuth() {
+  let marke;
+  do {
+    const s = await auth.listUsers(1000, marke);
+    for (const u of s.users) await auth.deleteUser(u.uid).catch(() => {});
+    marke = s.pageToken;
+  } while (marke);
+}
+await leereAuth();
+
+// Der Emulator setzt creationTime/lastSignInTime auf JETZT. Ein wirklich
+// altes Konto laesst sich darueber nicht erzeugen - deshalb wird die Zeit
+// stattdessen ueber den 'jetzt'-Parameter vorgespult. Das prueft dieselbe
+// Rechnung und kommt ohne Zeitreise aus.
+const spaeter = Date.now() + 100 * TAG_MS;
+
+await auth.createUser({ uid: 'anon-alt-1' });
+await auth.createUser({ uid: 'anon-alt-2' });
+await auth.createUser({ uid: 'lehrer-1', email: 'lehrer@fahrschule.de', password: 'geheim123' });
+await auth.createUser({ uid: 'lehrer-2', email: 'zweiter@fahrschule.de', password: 'geheim123' });
+await auth.createUser({ uid: 'mit-telefon', phoneNumber: '+4915112345678' });
+
+await pruefe('Ein Konto ohne Anbieter/E-Mail/Telefon gilt als anonym', async () => {
+  const n = await auth.getUser('anon-alt-1');
+  if (!istAnonymesKonto(n)) throw new Error('wurde nicht als anonym erkannt');
+});
+
+await pruefe('Ein Fahrlehrer-Konto gilt NICHT als anonym', async () => {
+  for (const uid of ['lehrer-1', 'lehrer-2']) {
+    const n = await auth.getUser(uid);
+    if (istAnonymesKonto(n)) throw new Error(uid + ' faelschlich als anonym erkannt');
+  }
+});
+
+await pruefe('Ein Konto mit Telefonnummer gilt NICHT als anonym', async () => {
+  const n = await auth.getUser('mit-telefon');
+  if (istAnonymesKonto(n)) throw new Error('faelschlich als anonym erkannt');
+});
+
+await pruefe('Frische anonyme Sitzungen werden NICHT angefasst', async () => {
+  const weg = await loescheAlteAnonymeKonten(auth, 60 * TAG_MS, 500, Date.now());
+  gleich(weg, 0, 'geloeschte Konten');
+  await auth.getUser('anon-alt-1');   // wirft, wenn geloescht
+});
+
+await pruefe('Nach 100 Tagen ohne Aktivitaet sind die anonymen Sitzungen weg', async () => {
+  const weg = await loescheAlteAnonymeKonten(auth, 60 * TAG_MS, 500, spaeter);
+  gleich(weg, 2, 'geloeschte Konten');
+});
+
+await pruefe('GEGENPROBE: die Fahrlehrer-Konten stehen noch', async () => {
+  for (const uid of ['lehrer-1', 'lehrer-2', 'mit-telefon']) {
+    const n = await auth.getUser(uid);         // wirft, wenn geloescht
+    if (!n) throw new Error(uid + ' fehlt');
+  }
+});
+
+await pruefe('Die Obergrenze je Lauf wird eingehalten', async () => {
+  for (let i = 0; i < 7; i++) await auth.createUser({ uid: 'anon-menge-' + i });
+  const weg = await loescheAlteAnonymeKonten(auth, 60 * TAG_MS, 3, spaeter);
+  if (weg > 3) throw new Error(`${weg} geloescht, erlaubt waren 3`);
+});
+
+await pruefe('Ein zweiter Lauf raeumt den Rest ab', async () => {
+  const weg = await loescheAlteAnonymeKonten(auth, 60 * TAG_MS, 500, spaeter);
+  const uebrig = (await auth.listUsers(1000)).users.filter(istAnonymesKonto);
+  gleich(uebrig.length, 0, 'uebrige anonyme Konten');
+  if (weg < 1) throw new Error('zweiter Lauf hat nichts getan');
+});
+
+await pruefe('Am Ende sind GENAU die drei echten Konten uebrig', async () => {
+  const alle = (await auth.listUsers(1000)).users.map(u => u.uid).sort();
+  gleich(alle.join(','), 'lehrer-1,lehrer-2,mit-telefon', 'verbliebene Konten');
 });
 
 console.log(`\n${ok} bestanden, ${schlecht} fehlgeschlagen\n`);

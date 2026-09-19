@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node statisch.test.mjs && node indizes.test.mjs && cd .. && firebase emulators:exec --only firestore,storage --project fahrsync-test \"node tests/rules.test.mjs && node tests/uebernahme.test.mjs && node tests/audit.test.mjs && node tests/rechnung.test.mjs && node tests/loeschen.test.mjs && node tests/kein_verlust.test.mjs && node tests/aufraeumen.test.mjs && node tests/speicher.test.mjs\"",
+    "test": "node statisch.test.mjs && node indizes.test.mjs && cd .. && firebase emulators:exec --only firestore,storage,auth --project fahrsync-test \"node tests/rules.test.mjs && node tests/uebernahme.test.mjs && node tests/audit.test.mjs && node tests/rechnung.test.mjs && node tests/loeschen.test.mjs && node tests/kein_verlust.test.mjs && node tests/aufraeumen.test.mjs && node tests/speicher.test.mjs\"",
     "test:statisch": "node statisch.test.mjs",
     "test:regeln": "cd .. && firebase emulators:exec --only firestore --project fahrsync-test \"node tests/rules.test.mjs\"",
     "test:uebernahme": "cd .. && firebase emulators:exec --only firestore --project uebernahme \"node tests/uebernahme.test.mjs\"",
@@ -13,7 +13,7 @@
     "test:kein-verlust": "cd .. && firebase emulators:exec --only firestore --project fahrsync-kein-verlust \"node tests/kein_verlust.test.mjs\"",
     "test:speicher": "cd .. && firebase emulators:exec --only firestore,storage --project fahrsync-speicher \"node tests/speicher.test.mjs\"",
     "test:indizes": "node indizes.test.mjs",
-    "test:aufraeumen": "cd .. && firebase emulators:exec --only firestore --project fahrsync-aufraeumen \"node tests/aufraeumen.test.mjs\""
+    "test:aufraeumen": "cd .. && firebase emulators:exec --only firestore,auth --project fahrsync-aufraeumen \"node tests/aufraeumen.test.mjs\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^3.0.4",

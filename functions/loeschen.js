@@ -234,8 +234,69 @@ async function repariereFehlendeAblaufdaten(db, neuesDatum, hoechstens = 500) {
   return nachgetragen;
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// ALTE ANONYME SITZUNGEN AUFRAEUMEN
+//
+// Das Schueler-Portal meldet sich bei JEDEM Besuch anonym an (der Schueler
+// hat kein eigenes Konto). Jeder Besuch legt damit ein Anmeldekonto an -
+// und bisher wurde davon nie eines wieder entfernt. Bei einer Fahrschule mit
+// 60 Schuelern, die zweimal die Woche nachsehen, sind das ueber 6000 Konten
+// im Jahr, die nichts mehr tun.
+//
+// Loeschen ist hier gefahrlos: An der anonymen Kennung haengt NICHTS. Die
+// Chat-Bilder liegen unter der Code-Kennung, der Lernstand im Zugangscode,
+// und das Portal meldet sich beim naechsten Aufruf einfach neu an. Wer
+// zwischendurch vorbeischaut, bekommt eine neue Kennung und merkt nichts.
+//
+// Die Frist ist trotzdem bewusst grosszuegig (Vorgabe: 60 Tage ohne jede
+// Aktivitaet), und geprueft wird die LETZTE Anmeldung, nicht das Anlegedatum.
+// Ein Konto, das noch benutzt wird, kann damit nicht erwischt werden.
+//
+// Nur echte anonyme Konten kommen in Frage: kein Anmeldeanbieter, keine
+// E-Mail, keine Telefonnummer. Ein Fahrlehrer-Konto kann so nie getroffen
+// werden - genau das waere der Schaden, den es zu vermeiden gilt.
+function istAnonymesKonto(nutzer) {
+  return (!nutzer.providerData || nutzer.providerData.length === 0)
+         && !nutzer.email && !nutzer.phoneNumber
+         && !(nutzer.customClaims && Object.keys(nutzer.customClaims).length);
+}
+
+async function loescheAlteAnonymeKonten(auth, maxAlterMs, hoechstens = 500, jetzt = Date.now()) {
+  let seite, geprueft = 0, geloescht = 0;
+  let marke;
+  do {
+    seite = await auth.listUsers(1000, marke);
+    const faellig = [];
+    for (const n of seite.users) {
+      geprueft++;
+      if (!istAnonymesKonto(n)) continue;
+      const m = n.metadata || {};
+      // lastRefreshTime kann fehlen; dann zaehlt die letzte Anmeldung, sonst
+      // das Anlegedatum. Im Zweifel gilt der JUENGSTE Zeitpunkt - lieber ein
+      // Konto zu lange behalten als eine laufende Sitzung abschneiden.
+      const zeiten = [m.lastRefreshTime, m.lastSignInTime, m.creationTime]
+        .filter(Boolean).map(t => new Date(t).getTime()).filter(Number.isFinite);
+      if (!zeiten.length) continue;
+      if (jetzt - Math.max(...zeiten) < maxAlterMs) continue;
+      faellig.push(n.uid);
+      if (faellig.length + geloescht >= hoechstens) break;
+    }
+    for (const uid of faellig) {
+      await auth.deleteUser(uid).catch(e => {
+        if (e.code !== 'auth/user-not-found') console.warn('Anonymes Konto:', uid, e.message);
+      });
+      geloescht++;
+    }
+    marke = seite.pageToken;
+  } while (marke && geloescht < hoechstens);
+  if (geloescht) {
+    console.log(`Alte anonyme Sitzungen entfernt: ${geloescht} von ${geprueft} geprueften Konten.`);
+  }
+  return geloescht;
+}
+
 module.exports = {
   loescheAlle, gehoertNochDemKonto, loescheChatBilderServer,
   loescheZugangscodesMitBildern, loeschUmfang, loescheKontoHart, CHAT_BUCKET,
-  repariereFehlendeAblaufdaten,
+  repariereFehlendeAblaufdaten, loescheAlteAnonymeKonten, istAnonymesKonto,
 };

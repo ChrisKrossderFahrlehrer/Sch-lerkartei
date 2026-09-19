@@ -8811,6 +8811,10 @@ window.setKlasseTab = (klasse) => {
 
 window.openOptionsMenu = () => {
   const s = getStudent(activeId);
+  // Ohne ausgewaehlten Schueler (oder wenn er zwischenzeitlich aus der
+  // Liste verschwunden ist) gab es hier einen stillen Absturz - der
+  // Knopf schien einfach nicht zu reagieren.
+  if (!s) { toast('Bitte zuerst einen Schüler öffnen.'); return; }
   const klassen = s.klassen || [s.klasse || 'B'];
   const hatB197 = klassen.includes('B197');
   // B197-Option nur zeigen wenn relevant
@@ -8829,6 +8833,10 @@ const ALLE_KLASSEN = [
 
 window.openZusatzKlasse = () => {
   const s = getStudent(activeId);
+  // Ohne ausgewaehlten Schueler (oder wenn er zwischenzeitlich aus der
+  // Liste verschwunden ist) gab es hier einen stillen Absturz - der
+  // Knopf schien einfach nicht zu reagieren.
+  if (!s) { toast('Bitte zuerst einen Schüler öffnen.'); return; }
   const aktiveKlassen = s.klassen || [s.klasse || 'B'];
   const list = document.getElementById('zusatz-klasse-list');
   list.innerHTML = ALLE_KLASSEN.map(({k, label, info}) => {
@@ -8882,6 +8890,10 @@ window.toggleZusatzKlasse = async (klasse) => {
 
 window.openKlasseAendern = () => {
   const s = getStudent(activeId);
+  // Ohne ausgewaehlten Schueler (oder wenn er zwischenzeitlich aus der
+  // Liste verschwunden ist) gab es hier einen stillen Absturz - der
+  // Knopf schien einfach nicht zu reagieren.
+  if (!s) { toast('Bitte zuerst einen Schüler öffnen.'); return; }
   const aktuelleKlasse = s.klasse || 'B';
   const keyMap = {'B':'b','B-Auto':'bauto','B197':'b197','BE':'be','A':'a'};
   // Alle Buttons zurücksetzen, aktuelle hervorheben
@@ -8938,6 +8950,10 @@ window.saveKlasseAendern = async (neueKlasse) => {
 
 window.openB197Settings = () => {
   const s = getStudent(activeId);
+  // Ohne ausgewaehlten Schueler (oder wenn er zwischenzeitlich aus der
+  // Liste verschwunden ist) gab es hier einen stillen Absturz - der
+  // Knopf schien einfach nicht zu reagieren.
+  if (!s) { toast('Bitte zuerst einen Schüler öffnen.'); return; }
   document.getElementById('inp-b197-ziel').value = s.zielSchaltstunden || 10;
   document.getElementById('b197-settings-modal').classList.add('open');
 };
