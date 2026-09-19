@@ -57,7 +57,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);} .btn-secondary:hover{border-color:var(--accent);color:var(--accent);}
 .btn-danger{background:transparent;color:var(--danger);border:1px solid var(--danger);} .btn-danger:hover{background:var(--danger);color:#fff;}
 .btn-success{background:var(--success);color:#0f0f0f;}
-.btn-full{width:100%;justify-content:center;} .btn-sm{padding:5px 11px;font-size:12px;}
+/* min-height: Der Anmelde-Knopf war 36 px hoch. Apple nennt 44 px als
+   Mindestmass fuer Tippziele, Google 48. Bewusst nur .btn-full und nicht
+   .btn allgemein - das wuerde auch die kleinen Knoepfe in den Tabellen
+   aufblaehen und dort die Zeilenhoehen verschieben. */
+.btn-full{width:100%;justify-content:center;min-height:44px;} .btn-sm{padding:5px 11px;font-size:12px;}
 
 /* ── App Layout ── */
 #app{display:none;min-height:100vh;flex-direction:column;}

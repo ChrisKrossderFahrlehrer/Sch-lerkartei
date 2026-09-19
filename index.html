@@ -362,7 +362,7 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
 .btn-back:active { transform:translateY(4px); box-shadow:0 1px 0 rgba(0,0,0,0.5), 0 2px 5px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.1); }
 .btn-icon-sm {
   background:var(--surface2); border:1px solid var(--border); color:var(--text);
-  width:36px; height:36px; border-radius:10px; font-size:0.9rem; cursor:pointer;
+  width:40px; height:40px; border-radius:10px; font-size:0.9rem; cursor:pointer;
   display:flex; align-items:center; justify-content:center;
   font-family:'Manrope',sans-serif; white-space:nowrap; flex-shrink:0;
   box-shadow:0 5px 0 rgba(0,0,0,0.5), 0 8px 14px rgba(0,0,0,0.32), inset 0 1px 1px rgba(255,255,255,0.14), inset 0 -2px 3px rgba(0,0,0,0.25);
@@ -1701,7 +1701,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
   <!-- Sortier-Leiste -->
   <div style="display:flex;align-items:center;gap:8px;padding:0 16px 4px">
     <span style="font-size:0.74rem;color:var(--muted);white-space:nowrap">Sortieren:</span>
-    <select id="sort-select" onchange="setSortMode(this.value)" style="flex:1;background:linear-gradient(180deg,rgba(255,255,255,0.07),rgba(0,0,0,0.06)),var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:9px 12px;font-size:0.8rem;outline:none;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,0.45),0 6px 12px rgba(0,0,0,0.3),inset 0 1px 1px rgba(255,255,255,0.12)">
+    <select id="sort-select" aria-label="Schülerliste sortieren" onchange="setSortMode(this.value)" style="flex:1;background:linear-gradient(180deg,rgba(255,255,255,0.07),rgba(0,0,0,0.06)),var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:9px 12px;font-size:0.8rem;outline:none;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,0.45),0 6px 12px rgba(0,0,0,0.3),inset 0 1px 1px rgba(255,255,255,0.12)">
       <option value="nameAsc">Name (A → Z)</option>
       <option value="nameDesc">Name (Z → A)</option>
       <option value="dateDesc">Neueste zuerst</option>
@@ -5368,7 +5368,7 @@ function renderStudentCard(s) {
     <div class="avatar" style="background:${c}">${initials(s)}</div>
     <div style="flex:1;min-width:0"><div class="sc-name">${ampelDot}${s.pinned?'📌 ':''}${escapeHtmlEigen(s.vorname)} ${escapeHtmlEigen(s.nachname)} ${bf17Tag}</div><div class="sc-meta">${meta}</div>${notifHTML}</div>
     <div class="sc-right">
-      <button onclick="event.stopPropagation();togglePin('${s.id}')" title="${s.pinned?'Lösen':'Anpinnen'}" style="background:none;border:none;cursor:pointer;font-size:1rem;padding:4px;opacity:${s.pinned?'1':'0.35'};line-height:1">📌</button>
+      <button onclick="event.stopPropagation();togglePin('${s.id}')" title="${s.pinned?'Lösen':'Anpinnen'}" style="background:none;border:none;cursor:pointer;font-size:1rem;padding:4px;min-width:40px;min-height:40px;display:inline-flex;align-items:center;justify-content:center;opacity:${s.pinned?'1':'0.35'};line-height:1">📌</button>
       <div class="progress-ring-wrap">
         <svg class="ring-svg" width="40" height="40" viewBox="0 0 40 40">
           <circle class="ring-bg" cx="20" cy="20" r="${r}"/>
