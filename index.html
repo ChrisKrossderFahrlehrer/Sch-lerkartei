@@ -3369,7 +3369,7 @@ const dbUpd = (...a) => window.__DEMO ? window.__demoWrite('upd', a) : updateDoc
 const dbDel = (...a) => window.__DEMO ? window.__demoWrite('del', a) : deleteDoc(...a);
 function __demoDaten(){
   const now=Date.now(), nm=(d)=>now-d*86400000, base=new Date();
-  const iso=(o)=>{ const x=new Date(base); x.setDate(x.getDate()+o); return x.toISOString().slice(0,10); };
+  const iso=(o)=>{ const x=new Date(base); x.setDate(x.getDate()+o); return alsLokalesDatum(x); };
   const students=[
     { id:'demo-s1', uid:'demo-user', fahrschuleId:'demo-user', schuelerNr:1, vorname:'Lena', nachname:'Bauer', geburt:'2006-04-12', klasse:'B', klassen:['B'], ziel:30, fahrstunden:14, sonderfahrten:3, theorieBestanden:true, archiviert:false, pinned:true, createdAt:nm(40) },
     { id:'demo-s2', uid:'demo-user', fahrschuleId:'demo-user', schuelerNr:2, vorname:'Jonas', nachname:'Klein', geburt:'2005-09-30', klasse:'B', klassen:['B'], ziel:30, fahrstunden:6, sonderfahrten:0, theorieBestanden:false, archiviert:false, pinned:false, createdAt:nm(20) },
@@ -5034,6 +5034,16 @@ function getSchuelerNr(s) {
 function getColor(s) { const i = students.indexOf(s); return COLORS[(i<0?0:i)%COLORS.length]; }
 function initials(s) { return ((s.vorname||'?')[0] + (s.nachname||'?')[0]).toUpperCase(); }
 function formatDate(d) { if (!d) return ''; const [y,m,day]=d.split('-'); return `${day}.${m}.${y}`; }
+// Datum als YYYY-MM-DD in ORTSZEIT. toISOString() rechnet nach UTC um und
+// liefert in deutscher Sommerzeit zwischen 00:00 und 02:00 den VORTAG.
+// Nachgemessen am 17.07.2026 um 00:30 Berliner Zeit: Das vorbelegte
+// Pruefungsdatum stand auf dem 16.07. - ein falsches Datum in einem
+// Nachweis, der nach § 6 FahrschAusbO gefuehrt wird. kalender.html und das
+// Schueler-Portal hatten den Helfer laengst, index.html nicht.
+function alsLokalesDatum(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+const heuteLokal = () => alsLokalesDatum(new Date());
 function age(d) { if (!d) return null; const b=new Date(d),now=new Date(); let a=now.getFullYear()-b.getFullYear(); if(now<new Date(now.getFullYear(),b.getMonth(),b.getDate()))a--; return a; }
 
 // BF17-Erkennung: Begleitetes Fahren ab 17 (Klasse B/B197/B-Auto, Alter 16-17).
@@ -6713,7 +6723,7 @@ window.openVersuchModal = () => {
   versuchTyp = 'praxis'; versuchErgebnis = 'durchgefallen';
   setVersuchTyp('praxis'); setVersuchErgebnis('durchgefallen');
   document.getElementById('inp-versuch-grund').value = '';
-  document.getElementById('inp-versuch-datum').value = new Date().toISOString().split('T')[0];
+  document.getElementById('inp-versuch-datum').value = heuteLokal();
 };
 
 let versuchTyp = 'praxis';
@@ -6976,7 +6986,7 @@ window.openPlanLesson = async (vonCode = false) => {
   document.getElementById('code-modal').classList.remove('open');
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
-  document.getElementById('inp-plan-datum').value   = tomorrow.toISOString().split('T')[0];
+  document.getElementById('inp-plan-datum').value   = alsLokalesDatum(tomorrow);
   document.getElementById('inp-plan-uhrzeit').value = '';
   document.getElementById('inp-plan-ort').value     = '';
   document.getElementById('inp-plan-notiz').value   = '';
@@ -7568,7 +7578,7 @@ function renderDashboard() {
 window.exportAlleDaten = () => {
   try {
     if (!students.length) { toast('Keine Schüler zum Exportieren'); return; }
-    const datum = new Date().toISOString().split('T')[0];
+    const datum = heuteLokal();
 
     // 1. JSON (vollständiges Backup)
     const backup = {
@@ -11697,7 +11707,7 @@ window.starteKomplettsicherung = async () => {
       sicherung.kalenderSchueler = kalSchuelerSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     } catch(e) { console.warn('kalenderSchueler', e); }
 
-    const datum = new Date().toISOString().slice(0,10);
+    const datum = heuteLokal();
     let inhalt = JSON.stringify(sicherung, null, 2);
     let dateiname = `FahrSync-Sicherung_${datum}.json`;
     if (passwort) {

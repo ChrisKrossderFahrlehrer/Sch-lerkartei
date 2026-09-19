@@ -186,7 +186,56 @@ async function loescheKontoHart(uid) {
   console.log('Konto endgueltig geloescht:', JSON.stringify(bericht));
   return bericht;
 }
+// ═══════════════════════════════════════════════════════════════════
+// ABLAUFDATUM NACHTRAGEN
+//
+// Das taegliche Aufraeumen findet alte Zugangscodes ueber
+//   .where('expiresAt', '<=', jetzt - 90 Tage)
+// Ein Firestore-Filter ueberspringt aber JEDES Dokument, dem das Feld ganz
+// fehlt - und solche gibt es: Der Client faengt sie an mehreren Stellen mit
+// `data.expiresAt || (Date.now()+…)` ab, und die Speicher-Regeln haben einen
+// eigenen Zweig fuer `!('expiresAt' in codeDoc().data)`.
+//
+// Ein solcher Code bliebe fuer immer liegen, ohne dass irgendwo ein Fehler
+// auftaucht - der Job meldet "fertig". Darin stecken Name, Lernstand und der
+// vollstaendige Chatverlauf eines Schuelers.
+//
+// BEWUSST wird hier NICHT geloescht. Ein Dokument ohne Ablaufdatum hat ein
+// unbekanntes Alter; es koennte ein aktiver Zugang sein, an dem gerade ein
+// Schueler haengt. Es bekommt deshalb ein Datum in der ZUKUNFT und faellt
+// danach ganz normal unter die 90-Tage-Regel. Niemand wird ausgesperrt,
+// nichts geht verloren - die Luecke schliesst sich trotzdem.
+//
+// Ohne Filter durchgesehen wird die Sammlung seitenweise, weil Firestore
+// nicht nach einem fehlenden Feld fragen kann.
+async function repariereFehlendeAblaufdaten(db, neuesDatum, hoechstens = 500) {
+  let letzter = null, geprueft = 0, nachgetragen = 0;
+  while (geprueft < hoechstens) {
+    let abfrage = db.collection('accessCodes').orderBy('__name__').limit(200);
+    if (letzter) abfrage = abfrage.startAfter(letzter);
+    const seite = await abfrage.get();
+    if (seite.empty) break;
+    for (const d of seite.docs) {
+      geprueft++;
+      const wert = d.get('expiresAt');
+      // Auch ein Textdatum oder null zaehlt als fehlend: Der Vergleich im
+      // Aufraeum-Job trifft nur Zahlen, alles andere wuerde ebenso
+      // stillschweigend durchrutschen.
+      if (typeof wert === 'number' && Number.isFinite(wert)) continue;
+      await d.ref.update({ expiresAt: neuesDatum });
+      nachgetragen++;
+    }
+    letzter = seite.docs[seite.docs.length - 1];
+    if (seite.size < 200) break;
+  }
+  if (nachgetragen) {
+    console.log(`Ablaufdatum nachgetragen bei ${nachgetragen} Zugangscode(s) von ${geprueft} geprueften.`);
+  }
+  return nachgetragen;
+}
+
 module.exports = {
   loescheAlle, gehoertNochDemKonto, loescheChatBilderServer,
   loescheZugangscodesMitBildern, loeschUmfang, loescheKontoHart, CHAT_BUCKET,
+  repariereFehlendeAblaufdaten,
 };

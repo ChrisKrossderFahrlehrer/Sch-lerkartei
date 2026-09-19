@@ -302,6 +302,32 @@ for (const d of CLIENT) {
             + `${offenHier ? '' : ' ✓'}`);
 }
 
+// ══ 7 Datum immer in Ortszeit ══════════════════════════════════════════
+// toISOString() rechnet nach UTC um. In deutscher Sommerzeit (UTC+2) ist
+// zwischen 00:00 und 02:00 Ortszeit in UTC noch der VORTAG - genau die
+// Stunden, in denen nach dem letzten Fahrschueler noch Papierkram gemacht
+// wird. Nachgemessen am 17.07.2026 um 00:30 Berliner Zeit: Das vorbelegte
+// Pruefungsdatum stand auf dem 16.07.
+//
+// kalender.html und das Schueler-Portal hatten dafuer laengst einen Helfer,
+// index.html nicht - die Korrektur war damals nur halb angekommen. Diese
+// Pruefung sorgt dafuer, dass sie nicht wieder halb zurueckkommt.
+console.log('\n7) Kein Datum wird ueber UTC gebildet');
+const DATEI_ALLE = [...CLIENT, 'sw.js', 'functions/index.js', 'functions/loeschen.js',
+                    'functions/rechnung.js'];
+let datumOffen = 0, datumGeprueft = 0;
+for (const d of DATEI_ALLE) {
+  const text = lies(d);
+  if (!text) continue;
+  datumGeprueft++;
+  for (const m of text.matchAll(/toISOString\(\)\s*\.\s*(?:slice\(\s*0\s*,\s*10\s*\)|split\(\s*['"]T['"]\s*\)\s*\[\s*0\s*\]|substr\(\s*0\s*,\s*10\s*\))/g)) {
+    datumOffen++;
+    melde(`${d}:${zeileVon(text, m.index)}  toISOString() als Datum`
+        + `\n        Ergibt in deutscher Nacht den Vortag. alsLokalesDatum()/heuteLokal() benutzen.`);
+  }
+}
+console.log(`  ${datumGeprueft} Dateien durchgesehen${datumOffen ? '' : ' ✓'}`);
+
 // ══ Ergebnis ═══════════════════════════════════════════════════════════
 console.log(befunde === 0
   ? '\n✓ Keine Befunde.\n'

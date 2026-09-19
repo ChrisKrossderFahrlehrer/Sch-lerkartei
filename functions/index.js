@@ -930,7 +930,7 @@ const TAG_MS = 24 * 60 * 60 * 1000;
 // Loeschen: siehe functions/loeschen.js. Ausgelagert, damit der Umfang der
 // Kontoloeschung gegen den Emulator geprueft werden kann statt nur behauptet.
 const { loescheAlle, loescheZugangscodesMitBildern, loeschUmfang, loescheKontoHart,
-        gehoertNochDemKonto } = require('./loeschen');
+        gehoertNochDemKonto, repariereFehlendeAblaufdaten } = require('./loeschen');
 
 // Ein laufendes Abonnement beim Zahlungsdienstleister beenden. Ohne das
 // wuerde nach der Kontoloeschung munter weiter abgebucht - der Kunde haette
@@ -1024,7 +1024,7 @@ exports.taeglichesAufraeumen = onSchedule(
   async () => {
     const db = admin.firestore();
     const jetzt = Date.now();
-    const bericht = { konten: 0, codes: 0, mails: 0, resets: 0, buchungen: 0, oauth: 0 };
+    const bericht = { konten: 0, codes: 0, nachgetragen: 0, mails: 0, resets: 0, buchungen: 0, oauth: 0 };
 
     // 1) Konten, deren 30-Tage-Frist abgelaufen ist
     try {
@@ -1035,6 +1035,17 @@ exports.taeglichesAufraeumen = onSchedule(
         bericht.konten++;
       }
     } catch (e) { console.error('Konto-Loeschung:', e); }
+
+    // 2a) Zuerst die Codes einfangen, denen expiresAt ganz fehlt. Der Filter
+    // unten wuerde sie stillschweigend ueberspringen - sie blieben fuer immer
+    // liegen, obwohl Name, Lernstand und Chatverlauf darin stehen. Sie werden
+    // NICHT geloescht (das Alter ist unbekannt, es koennte ein aktiver Zugang
+    // sein), sondern bekommen ein Ablaufdatum und fallen danach normal unter
+    // die 90-Tage-Regel.
+    try {
+      bericht.nachgetragen = await repariereFehlendeAblaufdaten(
+        db, jetzt + 14 * TAG_MS);
+    } catch (e) { console.error('Ablaufdatum nachtragen:', e); }
 
     // 2) Zugangscodes, die seit ueber 90 Tagen abgelaufen sind. Darin stecken
     // Name, Lernstand und der komplette Chatverlauf eines Schuelers - es gibt
