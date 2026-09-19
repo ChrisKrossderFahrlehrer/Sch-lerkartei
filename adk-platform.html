@@ -1565,7 +1565,7 @@ onAuthStateChanged(auth, async (user) => {
       }
     } catch(e) { console.warn('Konnte SuperAdmin-Profil nicht anlegen:', e); }
 
-    document.getElementById('sa-greeting').textContent = `Hallo, ${user.displayName || 'Admin'}`;
+    document.getElementById('sa-greeting').textContent = `Hallo, ${escHtml(user.displayName || 'Admin')}`;
     showScreen('screen-superadmin');
     loadSuperadmin();
     return;
@@ -1610,7 +1610,7 @@ onAuthStateChanged(auth, async (user) => {
       return;
     }
     document.getElementById('fl-sub').textContent  = currentProfil.fahrschuleName || '';
-    document.getElementById('fl-info').textContent = `Fahrschule: ${currentProfil.fahrschuleName} · ${currentProfil.name}`;
+    document.getElementById('fl-info').textContent = `Fahrschule: ${escHtml(currentProfil.fahrschuleName)} · ${escHtml(currentProfil.name)}`;
     showScreen('screen-fahrlehrer');
   } else {
     showScreen('screen-gesperrt');
@@ -1763,23 +1763,23 @@ async function renderSuperAdminEinst() {
       </div>
       <div class="form-group">
         <label class="form-label">PLZ</label>
-        <input class="form-input" id="sa-imp-plz" value="${imp.plz||''}" placeholder="z.B. 12345">
+        <input class="form-input" id="sa-imp-plz" value="${escHtml(imp.plz||'')}" placeholder="z.B. 12345">
       </div>
       <div class="form-group">
         <label class="form-label">Stadt / Land</label>
-        <input class="form-input" id="sa-imp-ort" value="${imp.ort||'Deutschland'}" placeholder="z.B. Berlin, Deutschland">
+        <input class="form-input" id="sa-imp-ort" value="${escHtml(imp.ort||'Deutschland')}" placeholder="z.B. Berlin, Deutschland">
       </div>
       <div class="form-group">
         <label class="form-label">Straße & Hausnummer (optional)</label>
-        <input class="form-input" id="sa-imp-strasse" value="${imp.strasse||''}" placeholder="z.B. Hauptstraße 1">
+        <input class="form-input" id="sa-imp-strasse" value="${escHtml(imp.strasse||'')}" placeholder="z.B. Hauptstraße 1">
       </div>
       <div class="form-group">
         <label class="form-label">Instagram (optional)</label>
-        <input class="form-input" id="sa-imp-instagram" value="${imp.instagram||'@ChrisKrossderFahrlehrer'}" placeholder="@username">
+        <input class="form-input" id="sa-imp-instagram" value="${escHtml(imp.instagram||'@ChrisKrossderFahrlehrer')}" placeholder="@username">
       </div>
       <div class="form-group">
         <label class="form-label">Steuernummer</label>
-        <input class="form-input" id="sa-imp-steuernummer" value="${imp.steuernummer||'050/240/09485'}" placeholder="z.B. 050/240/09485">
+        <input class="form-input" id="sa-imp-steuernummer" value="${escHtml(imp.steuernummer||'050/240/09485')}" placeholder="z.B. 050/240/09485">
       </div>
       <div class="form-group">
         <label class="form-label">Wirtschafts-Identifikationsnummer</label>
@@ -1806,7 +1806,7 @@ async function renderSuperAdminEinst() {
       </div>
       <div class="form-group">
         <label class="form-label">Titel</label>
-        <input class="form-input" id="sa-bc-titel" value="${(bc.titel||'').replace(/"/g,'&quot;')}" placeholder="z.B. 🎉 Neue Funktion verfügbar!">
+        <input class="form-input" id="sa-bc-titel" value="${escHtml(bc.titel||'')}" placeholder="z.B. 🎉 Neue Funktion verfügbar!">
       </div>
       <div class="form-group">
         <label class="form-label">Nachricht</label>
@@ -1840,15 +1840,15 @@ async function renderSuperAdminEinst() {
       </div>
       <div class="form-group">
         <label class="form-label">Werbetext</label>
-        <input class="form-input" id="sa-ad-text" value="${(w.text||'').replace(/"/g,'&quot;')}" placeholder="z.B. Lehrmittel jetzt 10% günstiger bei …">
+        <input class="form-input" id="sa-ad-text" value="${escHtml(w.text||'')}" placeholder="z.B. Lehrmittel jetzt 10% günstiger bei …">
       </div>
       <div class="form-group">
         <label class="form-label">Bild-URL <span style="color:var(--muted);font-weight:400">(optional, ersetzt den Text)</span></label>
-        <input class="form-input" id="sa-ad-img" value="${(w.img||'').replace(/"/g,'&quot;')}" placeholder="https://…/banner.png">
+        <input class="form-input" id="sa-ad-img" value="${escHtml(w.img||'')}" placeholder="https://…/banner.png">
       </div>
       <div class="form-group">
         <label class="form-label">Ziel-Link</label>
-        <input class="form-input" id="sa-ad-link" value="${(w.link||'').replace(/"/g,'&quot;')}" placeholder="https://…">
+        <input class="form-input" id="sa-ad-link" value="${escHtml(w.link||'')}" placeholder="https://…">
       </div>
       <label style="display:flex;align-items:center;gap:10px;margin-bottom:12px;cursor:pointer">
         <input type="checkbox" id="sa-ad-aktiv" ${w.aktiv?'checked':''} style="width:18px;height:18px;accent-color:var(--accent)">
@@ -1859,7 +1859,7 @@ async function renderSuperAdminEinst() {
     </div>
     <div class="section-hd" style="margin-top:8px">⚙️ Mein Account</div>
     <div class="card">
-      <div style="font-size:0.88rem;color:var(--muted);margin-bottom:4px">${currentUser?.email}</div>
+      <div style="font-size:0.88rem;color:var(--muted);margin-bottom:4px">${escHtml(currentUser?.email)}</div>
       <div style="font-size:0.72rem;color:var(--accent);margin-bottom:12px">SuperAdmin</div>
       <button class="btn-secondary" onclick="doLogout()">⏻ Abmelden</button>
     </div>
@@ -2069,7 +2069,7 @@ window.openFsDetail = (fsId) => {
   if (!fs) return;
   document.getElementById('modal-fs-name').textContent = fs.name;
   const logoHTML = fs.logoUrl
-    ? `<img alt="Fahrschul-Logo" src="${fs.logoUrl}" style="width:60px;height:60px;border-radius:12px;object-fit:contain;border:1px solid var(--border);margin-bottom:8px">`
+    ? `<img alt="Fahrschul-Logo" src="${escHtml(fs.logoUrl)}" style="width:60px;height:60px;border-radius:12px;object-fit:contain;border:1px solid var(--border);margin-bottom:8px">`
     : '';
   document.getElementById('modal-fs-content').innerHTML = `
     <div style="text-align:center;margin-bottom:12px">${logoHTML}</div>
@@ -2384,7 +2384,7 @@ async function renderFsAdmin() {
     const fsDoc = await getDoc(doc(db, 'fahrschulen', currentProfil.fahrschuleId));
     const fs = fsDoc.data();
     const logoPreview = fs.logoUrl
-      ? `<img alt="Logo-Vorschau" id="logo-preview" src="${fs.logoUrl}" style="width:80px;height:80px;border-radius:14px;object-fit:contain;border:1px solid var(--border);display:block;margin:0 auto 8px">`
+      ? `<img alt="Logo-Vorschau" id="logo-preview" src="${escHtml(fs.logoUrl)}" style="width:80px;height:80px;border-radius:14px;object-fit:contain;border:1px solid var(--border);display:block;margin:0 auto 8px">`
       : `<div id="logo-preview" style="width:80px;height:80px;border-radius:14px;background:var(--surface2);border:2px dashed var(--border);display:flex;align-items:center;justify-content:center;margin:0 auto 8px;font-size:2rem;color:var(--muted)">🏫</div>`;
     body.innerHTML = `
       <div class="section-hd">🖼️ Fahrschul-Logo</div>
@@ -2410,7 +2410,7 @@ async function renderFsAdmin() {
       </div>
       <div class="section-hd" style="margin-top:8px">Mein Account</div>
       <div class="card">
-        <div style="font-size:0.88rem;color:var(--muted);margin-bottom:12px">${currentUser?.email}</div>
+        <div style="font-size:0.88rem;color:var(--muted);margin-bottom:12px">${escHtml(currentUser?.email)}</div>
         <button class="btn-secondary" onclick="doLogout()">⏻ Abmelden</button>
       </div>
     `;
@@ -2474,7 +2474,7 @@ window.openLehrerDetail = async (uid) => {
       where('fahrschuleId', '==', currentProfil.fahrschuleId),
       where('uid', '==', uid));
     const snap = await getDocs(q);
-    toast(`${u.name} · ${snap.size} Schüler`);
+    toast(`${escHtml(u.name)} · ${snap.size} Schüler`);
   } catch(e) { console.error('openLehrerDetail:', e); toast('Fehler: ' + e.message); }
 };
 

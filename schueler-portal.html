@@ -1081,7 +1081,7 @@ function renderChat() {
     }
     const bildQuelle = m.imagePath || m.imageUrl;
     const inhalt = bildQuelle
-      ? `<img data-bildpfad="${m.imagePath || ''}" ${m.imageUrl ? `src="${m.imageUrl}"` : ''} loading="lazy" style="max-width:100%;min-width:120px;min-height:80px;border-radius:10px;display:block;cursor:pointer;background:rgba(0,0,0,0.15)">`
+      ? `<img data-bildpfad="${escHtml(m.imagePath || '')}" ${m.imageUrl ? `src="${escHtml(m.imageUrl)}"` : ''} loading="lazy" style="max-width:100%;min-width:120px;min-height:80px;border-radius:10px;display:block;cursor:pointer;background:rgba(0,0,0,0.15)">`
       : escHtml(m.text);
     return `${trenner}<div class="msg-bubble ${m.sender}" style="display:flex;flex-direction:column">
       ${isFL ? `<div style="font-size:0.68rem;color:var(--muted);margin-bottom:3px;font-weight:600">${escHtml(m.senderName||'Fahrlehrer')}</div>` : ''}
@@ -1340,8 +1340,14 @@ function renderFortschritt() {
 }
 
 // ── Helpers ────────────────────────────────────────────────────
+// Anfuehrungszeichen gehoeren dazu: Ohne sie zerlegt ein " im Wert jedes
+// Attribut, in das er eingesetzt wird - hier konkret das Suchfeld des
+// Zeichen-Katalogs (value="${escHtml(vzSuche)}"). Im Textinhalt schadet es
+// nichts, &quot; wird wieder als " angezeigt.
 function escHtml(str) {
-  return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(str == null ? '' : str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 function getAbgeschlosseneThemen(s) {

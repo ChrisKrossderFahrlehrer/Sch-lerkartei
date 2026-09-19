@@ -5327,7 +5327,7 @@ function renderStudentCard(s) {
   const bf17Tag = isBF17(s) ? '<span style="display:inline-block;background:rgba(88,166,255,0.18);color:#58a6ff;border-radius:5px;padding:1px 6px;font-size:0.72rem;font-weight:700;margin-left:2px" title="Begleitetes Fahren ab 17">BF17</span>' : '';
   const ampelKarte = pruefungsAmpel(s);
   const ampelPunkt = ampelKarte.farbe === 'gruen' ? '🟢' : ampelKarte.farbe === 'gelb' ? '🟡' : '🔴';
-  const ampelDot = `<span title="${ampelKarte.text}" style="font-size:0.7rem;margin-right:3px">${ampelPunkt}</span>`;
+  const ampelDot = `<span title="${escHtml(ampelKarte.text)}" style="font-size:0.7rem;margin-right:3px">${ampelPunkt}</span>`;
   const meta=['#'+getSchuelerNr(s), klasseLabel, a?a+' Jahre':null, (s.fahrstunden||0)+' Std.', s.theorieBestanden?'📋 Theorie ✓':null].filter(Boolean).join(' · ');
   const badge = pct>=90?'<span class="badge badge-green">Prüfungsreif</span>':pct>=60?'<span class="badge badge-amber">Guter Fortschritt</span>':pct>0?'<span class="badge badge-blue">In Ausbildung</span>':'<span class="badge badge-gray">Neu</span>';
 
@@ -5664,7 +5664,7 @@ function renderDetail() {
       const val = (s.themen||{})[t]||0;
       const bild = VZ_BILDER[t];
       const bildHTML = bild
-        ? `<img src="./verkehrszeichen/${bild}" alt="" style="width:38px;height:38px;object-fit:contain;flex-shrink:0" loading="lazy">`
+        ? `<img src="./verkehrszeichen/${escHtml(bild)}" alt="" style="width:38px;height:38px;object-fit:contain;flex-shrink:0" loading="lazy">`
         : '<div style="width:38px;flex-shrink:0"></div>';
       return adkThemaZeile(
         `<span style="display:flex;align-items:center;gap:10px;min-width:0">${bildHTML}<span style="min-width:0">${t}</span></span>`,
@@ -5678,7 +5678,7 @@ function renderDetail() {
         ? `<img src="${bildQuelle}" alt="" style="width:38px;height:38px;object-fit:contain;flex-shrink:0" loading="lazy">`
         : '<div style="width:38px;flex-shrink:0;text-align:center;font-size:1.3rem">🚧</div>';
       return adkThemaZeile(
-        `<span style="display:flex;align-items:center;gap:10px;min-width:0">${bildHTML}<span style="min-width:0">${z.name}</span></span>`,
+        `<span style="display:flex;align-items:center;gap:10px;min-width:0">${bildHTML}<span style="min-width:0">${escHtml(z.name)}</span></span>`,
         val, customZiel(z.id),
         `<button onclick="event.stopPropagation();deleteVzZeichen('${z.id}')" title="Zeichen löschen" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:2px 4px;font-size:0.8rem;flex-shrink:0">🗑</button>`);
     }).join('');
@@ -5711,7 +5711,7 @@ function renderDetail() {
       // erreichte Stufe setzte sie erneut, statt sie zu loeschen - anders
       // als bei allen anderen Zeilen. adkStufenBalken macht es ueberall gleich.
       return adkThemaZeile(
-        `${t.name}${scopeTag}`, val, customZiel(t.id),
+        `${escHtml(t.name)}${scopeTag}`, val, customZiel(t.id),
         `<button onclick="event.stopPropagation();deleteCustomThema('${t.id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:2px 4px;font-size:0.8rem;flex-shrink:0">🗑</button>`,
         'eigen');
     }).join('');
@@ -5893,7 +5893,7 @@ function renderDetail() {
       <!-- TAB: VERKEHRSZEICHEN -->
       <div id="tab-vz" style="padding:14px;display:${aktiverLernTab==='vz'?'block':'none'}">
         <div style="font-size:0.75rem;color:var(--muted);margin-bottom:10px;line-height:1.5">
-          Markiere, wie sicher ${s.vorname||'der Schüler'} die einzelnen Zeichen beherrscht.
+          Markiere, wie sicher ${escHtml(s.vorname||'der Schüler')} die einzelnen Zeichen beherrscht.
         </div>
         <div class="themen-list">${vzHTML}</div>
       </div>
@@ -6017,7 +6017,7 @@ function renderAdkGruppenChart(s) {
     return `
       <div style="margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
-          <span style="font-size:0.78rem;font-weight:600;color:var(--text)">${g.name}</span>
+          <span style="font-size:0.78rem;font-weight:600;color:var(--text)">${escHtml(g.name)}</span>
           <span style="font-size:0.8rem;font-weight:800;color:${color};min-width:36px;text-align:right">${pct}%</span>
         </div>
         <div style="background:var(--surface2);border-radius:6px;height:10px;overflow:hidden;border:1px solid var(--border)">
@@ -6446,7 +6446,7 @@ function renderProtokollListe() {
         <button onclick="deleteProtokollEintrag('${e.id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.8rem;padding:2px">🗑</button>
       </div>
       ${maengelHTML}
-      ${e.notiz ? `<div style="font-size:0.82rem;color:var(--text);line-height:1.4;margin-top:4px">📝 ${(e.notiz||"").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>` : ''}
+      ${e.notiz ? `<div style="font-size:0.82rem;color:var(--text);line-height:1.4;margin-top:4px">📝 ${escHtml(e.notiz||'')}</div>` : ''}
       ${e.fortschritt != null ? `<div style="font-size:0.68rem;color:var(--muted)">Fortschritt: ${e.fortschritt}%</div>` : ''}
     </div>`;
   }).join('');
@@ -7190,7 +7190,7 @@ window.deleteStudent = async () => {
     // Offene Aufraeum-Arbeit vormerken, falls die App vor Ablauf der
     // Rueckgaengig-Frist geschlossen wird (siehe holeOffeneLoeschungenNach).
     offeneLoeschungVormerken(geloeschteId);
-    zeigeUndoBalken(`🗑️ ${s.vorname} ${s.nachname} gelöscht`, async () => {
+    zeigeUndoBalken(`🗑️ ${escHtml(s.vorname)} ${escHtml(s.nachname)} gelöscht`, async () => {
       // Rückgängig: Schüler mit gleicher ID wiederherstellen
       try {
         await dbSet(doc(db,'students',backup.id), backup.data);
@@ -7466,7 +7466,7 @@ function renderDashboard() {
       <div class="avatar" style="background:${c};width:38px;height:38px;font-size:0.85rem;flex-shrink:0">${initials(s)}</div>
       <div class="dash-bar-wrap">
         <div class="dash-name">
-          <span>${s.vorname} ${s.nachname} ${warnung?'<span style="color:var(--danger);font-size:0.7rem">⚠️ Pflichtf. fehlen</span>':''}</span>
+          <span>${escHtml(s.vorname)} ${escHtml(s.nachname)} ${warnung?'<span style="color:var(--danger);font-size:0.7rem">⚠️ Pflichtf. fehlen</span>':''}</span>
           <span class="dash-pct" style="color:${progressColor(pct)}">${pct}%</span>
         </div>
         <div class="dash-bar-bg">
@@ -7509,7 +7509,7 @@ function renderDashboard() {
       ${schnellster ? `
       <div style="background:var(--surface);border:1px solid var(--accent2);border-radius:14px;padding:14px 16px;margin-bottom:10px">
         <div style="font-size:0.72rem;color:var(--accent2);font-weight:700;margin-bottom:6px">🏆 Bester Fortschritt</div>
-        <div style="font-weight:700">${schnellster.vorname} ${schnellster.nachname}</div>
+        <div style="font-weight:700">${escHtml(schnellster.vorname)} ${escHtml(schnellster.nachname)}</div>
         <div style="font-size:0.78rem;color:var(--muted)">${Math.min(overallProgress(schnellster),100)}% Fortschritt · ${schnellster.fahrstunden||0} Fahrstunden</div>
       </div>` : ''}
 
@@ -9217,8 +9217,8 @@ function renderProtokollScreen() {
         <button onclick="deleteProtokollEintrag('${e.id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.9rem;padding:4px 6px">🗑</button>
       </div>
       ${maengelHTML}
-      ${e.notiz ? `<div style="font-size:0.84rem;color:var(--text);line-height:1.5;margin-top:6px;padding:8px 10px;background:var(--surface);border-radius:8px;border-left:3px solid ${borderColor}">${isPlanung?'📌':'📝'} ${(e.notiz||"").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>` : ''}
-      ${e.unterschrift ? `<div style="margin-top:8px"><div style="font-size:0.68rem;color:var(--muted);margin-bottom:4px">✍️ Unterschrift</div><img alt="Unterschrift des Schülers" src="${e.unterschrift}" style="width:100%;max-width:280px;border:1px solid var(--border);border-radius:8px;background:#fff;display:block"></div>` : ''}
+      ${e.notiz ? `<div style="font-size:0.84rem;color:var(--text);line-height:1.5;margin-top:6px;padding:8px 10px;background:var(--surface);border-radius:8px;border-left:3px solid ${borderColor}">${isPlanung?'📌':'📝'} ${escHtml(e.notiz||'')}</div>` : ''}
+      ${e.unterschrift ? `<div style="margin-top:8px"><div style="font-size:0.68rem;color:var(--muted);margin-bottom:4px">✍️ Unterschrift</div><img alt="Unterschrift des Schülers" src="${escHtml(e.unterschrift)}" style="width:100%;max-width:280px;border:1px solid var(--border);border-radius:8px;background:#fff;display:block"></div>` : ''}
     </div>`;
   };
 
@@ -9294,18 +9294,21 @@ window.openImpressum = async () => {
   } catch(e) { /* offline fallback */ }
 
   const imp     = {};
-  const name    = platImp.name    || 'Chriskoo';
-  const inhaber = platImp.inhaber || '';
-  const strasse = platImp.strasse || '';
-  const plz     = platImp.plz    || '';
-  const ort     = platImp.ort    || 'Deutschland';
-  const tel     = platImp.tel || '';
-  const email   = platImp.email  || 'kontakt@fahrsync.de';
-  const web     = platImp.web    || 'fahrsync.de';
+  // Gleich beim Auslesen entwerten: Die Werte gehen unten in Textinhalt UND
+  // in Attribute (href="mailto:…", href="https://…"), die per Verkettung
+  // zusammengesetzt werden. An der Quelle ist es eine Stelle statt acht.
+  const name    = escHtml(platImp.name    || 'Chriskoo');
+  const inhaber = escHtml(platImp.inhaber || '');
+  const strasse = escHtml(platImp.strasse || '');
+  const plz     = escHtml(platImp.plz    || '');
+  const ort     = escHtml(platImp.ort    || 'Deutschland');
+  const tel     = escHtml(platImp.tel || '');
+  const email   = escHtml(platImp.email  || 'kontakt@fahrsync.de');
+  const web     = escHtml(platImp.web    || 'fahrsync.de');
   const fsnr    = '';
 
   const logoHTML = fsLogo
-    ? `<img alt="Logo der Fahrschule" src="${fsLogo}" style="width:72px;height:72px;border-radius:18px;object-fit:contain;border:1px solid var(--border)" onerror="this.style.display='none'">`
+    ? `<img alt="Logo der Fahrschule" src="${escHtml(fsLogo)}" style="width:72px;height:72px;border-radius:18px;object-fit:contain;border:1px solid var(--border)" onerror="this.style.display='none'">`
     : `<img alt="ADK Logo" src="./icon-192.png?v=3" style="width:72px;height:72px;border-radius:18px" onerror="this.style.display='none'">`;
 
   body.innerHTML = `
@@ -9434,8 +9437,8 @@ window.openImpressum = async () => {
     <div style="background:rgba(240,180,41,0.08);border:1px solid rgba(240,180,41,0.2);border-radius:12px;padding:14px;margin-top:4px">
       <div style="font-size:0.78rem;line-height:1.6;color:var(--muted);text-align:center">
         <strong style="color:var(--accent)">ADK – Digitale Kartei</strong><br>
-        Entwickelt von ${platImp.name||'Chriskoo'} · ${platImp.web||'fahrsync.de'}<br>
-        © ${new Date().getFullYear()} ${platImp.name||'Chriskoo'} · Alle Rechte vorbehalten<br>
+        Entwickelt von ${escHtml(platImp.name||'Chriskoo')} · ${escHtml(platImp.web||'fahrsync.de')}<br>
+        © ${new Date().getFullYear()} ${escHtml(platImp.name||'Chriskoo')} · Alle Rechte vorbehalten<br>
         <span style="font-size:0.7rem">Version 1.0 · Powered by Firebase · Made in Germany 🇩🇪</span>
       </div>
     </div>
@@ -9568,7 +9571,7 @@ window.exportiereDatenPDF = async () => {
     : '<tr><td colspan="4" style="padding:8px;text-align:center;color:#888">Keine Protokolle</td></tr>';
 
   const html = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
-    <title>Datenauskunft – ${s.vorname} ${s.nachname}</title>
+    <title>Datenauskunft – ${escHtml(s.vorname)} ${escHtml(s.nachname)}</title>
     <style>
       body{font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:30px;color:#222;line-height:1.5}
       h1{font-size:20px;border-bottom:2px solid #f0b429;padding-bottom:8px}
@@ -9684,7 +9687,7 @@ window.exportPDF = () => {
         <td style="padding:3px 8px;font-size:10px">${formatDate(e.datum)}</td>
         <td style="padding:3px 8px;font-size:10px">${e.stunde||''}. Std.</td>
         <td style="padding:3px 8px;font-size:10px">${'⭐'.repeat(e.sterne||0)}</td>
-        <td style="padding:3px 8px;font-size:10px;color:#555">${(e.notiz||'').slice(0,40)}</td>
+        <td style="padding:3px 8px;font-size:10px;color:#555">${escHtml((e.notiz||'').slice(0,40))}</td>
       </tr>`).join('');
 
   // B197 Zeile
@@ -9796,7 +9799,7 @@ window.exportPDF = () => {
     <div>
       <div style="font-size:10px;color:#888;margin-bottom:6px">Unterschrift Fahrschüler</div>
       ${s.abschlussUnterschrift
-        ? `<img alt="Abschluss-Unterschrift des Schülers" src="${s.abschlussUnterschrift}" style="height:50px;max-width:160px;object-fit:contain;display:block;margin-bottom:2px" /><div style="border-top:1px solid #333;width:160px;padding-top:4px;font-size:9px;color:#888">${s.abschlussUnterschriftDatum ? new Date(s.abschlussUnterschriftDatum).toLocaleDateString('de-DE') : ''} ✍️ digital signiert</div>`
+        ? `<img alt="Abschluss-Unterschrift des Schülers" src="${escHtml(s.abschlussUnterschrift)}" style="height:50px;max-width:160px;object-fit:contain;display:block;margin-bottom:2px" /><div style="border-top:1px solid #333;width:160px;padding-top:4px;font-size:9px;color:#888">${s.abschlussUnterschriftDatum ? new Date(s.abschlussUnterschriftDatum).toLocaleDateString('de-DE') : ''} ✍️ digital signiert</div>`
         : `<div style="margin-top:14px;border-top:1px solid #333;width:160px;padding-top:4px;font-size:9px;color:#888">Datum, Unterschrift</div>`
       }
     </div>
@@ -9937,7 +9940,7 @@ async function loadChatMessages() {
         : '';
       const bildQuelle = msg.imagePath || msg.imageUrl;
       const inhalt = bildQuelle
-        ? `<img data-bildpfad="${msg.imagePath || ''}" ${msg.imageUrl ? `src="${msg.imageUrl}"` : ''} loading="lazy" style="max-width:100%;min-width:120px;min-height:80px;border-radius:12px;display:block;cursor:pointer;background:rgba(0,0,0,0.15)">`
+        ? `<img data-bildpfad="${escHtml(msg.imagePath || '')}" ${msg.imageUrl ? `src="${escHtml(msg.imageUrl)}"` : ''} loading="lazy" style="max-width:100%;min-width:120px;min-height:80px;border-radius:12px;display:block;cursor:pointer;background:rgba(0,0,0,0.15)">`
         : (msg.text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       return `${trenner}
         <div style="display:flex;flex-direction:column;align-items:${vonFahrlehrer?'flex-end':'flex-start'};gap:2px">
@@ -10665,7 +10668,7 @@ window.vzBildGewaehlt = (ev) => {
       c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
       vzBildDaten = c.toDataURL('image/png');
       document.getElementById('vz-bild-vorschau').innerHTML =
-        `<img src="${vzBildDaten}" style="width:70px;height:70px;object-fit:contain;background:#fff;border-radius:8px;padding:4px">`;
+        `<img src="${escHtml(vzBildDaten)}" style="width:70px;height:70px;object-fit:contain;background:#fff;border-radius:8px;padding:4px">`;
     };
     img.onerror = () => { errEl.textContent = 'Bild konnte nicht gelesen werden.'; };
     img.src = e.target.result;

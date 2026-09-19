@@ -609,7 +609,31 @@ window.closeModal=closeModal; window.closeModalOutside=closeModalOutside;
 function fmt(ts){if(!ts)return'—';const d=ts.toDate?ts.toDate():new Date(ts);return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});}
 function fmtTime(ts){if(!ts)return'—';const d=ts.toDate?ts.toDate():new Date(ts);return d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});}
 function fmtDatetime(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(ts);return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});}
-function escHtml(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+// SICHERHEITS-FIX: Hier fehlten die Anfuehrungszeichen. Das faellt nur auf,
+// wenn der Wert in einem ATTRIBUT landet - dort bricht ein " oder ' aus dem
+// Attribut aus. Nachgemessen an value="${escHtml(p?.ort||'')}": Ein Ort mit
+// Anfuehrungszeichen zerlegte das Eingabefeld. Escapen schadet im Textinhalt
+// nichts (&quot; wird wieder als " angezeigt), also einheitlich beides.
+function escHtml(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+// Fuer Werte, die in einem onclick="…('HIER')" stehen. Zwei Ebenen: Der
+// Browser wandelt HTML-Entities im Attribut ZUERST zurueck, erst danach
+// wertet er JavaScript aus. Ein &#39; waere also wieder ein echtes ' und
+// wuerde die Zeichenkette beenden. Deshalb zuerst fuer JavaScript entwerten
+// (Backslash), dann fuer HTML. Gleiche Umsetzung wie in adk-platform.html.
+//
+// Nachgewiesen ohne diese Funktion: Ein Fahrschulname "Fahrschule O'Brien"
+// machte den Loeschen-Knopf wirkungslos, und ein praeparierter Name fuehrte
+// in der SuperAdmin-Ansicht fremden Code aus - inklusive deleteSchool() auf
+// eine FREMDE Fahrschule.
+function attrJs(s){
+  return String(s==null?'':s)
+    .replace(/\\/g,'\\\\')
+    .replace(/'/g,"\\'")
+    .replace(/&/g,'&amp;')
+    .replace(/"/g,'&quot;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;');
+}
 // Datum als YYYY-MM-DD in ORTSZEIT. toISOString() rechnet nach UTC um und
 // liefert in deutscher Sommerzeit zwischen 00:00 und 02:00 den Vortag - genau
 // die Stunden, in denen abends noch gearbeitet wird.
@@ -1133,7 +1157,7 @@ function fuelleThemenListe(){
   const liste = window.__thArt === 'grund'
     ? THEORIE_GRUNDSTOFF
     : [...THEORIE_ZUSATZ.B, ...THEORIE_ZUSATZ.A];
-  sel.innerHTML = liste.map(t => `<option value="${t.nr}">${t.nr} – ${t.titel}</option>`).join('');
+  sel.innerHTML = liste.map(t => `<option value="${t.nr}">${t.nr} – ${escHtml(t.titel)}</option>`).join('');
 }
 window.speichereTheorieStunde = async function(){
   const statusEl = document.getElementById('th-status');
@@ -1188,10 +1212,10 @@ pages['sa-dashboard']=async function(el){
     return `<div class="sa-school-card">
       <div style="font-size:28px">🏫</div>
       <div style="flex:1">
-        <div class="sa-school-name">${s.name}</div>
+        <div class="sa-school-name">${escHtml(s.name)}</div>
         <div class="sa-school-meta">${BUNDESLAENDER[s.bundesland]||s.bundesland} · ${lehrerInSchool} Fahrlehrer</div>
       </div>
-      <button class="btn btn-danger btn-sm" onclick="deleteSchool('${d.id}','${s.name}')">Löschen</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteSchool('${d.id}','${attrJs(s.name)}')">Löschen</button>
     </div>`;
   }).join('');
 };
@@ -1226,9 +1250,9 @@ async function renderSASchoolList(){
       const admin=usersSnap.docs.find(u=>u.data().uid===s.adminUid);
       const lehrerCount=usersSnap.docs.filter(u=>u.data().schoolId===d.id&&u.data().role==='lehrer').length;
       return `<tr>
-        <td>${s.name}</td><td>${BUNDESLAENDER[s.bundesland]||s.bundesland}</td>
-        <td>${lehrerCount}</td><td>${admin?.data().email||'—'}</td>
-        <td><button class="btn btn-danger btn-sm" onclick="deleteSchool('${d.id}','${s.name}')">Löschen</button></td>
+        <td>${escHtml(s.name)}</td><td>${BUNDESLAENDER[s.bundesland]||s.bundesland}</td>
+        <td>${lehrerCount}</td><td>${escHtml(admin?.data().email||'—')}</td>
+        <td><button class="btn btn-danger btn-sm" onclick="deleteSchool('${d.id}','${attrJs(s.name)}')">Löschen</button></td>
       </tr>`;
     }).join('')+'</tbody></table>';
 }
@@ -1279,7 +1303,7 @@ pages['admin-dashboard']=async function(el){
   const pl=document.getElementById('pending-list');
   if(pSnap.empty){pl.innerHTML='<p class="text-muted">Keine ausstehenden Anfragen.</p>';return;}
   pl.innerHTML='<table><thead><tr><th>Name</th><th>E-Mail</th><th></th></tr></thead><tbody>'+
-    pSnap.docs.map(d=>{const u=d.data();return`<tr><td>${u.fname} ${u.lname}</td><td>${u.email}</td><td><button class="btn btn-success btn-sm" onclick="approveLehrer('${d.id}')">Freischalten</button></td></tr>`;}).join('')+'</tbody></table>';
+    pSnap.docs.map(d=>{const u=d.data();return`<tr><td>${escHtml(u.fname)} ${escHtml(u.lname)}</td><td>${escHtml(u.email)}</td><td><button class="btn btn-success btn-sm" onclick="approveLehrer('${d.id}')">Freischalten</button></td></tr>`;}).join('')+'</tbody></table>';
 };
 window.approveLehrer=async function(uid){
   await updateDoc(doc(db,'kalenderUsers',uid),{approved:true});
@@ -1313,13 +1337,13 @@ async function renderLehrerList(){
   if(snap.empty){el.innerHTML='<p class="text-muted">Noch keine Fahrlehrer.</p>';return;}
   el.innerHTML='<table><thead><tr><th>Name</th><th>E-Mail</th><th>Blockdauer</th><th>Kalender</th><th>Schüler</th><th></th></tr></thead><tbody>'+
     snap.docs.map(d=>{const u=d.data();const bd=u.blockDauer||60;
-      return`<tr><td>${u.fname} ${u.lname}</td><td>${u.email}</td>
+      return`<tr><td>${escHtml(u.fname)} ${escHtml(u.lname)}</td><td>${escHtml(u.email)}</td>
         <td><select onchange="setLehrerBlockDauer('${d.id}',this.value)" style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:3px 7px;font-size:12px">
           ${[45,50,60,75,80,90,100,120].map(m=>`<option value="${m}" ${bd===m?'selected':''}>${m} Min</option>`).join('')}
         </select></td>
-        <td><button class="btn btn-primary btn-sm" onclick="viewLehrerKalender('${d.id}','${u.fname} ${u.lname}')">📅</button></td>
-        <td><button class="btn btn-secondary btn-sm" onclick="viewLehrerSchueler('${d.id}','${u.fname} ${u.lname}')">Schüler</button></td>
-        <td><button class="btn btn-danger btn-sm" onclick="deleteLehrer('${d.id}','${u.fname} ${u.lname}')">Löschen</button></td>
+        <td><button class="btn btn-primary btn-sm" onclick="viewLehrerKalender('${d.id}','${attrJs(u.fname+' '+u.lname)}')">📅</button></td>
+        <td><button class="btn btn-secondary btn-sm" onclick="viewLehrerSchueler('${d.id}','${attrJs(u.fname+' '+u.lname)}')">Schüler</button></td>
+        <td><button class="btn btn-danger btn-sm" onclick="deleteLehrer('${d.id}','${attrJs(u.fname+' '+u.lname)}')">Löschen</button></td>
       </tr>`;}).join('')+'</tbody></table>';
 }
 window.createLehrer=async function(){
@@ -1340,7 +1364,7 @@ window.setLehrerBlockDauer=async function(uid,min){
 };
 window.viewLehrerSchueler=async function(lehrerUid,lehrerName){
   const snap=await getDocs(query(collection(db,SCHUELER_COLL),where('lehrerUid','==',lehrerUid),where('schoolId','==',currentSchoolId)));
-  const rows=snap.docs.map(d=>{const s=d.data();return`<tr><td>${s.fname} ${s.lname}</td><td>${s.email||'—'}</td><td><button class="btn btn-danger btn-sm" onclick="unassignSchueler('${d.id}')">Entfernen</button></td></tr>`;}).join('');
+  const rows=snap.docs.map(d=>{const s=d.data();return`<tr><td>${escHtml(s.fname)} ${escHtml(s.lname)}</td><td>${escHtml(s.email||'—')}</td><td><button class="btn btn-danger btn-sm" onclick="unassignSchueler('${d.id}')">Entfernen</button></td></tr>`;}).join('');
   openModal(`<h2 class="modal-title">Schüler: ${lehrerName}</h2>${rows?`<table><thead><tr><th>Name</th><th>E-Mail</th><th></th></tr></thead><tbody>${rows}</tbody></table>`:'<p class="text-muted">Keine Schüler.</p>'}`);
 };
 window.unassignSchueler=async function(id){await updateDoc(doc(db,SCHUELER_COLL,id),{lehrerUid:null});toast('Entfernt.','success');closeModal();};
@@ -1364,7 +1388,7 @@ pages['admin-schueler']=async function(el){
   <div class="card"><div class="card-title">Alle Schüler</div><div id="schueler-list"><div class="spinner"></div></div></div></div>`;
   const lSnap=await getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId),where('role','==','lehrer'),where('approved','==',true)));
   const sel=document.getElementById('ns-lehrer');
-  lSnap.docs.forEach(d=>{const u=d.data();sel.innerHTML+=`<option value="${d.id}">${u.fname} ${u.lname}</option>`;});
+  lSnap.docs.forEach(d=>{const u=d.data();sel.innerHTML+=`<option value="${d.id}">${escHtml(u.fname)} ${escHtml(u.lname)}</option>`;});
   await loadSchuelerList(lSnap.docs);
 };
 async function loadSchuelerList(lehrerDocs){
@@ -1379,11 +1403,11 @@ async function loadSchuelerList(lehrerDocs){
       const link=`${location.origin}${location.pathname}?schueler=${d.id}&lehrer=${s.lehrerUid||''}`;
       const k=s.maxFahrstunden>0?`${s.bookedCount||0}/${s.maxFahrstunden}`:`${s.bookedCount||0}/∞`;
       const w=s.maxFahrstunden>0&&(s.bookedCount||0)>=s.maxFahrstunden;
-      const autoStr=s.autoId&&am[s.autoId]?`<span class="auto-kennzeichen" style="font-size:10px">${am[s.autoId].kennzeichen}</span>`:'—';
-      return`<tr><td>${s.fname} ${s.lname}</td><td>${s.lehrerUid?(lm[s.lehrerUid]||'?'):'—'}</td>
+      const autoStr=s.autoId&&am[s.autoId]?`<span class="auto-kennzeichen" style="font-size:10px">${escHtml(am[s.autoId].kennzeichen)}</span>`:'—';
+      return`<tr><td>${escHtml(s.fname)} ${escHtml(s.lname)}</td><td>${s.lehrerUid?(lm[s.lehrerUid]||'?'):'—'}</td>
         <td style="color:${w?'var(--danger)':'inherit'}">${k}${w?' ⚠️':''}</td>
         <td>${autoStr}</td>
-        <td>${s.lehrerUid?`<button class="copy-btn" onclick="copyLink('${link}')">🔗</button>`:'—'}</td>
+        <td>${s.lehrerUid?`<button class="copy-btn" onclick="copyLink('${attrJs(link)}')">🔗</button>`:'—'}</td>
         <td><button class="btn btn-secondary btn-sm" onclick="editSchueler('${d.id}')">Bearb.</button> <button class="btn btn-danger btn-sm" onclick="deleteSchueler('${d.id}')">Löschen</button></td>
       </tr>`;}).join('')+'</tbody></table>';
 }
@@ -1403,11 +1427,11 @@ window.deleteSchueler=async function(id){if(!confirm('Schüler löschen?'))retur
 window.editSchueler=async function(id){
   const snap=await getDoc(doc(db,SCHUELER_COLL,id));const s=snap.data();
   const lSnap=await getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId),where('role','==','lehrer'),where('approved','==',true)));
-  const opts=lSnap.docs.map(d=>{const u=d.data();return`<option value="${d.id}" ${s.lehrerUid===d.id?'selected':''}>${u.fname} ${u.lname}</option>`;}).join('');
+  const opts=lSnap.docs.map(d=>{const u=d.data();return`<option value="${d.id}" ${s.lehrerUid===d.id?'selected':''}>${escHtml(u.fname)} ${escHtml(u.lname)}</option>`;}).join('');
   openModal(`<h2 class="modal-title">Schüler bearbeiten</h2>
-    <div class="field"><label>Vorname</label><input id="es-fname" value="${s.fname}"></div>
-    <div class="field"><label>Nachname</label><input id="es-lname" value="${s.lname}"></div>
-    <div class="field"><label>E-Mail</label><input id="es-email" value="${s.email||''}"></div>
+    <div class="field"><label>Vorname</label><input id="es-fname" value="${escHtml(s.fname)}"></div>
+    <div class="field"><label>Nachname</label><input id="es-lname" value="${escHtml(s.lname)}"></div>
+    <div class="field"><label>E-Mail</label><input id="es-email" value="${escHtml(s.email||'')}"></div>
     <div class="field"><label>Telefon</label><input id="es-tel" value="${s.tel||''}"></div>
     <div class="field"><label>Fahrlehrer</label><select id="es-lehrer"><option value="">— Keiner —</option>${opts}</select></div>
     <div class="grid-2">
@@ -1436,7 +1460,7 @@ pages['admin-schule']=async function(el){
   el.innerHTML=`<div class="page active"><h2 class="page-title">Fahrschule</h2>
   <div class="card">
     <div class="card-title">Stammdaten</div>
-    <div class="field"><label>Name</label><input id="sc-name" value="${school.name||''}"></div>
+    <div class="field"><label>Name</label><input id="sc-name" value="${escHtml(school.name||'')}"></div>
     <div class="field"><label>Bundesland</label>
       <select id="sc-bl">${Object.entries(BUNDESLAENDER).map(([k,v])=>`<option value="${k}" ${school.bundesland===k?'selected':''}>${v}</option>`).join('')}</select>
     </div>
@@ -1495,7 +1519,7 @@ window.loadAuslastung=async function(){
   Object.entries(stats).sort((a,b)=>b[1].booked-a[1].booked).forEach(([uid,s])=>{
     const pct=s.total?Math.round(s.booked/s.total*100):0;
     const bc=pct>=80?'var(--success)':pct>=50?'var(--accent)':'var(--danger)';
-    html+=`<div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-weight:500">${s.name}</span><span style="font-size:12px;color:var(--text-muted)">${s.booked}/${s.total} · ${pct}%</span></div>
+    html+=`<div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-weight:500">${escHtml(s.name)}</span><span style="font-size:12px;color:var(--text-muted)">${s.booked}/${s.total} · ${pct}%</span></div>
     <div class="auslastung-bar-bg"><div class="auslastung-bar-fill" style="width:${pct}%;background:${bc}"></div></div></div>`;
   });
   html+='</div>';
@@ -1528,8 +1552,8 @@ async function renderAutoList(){
   }
   if(snap.empty){el.innerHTML='<p class="text-muted">Noch keine Fahrzeuge.</p>';return;}
   el.innerHTML=snap.docs.map(d=>{const a=d.data();return`<div class="auto-card">
-    <div class="auto-icon">🚗</div><div class="auto-info"><div class="auto-name">${a.modell}</div><div class="auto-detail">${a.farbe?a.farbe+' · ':''}${a.notiz||''}</div></div>
-    <span class="auto-kennzeichen">${a.kennzeichen}</span>
+    <div class="auto-icon">🚗</div><div class="auto-info"><div class="auto-name">${escHtml(a.modell)}</div><div class="auto-detail">${a.farbe?a.farbe+' · ':''}${escHtml(a.notiz||'')}</div></div>
+    <span class="auto-kennzeichen">${escHtml(a.kennzeichen)}</span>
     <button class="btn btn-secondary btn-sm" onclick="editAuto('${d.id}')">Bearb.</button>
     <button class="btn btn-danger btn-sm" onclick="deleteAuto('${d.id}')">Löschen</button>
   </div>`;}).join('');
@@ -1551,10 +1575,10 @@ window.addAuto=async function(){
 window.editAuto=async function(id){
   const snap=await getDoc(doc(db,'autos',id));const a=snap.data();
   openModal(`<h2 class="modal-title">Auto bearbeiten</h2>
-    <div class="field"><label>Modell</label><input id="ea-m" value="${a.modell}"></div>
-    <div class="field"><label>Kennzeichen</label><input id="ea-k" value="${a.kennzeichen}"></div>
+    <div class="field"><label>Modell</label><input id="ea-m" value="${escHtml(a.modell)}"></div>
+    <div class="field"><label>Kennzeichen</label><input id="ea-k" value="${escHtml(a.kennzeichen)}"></div>
     <div class="field"><label>Farbe</label><input id="ea-f" value="${a.farbe||''}"></div>
-    <div class="field"><label>Notiz</label><input id="ea-n" value="${a.notiz||''}"></div>
+    <div class="field"><label>Notiz</label><input id="ea-n" value="${escHtml(a.notiz||'')}"></div>
     <button class="btn btn-primary" onclick="saveAuto('${id}')">Speichern</button>`);
 };
 window.saveAuto=async function(id){
@@ -1577,7 +1601,7 @@ pages['admin-urlaub']=async function(el){
   <div class="card"><div class="card-title">Alle Urlaube</div><div id="urlaub-list"><div class="spinner"></div></div></div></div>`;
   const lSnap=await getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId),where('role','==','lehrer'),where('approved','==',true)));
   const sel=document.getElementById('urlaub-lehrer');
-  lSnap.docs.forEach(d=>{const u=d.data();sel.innerHTML+=`<option value="${d.id}">${u.fname} ${u.lname}</option>`;});
+  lSnap.docs.forEach(d=>{const u=d.data();sel.innerHTML+=`<option value="${d.id}">${escHtml(u.fname)} ${escHtml(u.lname)}</option>`;});
   await renderUrlaubList();
 };
 pages['lehrer-urlaub']=async function(el){
@@ -1881,7 +1905,7 @@ async function renderWeekCal(label,grid){
         const hp=Math.max(20,Math.round(((endH*60+endM)-(hour*60+startM))/60*44));
         const pend=!s.bookedBy&&window.__pendingReq&&window.__pendingReq.bySlot[s.id];
         const name=s.bookedBy?(scm[s.bookedBy]||'?'):(pend?('⏳ '+pend):'Frei');
-        cc+=`<div class="week-slot-chip" style="background:rgba(${r},${g},${b},0.25);color:${c};filter:brightness(1.4);height:${hp}px;top:${Math.round(startM/60*44)}px" onclick="event.stopPropagation();openDayModal(${day.getFullYear()},${day.getMonth()},${day.getDate()})">${fmtTime(s.startTime)} ${name}</div>`;});
+        cc+=`<div class="week-slot-chip" style="background:rgba(${r},${g},${b},0.25);color:${c};filter:brightness(1.4);height:${hp}px;top:${Math.round(startM/60*44)}px" onclick="event.stopPropagation();openDayModal(${day.getFullYear()},${day.getMonth()},${day.getDate()})">${fmtTime(s.startTime)} ${escHtml(name)}</div>`;});
       html+=`<div class="week-cell${blocked?' blocked-cell':''}" style="border-left:1px solid rgba(46,46,46,.3)" onclick="openDayModal(${day.getFullYear()},${day.getMonth()},${day.getDate()})">${cc}</div>`;
     });
   });
@@ -1921,7 +1945,7 @@ window.openDayModal=async function(year,month,day){
     ${!s.bookedBy?`<div style="display:flex;gap:6px;align-items:center;margin-top:6px;width:100%">
       <select id="man-buch-${d.id}" style="flex:1;min-width:0;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 8px;font-size:0.8rem">
         <option value="">Schüler wählen…</option>
-        ${Object.entries(scm).map(([sid,name])=>`<option value="${sid}">${name}</option>`).join('')}
+        ${Object.entries(scm).map(([sid,name])=>`<option value="${sid}">${escHtml(name)}</option>`).join('')}
       </select>
       <button class="btn btn-primary btn-sm" onclick="manuellBuchen('${d.id}',document.getElementById('man-buch-${d.id}').value,${year},${month},${day})">Buchen</button>
       <button class="btn btn-danger btn-sm" onclick="deleteSlot('${d.id}')">Löschen</button>
@@ -2007,7 +2031,7 @@ window.oeffneTerminDetail = async function(slotId, year, month, day) {
     const datumTxt = s.startTime.toDate().toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long' });
     const anOptionen = AN_KATEGORIEN.map(k => `<option value="${k.code}" ${s.anKategorie === k.code ? 'selected' : ''}>${k.code} – ${k.label}</option>`).join('');
     openModal(`
-      <h2 class="modal-title">👤 ${name}</h2>
+      <h2 class="modal-title">👤 ${escHtml(name)}</h2>
       <p class="text-muted" style="margin:-6px 0 14px">${datumTxt} · ${fmtTime(s.startTime)}–${fmtTime(s.endTime)} · ${typeBadgeHtml(s.type)}</p>
       <div class="card-title">Aktueller Termin</div>
       <label style="display:flex;align-items:center;gap:8px;margin-bottom:14px;cursor:pointer">
@@ -2096,7 +2120,7 @@ pages['lehrer-slots']=async function(el){
   if(!docs.length){sl.innerHTML='<p class="text-muted">Noch keine Slots.</p>';return;}
   sl.innerHTML='<table><thead><tr><th>Datum</th><th>Zeit</th><th>Typ</th><th>Status</th><th></th></tr></thead><tbody>'+
     docs.map(d=>{const s=d.data();return`<tr><td>${fmt(s.startTime)}</td><td>${fmtTime(s.startTime)}–${fmtTime(s.endTime)}</td><td>${typeBadgeHtml(s.type)}</td>
-      <td>${s.bookedBy?`<span class="badge badge-booked">${scm[s.bookedBy]||'?'}</span>`:'<span class="badge badge-free">Frei</span>'}</td>
+      <td>${s.bookedBy?`<span class="badge badge-booked">${escHtml(scm[s.bookedBy]||'?')}</span>`:'<span class="badge badge-free">Frei</span>'}</td>
       <td>${!s.bookedBy?`<button class="btn btn-danger btn-sm" onclick="deleteSlotFromList('${d.id}')">Löschen</button>`:''}</td></tr>`;}).join('')+'</tbody></table>';
 };
 window.deleteSlotFromList=async function(id){let _bb=null;try{const s=await getDoc(doc(db,'slots',id));if(s.exists())_bb=s.data().bookedBy||null;}catch(e){}await deleteDoc(doc(db,'slots',id));try{await publishMyBookingLink();}catch(e){}if(_bb){try{await publishStudentBookings(_bb);}catch(e){}}toast('Gelöscht.','success');pages['lehrer-slots'](document.getElementById('main-content'));};
@@ -2333,8 +2357,8 @@ async function renderBestaetigteBuchungen(){
   const bookedDocs=snap.docs.filter(d=>d.data().bookedBy).sort((a,b)=>{const ta=a.data().startTime,tb=b.data().startTime;return((ta&&ta.toMillis)?ta.toMillis():0)-((tb&&tb.toMillis)?tb.toMillis():0);});
   if(!bookedDocs.length){bl.innerHTML='<p class="text-muted">Noch keine Buchungen.</p>';return;}
   bl.innerHTML='<table><thead><tr><th>Schüler</th><th>Datum</th><th>Zeit</th><th>Typ</th><th>Auto</th><th></th></tr></thead><tbody>'+
-    bookedDocs.map(d=>{const s=d.data();const aid=scAutoM[s.bookedBy];const aStr=aid&&am[aid]?`<span class="auto-kennzeichen" style="font-size:10px">${am[aid].kennzeichen}</span>`:'—';
-      return`<tr><td>${scm[s.bookedBy]||'?'}</td><td>${fmt(s.startTime)}</td><td>${fmtTime(s.startTime)}–${fmtTime(s.endTime)}</td><td>${typeBadgeHtml(s.type)}</td><td>${aStr}</td>
+    bookedDocs.map(d=>{const s=d.data();const aid=scAutoM[s.bookedBy];const aStr=aid&&am[aid]?`<span class="auto-kennzeichen" style="font-size:10px">${escHtml(am[aid].kennzeichen)}</span>`:'—';
+      return`<tr><td>${escHtml(scm[s.bookedBy]||'?')}</td><td>${fmt(s.startTime)}</td><td>${fmtTime(s.startTime)}–${fmtTime(s.endTime)}</td><td>${typeBadgeHtml(s.type)}</td><td>${aStr}</td>
         <td><button class="btn btn-danger btn-sm" onclick="cancelBookingLehrer('${d.id}')">Stornieren</button></td></tr>`;}).join('')+'</tbody></table>';
 }
 window.cancelBookingLehrer=async function(id){
@@ -2373,8 +2397,8 @@ pages['lehrer-schueler']=async function(el){
     const max=s.maxFahrstunden||0,count=s.bookedCount||0,warn=max>0&&count>=max;
     const kontingent=max>0?`${count}/${max}`:`${count}/∞`;
     let autoHtml='';
-    if(s.autoId){const ca=autosSnap.docs.find(x=>x.id===s.autoId);if(ca){const a=ca.data();autoHtml=`<span class="auto-kennzeichen" style="font-size:10px">${a.kennzeichen}</span> <span style="font-size:11px;color:var(--text-muted)">${a.modell}</span>`;}}
-    const autoOptsS=`<option value="">— Kein Auto —</option>`+autosSnap.docs.map(x=>{const a=x.data();return`<option value="${x.id}" ${s.autoId===x.id?'selected':''}>${a.modell} · ${a.kennzeichen}</option>`;}).join('');
+    if(s.autoId){const ca=autosSnap.docs.find(x=>x.id===s.autoId);if(ca){const a=ca.data();autoHtml=`<span class="auto-kennzeichen" style="font-size:10px">${escHtml(a.kennzeichen)}</span> <span style="font-size:11px;color:var(--text-muted)">${escHtml(a.modell)}</span>`;}}
+    const autoOptsS=`<option value="">— Kein Auto —</option>`+autosSnap.docs.map(x=>{const a=x.data();return`<option value="${x.id}" ${s.autoId===x.id?'selected':''}>${escHtml(a.modell)} · ${escHtml(a.kennzeichen)}</option>`;}).join('');
     let notizenHtml='',pruefungen=[];
     try{notizenHtml=await loadNotizenHtml(d.id,'lehrer');}catch(e){console.warn('notizen',e);}
     try{pruefungen=await loadPruefungenForSchueler(d.id);}catch(e){console.warn('pruefungen',e);}
@@ -2382,15 +2406,15 @@ pages['lehrer-schueler']=async function(el){
     html+=`<div class="card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:14px">
         <div>
-          <div style="font-family:var(--font-display);font-size:18px">${s.fname} ${s.lname}</div>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:3px">${s.email||''} ${s.tel?'· '+s.tel:''}</div>
+          <div style="font-family:var(--font-display);font-size:18px">${escHtml(s.fname)} ${escHtml(s.lname)}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:3px">${escHtml(s.email||'')} ${s.tel?'· '+s.tel:''}</div>
           <div style="margin-top:5px;display:flex;gap:7px;align-items:center;flex-wrap:wrap">
             <span style="color:${warn?'var(--danger)':'var(--text-muted)'};font-size:12px">🎓 ${kontingent}${warn?' ⚠️':''}</span>
             ${autoHtml?`<span>${autoHtml}</span>`:''}
             ${letzteStatus?pruefungStatusBadge(letzteStatus):''}
           </div>
         </div>
-        <button class="copy-btn" onclick="copyLink('${link}')">🔗 Buchungslink</button>
+        <button class="copy-btn" onclick="copyLink('${attrJs(link)}')">🔗 Buchungslink</button>
       </div>
       <div class="grid-3" style="gap:12px">
         <div>
@@ -2402,7 +2426,7 @@ pages['lehrer-schueler']=async function(el){
           <div class="card-title" style="margin-bottom:10px">📝 Notizen</div>
           <div id="notizen-container-${d.id}">${notizenHtml}</div>
           <div class="notiz-compose" style="margin-top:7px">
-            <textarea id="notiz-text-${d.id}" placeholder="Notiz für ${s.fname}…"></textarea>
+            <textarea id="notiz-text-${d.id}" placeholder="Notiz für ${escHtml(s.fname)}…"></textarea>
             <div style="display:flex;justify-content:flex-end;margin-top:7px"><button class="btn btn-primary btn-sm" onclick="addNotizLehrer('${d.id}')">Senden</button></div>
           </div>
         </div>
@@ -2474,7 +2498,7 @@ async function renderAdminCal(){
   for(let d=1;d<=dim;d++){
     const isT=d===today.getDate()&&month===today.getMonth()&&year===today.getFullYear();
     const isB=bSet.has(d);const slots=slotsByDay[d]||[];
-    const slotHtml=slots.slice(0,2).map(s=>{const sn=s.bookedBy?(scm[s.bookedBy]||'?'):'';return s.bookedBy?`<div class="cal-slot slot-${s.type} slot-booked" title="${sn}">${fmtTime(s.startTime)} ${sn}</div>`:`<div class="cal-slot" style="background:rgba(91,186,122,.25);color:#5bba7a">${fmtTime(s.startTime)} Frei</div>`;}).join('');
+    const slotHtml=slots.slice(0,2).map(s=>{const sn=s.bookedBy?(scm[s.bookedBy]||'?'):'';return s.bookedBy?`<div class="cal-slot slot-${s.type} slot-booked" title="${escHtml(sn)}">${fmtTime(s.startTime)} ${escHtml(sn)}</div>`:`<div class="cal-slot" style="background:rgba(91,186,122,.25);color:#5bba7a">${fmtTime(s.startTime)} Frei</div>`;}).join('');
     html+=`<div class="cal-day${isT?' today':''}${isB?' blocked':''}" onclick="adminOpenDayDetail(${year},${month},${d})" style="display:flex;flex-direction:column">
       <div class="cal-day-num">${d}</div>${isB?((blocksByDay[d]||[]).slice(0,2).map(b=>`<div class="cal-slot" style="background:${_blockColor(b)}26;color:${_blockColor(b)};font-size:8px">${escHtml(_blockLabel(b))}</div>`).join('')||'<div class="cal-slot" style="background:rgba(224,85,85,.15);color:#e05555;font-size:8px">Gesperrt</div>'):slotHtml}
       ${slots.length>2?`<div style="font-size:8px;color:var(--text-muted)">+${slots.length-2}</div>`:''}
@@ -2507,7 +2531,7 @@ function renderPruefungenList(list,canEdit,sid){
   if(!list.length)return'<p class="text-muted">Noch keine Prüfungen.</p>';
   return list.map(p=>{const ds=p.datum?new Date(p.datum+'T12:00:00').toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'}):'—';
     return`<div class="pruefung-card"><div class="pruefung-status" style="background:${pruefungStatusDot(p.status)}"></div>
-    <div class="pruefung-info"><div class="pruefung-title">Versuch ${p.versuch||1}</div><div class="pruefung-meta">📅 ${ds}${p.ort?' · 📍'+p.ort:''}${p.notiz?' · '+p.notiz:''}</div></div>
+    <div class="pruefung-info"><div class="pruefung-title">Versuch ${p.versuch||1}</div><div class="pruefung-meta">📅 ${ds}${p.ort?' · 📍'+escHtml(p.ort):''}${p.notiz?' · '+escHtml(p.notiz):''}</div></div>
     ${pruefungStatusBadge(p.status)}
     ${canEdit?`<button class="btn btn-secondary btn-sm" onclick="editPruefung('${p.id}','${sid}')">Bearb.</button><button class="btn btn-danger btn-sm" onclick="deletePruefung('${p.id}','${sid}')">×</button>`:''}
     </div>`;}).join('');}
@@ -2544,7 +2568,7 @@ pages['lehrer-pruefungen']=async function(el){
   const lp=document.getElementById('lp-content');if(snap.empty){lp.innerHTML='<p class="text-muted">Keine Schüler.</p>';return;}
   let html='';
   for(const d of snap.docs){const s=d.data();const ps=await loadPruefungenForSchueler(d.id);const ls=ps.length?ps[0].status:null;
-    html+=`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px"><div><div style="font-family:var(--font-display);font-size:17px">${s.fname} ${s.lname}</div><div style="margin-top:3px">${ls?pruefungStatusBadge(ls):'<span class="badge badge-ausstehend">Keine Prüfung</span>'}</div></div><button class="btn btn-primary btn-sm" onclick="openAddPruefung('${d.id}')">+ Eintragen</button></div>
+    html+=`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px"><div><div style="font-family:var(--font-display);font-size:17px">${escHtml(s.fname)} ${escHtml(s.lname)}</div><div style="margin-top:3px">${ls?pruefungStatusBadge(ls):'<span class="badge badge-ausstehend">Keine Prüfung</span>'}</div></div><button class="btn btn-primary btn-sm" onclick="openAddPruefung('${d.id}')">+ Eintragen</button></div>
     <div id="pruefungen-container-${d.id}">${renderPruefungenList(ps,true,d.id)}</div></div>`;
   }
   lp.innerHTML=html;
@@ -2579,7 +2603,7 @@ function renderAdminPruefungenList(lm){
   if(!list.length){el.innerHTML='<p class="text-muted">Keine Einträge.</p>';return;}
   el.innerHTML=list.map(s=>{const ls=s.pruefungen.length?s.pruefungen[0].status:null;return`<div class="pruefung-card">
     <div class="pruefung-status" style="background:${ls?pruefungStatusDot(ls):'#444'}"></div>
-    <div class="pruefung-info"><div class="pruefung-title">${s.fname} ${s.lname}</div><div class="pruefung-meta">${s.lehrerUid?(lm?.[s.lehrerUid]||'?'):'—'} · ${s.pruefungen.length} Versuch(e)</div></div>
+    <div class="pruefung-info"><div class="pruefung-title">${escHtml(s.fname)} ${escHtml(s.lname)}</div><div class="pruefung-meta">${s.lehrerUid?(lm?.[s.lehrerUid]||'?'):'—'} · ${s.pruefungen.length} Versuch(e)</div></div>
     ${ls?pruefungStatusBadge(ls):'<span class="badge badge-ausstehend">Keine</span>'}
     <button class="btn btn-primary btn-sm" onclick="openAddPruefung('${s.id}')">+ Eintragen</button>
     <button class="btn btn-secondary btn-sm" onclick="togglePruefungDetail('${s.id}')">Details</button>
@@ -2600,9 +2624,9 @@ pages['lehrer-warteliste']=async function(el){
   if(!docs.length){wl.innerHTML='<p class="text-muted">Keine Einträge auf der Warteliste.</p>';return;}
   const scIds=[...new Set(docs.map(d=>d.data().schuelerId))];const scm={};
   for(const id of scIds){const s=await getDoc(doc(db,SCHUELER_COLL,id));if(s.exists())scm[id]=s.data();}
-  wl.innerHTML=docs.map(d=>{const w=d.data();const s=scm[w.schuelerId];const name=s?`${s.fname} ${s.lname}`:'Unbekannt';const link=`${location.origin}${location.pathname}?schueler=${w.schuelerId}&lehrer=${currentUser.uid}`;
+  wl.innerHTML=docs.map(d=>{const w=d.data();const s=scm[w.schuelerId];const name=s?`${escHtml(s.fname)} ${escHtml(s.lname)}`:'Unbekannt';const link=`${location.origin}${location.pathname}?schueler=${w.schuelerId}&lehrer=${currentUser.uid}`;
     return`<div class="warteliste-row"><div><div class="warteliste-name">${name}</div><div class="warteliste-meta">${fmtDatetime(w.createdAt)}${w.notiz?' · '+escHtml(w.notiz):''}</div></div>
-    <button class="copy-btn" onclick="copyLink('${link}')">🔗 Link</button><button class="btn btn-success btn-sm" onclick="removeFromWarteliste('${d.id}')">✓ Erledigt</button></div>`;}).join('');
+    <button class="copy-btn" onclick="copyLink('${attrJs(link)}')">🔗 Link</button><button class="btn btn-success btn-sm" onclick="removeFromWarteliste('${d.id}')">✓ Erledigt</button></div>`;}).join('');
 };
 window.removeFromWarteliste=async function(id){await updateDoc(doc(db,'warteliste',id),{abgearbeitet:true});toast('Erledigt.','success');pages['lehrer-warteliste'](document.getElementById('main-content'));};
 
@@ -2613,9 +2637,9 @@ pages['lehrer-profil']=async function(el){
   el.innerHTML=`<div class="page active"><h2 class="page-title">Einstellungen</h2><div class="card"><div id="profil-content"><div class="spinner"></div></div></div></div>`;
   const[autosSnap,pSnap]=await Promise.all([getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId))),getDoc(doc(db,'kalenderUsers',currentUser.uid))]);
   const p=pSnap.data();const currentAutoId=p.autoId||'';const bd=p.blockDauer||60;const sp=p.slotplan||{};
-  const opts=`<option value="">— Kein Auto —</option>`+autosSnap.docs.map(d=>{const a=d.data();return`<option value="${d.id}" ${currentAutoId===d.id?'selected':''}>${a.modell} · ${a.kennzeichen}</option>`;}).join('');
+  const opts=`<option value="">— Kein Auto —</option>`+autosSnap.docs.map(d=>{const a=d.data();return`<option value="${d.id}" ${currentAutoId===d.id?'selected':''}>${escHtml(a.modell)} · ${escHtml(a.kennzeichen)}</option>`;}).join('');
   let autoHtml='';
-  if(currentAutoId){const ca=autosSnap.docs.find(d=>d.id===currentAutoId);if(ca){const a=ca.data();autoHtml=`<div class="auto-card" style="margin-bottom:16px"><div class="auto-icon">🚗</div><div class="auto-info"><div class="auto-name">${a.modell}</div></div><span class="auto-kennzeichen">${a.kennzeichen}</span></div>`;}}
+  if(currentAutoId){const ca=autosSnap.docs.find(d=>d.id===currentAutoId);if(ca){const a=ca.data();autoHtml=`<div class="auto-card" style="margin-bottom:16px"><div class="auto-icon">🚗</div><div class="auto-info"><div class="auto-name">${escHtml(a.modell)}</div></div><span class="auto-kennzeichen">${escHtml(a.kennzeichen)}</span></div>`;}}
   document.getElementById('profil-content').innerHTML=`
     <div class="card-title">🚘 Mein Auto</div>${autoHtml}
     <div class="field"><label>Auto auswählen</label><select id="lehrer-auto-sel">${opts}</select></div>

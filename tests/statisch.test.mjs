@@ -195,6 +195,113 @@ if (bloeckeZeichen.size === ZEICHEN_IN.length) {
   }
 }
 
+// ══ 6 Eingesetzte Werte in HTML-Attributen ═════════════════════════════
+// Der Fund, der diese Pruefung ausgeloest hat:
+//
+//   onclick="deleteSchool('${d.id}','${s.name}')"
+//
+// Ein Fahrschulname "Fahrschule O'Brien" machte den Loeschen-Knopf damit
+// wirkungslos - das Anfuehrungszeichen beendete die Zeichenkette mitten
+// drin. Ein absichtlich gesetzter Name fuehrte in der SuperAdmin-Ansicht
+// fremden Code aus und konnte deleteSchool() auf eine FREMDE Fahrschule
+// rufen, die daraufhin samt Lehrern, Schuelern und Terminen verschwand.
+//
+// Regel deshalb: Was in einem on...-Attribut in einer JS-Zeichenkette
+// landet, muss durch attrJs(); was in einem sonstigen Attributwert landet,
+// durch eine Escape-Funktion - oder es ist erkennbar eine Zahl, eine feste
+// Zeichenkette oder ein Farb-/Stil-Ausdruck.
+console.log('\n6) Eingesetzte Werte in HTML-Attributen sind entwertet');
+
+// Backtick-Strings heraustrennen (mit verschachtelten ${} umgehen).
+function templateLiterale(text) {
+  const aus = [];
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] !== '`') continue;
+    const start = i; i++;
+    let tiefe = 0;
+    for (; i < text.length; i++) {
+      const c = text[i];
+      if (c === '\\') { i++; continue; }
+      if (c === '$' && text[i + 1] === '{') { tiefe++; i++; continue; }
+      if (c === '}' && tiefe) { tiefe--; continue; }
+      if (c === '`' && !tiefe) break;
+    }
+    aus.push([start, text.slice(start, i + 1)]);
+  }
+  return aus;
+}
+
+// Steht die Stelle in einem quotierten Attributwert? Wenn ja: welches?
+function attributAn(lit, pos) {
+  const davor = lit.slice(0, pos);
+  const lt = davor.lastIndexOf('<'), gt = davor.lastIndexOf('>');
+  if (lt < 0 || lt < gt) return null;                 // Textinhalt, nicht Attribut
+  const imTag = davor.slice(lt);
+  for (const q of ['"', "'"]) {
+    if ((imTag.split(q).length - 1) % 2 !== 1) continue;
+    const m = imTag.match(new RegExp(`([\\w-]+)\\s*=\\s*${q}[^${q}]*$`));
+    return m ? m[1].toLowerCase() : '?';
+  }
+  return null;
+}
+
+const ENTWERTET = /\b(esc|escHtml|escape|escapeHtmlEigen|esc2|attrJs|encodeURIComponent)\s*\(/;
+
+// Gemeldet wird nur, was ueberhaupt freien Text tragen KANN. Ein erster
+// Entwurf schlug bei jeder eingesetzten Dokument-ID, Zahl und Schleifen-
+// Zaehler an - 237 Meldungen, von denen keine ein Fehler war. Eine Pruefung,
+// die man wegklickt, ist schlechter als keine. Ausschlaggebend ist deshalb
+// der Feldname: Wer '.name', '.notiz' oder '.email' einsetzt, setzt etwas
+// ein, das ein Mensch getippt hat; wer '.id' oder 'i' einsetzt, nicht.
+const TEXTFELD = new RegExp(
+  '(?:^|[.\\[\'"\\w])(' +
+  'name|titel|title|text|notiz|kommentar|beschreibung|bemerkung|betreff|nachricht|inhalt|' +
+  'ort|adresse|strasse|plz|vorname|nachname|fname|lname|email|mail|firma|schule|grund|anlass|' +
+  'modell|kennzeichen|displayName|fahrschuleName|instagram|steuernummer|' +
+  'url|Url|link|bild|Bild|logo|Logo|unterschrift|Unterschrift|pfad|Pfad' +
+  ')\\b', '');
+
+let attrGesamt = 0;
+for (const d of CLIENT) {
+  const text = lies(d);
+  if (!text) continue;
+  let offenHier = 0, geprueft = 0, beobachtet = 0;
+  for (const [start, lit] of templateLiterale(text)) {
+    for (const m of lit.matchAll(/\$\{/g)) {
+      const attr = attributAn(lit, m.index);
+      if (!attr) continue;
+      // Ausdruck zwischen ${ und passendem }
+      let i = m.index + 2, tiefe = 1;
+      for (; i < lit.length && tiefe; i++) {
+        if (lit[i] === '{') tiefe++;
+        else if (lit[i] === '}') tiefe--;
+      }
+      const ausdruck = lit.slice(m.index + 2, i - 1).trim();
+      geprueft++;
+      const traegtText = TEXTFELD.test(ausdruck);
+      const entwertet  = ENTWERTET.test(ausdruck);
+
+      // In on...-Attributen reicht escHtml NICHT: Der Browser dreht die
+      // Entities zurueck, BEVOR JavaScript laeuft - aus &#39; wird wieder
+      // ein echtes ' und beendet die Zeichenkette mitten im Aufruf.
+      if (attr.startsWith('on') && traegtText && !/\battrJs\s*\(/.test(ausdruck)) {
+        offenHier++;
+        melde(`${d}:${zeileVon(text, start + m.index)}  ${attr}="…\${${ausdruck.slice(0, 50)}}"`
+            + `\n        In einem ${attr} braucht es attrJs() - escHtml() allein reicht dort nicht.`);
+        continue;
+      }
+      if (!traegtText || entwertet) { if (traegtText) beobachtet++; continue; }
+      if (attr === 'style' || attr === 'class') continue;
+      offenHier++;
+      melde(`${d}:${zeileVon(text, start + m.index)}  ${attr}="…\${${ausdruck.slice(0, 55)}}"`
+          + `\n        Freier Text ohne Entwertung in einem Attribut.`);
+    }
+  }
+  attrGesamt += geprueft;
+  console.log(`  ${d.padEnd(22)} ${geprueft} Einsetzungen, davon ${beobachtet} mit freiem Text`
+            + `${offenHier ? '' : ' ✓'}`);
+}
+
 // ══ Ergebnis ═══════════════════════════════════════════════════════════
 console.log(befunde === 0
   ? '\n✓ Keine Befunde.\n'
