@@ -362,7 +362,7 @@ select.form-input { appearance:none; background-image:url("data:image/svg+xml,%3
 .btn-back:active { transform:translateY(4px); box-shadow:0 1px 0 rgba(0,0,0,0.5), 0 2px 5px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.1); }
 .btn-icon-sm {
   background:var(--surface2); border:1px solid var(--border); color:var(--text);
-  width:36px; height:36px; border-radius:10px; font-size:0.9rem; cursor:pointer;
+  width:40px; height:40px; border-radius:10px; font-size:0.9rem; cursor:pointer;
   display:flex; align-items:center; justify-content:center;
   font-family:'Manrope',sans-serif; white-space:nowrap; flex-shrink:0;
   box-shadow:0 5px 0 rgba(0,0,0,0.5), 0 8px 14px rgba(0,0,0,0.32), inset 0 1px 1px rgba(255,255,255,0.14), inset 0 -2px 3px rgba(0,0,0,0.25);
@@ -1390,20 +1390,51 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 
 <!-- ══ LOGIN ══ -->
 <div class="screen active" id="screen-login"><div class="zeichen-drift">
-    <img src="./verkehrszeichen/zeichen-306-vorfahrtstrasse.png" width="60" style="left:4%;animation-delay:0s;animation-duration:32s" alt="">
-    <img src="./verkehrszeichen/zeichen-205-vorfahrt-gewaehren.png" width="52" style="left:16%;animation-delay:-4s;animation-duration:27s" alt="">
-    <img src="./verkehrszeichen/zeichen-206-stop.png" width="56" style="left:28%;animation-delay:-8s;animation-duration:30s" alt="">
-    <img src="./verkehrszeichen/zeichen-220-einbahnstrasse.png" width="46" style="left:40%;animation-delay:-13s;animation-duration:25s" alt="">
-    <img src="./verkehrszeichen/zeichen-301-vorfahrt.png" width="50" style="left:52%;animation-delay:-17s;animation-duration:31s" alt="">
-    <img src="./verkehrszeichen/zeichen-325-1-verkehrsberuhigt.png" width="54" style="left:64%;animation-delay:-22s;animation-duration:28s" alt="">
-    <img src="./verkehrszeichen/zusatz-abknickende-vorfahrt.png" width="44" style="left:76%;animation-delay:-3s;animation-duration:33s" alt="">
-    <img src="./verkehrszeichen/zeichen-720-gruenpfeil.png" width="48" style="left:88%;animation-delay:-10s;animation-duration:26s" alt="">
-    <img src="./verkehrszeichen/zeichen-306-vorfahrtstrasse.png" width="40" style="left:96%;animation-delay:-15s;animation-duration:29s" alt="">
-    <img src="./verkehrszeichen/zeichen-206-stop.png" width="42" style="left:58%;animation-delay:-20s;animation-duration:34s" alt="">
-    <img src="./verkehrszeichen/zeichen-220-einbahnstrasse.png" width="38" style="left:10%;animation-delay:-25s;animation-duration:27s" alt="">
-    <img src="./verkehrszeichen/zeichen-205-vorfahrt-gewaehren.png" width="46" style="left:70%;animation-delay:-6s;animation-duration:32s" alt="">
-    <img src="./verkehrszeichen/zeichen-325-1-verkehrsberuhigt.png" width="40" style="left:34%;animation-delay:-11s;animation-duration:30s" alt="">
-    <img src="./verkehrszeichen/zeichen-720-gruenpfeil.png" width="36" style="left:82%;animation-delay:-18s;animation-duration:25s" alt="">
+    <!-- 26 Zeichen aus 16 verschiedenen Vorlagen (vorher 14 aus 8). Sie
+         liegen unter ./verkehrszeichen-flug/ und sind freigestellt: der
+         weisse Hintergrund der Katalogbilder ist weg, das Weiss INNERHALB
+         des Schildes - die STOP-Schrift, das weisse Dreieck bei "Vorfahrt
+         gewaehren" - steht noch. Bei 96 px Kantenlaenge wiegen alle 16
+         zusammen 188 KB, also etwa so viel wie die acht grossen PNG vorher.
+
+         Groesse und Tempo haengen zusammen (15 s bis 41 s): Was groesser
+         ist, wirkt naeher und zieht schneller vorbei. Die negativen
+         animation-delay sorgen dafuer, dass die Flaeche schon beim Laden
+         gefuellt ist, statt sich erst nach und nach zu beleben.
+
+         Die Startpunkte laufen von -30 % bis 55 %, nicht ueber die ganze
+         Breite. Grund: Die Bewegung verschiebt jedes Bild zusaetzlich um
+         -15vw bis +115vw, das 'left' kommt also oben drauf - wer bei 90 %
+         startet, ist fast den ganzen Durchlauf rechts ausserhalb.
+         Nachgemessen: mit 0..97 % waren im Schnitt 10,6 von 26 gleichzeitig
+         im Bild, mit -30..55 % sind es 16,6. (Ein Teil davon liegt hinter
+         der Login-Box - die soll lesbar bleiben.) -->
+    <img src="./verkehrszeichen-flug/267.png" width="42" alt="" decoding="async" fetchpriority="low" style="left:-30.7%;opacity:0.094;animation-delay:-8.5s;animation-duration:30.9s">
+    <img src="./verkehrszeichen-flug/274-50.png" width="36" alt="" decoding="async" fetchpriority="low" style="left:-26.6%;opacity:0.083;animation-delay:-33.2s;animation-duration:36.8s">
+    <img src="./verkehrszeichen-flug/101.png" width="36" alt="" decoding="async" fetchpriority="low" style="left:-23.1%;opacity:0.083;animation-delay:-5.4s;animation-duration:39.2s">
+    <img src="./verkehrszeichen-flug/142-10.png" width="36" alt="" decoding="async" fetchpriority="low" style="left:-21.6%;opacity:0.083;animation-delay:-28.2s;animation-duration:39.2s">
+    <img src="./verkehrszeichen-flug/274-50.png" width="33" alt="" decoding="async" fetchpriority="low" style="left:-18.3%;opacity:0.078;animation-delay:-32.9s;animation-duration:41.0s">
+    <img src="./verkehrszeichen-flug/205.png" width="45" alt="" decoding="async" fetchpriority="low" style="left:-14.2%;opacity:0.099;animation-delay:-8.0s;animation-duration:32.7s">
+    <img src="./verkehrszeichen-flug/123.png" width="46" alt="" decoding="async" fetchpriority="low" style="left:-9.8%;opacity:0.101;animation-delay:-1.2s;animation-duration:30.9s">
+    <img src="./verkehrszeichen-flug/131.png" width="55" alt="" decoding="async" fetchpriority="low" style="left:-7.3%;opacity:0.117;animation-delay:-9.9s;animation-duration:24.5s">
+    <img src="./verkehrszeichen-flug/239.png" width="39" alt="" decoding="async" fetchpriority="low" style="left:-3.5%;opacity:0.088;animation-delay:-31.5s;animation-duration:34.8s">
+    <img src="./verkehrszeichen-flug/250.png" width="49" alt="" decoding="async" fetchpriority="low" style="left:-0.8%;opacity:0.107;animation-delay:-13.5s;animation-duration:26.8s">
+    <img src="./verkehrszeichen-flug/142-10.png" width="32" alt="" decoding="async" fetchpriority="low" style="left:3.1%;opacity:0.076;animation-delay:-14.5s;animation-duration:39.0s">
+    <img src="./verkehrszeichen-flug/283.png" width="59" alt="" decoding="async" fetchpriority="low" style="left:7.0%;opacity:0.125;animation-delay:-8.5s;animation-duration:18.5s">
+    <img src="./verkehrszeichen-flug/250.png" width="50" alt="" decoding="async" fetchpriority="low" style="left:8.3%;opacity:0.108;animation-delay:-6.0s;animation-duration:27.0s">
+    <img src="./verkehrszeichen-flug/136-10.png" width="43" alt="" decoding="async" fetchpriority="low" style="left:13.7%;opacity:0.096;animation-delay:-13.9s;animation-duration:30.5s">
+    <img src="./verkehrszeichen-flug/237.png" width="62" alt="" decoding="async" fetchpriority="low" style="left:16.6%;opacity:0.13;animation-delay:-3.2s;animation-duration:18.1s">
+    <img src="./verkehrszeichen-flug/215.png" width="47" alt="" decoding="async" fetchpriority="low" style="left:19.7%;opacity:0.103;animation-delay:-10.0s;animation-duration:28.2s">
+    <img src="./verkehrszeichen-flug/314.png" width="36" alt="" decoding="async" fetchpriority="low" style="left:23.3%;opacity:0.083;animation-delay:-18.1s;animation-duration:36.9s">
+    <img src="./verkehrszeichen-flug/306.png" width="43" alt="" decoding="async" fetchpriority="low" style="left:26.4%;opacity:0.096;animation-delay:-3.5s;animation-duration:31.6s">
+    <img src="./verkehrszeichen-flug/237.png" width="62" alt="" decoding="async" fetchpriority="low" style="left:28.5%;opacity:0.13;animation-delay:-15.6s;animation-duration:16.7s">
+    <img src="./verkehrszeichen-flug/205.png" width="30" alt="" decoding="async" fetchpriority="low" style="left:31.8%;opacity:0.072;animation-delay:-1.8s;animation-duration:40.4s">
+    <img src="./verkehrszeichen-flug/239.png" width="61" alt="" decoding="async" fetchpriority="low" style="left:34.7%;opacity:0.128;animation-delay:-7.8s;animation-duration:15.5s">
+    <img src="./verkehrszeichen-flug/123.png" width="40" alt="" decoding="async" fetchpriority="low" style="left:37.8%;opacity:0.09;animation-delay:-28.4s;animation-duration:36.7s">
+    <img src="./verkehrszeichen-flug/250.png" width="62" alt="" decoding="async" fetchpriority="low" style="left:42.7%;opacity:0.13;animation-delay:-3.9s;animation-duration:17.8s">
+    <img src="./verkehrszeichen-flug/206.png" width="35" alt="" decoding="async" fetchpriority="low" style="left:45.3%;opacity:0.081;animation-delay:-35.3s;animation-duration:37.5s">
+    <img src="./verkehrszeichen-flug/250.png" width="46" alt="" decoding="async" fetchpriority="low" style="left:48.3%;opacity:0.101;animation-delay:-15.2s;animation-duration:29.0s">
+    <img src="./verkehrszeichen-flug/136-10.png" width="44" alt="" decoding="async" fetchpriority="low" style="left:51.6%;opacity:0.098;animation-delay:-11.3s;animation-duration:30.6s">
   </div>
   
       <div style="text-align:center;margin:4px 0 18px">
@@ -1670,7 +1701,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
   <!-- Sortier-Leiste -->
   <div style="display:flex;align-items:center;gap:8px;padding:0 16px 4px">
     <span style="font-size:0.74rem;color:var(--muted);white-space:nowrap">Sortieren:</span>
-    <select id="sort-select" onchange="setSortMode(this.value)" style="flex:1;background:linear-gradient(180deg,rgba(255,255,255,0.07),rgba(0,0,0,0.06)),var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:9px 12px;font-size:0.8rem;outline:none;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,0.45),0 6px 12px rgba(0,0,0,0.3),inset 0 1px 1px rgba(255,255,255,0.12)">
+    <select id="sort-select" aria-label="Schülerliste sortieren" onchange="setSortMode(this.value)" style="flex:1;background:linear-gradient(180deg,rgba(255,255,255,0.07),rgba(0,0,0,0.06)),var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:9px 12px;font-size:0.8rem;outline:none;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,0.45),0 6px 12px rgba(0,0,0,0.3),inset 0 1px 1px rgba(255,255,255,0.12)">
       <option value="nameAsc">Name (A → Z)</option>
       <option value="nameDesc">Name (Z → A)</option>
       <option value="dateDesc">Neueste zuerst</option>
@@ -3338,7 +3369,7 @@ const dbUpd = (...a) => window.__DEMO ? window.__demoWrite('upd', a) : updateDoc
 const dbDel = (...a) => window.__DEMO ? window.__demoWrite('del', a) : deleteDoc(...a);
 function __demoDaten(){
   const now=Date.now(), nm=(d)=>now-d*86400000, base=new Date();
-  const iso=(o)=>{ const x=new Date(base); x.setDate(x.getDate()+o); return x.toISOString().slice(0,10); };
+  const iso=(o)=>{ const x=new Date(base); x.setDate(x.getDate()+o); return alsLokalesDatum(x); };
   const students=[
     { id:'demo-s1', uid:'demo-user', fahrschuleId:'demo-user', schuelerNr:1, vorname:'Lena', nachname:'Bauer', geburt:'2006-04-12', klasse:'B', klassen:['B'], ziel:30, fahrstunden:14, sonderfahrten:3, theorieBestanden:true, archiviert:false, pinned:true, createdAt:nm(40) },
     { id:'demo-s2', uid:'demo-user', fahrschuleId:'demo-user', schuelerNr:2, vorname:'Jonas', nachname:'Klein', geburt:'2005-09-30', klasse:'B', klassen:['B'], ziel:30, fahrstunden:6, sonderfahrten:0, theorieBestanden:false, archiviert:false, pinned:false, createdAt:nm(20) },
@@ -5003,6 +5034,16 @@ function getSchuelerNr(s) {
 function getColor(s) { const i = students.indexOf(s); return COLORS[(i<0?0:i)%COLORS.length]; }
 function initials(s) { return ((s.vorname||'?')[0] + (s.nachname||'?')[0]).toUpperCase(); }
 function formatDate(d) { if (!d) return ''; const [y,m,day]=d.split('-'); return `${day}.${m}.${y}`; }
+// Datum als YYYY-MM-DD in ORTSZEIT. toISOString() rechnet nach UTC um und
+// liefert in deutscher Sommerzeit zwischen 00:00 und 02:00 den VORTAG.
+// Nachgemessen am 17.07.2026 um 00:30 Berliner Zeit: Das vorbelegte
+// Pruefungsdatum stand auf dem 16.07. - ein falsches Datum in einem
+// Nachweis, der nach § 6 FahrschAusbO gefuehrt wird. kalender.html und das
+// Schueler-Portal hatten den Helfer laengst, index.html nicht.
+function alsLokalesDatum(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+const heuteLokal = () => alsLokalesDatum(new Date());
 function age(d) { if (!d) return null; const b=new Date(d),now=new Date(); let a=now.getFullYear()-b.getFullYear(); if(now<new Date(now.getFullYear(),b.getMonth(),b.getDate()))a--; return a; }
 
 // BF17-Erkennung: Begleitetes Fahren ab 17 (Klasse B/B197/B-Auto, Alter 16-17).
@@ -5296,7 +5337,7 @@ function renderStudentCard(s) {
   const bf17Tag = isBF17(s) ? '<span style="display:inline-block;background:rgba(88,166,255,0.18);color:#58a6ff;border-radius:5px;padding:1px 6px;font-size:0.72rem;font-weight:700;margin-left:2px" title="Begleitetes Fahren ab 17">BF17</span>' : '';
   const ampelKarte = pruefungsAmpel(s);
   const ampelPunkt = ampelKarte.farbe === 'gruen' ? '🟢' : ampelKarte.farbe === 'gelb' ? '🟡' : '🔴';
-  const ampelDot = `<span title="${ampelKarte.text}" style="font-size:0.7rem;margin-right:3px">${ampelPunkt}</span>`;
+  const ampelDot = `<span title="${escHtml(ampelKarte.text)}" style="font-size:0.7rem;margin-right:3px">${ampelPunkt}</span>`;
   const meta=['#'+getSchuelerNr(s), klasseLabel, a?a+' Jahre':null, (s.fahrstunden||0)+' Std.', s.theorieBestanden?'📋 Theorie ✓':null].filter(Boolean).join(' · ');
   const badge = pct>=90?'<span class="badge badge-green">Prüfungsreif</span>':pct>=60?'<span class="badge badge-amber">Guter Fortschritt</span>':pct>0?'<span class="badge badge-blue">In Ausbildung</span>':'<span class="badge badge-gray">Neu</span>';
 
@@ -5327,7 +5368,7 @@ function renderStudentCard(s) {
     <div class="avatar" style="background:${c}">${initials(s)}</div>
     <div style="flex:1;min-width:0"><div class="sc-name">${ampelDot}${s.pinned?'📌 ':''}${escapeHtmlEigen(s.vorname)} ${escapeHtmlEigen(s.nachname)} ${bf17Tag}</div><div class="sc-meta">${meta}</div>${notifHTML}</div>
     <div class="sc-right">
-      <button onclick="event.stopPropagation();togglePin('${s.id}')" title="${s.pinned?'Lösen':'Anpinnen'}" style="background:none;border:none;cursor:pointer;font-size:1rem;padding:4px;opacity:${s.pinned?'1':'0.35'};line-height:1">📌</button>
+      <button onclick="event.stopPropagation();togglePin('${s.id}')" title="${s.pinned?'Lösen':'Anpinnen'}" style="background:none;border:none;cursor:pointer;font-size:1rem;padding:4px;min-width:40px;min-height:40px;display:inline-flex;align-items:center;justify-content:center;opacity:${s.pinned?'1':'0.35'};line-height:1">📌</button>
       <div class="progress-ring-wrap">
         <svg class="ring-svg" width="40" height="40" viewBox="0 0 40 40">
           <circle class="ring-bg" cx="20" cy="20" r="${r}"/>
@@ -5633,7 +5674,7 @@ function renderDetail() {
       const val = (s.themen||{})[t]||0;
       const bild = VZ_BILDER[t];
       const bildHTML = bild
-        ? `<img src="./verkehrszeichen/${bild}" alt="" style="width:38px;height:38px;object-fit:contain;flex-shrink:0" loading="lazy">`
+        ? `<img src="./verkehrszeichen/${escHtml(bild)}" alt="" style="width:38px;height:38px;object-fit:contain;flex-shrink:0" loading="lazy">`
         : '<div style="width:38px;flex-shrink:0"></div>';
       return adkThemaZeile(
         `<span style="display:flex;align-items:center;gap:10px;min-width:0">${bildHTML}<span style="min-width:0">${t}</span></span>`,
@@ -5647,7 +5688,7 @@ function renderDetail() {
         ? `<img src="${bildQuelle}" alt="" style="width:38px;height:38px;object-fit:contain;flex-shrink:0" loading="lazy">`
         : '<div style="width:38px;flex-shrink:0;text-align:center;font-size:1.3rem">🚧</div>';
       return adkThemaZeile(
-        `<span style="display:flex;align-items:center;gap:10px;min-width:0">${bildHTML}<span style="min-width:0">${z.name}</span></span>`,
+        `<span style="display:flex;align-items:center;gap:10px;min-width:0">${bildHTML}<span style="min-width:0">${escHtml(z.name)}</span></span>`,
         val, customZiel(z.id),
         `<button onclick="event.stopPropagation();deleteVzZeichen('${z.id}')" title="Zeichen löschen" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:2px 4px;font-size:0.8rem;flex-shrink:0">🗑</button>`);
     }).join('');
@@ -5680,7 +5721,7 @@ function renderDetail() {
       // erreichte Stufe setzte sie erneut, statt sie zu loeschen - anders
       // als bei allen anderen Zeilen. adkStufenBalken macht es ueberall gleich.
       return adkThemaZeile(
-        `${t.name}${scopeTag}`, val, customZiel(t.id),
+        `${escHtml(t.name)}${scopeTag}`, val, customZiel(t.id),
         `<button onclick="event.stopPropagation();deleteCustomThema('${t.id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:2px 4px;font-size:0.8rem;flex-shrink:0">🗑</button>`,
         'eigen');
     }).join('');
@@ -5862,7 +5903,7 @@ function renderDetail() {
       <!-- TAB: VERKEHRSZEICHEN -->
       <div id="tab-vz" style="padding:14px;display:${aktiverLernTab==='vz'?'block':'none'}">
         <div style="font-size:0.75rem;color:var(--muted);margin-bottom:10px;line-height:1.5">
-          Markiere, wie sicher ${s.vorname||'der Schüler'} die einzelnen Zeichen beherrscht.
+          Markiere, wie sicher ${escHtml(s.vorname||'der Schüler')} die einzelnen Zeichen beherrscht.
         </div>
         <div class="themen-list">${vzHTML}</div>
       </div>
@@ -5986,7 +6027,7 @@ function renderAdkGruppenChart(s) {
     return `
       <div style="margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
-          <span style="font-size:0.78rem;font-weight:600;color:var(--text)">${g.name}</span>
+          <span style="font-size:0.78rem;font-weight:600;color:var(--text)">${escHtml(g.name)}</span>
           <span style="font-size:0.8rem;font-weight:800;color:${color};min-width:36px;text-align:right">${pct}%</span>
         </div>
         <div style="background:var(--surface2);border-radius:6px;height:10px;overflow:hidden;border:1px solid var(--border)">
@@ -6415,7 +6456,7 @@ function renderProtokollListe() {
         <button onclick="deleteProtokollEintrag('${e.id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.8rem;padding:2px">🗑</button>
       </div>
       ${maengelHTML}
-      ${e.notiz ? `<div style="font-size:0.82rem;color:var(--text);line-height:1.4;margin-top:4px">📝 ${(e.notiz||"").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>` : ''}
+      ${e.notiz ? `<div style="font-size:0.82rem;color:var(--text);line-height:1.4;margin-top:4px">📝 ${escHtml(e.notiz||'')}</div>` : ''}
       ${e.fortschritt != null ? `<div style="font-size:0.68rem;color:var(--muted)">Fortschritt: ${e.fortschritt}%</div>` : ''}
     </div>`;
   }).join('');
@@ -6682,7 +6723,7 @@ window.openVersuchModal = () => {
   versuchTyp = 'praxis'; versuchErgebnis = 'durchgefallen';
   setVersuchTyp('praxis'); setVersuchErgebnis('durchgefallen');
   document.getElementById('inp-versuch-grund').value = '';
-  document.getElementById('inp-versuch-datum').value = new Date().toISOString().split('T')[0];
+  document.getElementById('inp-versuch-datum').value = heuteLokal();
 };
 
 let versuchTyp = 'praxis';
@@ -6945,7 +6986,7 @@ window.openPlanLesson = async (vonCode = false) => {
   document.getElementById('code-modal').classList.remove('open');
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
-  document.getElementById('inp-plan-datum').value   = tomorrow.toISOString().split('T')[0];
+  document.getElementById('inp-plan-datum').value   = alsLokalesDatum(tomorrow);
   document.getElementById('inp-plan-uhrzeit').value = '';
   document.getElementById('inp-plan-ort').value     = '';
   document.getElementById('inp-plan-notiz').value   = '';
@@ -7159,7 +7200,7 @@ window.deleteStudent = async () => {
     // Offene Aufraeum-Arbeit vormerken, falls die App vor Ablauf der
     // Rueckgaengig-Frist geschlossen wird (siehe holeOffeneLoeschungenNach).
     offeneLoeschungVormerken(geloeschteId);
-    zeigeUndoBalken(`🗑️ ${s.vorname} ${s.nachname} gelöscht`, async () => {
+    zeigeUndoBalken(`🗑️ ${escHtml(s.vorname)} ${escHtml(s.nachname)} gelöscht`, async () => {
       // Rückgängig: Schüler mit gleicher ID wiederherstellen
       try {
         await dbSet(doc(db,'students',backup.id), backup.data);
@@ -7435,7 +7476,7 @@ function renderDashboard() {
       <div class="avatar" style="background:${c};width:38px;height:38px;font-size:0.85rem;flex-shrink:0">${initials(s)}</div>
       <div class="dash-bar-wrap">
         <div class="dash-name">
-          <span>${s.vorname} ${s.nachname} ${warnung?'<span style="color:var(--danger);font-size:0.7rem">⚠️ Pflichtf. fehlen</span>':''}</span>
+          <span>${escHtml(s.vorname)} ${escHtml(s.nachname)} ${warnung?'<span style="color:var(--danger);font-size:0.7rem">⚠️ Pflichtf. fehlen</span>':''}</span>
           <span class="dash-pct" style="color:${progressColor(pct)}">${pct}%</span>
         </div>
         <div class="dash-bar-bg">
@@ -7478,7 +7519,7 @@ function renderDashboard() {
       ${schnellster ? `
       <div style="background:var(--surface);border:1px solid var(--accent2);border-radius:14px;padding:14px 16px;margin-bottom:10px">
         <div style="font-size:0.72rem;color:var(--accent2);font-weight:700;margin-bottom:6px">🏆 Bester Fortschritt</div>
-        <div style="font-weight:700">${schnellster.vorname} ${schnellster.nachname}</div>
+        <div style="font-weight:700">${escHtml(schnellster.vorname)} ${escHtml(schnellster.nachname)}</div>
         <div style="font-size:0.78rem;color:var(--muted)">${Math.min(overallProgress(schnellster),100)}% Fortschritt · ${schnellster.fahrstunden||0} Fahrstunden</div>
       </div>` : ''}
 
@@ -7537,7 +7578,7 @@ function renderDashboard() {
 window.exportAlleDaten = () => {
   try {
     if (!students.length) { toast('Keine Schüler zum Exportieren'); return; }
-    const datum = new Date().toISOString().split('T')[0];
+    const datum = heuteLokal();
 
     // 1. JSON (vollständiges Backup)
     const backup = {
@@ -8770,6 +8811,10 @@ window.setKlasseTab = (klasse) => {
 
 window.openOptionsMenu = () => {
   const s = getStudent(activeId);
+  // Ohne ausgewaehlten Schueler (oder wenn er zwischenzeitlich aus der
+  // Liste verschwunden ist) gab es hier einen stillen Absturz - der
+  // Knopf schien einfach nicht zu reagieren.
+  if (!s) { toast('Bitte zuerst einen Schüler öffnen.'); return; }
   const klassen = s.klassen || [s.klasse || 'B'];
   const hatB197 = klassen.includes('B197');
   // B197-Option nur zeigen wenn relevant
@@ -8788,6 +8833,10 @@ const ALLE_KLASSEN = [
 
 window.openZusatzKlasse = () => {
   const s = getStudent(activeId);
+  // Ohne ausgewaehlten Schueler (oder wenn er zwischenzeitlich aus der
+  // Liste verschwunden ist) gab es hier einen stillen Absturz - der
+  // Knopf schien einfach nicht zu reagieren.
+  if (!s) { toast('Bitte zuerst einen Schüler öffnen.'); return; }
   const aktiveKlassen = s.klassen || [s.klasse || 'B'];
   const list = document.getElementById('zusatz-klasse-list');
   list.innerHTML = ALLE_KLASSEN.map(({k, label, info}) => {
@@ -8841,6 +8890,10 @@ window.toggleZusatzKlasse = async (klasse) => {
 
 window.openKlasseAendern = () => {
   const s = getStudent(activeId);
+  // Ohne ausgewaehlten Schueler (oder wenn er zwischenzeitlich aus der
+  // Liste verschwunden ist) gab es hier einen stillen Absturz - der
+  // Knopf schien einfach nicht zu reagieren.
+  if (!s) { toast('Bitte zuerst einen Schüler öffnen.'); return; }
   const aktuelleKlasse = s.klasse || 'B';
   const keyMap = {'B':'b','B-Auto':'bauto','B197':'b197','BE':'be','A':'a'};
   // Alle Buttons zurücksetzen, aktuelle hervorheben
@@ -8897,6 +8950,10 @@ window.saveKlasseAendern = async (neueKlasse) => {
 
 window.openB197Settings = () => {
   const s = getStudent(activeId);
+  // Ohne ausgewaehlten Schueler (oder wenn er zwischenzeitlich aus der
+  // Liste verschwunden ist) gab es hier einen stillen Absturz - der
+  // Knopf schien einfach nicht zu reagieren.
+  if (!s) { toast('Bitte zuerst einen Schüler öffnen.'); return; }
   document.getElementById('inp-b197-ziel').value = s.zielSchaltstunden || 10;
   document.getElementById('b197-settings-modal').classList.add('open');
 };
@@ -9186,8 +9243,8 @@ function renderProtokollScreen() {
         <button onclick="deleteProtokollEintrag('${e.id}')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.9rem;padding:4px 6px">🗑</button>
       </div>
       ${maengelHTML}
-      ${e.notiz ? `<div style="font-size:0.84rem;color:var(--text);line-height:1.5;margin-top:6px;padding:8px 10px;background:var(--surface);border-radius:8px;border-left:3px solid ${borderColor}">${isPlanung?'📌':'📝'} ${(e.notiz||"").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>` : ''}
-      ${e.unterschrift ? `<div style="margin-top:8px"><div style="font-size:0.68rem;color:var(--muted);margin-bottom:4px">✍️ Unterschrift</div><img alt="Unterschrift des Schülers" src="${e.unterschrift}" style="width:100%;max-width:280px;border:1px solid var(--border);border-radius:8px;background:#fff;display:block"></div>` : ''}
+      ${e.notiz ? `<div style="font-size:0.84rem;color:var(--text);line-height:1.5;margin-top:6px;padding:8px 10px;background:var(--surface);border-radius:8px;border-left:3px solid ${borderColor}">${isPlanung?'📌':'📝'} ${escHtml(e.notiz||'')}</div>` : ''}
+      ${e.unterschrift ? `<div style="margin-top:8px"><div style="font-size:0.68rem;color:var(--muted);margin-bottom:4px">✍️ Unterschrift</div><img alt="Unterschrift des Schülers" src="${escHtml(e.unterschrift)}" style="width:100%;max-width:280px;border:1px solid var(--border);border-radius:8px;background:#fff;display:block"></div>` : ''}
     </div>`;
   };
 
@@ -9263,18 +9320,21 @@ window.openImpressum = async () => {
   } catch(e) { /* offline fallback */ }
 
   const imp     = {};
-  const name    = platImp.name    || 'Chriskoo';
-  const inhaber = platImp.inhaber || '';
-  const strasse = platImp.strasse || '';
-  const plz     = platImp.plz    || '';
-  const ort     = platImp.ort    || 'Deutschland';
-  const tel     = platImp.tel || '';
-  const email   = platImp.email  || 'kontakt@fahrsync.de';
-  const web     = platImp.web    || 'fahrsync.de';
+  // Gleich beim Auslesen entwerten: Die Werte gehen unten in Textinhalt UND
+  // in Attribute (href="mailto:…", href="https://…"), die per Verkettung
+  // zusammengesetzt werden. An der Quelle ist es eine Stelle statt acht.
+  const name    = escHtml(platImp.name    || 'Chriskoo');
+  const inhaber = escHtml(platImp.inhaber || '');
+  const strasse = escHtml(platImp.strasse || '');
+  const plz     = escHtml(platImp.plz    || '');
+  const ort     = escHtml(platImp.ort    || 'Deutschland');
+  const tel     = escHtml(platImp.tel || '');
+  const email   = escHtml(platImp.email  || 'kontakt@fahrsync.de');
+  const web     = escHtml(platImp.web    || 'fahrsync.de');
   const fsnr    = '';
 
   const logoHTML = fsLogo
-    ? `<img alt="Logo der Fahrschule" src="${fsLogo}" style="width:72px;height:72px;border-radius:18px;object-fit:contain;border:1px solid var(--border)" onerror="this.style.display='none'">`
+    ? `<img alt="Logo der Fahrschule" src="${escHtml(fsLogo)}" style="width:72px;height:72px;border-radius:18px;object-fit:contain;border:1px solid var(--border)" onerror="this.style.display='none'">`
     : `<img alt="ADK Logo" src="./icon-192.png?v=3" style="width:72px;height:72px;border-radius:18px" onerror="this.style.display='none'">`;
 
   body.innerHTML = `
@@ -9403,8 +9463,8 @@ window.openImpressum = async () => {
     <div style="background:rgba(240,180,41,0.08);border:1px solid rgba(240,180,41,0.2);border-radius:12px;padding:14px;margin-top:4px">
       <div style="font-size:0.78rem;line-height:1.6;color:var(--muted);text-align:center">
         <strong style="color:var(--accent)">ADK – Digitale Kartei</strong><br>
-        Entwickelt von ${platImp.name||'Chriskoo'} · ${platImp.web||'fahrsync.de'}<br>
-        © ${new Date().getFullYear()} ${platImp.name||'Chriskoo'} · Alle Rechte vorbehalten<br>
+        Entwickelt von ${escHtml(platImp.name||'Chriskoo')} · ${escHtml(platImp.web||'fahrsync.de')}<br>
+        © ${new Date().getFullYear()} ${escHtml(platImp.name||'Chriskoo')} · Alle Rechte vorbehalten<br>
         <span style="font-size:0.7rem">Version 1.0 · Powered by Firebase · Made in Germany 🇩🇪</span>
       </div>
     </div>
@@ -9537,7 +9597,7 @@ window.exportiereDatenPDF = async () => {
     : '<tr><td colspan="4" style="padding:8px;text-align:center;color:#888">Keine Protokolle</td></tr>';
 
   const html = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
-    <title>Datenauskunft – ${s.vorname} ${s.nachname}</title>
+    <title>Datenauskunft – ${escHtml(s.vorname)} ${escHtml(s.nachname)}</title>
     <style>
       body{font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:30px;color:#222;line-height:1.5}
       h1{font-size:20px;border-bottom:2px solid #f0b429;padding-bottom:8px}
@@ -9653,7 +9713,7 @@ window.exportPDF = () => {
         <td style="padding:3px 8px;font-size:10px">${formatDate(e.datum)}</td>
         <td style="padding:3px 8px;font-size:10px">${e.stunde||''}. Std.</td>
         <td style="padding:3px 8px;font-size:10px">${'⭐'.repeat(e.sterne||0)}</td>
-        <td style="padding:3px 8px;font-size:10px;color:#555">${(e.notiz||'').slice(0,40)}</td>
+        <td style="padding:3px 8px;font-size:10px;color:#555">${escHtml((e.notiz||'').slice(0,40))}</td>
       </tr>`).join('');
 
   // B197 Zeile
@@ -9765,7 +9825,7 @@ window.exportPDF = () => {
     <div>
       <div style="font-size:10px;color:#888;margin-bottom:6px">Unterschrift Fahrschüler</div>
       ${s.abschlussUnterschrift
-        ? `<img alt="Abschluss-Unterschrift des Schülers" src="${s.abschlussUnterschrift}" style="height:50px;max-width:160px;object-fit:contain;display:block;margin-bottom:2px" /><div style="border-top:1px solid #333;width:160px;padding-top:4px;font-size:9px;color:#888">${s.abschlussUnterschriftDatum ? new Date(s.abschlussUnterschriftDatum).toLocaleDateString('de-DE') : ''} ✍️ digital signiert</div>`
+        ? `<img alt="Abschluss-Unterschrift des Schülers" src="${escHtml(s.abschlussUnterschrift)}" style="height:50px;max-width:160px;object-fit:contain;display:block;margin-bottom:2px" /><div style="border-top:1px solid #333;width:160px;padding-top:4px;font-size:9px;color:#888">${s.abschlussUnterschriftDatum ? new Date(s.abschlussUnterschriftDatum).toLocaleDateString('de-DE') : ''} ✍️ digital signiert</div>`
         : `<div style="margin-top:14px;border-top:1px solid #333;width:160px;padding-top:4px;font-size:9px;color:#888">Datum, Unterschrift</div>`
       }
     </div>
@@ -9906,7 +9966,7 @@ async function loadChatMessages() {
         : '';
       const bildQuelle = msg.imagePath || msg.imageUrl;
       const inhalt = bildQuelle
-        ? `<img data-bildpfad="${msg.imagePath || ''}" ${msg.imageUrl ? `src="${msg.imageUrl}"` : ''} loading="lazy" style="max-width:100%;min-width:120px;min-height:80px;border-radius:12px;display:block;cursor:pointer;background:rgba(0,0,0,0.15)">`
+        ? `<img data-bildpfad="${escHtml(msg.imagePath || '')}" ${msg.imageUrl ? `src="${escHtml(msg.imageUrl)}"` : ''} loading="lazy" style="max-width:100%;min-width:120px;min-height:80px;border-radius:12px;display:block;cursor:pointer;background:rgba(0,0,0,0.15)">`
         : (msg.text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       return `${trenner}
         <div style="display:flex;flex-direction:column;align-items:${vonFahrlehrer?'flex-end':'flex-start'};gap:2px">
@@ -10634,7 +10694,7 @@ window.vzBildGewaehlt = (ev) => {
       c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
       vzBildDaten = c.toDataURL('image/png');
       document.getElementById('vz-bild-vorschau').innerHTML =
-        `<img src="${vzBildDaten}" style="width:70px;height:70px;object-fit:contain;background:#fff;border-radius:8px;padding:4px">`;
+        `<img src="${escHtml(vzBildDaten)}" style="width:70px;height:70px;object-fit:contain;background:#fff;border-radius:8px;padding:4px">`;
     };
     img.onerror = () => { errEl.textContent = 'Bild konnte nicht gelesen werden.'; };
     img.src = e.target.result;
@@ -10680,6 +10740,17 @@ window.deleteVzZeichen = async (id) => {
 
 
 // ══ VERKEHRSZEICHEN-KATALOG (amtliche Zeichen zum Auswaehlen) ════════
+// ── ZEICHENLISTE ANFANG ──────────────────────────────────────────
+// ACHTUNG: Diese Liste steht WORTGLEICH ein zweites Mal – in der jeweils
+// anderen Datei (index.html / schueler-portal.html). Das ist Absicht:
+// Ein `import` aus einer gemeinsamen Datei waere zwar kuerzer, macht aber
+// die GANZE Seite von einer zweiten Datei abhaengig. Faellt die aus – 404
+// nach einem halb durchgelaufenen Deploy, oder offline, weil der Service
+// Worker sie nicht vorhaelt – laedt das Modul nicht und die App bleibt
+// komplett leer. Eine reine Nachschlageliste ist diesen Ausfall nicht wert.
+// Gegen das Auseinanderlaufen der Kopien wacht tests/statisch.test.mjs:
+// Der Test vergleicht beide Bloecke Zeichen fuer Zeichen. Wer hier etwas
+// aendert, aendert es in BEIDEN Dateien.
 const ZEICHEN_KATALOG = {
     '201-50':['Andreaskreuz','vorfahrt'],
     '205':['Vorfahrt gewähren','vorfahrt'],
@@ -10780,6 +10851,7 @@ const KAT_GRUPPEN = [
   ['alle','Alle'], ['vorfahrt','Vorfahrt & Halt'], ['gefahr','Gefahrzeichen'],
   ['gebot','Gebotszeichen'], ['verbot','Verbotszeichen'], ['richt','Richtzeichen'], ['wegweiser','Wegweiser']
 ];
+// ── ZEICHENLISTE ENDE ────────────────────────────────────────────
 let katAktiveGruppe = 'alle';
 
 window.openZeichenKatalog = () => {
@@ -11651,7 +11723,7 @@ window.starteKomplettsicherung = async () => {
       sicherung.kalenderSchueler = kalSchuelerSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     } catch(e) { console.warn('kalenderSchueler', e); }
 
-    const datum = new Date().toISOString().slice(0,10);
+    const datum = heuteLokal();
     let inhalt = JSON.stringify(sicherung, null, 2);
     let dateiname = `FahrSync-Sicherung_${datum}.json`;
     if (passwort) {
@@ -11803,7 +11875,9 @@ window.leseSicherung = async (datei) => {
     <div class="sheet-title">📖 Verkehrszeichen-Katalog</div>
     <input id="kat-suche" oninput="renderKatalog()" placeholder="Suchen, z.B. Halt, Tempo, Parken…"
       style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:11px 12px;font-size:0.88rem;margin-bottom:10px">
-    <div id="kat-reiter" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:8px;-webkit-overflow-scrolling:touch"></div>
+    <!-- Umbrechen statt seitlich scrollen: Von den sieben Kategorien waren nur
+         dreieinhalb zu sehen, der Rest stand ausserhalb des Bildschirms. -->
+    <div id="kat-reiter" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
     <div id="kat-liste" style="max-height:46vh;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px"></div>
     <div style="font-size:0.66rem;color:var(--muted);margin-top:10px;line-height:1.5">
       Amtliche Verkehrszeichen (Quelle: Bundesanstalt für Straßenwesen), gemeinfrei nach § 5 UrhG.

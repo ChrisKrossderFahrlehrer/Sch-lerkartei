@@ -186,7 +186,117 @@ async function loescheKontoHart(uid) {
   console.log('Konto endgueltig geloescht:', JSON.stringify(bericht));
   return bericht;
 }
+// ═══════════════════════════════════════════════════════════════════
+// ABLAUFDATUM NACHTRAGEN
+//
+// Das taegliche Aufraeumen findet alte Zugangscodes ueber
+//   .where('expiresAt', '<=', jetzt - 90 Tage)
+// Ein Firestore-Filter ueberspringt aber JEDES Dokument, dem das Feld ganz
+// fehlt - und solche gibt es: Der Client faengt sie an mehreren Stellen mit
+// `data.expiresAt || (Date.now()+…)` ab, und die Speicher-Regeln haben einen
+// eigenen Zweig fuer `!('expiresAt' in codeDoc().data)`.
+//
+// Ein solcher Code bliebe fuer immer liegen, ohne dass irgendwo ein Fehler
+// auftaucht - der Job meldet "fertig". Darin stecken Name, Lernstand und der
+// vollstaendige Chatverlauf eines Schuelers.
+//
+// BEWUSST wird hier NICHT geloescht. Ein Dokument ohne Ablaufdatum hat ein
+// unbekanntes Alter; es koennte ein aktiver Zugang sein, an dem gerade ein
+// Schueler haengt. Es bekommt deshalb ein Datum in der ZUKUNFT und faellt
+// danach ganz normal unter die 90-Tage-Regel. Niemand wird ausgesperrt,
+// nichts geht verloren - die Luecke schliesst sich trotzdem.
+//
+// Ohne Filter durchgesehen wird die Sammlung seitenweise, weil Firestore
+// nicht nach einem fehlenden Feld fragen kann.
+async function repariereFehlendeAblaufdaten(db, neuesDatum, hoechstens = 500) {
+  let letzter = null, geprueft = 0, nachgetragen = 0;
+  while (geprueft < hoechstens) {
+    let abfrage = db.collection('accessCodes').orderBy('__name__').limit(200);
+    if (letzter) abfrage = abfrage.startAfter(letzter);
+    const seite = await abfrage.get();
+    if (seite.empty) break;
+    for (const d of seite.docs) {
+      geprueft++;
+      const wert = d.get('expiresAt');
+      // Auch ein Textdatum oder null zaehlt als fehlend: Der Vergleich im
+      // Aufraeum-Job trifft nur Zahlen, alles andere wuerde ebenso
+      // stillschweigend durchrutschen.
+      if (typeof wert === 'number' && Number.isFinite(wert)) continue;
+      await d.ref.update({ expiresAt: neuesDatum });
+      nachgetragen++;
+    }
+    letzter = seite.docs[seite.docs.length - 1];
+    if (seite.size < 200) break;
+  }
+  if (nachgetragen) {
+    console.log(`Ablaufdatum nachgetragen bei ${nachgetragen} Zugangscode(s) von ${geprueft} geprueften.`);
+  }
+  return nachgetragen;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ALTE ANONYME SITZUNGEN AUFRAEUMEN
+//
+// Das Schueler-Portal meldet sich bei JEDEM Besuch anonym an (der Schueler
+// hat kein eigenes Konto). Jeder Besuch legt damit ein Anmeldekonto an -
+// und bisher wurde davon nie eines wieder entfernt. Bei einer Fahrschule mit
+// 60 Schuelern, die zweimal die Woche nachsehen, sind das ueber 6000 Konten
+// im Jahr, die nichts mehr tun.
+//
+// Loeschen ist hier gefahrlos: An der anonymen Kennung haengt NICHTS. Die
+// Chat-Bilder liegen unter der Code-Kennung, der Lernstand im Zugangscode,
+// und das Portal meldet sich beim naechsten Aufruf einfach neu an. Wer
+// zwischendurch vorbeischaut, bekommt eine neue Kennung und merkt nichts.
+//
+// Die Frist ist trotzdem bewusst grosszuegig (Vorgabe: 60 Tage ohne jede
+// Aktivitaet), und geprueft wird die LETZTE Anmeldung, nicht das Anlegedatum.
+// Ein Konto, das noch benutzt wird, kann damit nicht erwischt werden.
+//
+// Nur echte anonyme Konten kommen in Frage: kein Anmeldeanbieter, keine
+// E-Mail, keine Telefonnummer. Ein Fahrlehrer-Konto kann so nie getroffen
+// werden - genau das waere der Schaden, den es zu vermeiden gilt.
+function istAnonymesKonto(nutzer) {
+  return (!nutzer.providerData || nutzer.providerData.length === 0)
+         && !nutzer.email && !nutzer.phoneNumber
+         && !(nutzer.customClaims && Object.keys(nutzer.customClaims).length);
+}
+
+async function loescheAlteAnonymeKonten(auth, maxAlterMs, hoechstens = 500, jetzt = Date.now()) {
+  let seite, geprueft = 0, geloescht = 0;
+  let marke;
+  do {
+    seite = await auth.listUsers(1000, marke);
+    const faellig = [];
+    for (const n of seite.users) {
+      geprueft++;
+      if (!istAnonymesKonto(n)) continue;
+      const m = n.metadata || {};
+      // lastRefreshTime kann fehlen; dann zaehlt die letzte Anmeldung, sonst
+      // das Anlegedatum. Im Zweifel gilt der JUENGSTE Zeitpunkt - lieber ein
+      // Konto zu lange behalten als eine laufende Sitzung abschneiden.
+      const zeiten = [m.lastRefreshTime, m.lastSignInTime, m.creationTime]
+        .filter(Boolean).map(t => new Date(t).getTime()).filter(Number.isFinite);
+      if (!zeiten.length) continue;
+      if (jetzt - Math.max(...zeiten) < maxAlterMs) continue;
+      faellig.push(n.uid);
+      if (faellig.length + geloescht >= hoechstens) break;
+    }
+    for (const uid of faellig) {
+      await auth.deleteUser(uid).catch(e => {
+        if (e.code !== 'auth/user-not-found') console.warn('Anonymes Konto:', uid, e.message);
+      });
+      geloescht++;
+    }
+    marke = seite.pageToken;
+  } while (marke && geloescht < hoechstens);
+  if (geloescht) {
+    console.log(`Alte anonyme Sitzungen entfernt: ${geloescht} von ${geprueft} geprueften Konten.`);
+  }
+  return geloescht;
+}
+
 module.exports = {
   loescheAlle, gehoertNochDemKonto, loescheChatBilderServer,
   loescheZugangscodesMitBildern, loeschUmfang, loescheKontoHart, CHAT_BUCKET,
+  repariereFehlendeAblaufdaten, loescheAlteAnonymeKonten, istAnonymesKonto,
 };

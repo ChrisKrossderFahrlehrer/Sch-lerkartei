@@ -296,6 +296,40 @@ html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--tex
 @media (prefers-reduced-motion: reduce) {
   .login-wrap > * { animation: none; }
 }
+
+/* FIX: Das Theorie-Fenster benutzt seit jeher die Klassen .modal-overlay,
+   .modal-sheet, .sheet-title und .btn-sheet-cancel - diese Datei hat aber
+   KEINE davon definiert (sie stehen nur in index.html). Damit war es nie ein
+   Fenster: Der Block lag ohne Hintergrund und ohne z-index einfach unten in
+   der Seite, dauerhaft sichtbar, und das 'open' beim Oeffnen bewirkte nichts.
+   Aufgefallen ist es erst, als der Verkehrszeichen-Katalog mit 93 Bildern
+   dort hineinkam - vorher war der Block kurz genug, um unterzugehen.
+   z-index 6000: ueber der Hilfe-Flaeche (5000), unter Meldung und
+   Ladebildschirm (8888/9999). */
+.modal-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,0.72);
+  z-index:6000; display:none; align-items:flex-end; justify-content:center;
+}
+.modal-overlay.open { display:flex; }
+.modal-sheet {
+  background:var(--surface); border:1px solid var(--border); border-bottom:none;
+  border-radius:20px 20px 0 0; width:100%; max-width:480px;
+  padding:22px 18px calc(env(safe-area-inset-bottom, 0px) + 26px);
+  max-height:calc(100dvh - env(safe-area-inset-top, 0px) - 24px);
+  overflow-y:auto; -webkit-overflow-scrolling:touch;
+  animation:blattHoch 0.22s ease;
+}
+@keyframes blattHoch { from{transform:translateY(28px);opacity:0} to{transform:translateY(0);opacity:1} }
+@media (prefers-reduced-motion: reduce) { .modal-sheet { animation:none; } }
+.sheet-title {
+  font-family:'Syne',sans-serif; font-size:1.1rem; font-weight:700;
+  margin-bottom:18px; text-align:center;
+}
+.btn-sheet-cancel {
+  width:100%; background:var(--surface2); border:1px solid var(--border);
+  color:var(--text); padding:13px; border-radius:12px;
+  font-family:'Manrope',sans-serif; font-weight:600; font-size:0.9rem; cursor:pointer;
+}
 </style>
 <link rel="manifest" href="./manifest-portal.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -318,20 +352,51 @@ html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--tex
 
 <!-- ════ LOGIN ════ -->
 <div class="screen active" id="screen-login"><div class="zeichen-drift">
-    <img src="./verkehrszeichen/zeichen-306-vorfahrtstrasse.png" width="60" style="left:4%;animation-delay:0s;animation-duration:32s" alt="">
-    <img src="./verkehrszeichen/zeichen-205-vorfahrt-gewaehren.png" width="52" style="left:16%;animation-delay:-4s;animation-duration:27s" alt="">
-    <img src="./verkehrszeichen/zeichen-206-stop.png" width="56" style="left:28%;animation-delay:-8s;animation-duration:30s" alt="">
-    <img src="./verkehrszeichen/zeichen-220-einbahnstrasse.png" width="46" style="left:40%;animation-delay:-13s;animation-duration:25s" alt="">
-    <img src="./verkehrszeichen/zeichen-301-vorfahrt.png" width="50" style="left:52%;animation-delay:-17s;animation-duration:31s" alt="">
-    <img src="./verkehrszeichen/zeichen-325-1-verkehrsberuhigt.png" width="54" style="left:64%;animation-delay:-22s;animation-duration:28s" alt="">
-    <img src="./verkehrszeichen/zusatz-abknickende-vorfahrt.png" width="44" style="left:76%;animation-delay:-3s;animation-duration:33s" alt="">
-    <img src="./verkehrszeichen/zeichen-720-gruenpfeil.png" width="48" style="left:88%;animation-delay:-10s;animation-duration:26s" alt="">
-    <img src="./verkehrszeichen/zeichen-306-vorfahrtstrasse.png" width="40" style="left:96%;animation-delay:-15s;animation-duration:29s" alt="">
-    <img src="./verkehrszeichen/zeichen-206-stop.png" width="42" style="left:58%;animation-delay:-20s;animation-duration:34s" alt="">
-    <img src="./verkehrszeichen/zeichen-220-einbahnstrasse.png" width="38" style="left:10%;animation-delay:-25s;animation-duration:27s" alt="">
-    <img src="./verkehrszeichen/zeichen-205-vorfahrt-gewaehren.png" width="46" style="left:70%;animation-delay:-6s;animation-duration:32s" alt="">
-    <img src="./verkehrszeichen/zeichen-325-1-verkehrsberuhigt.png" width="40" style="left:34%;animation-delay:-11s;animation-duration:30s" alt="">
-    <img src="./verkehrszeichen/zeichen-720-gruenpfeil.png" width="36" style="left:82%;animation-delay:-18s;animation-duration:25s" alt="">
+    <!-- 26 Zeichen aus 16 verschiedenen Vorlagen (vorher 14 aus 8). Sie
+         liegen unter ./verkehrszeichen-flug/ und sind freigestellt: der
+         weisse Hintergrund der Katalogbilder ist weg, das Weiss INNERHALB
+         des Schildes - die STOP-Schrift, das weisse Dreieck bei "Vorfahrt
+         gewaehren" - steht noch. Bei 96 px Kantenlaenge wiegen alle 16
+         zusammen 188 KB, also etwa so viel wie die acht grossen PNG vorher.
+
+         Groesse und Tempo haengen zusammen (15 s bis 41 s): Was groesser
+         ist, wirkt naeher und zieht schneller vorbei. Die negativen
+         animation-delay sorgen dafuer, dass die Flaeche schon beim Laden
+         gefuellt ist, statt sich erst nach und nach zu beleben.
+
+         Die Startpunkte laufen von -30 % bis 55 %, nicht ueber die ganze
+         Breite. Grund: Die Bewegung verschiebt jedes Bild zusaetzlich um
+         -15vw bis +115vw, das 'left' kommt also oben drauf - wer bei 90 %
+         startet, ist fast den ganzen Durchlauf rechts ausserhalb.
+         Nachgemessen: mit 0..97 % waren im Schnitt 10,6 von 26 gleichzeitig
+         im Bild, mit -30..55 % sind es 16,6. (Ein Teil davon liegt hinter
+         der Login-Box - die soll lesbar bleiben.) -->
+    <img src="./verkehrszeichen-flug/267.png" width="42" alt="" decoding="async" fetchpriority="low" style="left:-30.7%;opacity:0.094;animation-delay:-8.5s;animation-duration:30.9s">
+    <img src="./verkehrszeichen-flug/274-50.png" width="36" alt="" decoding="async" fetchpriority="low" style="left:-26.6%;opacity:0.083;animation-delay:-33.2s;animation-duration:36.8s">
+    <img src="./verkehrszeichen-flug/101.png" width="36" alt="" decoding="async" fetchpriority="low" style="left:-23.1%;opacity:0.083;animation-delay:-5.4s;animation-duration:39.2s">
+    <img src="./verkehrszeichen-flug/142-10.png" width="36" alt="" decoding="async" fetchpriority="low" style="left:-21.6%;opacity:0.083;animation-delay:-28.2s;animation-duration:39.2s">
+    <img src="./verkehrszeichen-flug/274-50.png" width="33" alt="" decoding="async" fetchpriority="low" style="left:-18.3%;opacity:0.078;animation-delay:-32.9s;animation-duration:41.0s">
+    <img src="./verkehrszeichen-flug/205.png" width="45" alt="" decoding="async" fetchpriority="low" style="left:-14.2%;opacity:0.099;animation-delay:-8.0s;animation-duration:32.7s">
+    <img src="./verkehrszeichen-flug/123.png" width="46" alt="" decoding="async" fetchpriority="low" style="left:-9.8%;opacity:0.101;animation-delay:-1.2s;animation-duration:30.9s">
+    <img src="./verkehrszeichen-flug/131.png" width="55" alt="" decoding="async" fetchpriority="low" style="left:-7.3%;opacity:0.117;animation-delay:-9.9s;animation-duration:24.5s">
+    <img src="./verkehrszeichen-flug/239.png" width="39" alt="" decoding="async" fetchpriority="low" style="left:-3.5%;opacity:0.088;animation-delay:-31.5s;animation-duration:34.8s">
+    <img src="./verkehrszeichen-flug/250.png" width="49" alt="" decoding="async" fetchpriority="low" style="left:-0.8%;opacity:0.107;animation-delay:-13.5s;animation-duration:26.8s">
+    <img src="./verkehrszeichen-flug/142-10.png" width="32" alt="" decoding="async" fetchpriority="low" style="left:3.1%;opacity:0.076;animation-delay:-14.5s;animation-duration:39.0s">
+    <img src="./verkehrszeichen-flug/283.png" width="59" alt="" decoding="async" fetchpriority="low" style="left:7.0%;opacity:0.125;animation-delay:-8.5s;animation-duration:18.5s">
+    <img src="./verkehrszeichen-flug/250.png" width="50" alt="" decoding="async" fetchpriority="low" style="left:8.3%;opacity:0.108;animation-delay:-6.0s;animation-duration:27.0s">
+    <img src="./verkehrszeichen-flug/136-10.png" width="43" alt="" decoding="async" fetchpriority="low" style="left:13.7%;opacity:0.096;animation-delay:-13.9s;animation-duration:30.5s">
+    <img src="./verkehrszeichen-flug/237.png" width="62" alt="" decoding="async" fetchpriority="low" style="left:16.6%;opacity:0.13;animation-delay:-3.2s;animation-duration:18.1s">
+    <img src="./verkehrszeichen-flug/215.png" width="47" alt="" decoding="async" fetchpriority="low" style="left:19.7%;opacity:0.103;animation-delay:-10.0s;animation-duration:28.2s">
+    <img src="./verkehrszeichen-flug/314.png" width="36" alt="" decoding="async" fetchpriority="low" style="left:23.3%;opacity:0.083;animation-delay:-18.1s;animation-duration:36.9s">
+    <img src="./verkehrszeichen-flug/306.png" width="43" alt="" decoding="async" fetchpriority="low" style="left:26.4%;opacity:0.096;animation-delay:-3.5s;animation-duration:31.6s">
+    <img src="./verkehrszeichen-flug/237.png" width="62" alt="" decoding="async" fetchpriority="low" style="left:28.5%;opacity:0.13;animation-delay:-15.6s;animation-duration:16.7s">
+    <img src="./verkehrszeichen-flug/205.png" width="30" alt="" decoding="async" fetchpriority="low" style="left:31.8%;opacity:0.072;animation-delay:-1.8s;animation-duration:40.4s">
+    <img src="./verkehrszeichen-flug/239.png" width="61" alt="" decoding="async" fetchpriority="low" style="left:34.7%;opacity:0.128;animation-delay:-7.8s;animation-duration:15.5s">
+    <img src="./verkehrszeichen-flug/123.png" width="40" alt="" decoding="async" fetchpriority="low" style="left:37.8%;opacity:0.09;animation-delay:-28.4s;animation-duration:36.7s">
+    <img src="./verkehrszeichen-flug/250.png" width="62" alt="" decoding="async" fetchpriority="low" style="left:42.7%;opacity:0.13;animation-delay:-3.9s;animation-duration:17.8s">
+    <img src="./verkehrszeichen-flug/206.png" width="35" alt="" decoding="async" fetchpriority="low" style="left:45.3%;opacity:0.081;animation-delay:-35.3s;animation-duration:37.5s">
+    <img src="./verkehrszeichen-flug/250.png" width="46" alt="" decoding="async" fetchpriority="low" style="left:48.3%;opacity:0.101;animation-delay:-15.2s;animation-duration:29.0s">
+    <img src="./verkehrszeichen-flug/136-10.png" width="44" alt="" decoding="async" fetchpriority="low" style="left:51.6%;opacity:0.098;animation-delay:-11.3s;animation-duration:30.6s">
   </div>
   
   <div class="login-wrap">
@@ -882,34 +947,71 @@ function renderDashboard() {
     </div>`;
 }
 
-// Verkehrszeichen, die der Fahrlehrer mit dem Schueler geuebt hat.
-// Daten kommen fertig aus dem Portal-Snapshot (Name, Bild, Bewertung 0-5).
+// Verkehrszeichen: wie weit der Schueler mit den Zeichen ist - als Grafik.
+//
+// Vorher stand hier JEDES Zeichen einzeln, mit genau der Stufe, die der
+// Fahrlehrer vergeben hat ("Stop – Geübt", "Vorfahrtstraße – Fast sicher").
+// Das ist mehr Auskunft, als der Schueler braucht: Er soll sehen, wo er
+// steht, nicht die einzelne Note zu jedem Schild nachlesen koennen. Die
+// Karte zeigt deshalb das Gesamtbild - ein gestapelter Balken ueber die
+// Stufen und darunter, wie viele Zeichen auf welcher Stufe stehen.
+//
+// Die Zeichen selbst sind dadurch nicht verschwunden: Alle 93 amtlichen
+// liegen im Theorie-Wissen zum Nachschlagen, dort aber ohne Bewertung.
+//
+// Die Stufen kommen weiter aus ADK_STUFEN, damit die Farben und Namen
+// dieselben sind wie in der Fahrlehrer-Ansicht (§ 6 FahrschAusbO: der
+// Schueler darf nichts anderes lesen, als der Fahrlehrer eingetragen hat).
 function renderVerkehrszeichenCard(s) {
   const zeichen = s.verkehrszeichen || [];
   if (!zeichen.length) return '';
-  // Muss exakt zur Skala der Fahrlehrer-Ansicht passen (Wert 1..5),
-  // sonst liest der Schueler etwas anderes als der Fahrlehrer eingestellt
-  // hat - deshalb jetzt aus ADK_STUFEN statt aus einer lokalen Kopie.
-  const sicher = zeichen.filter(z => (z.w || 0) >= 4).length;
-  const besprochen = zeichen.filter(z => (z.w || 0) > 0).length;
+  const gesamt     = zeichen.length;
+  // Werte ausserhalb 0..5 koennen aus aelteren Datensaetzen stammen -
+  // einfangen, sonst zaehlt so ein Ausreisser in keinem Topf mit und die
+  // Summe der Balkenstuecke ergibt nicht mehr die Gesamtzahl.
+  const stufeVon   = (z) => Math.min(5, Math.max(0, z.w | 0));
+  const sicher     = zeichen.filter(z => stufeVon(z) >= 4).length;
+  const besprochen = zeichen.filter(z => stufeVon(z) > 0).length;
+  const anteil     = Math.round(sicher / gesamt * 100);
 
-  const zeilen = zeichen.map(z => {
-    const w = z.w || 0;
-    const bild = z.b
-      ? `<img src="${z.b}" alt="" style="width:34px;height:34px;object-fit:contain;flex-shrink:0" loading="lazy">`
-      : '<div style="width:34px;flex-shrink:0;text-align:center;font-size:1.1rem">🚧</div>';
-    return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);opacity:${w>0?'1':'0.5'}">
-        ${bild}
-        <div style="flex:1;min-width:0;font-size:0.82rem">${z.n}</div>
-        <div style="font-size:0.72rem;color:${ADK_STUFE_FARB(w)};white-space:nowrap">${ADK_STUFE_KURZ(w)}</div>
-      </div>`;
-  }).join('');
+  // Hoechste Stufe zuerst, "noch nicht behandelt" zuletzt.
+  const toepfe = ADK_STUFEN.slice().reverse().map(st => ({
+    label: st.lang, farbe: st.farbe,
+    anzahl: zeichen.filter(z => stufeVon(z) === st.wert).length,
+  })).concat([{
+    label: 'Noch nicht behandelt', farbe: '#6b7fa8',
+    anzahl: zeichen.filter(z => stufeVon(z) === 0).length,
+  }]);
+  const belegt = toepfe.filter(t => t.anzahl > 0);
+
+  const balken = belegt.map(t =>
+    `<div style="width:${(t.anzahl / gesamt * 100).toFixed(3)}%;background:${t.farbe}"></div>`).join('');
+
+  const legende = belegt.map(t => `
+      <div style="display:flex;align-items:center;gap:8px;font-size:0.78rem;padding:3px 0">
+        <span style="width:9px;height:9px;border-radius:50%;background:${t.farbe};flex-shrink:0"></span>
+        <span style="flex:1;min-width:0;color:var(--muted)">${t.label}</span>
+        <span style="font-weight:700;font-variant-numeric:tabular-nums">${t.anzahl}</span>
+      </div>`).join('');
 
   return `
     <div class="card">
-      <div class="card-title">🚦 Verkehrszeichen <span style="font-size:0.75rem;color:var(--muted);font-weight:400">(${sicher} von ${zeichen.length} sicher)</span></div>
-      <div style="font-size:0.72rem;color:var(--muted);margin:-2px 0 8px">${besprochen} Zeichen habt ihr schon besprochen.</div>
-      ${zeilen}
+      <div class="card-title">🚦 Verkehrszeichen</div>
+      <div style="display:flex;align-items:baseline;gap:10px;margin:2px 0 10px">
+        <div class="prog-pct" style="font-size:1.5rem">${anteil}%</div>
+        <div style="font-size:0.78rem;color:var(--muted);line-height:1.4">
+          ${sicher} von ${gesamt} Zeichen sitzen sicher<br>
+          <span style="font-size:0.72rem">${besprochen} habt ihr schon besprochen</span>
+        </div>
+      </div>
+      <!-- Der gestapelte Balken IST die Grafik. Fuer Vorlesehilfen steht
+           dieselbe Auskunft noch einmal als Text im aria-label - ein
+           farbiger Balken allein sagt einem blinden Nutzer nichts. -->
+      <div role="img" aria-label="${escHtml(belegt.map(t => t.anzahl + ' ' + t.label).join(', '))}"
+           style="display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--surface2);margin-bottom:12px">
+        ${balken}
+      </div>
+      ${legende}
     </div>`;
 }
 
@@ -979,7 +1081,7 @@ function renderChat() {
     }
     const bildQuelle = m.imagePath || m.imageUrl;
     const inhalt = bildQuelle
-      ? `<img data-bildpfad="${m.imagePath || ''}" ${m.imageUrl ? `src="${m.imageUrl}"` : ''} loading="lazy" style="max-width:100%;min-width:120px;min-height:80px;border-radius:10px;display:block;cursor:pointer;background:rgba(0,0,0,0.15)">`
+      ? `<img data-bildpfad="${escHtml(m.imagePath || '')}" ${m.imageUrl ? `src="${escHtml(m.imageUrl)}"` : ''} loading="lazy" style="max-width:100%;min-width:120px;min-height:80px;border-radius:10px;display:block;cursor:pointer;background:rgba(0,0,0,0.15)">`
       : escHtml(m.text);
     return `${trenner}<div class="msg-bubble ${m.sender}" style="display:flex;flex-direction:column">
       ${isFL ? `<div style="font-size:0.68rem;color:var(--muted);margin-bottom:3px;font-weight:600">${escHtml(m.senderName||'Fahrlehrer')}</div>` : ''}
@@ -1173,11 +1275,24 @@ function renderFortschritt() {
   const gesamt     = themenList.length;
   const pct        = gesamt > 0 ? Math.round((sicher/gesamt)*100) : 0;
 
+  // Die Verkehrszeichen stehen in denselben Themen-Daten wie alle anderen
+  // Punkte - hier standen sie deshalb weiterhin einzeln mit ihrer genauen
+  // Stufe, obwohl die Karte auf dem Dashboard laengst nur noch das
+  // Gesamtbild zeigt. Ein Tipp auf "Lernstand" haette die Einzelnote also
+  // doch wieder verraten. Die Zeichen kommen jetzt auch hier als Grafik,
+  // und zwar als dieselbe - eine Funktion, zwei Stellen.
+  //
+  // Mitgezaehlt werden sie weiter: Beim Prozentwert oben sollen sie
+  // zaehlen, nur nicht namentlich untereinander stehen.
+  const zeichenNamen = new Set((s.verkehrszeichen || []).map(z => z.n));
+
   // Gruppiere nach Niveau
   const byLevel = {5:[], 4:[], 3:[], 2:[], 1:[], 0:[]};
   themenList.forEach(([name, val]) => {
+    if (zeichenNamen.has(name)) return;
     byLevel[Math.min(5, Math.max(0, val||0))].push(name);
   });
+  const uebrigeThemen = Object.values(byLevel).reduce((a, x) => a + x.length, 0);
 
   // FIX: Diese Liste war gegen die Fahrlehrer-Ansicht um eine Stufe
   // verschoben - Stufe 4 hiess hier "Sicher", beim Fahrlehrer aber
@@ -1220,12 +1335,19 @@ function renderFortschritt() {
       ? `<div style="text-align:center;padding:32px;color:var(--muted)">
            Noch keine Themen bewertet.<br>Dein Fahrlehrer trägt deinen Fortschritt ein.
          </div>`
-      : `<div class="card">${levelsHTML}</div>`}`;
+      : `${uebrigeThemen ? `<div class="card" style="margin-bottom:16px">${levelsHTML}</div>` : ''}
+         ${renderVerkehrszeichenCard(s)}`}`;
 }
 
 // ── Helpers ────────────────────────────────────────────────────
+// Anfuehrungszeichen gehoeren dazu: Ohne sie zerlegt ein " im Wert jedes
+// Attribut, in das er eingesetzt wird - hier konkret das Suchfeld des
+// Zeichen-Katalogs (value="${escHtml(vzSuche)}"). Im Textinhalt schadet es
+// nichts, &quot; wird wieder als " angezeigt.
 function escHtml(str) {
-  return (str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(str == null ? '' : str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 function getAbgeschlosseneThemen(s) {
@@ -1391,6 +1513,130 @@ window.sendeSchuelerBild = async (datei) => {
 // nach BKatV 2026, Promillegrenzen nach §24c StVG). Bewusst kompakt und
 // in einfacher Sprache - kein Ersatz fuer den eigentlichen Theorieunterricht,
 // sondern eine schnelle Gedaechtnisstuetze.
+// ── VERKEHRSZEICHEN-KATALOG ────────────────────────────────────
+// Alle amtlichen Zeichen zum Nachschlagen - BEWUSST unabhaengig vom
+// Lernstand. Vorher verwies der Theorie-Bereich auf "deinen
+// Ausbildungsstand": Dort sieht der Schueler aber nur die Zeichen, die sein
+// Fahrlehrer schon bewertet hat. Wer ein Zeichen nachschlagen will, das noch
+// nicht dran war - also genau dann, wenn man nachschlaegt -, fand nichts.
+//
+// Dieselben Bilder wie in der Fahrlehrer-App, aus ./verkehrszeichen-katalog/.
+// Rein statisch: kein Datenbankzugriff, keine Regel betroffen.
+// ── ZEICHENLISTE ANFANG ──────────────────────────────────────────
+// ACHTUNG: Diese Liste steht WORTGLEICH ein zweites Mal – in der jeweils
+// anderen Datei (index.html / schueler-portal.html). Das ist Absicht:
+// Ein `import` aus einer gemeinsamen Datei waere zwar kuerzer, macht aber
+// die GANZE Seite von einer zweiten Datei abhaengig. Faellt die aus – 404
+// nach einem halb durchgelaufenen Deploy, oder offline, weil der Service
+// Worker sie nicht vorhaelt – laedt das Modul nicht und die App bleibt
+// komplett leer. Eine reine Nachschlageliste ist diesen Ausfall nicht wert.
+// Gegen das Auseinanderlaufen der Kopien wacht tests/statisch.test.mjs:
+// Der Test vergleicht beide Bloecke Zeichen fuer Zeichen. Wer hier etwas
+// aendert, aendert es in BEIDEN Dateien.
+const ZEICHEN_KATALOG = {
+    '201-50':['Andreaskreuz','vorfahrt'],
+    '205':['Vorfahrt gewähren','vorfahrt'],
+    '206':['Stop','vorfahrt'],
+    '208':['Vorrang des Gegenverkehrs','vorfahrt'],
+    '101':['Gefahrstelle','gefahr'],
+    '102':['Kreuzung – Vorfahrt von rechts','gefahr'],
+    '103-10':['Kurve (links)','gefahr'],
+    '103-20':['Kurve (rechts)','gefahr'],
+    '105-10':['Doppelkurve (zunächst links)','gefahr'],
+    '108-10':['Gefälle','gefahr'],
+    '110-10':['Steigung','gefahr'],
+    '112':['Unebene Fahrbahn','gefahr'],
+    '114':['Schleudergefahr','gefahr'],
+    '117-10':['Seitenwind','gefahr'],
+    '120':['Verengte Fahrbahn','gefahr'],
+    '121-10':['Einseitig verengte Fahrbahn','gefahr'],
+    '123':['Baustelle','gefahr'],
+    '124':['Stau','gefahr'],
+    '131':['Ampel','gefahr'],
+    '133-10':['Fußgänger','gefahr'],
+    '136-10':['Kinder','gefahr'],
+    '138-10':['Radverkehr','gefahr'],
+    '142-10':['Wildwechsel','gefahr'],
+    '151':['Bahnübergang','gefahr'],
+    '209-10':['Vorgeschriebene Fahrtrichtung rechts','gebot'],
+    '211-10':['Hier rechts','gebot'],
+    '214-10':['Geradeaus oder rechts','gebot'],
+    '215':['Kreisverkehr','gebot'],
+    '220-10':['Einbahnstraße','gebot'],
+    '222-10':['Vorbeifahrt rechts','gebot'],
+    '237':['Radweg','gebot'],
+    '239':['Gehweg','gebot'],
+    '240':['Gemeinsamer Geh- und Radweg','gebot'],
+    '241-30':['Getrennter Geh- und Radweg','gebot'],
+    '242_1':['Fußgängerzone','gebot'],
+    '244_1':['Fahrradstraße','gebot'],
+    '250':['Verbot für Fahrzeuge aller Art','verbot'],
+    '251':['Verbot für Kraftwagen','verbot'],
+    '253':['Verbot für LKW','verbot'],
+    '254':['Verbot für Radverkehr','verbot'],
+    '259':['Verbot für Fußgänger','verbot'],
+    '260':['Verbot für Krafträder und Kraftwagen','verbot'],
+    '262':['Tatsächliche Masse','verbot'],
+    '264-2':['Höchstbreite','verbot'],
+    '265':['Höchsthöhe','verbot'],
+    '266':['Höchstlänge','verbot'],
+    '267':['Verbot der Einfahrt','verbot'],
+    '268':['Schneeketten vorgeschrieben','verbot'],
+    '272':['Wendeverbot','verbot'],
+    '274-50':['Zulässige Höchstgeschwindigkeit','verbot'],
+    '274_1':['Beginn Tempo-30-Zone','verbot'],
+    '274_2':['Ende Tempo-30-Zone','verbot'],
+    '276':['Überholverbot','verbot'],
+    '277':['Überholverbot für LKW','verbot'],
+    '278-50':['Ende der Höchstgeschwindigkeit','verbot'],
+    '280':['Ende des Überholverbots','verbot'],
+    '282':['Ende sämtlicher Streckenverbote','verbot'],
+    '283':['Absolutes Haltverbot','verbot'],
+    '286':['Eingeschränktes Haltverbot','verbot'],
+    '290_1':['Beginn Haltverbotszone','verbot'],
+    '301':['Einmalige Vorfahrt','richt'],
+    '306':['Vorfahrtstraße','richt'],
+    '307':['Ende der Vorfahrtstraße','richt'],
+    '308':['Vorrang vor Gegenverkehr','richt'],
+    '310':['Ortstafel','richt'],
+    '311':['Ortsende','richt'],
+    '314':['Parken','richt'],
+    '315-55':['Parken auf Gehwegen','richt'],
+    '325_1':['Verkehrsberuhigter Bereich','richt'],
+    '325_2':['Ende verkehrsberuhigter Bereich','richt'],
+    '330_1':['Autobahn','richt'],
+    '330_2':['Ende der Autobahn','richt'],
+    '331_1':['Kraftfahrstraße','richt'],
+    '331_2':['Ende der Kraftfahrstraße','richt'],
+    '350-10':['Fußgängerüberweg','richt'],
+    '354':['Wasserschutzgebiet','richt'],
+    '405':['Autobahn-Knotenpunkt','wegweiser'],
+    '406-50':['Knotenpunktstafel Autobahn','wegweiser'],
+    '410':['Wegweiser zur Autobahn','wegweiser'],
+    '415-10':['Vorwegweiser Bundesstraße','wegweiser'],
+    '418-10':['Vorwegweiser außerorts','wegweiser'],
+    '430-10':['Vorwegweiser zur Autobahn','wegweiser'],
+    '434-50':['Wegweisertafel Landstraße','wegweiser'],
+    '437':['Straßennamensschild','wegweiser'],
+    '438':['Vorwegweiser Landstraße','wegweiser'],
+    '439':['Wegweiser Landstraße','wegweiser'],
+    '440':['Vorwegweiser Autobahn','wegweiser'],
+    '441':['Wegweiser Autobahn','wegweiser'],
+    '442-10':['Vorwegweiser für bestimmte Verkehrsarten','wegweiser'],
+    '448':['Ausfahrttafel Autobahn','wegweiser'],
+    '449':['Ankündigungstafel Autobahn','wegweiser'],
+    '453':['Entfernungstafel Autobahn','wegweiser'],
+    '454-10':['Umleitungswegweiser','wegweiser']
+};
+
+const KAT_GRUPPEN = [
+  ['alle','Alle'], ['vorfahrt','Vorfahrt & Halt'], ['gefahr','Gefahrzeichen'],
+  ['gebot','Gebotszeichen'], ['verbot','Verbotszeichen'], ['richt','Richtzeichen'], ['wegweiser','Wegweiser']
+];
+// ── ZEICHENLISTE ENDE ────────────────────────────────────────────
+let vzGruppe = 'alle';
+let vzSuche = '';
+
 const THEORIE_WISSEN = [
   {
     icon: '🧮', titel: 'Bremsformeln',
@@ -1437,10 +1683,95 @@ const THEORIE_WISSEN = [
       <p style="color:var(--muted);font-size:0.72rem">Werte nach Bußgeldkatalog-Verordnung (BKatV) 2026, ohne Gewähr – bei Rechtsfragen bitte deinen Fahrlehrer fragen.</p>`
   },
   {
-    icon: '🚦', titel: 'Verkehrszeichen',
-    html: `<p>Die amtlichen Verkehrszeichen findest du direkt bei deinem Ausbildungsstand – dort siehst du auch, wie sicher du bei jedem einzelnen Zeichen schon bist.</p>`
+    // katalog:true statt festem html - dieser Eintrag baut die Übersicht auf.
+    icon: '🚦', titel: 'Verkehrszeichen', katalog: true,
   },
 ];
+
+// Zeichen der gewählten Kategorie, gefiltert nach dem Suchfeld. Gesucht wird
+// über den Namen UND die Zeichennummer - "205" findet genauso wie "Vorfahrt".
+function vzTreffer() {
+  const such = vzSuche.trim().toLowerCase();
+  return Object.entries(ZEICHEN_KATALOG).filter(([nr, v]) => {
+    if (vzGruppe !== 'alle' && v[1] !== vzGruppe) return false;
+    return !such || v[0].toLowerCase().includes(such) || nr.includes(such);
+  });
+}
+
+// Das Gitter der Kacheln. Steht bewusst als eigene Funktion da: Beim Tippen
+// im Suchfeld wird NUR dieses Gitter neu gezeichnet (siehe vzSucheEingabe).
+// Als zweite Textkopie waere es genau die Art Stelle, an der spaeter eine
+// Aenderung nur in einer der beiden Haelften landet.
+function vzGitterHTML(treffer) {
+  if (!treffer.length) {
+    return '<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:20px;font-size:0.85rem">Nichts gefunden.</div>';
+  }
+  return treffer.map(([nr, v]) => `<div style="background:var(--surface2);border:1px solid var(--border);
+      border-radius:10px;padding:8px 6px;text-align:center">
+      <img src="./verkehrszeichen-katalog/${nr}.jpg" alt="${escHtml(v[0])}" loading="lazy"
+           style="width:46px;height:46px;object-fit:contain">
+      <div style="font-size:0.62rem;color:var(--muted);margin-top:4px;line-height:1.25">${escHtml(v[0])}</div>
+    </div>`).join('');
+}
+
+function vzKatalogHTML() {
+  const reiter = KAT_GRUPPEN.map(([k, label]) => {
+    const anzahl = k === 'alle' ? Object.keys(ZEICHEN_KATALOG).length
+                                : Object.values(ZEICHEN_KATALOG).filter(v => v[1] === k).length;
+    const aktiv = vzGruppe === k;
+    return `<button onclick="vzSetzeGruppe('${k}')" style="padding:6px 11px;border-radius:8px;
+      border:1px solid ${aktiv ? 'var(--accent)' : 'var(--border)'};
+      background:${aktiv ? 'var(--accent)' : 'var(--surface2)'};
+      color:${aktiv ? '#0d1117' : 'var(--muted)'};font-size:0.7rem;
+      font-weight:${aktiv ? '800' : '600'};cursor:pointer;white-space:nowrap">${label} ${anzahl}</button>`;
+  }).join('');
+
+  const gitter = vzGitterHTML(vzTreffer());
+
+  return `
+    <button onclick="oeffneTheorieWissen()" style="background:none;border:none;color:var(--accent);cursor:pointer;padding:0;margin-bottom:12px;font-size:0.85rem">← Zurück</button>
+    <div style="font-size:1.1rem;font-weight:700;margin-bottom:4px">🚦 Verkehrszeichen</div>
+    <div style="font-size:0.75rem;color:var(--muted);margin-bottom:12px;line-height:1.5">
+      Alle ${Object.keys(ZEICHEN_KATALOG).length} amtlichen Zeichen zum Nachschlagen – unabhängig davon,
+      was im Unterricht schon dran war.
+    </div>
+    <input id="vz-suche" value="${escHtml(vzSuche)}" oninput="vzSucheEingabe(this.value)"
+           placeholder="Suchen – z. B. „Stop&quot; oder „205&quot;" autocomplete="off"
+           style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);
+                  color:var(--text);border-radius:10px;padding:10px 12px;font-size:0.85rem;margin-bottom:10px">
+    <!-- Umbrechen statt seitlich scrollen: Bei "overflow-x:auto" standen drei
+         der sieben Kategorien ausserhalb des Bildschirms - man sah nicht, dass
+         es sie gibt. (Genau der Fehler, der beim Filter-Knopf in der
+         Fahrlehrer-App schon einmal durchgerutscht ist.) Nebenbei stoert eine
+         waagerecht scrollende Zeile die Wisch-Geste zum Zurueckgehen. -->
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">${reiter}</div>
+    <div id="vz-gitter" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px">${gitter}</div>
+    <!-- Dieselbe Quellenangabe wie im Katalog der Fahrlehrer-App. Die Bilder
+         sind dieselben; gesehen werden sie hier von deutlich mehr Leuten. -->
+    <div style="font-size:0.62rem;color:var(--muted);margin-top:14px;line-height:1.5">
+      Amtliche Verkehrszeichen (Quelle: Bundesanstalt für Straßenwesen), gemeinfrei nach § 5 UrhG.
+      Einteilung nach StVO: Gefahrzeichen (Anlage 1), Vorschriftzeichen (Anlage 2), Richtzeichen und Wegweisung (Anlage 3).
+    </div>`;
+}
+
+// Beim Tippen nur das Gitter neu zeichnen, nicht das ganze Blatt: Sonst
+// verliert das Suchfeld bei jedem Buchstaben den Fokus und die Tastatur
+// klappt auf dem Telefon zu.
+window.vzSucheEingabe = (wert) => {
+  vzSuche = wert;
+  // Das Gitter ueber seine id suchen, nicht ueber lastElementChild: Sobald
+  // unter dem Gitter noch etwas steht - etwa die Quellenangabe -, trifft
+  // lastElementChild das Falsche und die Suche zeigt nichts mehr an.
+  const gitter = document.getElementById('vz-gitter');
+  if (!gitter) return;
+  gitter.innerHTML = vzGitterHTML(vzTreffer());
+};
+
+window.vzSetzeGruppe = (k) => {
+  vzGruppe = k;
+  const detail = document.getElementById('tw-detail');
+  if (detail) detail.innerHTML = vzKatalogHTML();
+};
 
 // FIX(Audit): Das Theorie-Fenster ruft im onclick seiner Flaeche closeModal()
 // auf - die Funktion gab es in dieser Datei aber gar nicht (nur in index.html).
@@ -1472,6 +1803,11 @@ window.zeigeTheorieDetail = (i) => {
   document.getElementById('tw-liste').style.display = 'none';
   const detail = document.getElementById('tw-detail');
   detail.style.display = 'block';
+  if (t.katalog) {
+    vzGruppe = 'alle'; vzSuche = '';
+    detail.innerHTML = vzKatalogHTML();
+    return;
+  }
   detail.innerHTML = `
     <button onclick="oeffneTheorieWissen()" style="background:none;border:none;color:var(--accent);cursor:pointer;padding:0;margin-bottom:12px;font-size:0.85rem">← Zurück</button>
     <div style="font-size:1.1rem;font-weight:700;margin-bottom:10px">${t.icon} ${t.titel}</div>
