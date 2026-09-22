@@ -2882,7 +2882,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
 import { signInAnonymously, getAuth, setPersistence, browserLocalPersistence, indexedDBLocalPersistence, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider, verifyBeforeUpdateEmail, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, enableIndexedDbPersistence, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, getDocs, getDoc, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, enableIndexedDbPersistence, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, getDocs, getDoc, serverTimestamp, Timestamp, deleteField } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
 import { getStorage, ref, uploadBytes, getDownloadURL, listAll, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
@@ -4300,6 +4300,59 @@ function friendlyError(code) {
 // ─────────────────────────────────────────
 // AUTO-MIGRATION: Alte Codes ohne Snapshot reparieren
 // ─────────────────────────────────────────
+// EINMALIGES AUFRAEUMEN: Themen, die aus dem Lehrplan genommen wurden.
+//
+// Wird ein Thema aus dem Plan entfernt, verschwindet es aus der Oberflaeche -
+// der einmal vergebene Wert bleibt aber im Schuelerdokument stehen. Er ist
+// dann unsichtbar und nicht mehr aenderbar, taucht aber in jedem Datenexport
+// und in jeder Datenauskunft nach Art. 15 DSGVO wieder auf.
+//
+// Dieser Lauf entfernt genau die hier aufgezaehlten Felder, und nur sie.
+// Geschrieben wird ausschliesslich bei Schuelern, die das Feld wirklich
+// haben - wer es nie hatte, wird nicht angefasst.
+//
+// Die Marke in localStorage sorgt dafuer, dass der Lauf einmal je Konto und
+// Geraet stattfindet. Laeuft er wegen eines Fehlers nicht durch, wird die
+// Marke nicht gesetzt und der naechste Login versucht es erneut.
+const ENTFERNTE_THEMEN = [
+  'Liegenbleiben & Absichern',   // aus der Aufbaustufe Klasse B genommen
+];
+
+async function raeumeEntfernteThemenAuf() {
+  try {
+    if (!currentUser || window.__DEMO) return;
+    if (!ENTFERNTE_THEMEN.length) return;
+    const marke = `adk_themen_aufraeumen_${currentUser.uid}_v1`;
+    if (localStorage.getItem(marke)) return;
+    if (!students.length) return;   // Liste noch nicht da -> naechster Login
+
+    let geaendert = 0, misslungen = 0;
+    for (const s of students) {
+      const weg = ENTFERNTE_THEMEN.filter(n => (s.themen || {})[n] !== undefined);
+      if (!weg.length) continue;
+      const felder = {};
+      for (const n of weg) felder[`themen.${n}`] = deleteField();
+      try {
+        // dbUpd und nicht saveToFirestore: Letzteres wuerde fuer jeden
+        // Schueler zusaetzlich den Portal-Schnappschuss neu schreiben.
+        await dbUpd(doc(db, 'students', s.id), felder);
+        for (const n of weg) delete s.themen[n];
+        geaendert++;
+      } catch (e) { misslungen++; console.warn('Thema aufraeumen:', s.id, e && e.message); }
+    }
+    // Die Marke NUR setzen, wenn wirklich alles durchlief. Sonst waeren die
+    // Schueler, bei denen das Schreiben scheiterte (kurzer Netzausfall,
+    // abgelaufene Anmeldung), fuer immer uebersprungen - der Lauf findet ja
+    // nie wieder statt.
+    if (misslungen === 0) localStorage.setItem(marke, String(Date.now()));
+    if (geaendert) {
+      console.log(`Aus dem Plan genommene Themen entfernt bei ${geaendert} Schueler(n).`);
+      renderList();
+      if (activeId) renderDetail();
+    }
+  } catch (e) { console.warn('raeumeEntfernteThemenAuf:', e); }
+}
+
 async function resyncPortalSnapshotsV2() {
   // EINMALIGE HEILUNG: Portal-Snapshots (Lernstand/Themen, Fahrstunden,
   // Sonderfahrten) wurden bis heute nur bei der Code-Erstellung geschrieben.
@@ -4745,7 +4798,9 @@ function listenStudents() {
   });
 
   function verarbeiteSchueler() {
-    if (!window.__snapResyncKick && students.length) { window.__snapResyncKick = true; setTimeout(resyncPortalSnapshotsV2, 1200); }
+    if (!window.__snapResyncKick && students.length) { window.__snapResyncKick = true;
+      setTimeout(resyncPortalSnapshotsV2, 1200);
+      setTimeout(raeumeEntfernteThemenAuf, 2400); }
     students.sort((a,b) => (a.nachname||'').localeCompare(b.nachname||''));
     renderList();
     if (activeId) renderDetail();
