@@ -3045,7 +3045,6 @@ const ADK_THEMEN = [
       'Umweltschonende & vorausschauende Fahrweise',
       'Steigung & Gefälle',
       'Rangieren in engen Verhältnissen',
-      'Liegenbleiben & Absichern',
     ]
   },
   {
@@ -8297,6 +8296,33 @@ function buildPortalVerkehrszeichen(s) {
   return liste;
 }
 
+// Nur die Themen mitgeben, die im Plan des Schuelers wirklich stehen.
+//
+// Der Grund: Wird ein Thema aus dem Lehrplan genommen ('Liegenbleiben &
+// Absichern'), bleibt der einmal vergebene Wert in s.themen liegen - er wird
+// bewusst NICHT geloescht. Ungefiltert bekaeme das Portal ihn weiter
+// geschickt, und der Schueler saehe das Thema in seinem Lernstand, obwohl es
+// beim Fahrlehrer laengst verschwunden ist. Dasselbe gilt nach einem
+// Klassenwechsel fuer Themen der alten Klasse.
+//
+// overallProgress() rechnet in der Fahrlehrer-App ohnehin nur ueber den Plan
+// der aktuellen Klasse - das Portal macht es damit genauso, statt eine
+// andere Zahl anzuzeigen als der Fahrlehrer sieht.
+//
+// Die Werte selbst bleiben unangetastet in der Datenbank. Kommt ein Thema
+// zurueck in den Plan, ist auch die alte Bewertung wieder da.
+function themenAusPlan(s) {
+  const klasse = s.klasse || 'B';
+  const ADK = klasse === 'A' ? ADK_THEMEN_A : klasse === 'BE' ? ADK_THEMEN_BE : ADK_THEMEN;
+  const imPlan = new Set(ADK.flatMap(g => g.items));
+  const alle = s.themen || {};
+  const aus = {};
+  for (const name of Object.keys(alle)) {
+    if (imPlan.has(name)) aus[name] = alle[name];
+  }
+  return aus;
+}
+
 function buildPortalSnapshot(s, code, expiresAt) {
   return {
     id:                s.id || null,
@@ -8308,7 +8334,7 @@ function buildPortalSnapshot(s, code, expiresAt) {
     fahrstunden:       s.fahrstunden || 0,
     zielStunden:       s.zielStunden || 30,
     sonderfahrten:     s.sonderfahrten || {},
-    themen:            s.themen || {},
+    themen:            themenAusPlan(s),
     verkehrszeichen:   buildPortalVerkehrszeichen(s),
     schaltstunden:     s.schaltstunden || 0,
     zielSchaltstunden: s.zielSchaltstunden || 10,
