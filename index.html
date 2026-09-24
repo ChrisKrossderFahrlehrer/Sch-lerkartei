@@ -2882,7 +2882,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
 import { signInAnonymously, getAuth, setPersistence, browserLocalPersistence, indexedDBLocalPersistence, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider, verifyBeforeUpdateEmail, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, enableIndexedDbPersistence, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, getDocs, getDoc, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, enableIndexedDbPersistence, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, getDocs, getDoc, serverTimestamp, Timestamp, deleteField } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
 import { getStorage, ref, uploadBytes, getDownloadURL, listAll, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
@@ -3045,7 +3045,6 @@ const ADK_THEMEN = [
       'Umweltschonende & vorausschauende Fahrweise',
       'Steigung & Gefälle',
       'Rangieren in engen Verhältnissen',
-      'Liegenbleiben & Absichern',
     ]
   },
   {
@@ -4301,6 +4300,68 @@ function friendlyError(code) {
 // ─────────────────────────────────────────
 // AUTO-MIGRATION: Alte Codes ohne Snapshot reparieren
 // ─────────────────────────────────────────
+// EINMALIGES AUFRAEUMEN: Themen, die aus dem Lehrplan genommen wurden.
+//
+// Wird ein Thema aus dem Plan entfernt, verschwindet es aus der Oberflaeche -
+// der einmal vergebene Wert bleibt aber im Schuelerdokument stehen. Er ist
+// dann unsichtbar und nicht mehr aenderbar, taucht aber in jedem Datenexport
+// und in jeder Datenauskunft nach Art. 15 DSGVO wieder auf.
+//
+// Dieser Lauf entfernt genau die hier aufgezaehlten Felder, und nur sie.
+// Geschrieben wird ausschliesslich bei Schuelern, die das Feld wirklich
+// haben - wer es nie hatte, wird nicht angefasst.
+//
+// Die Marke in localStorage sorgt dafuer, dass der Lauf einmal je Konto und
+// Geraet stattfindet. Laeuft er wegen eines Fehlers nicht durch, wird die
+// Marke nicht gesetzt und der naechste Login versucht es erneut.
+const ENTFERNTE_THEMEN = [
+  'Liegenbleiben & Absichern',   // aus der Aufbaustufe Klasse B genommen
+];
+
+// Aufgeraeumt wird beides: Themen, die aus dem Plan genommen wurden, UND
+// die alten Handwerte automatischer Themen. Letztere werden nirgends mehr
+// angezeigt (der Wert wird ja berechnet), stuenden aber weiterhin im
+// Datenexport und wuerden dem berechneten Stand widersprechen.
+const AUFZURAEUMENDE_FELDER = () => [...ENTFERNTE_THEMEN, ...Object.keys(AUTO_THEMEN)];
+
+async function raeumeEntfernteThemenAuf() {
+  try {
+    if (!currentUser || window.__DEMO) return;
+    const FELDER = AUFZURAEUMENDE_FELDER();
+    if (!FELDER.length) return;
+    // v2: seit "Prüfungsreife festgestellt" automatisch mitlaeuft, kommen
+    // auch dessen alte Handwerte dazu - der Lauf muss deshalb erneut gehen.
+    const marke = `adk_themen_aufraeumen_${currentUser.uid}_v2`;
+    if (localStorage.getItem(marke)) return;
+    if (!students.length) return;   // Liste noch nicht da -> naechster Login
+
+    let geaendert = 0, misslungen = 0;
+    for (const s of students) {
+      const weg = FELDER.filter(n => (s.themen || {})[n] !== undefined);
+      if (!weg.length) continue;
+      const felder = {};
+      for (const n of weg) felder[`themen.${n}`] = deleteField();
+      try {
+        // dbUpd und nicht saveToFirestore: Letzteres wuerde fuer jeden
+        // Schueler zusaetzlich den Portal-Schnappschuss neu schreiben.
+        await dbUpd(doc(db, 'students', s.id), felder);
+        for (const n of weg) delete s.themen[n];
+        geaendert++;
+      } catch (e) { misslungen++; console.warn('Thema aufraeumen:', s.id, e && e.message); }
+    }
+    // Die Marke NUR setzen, wenn wirklich alles durchlief. Sonst waeren die
+    // Schueler, bei denen das Schreiben scheiterte (kurzer Netzausfall,
+    // abgelaufene Anmeldung), fuer immer uebersprungen - der Lauf findet ja
+    // nie wieder statt.
+    if (misslungen === 0) localStorage.setItem(marke, String(Date.now()));
+    if (geaendert) {
+      console.log(`Aus dem Plan genommene Themen entfernt bei ${geaendert} Schueler(n).`);
+      renderList();
+      if (activeId) renderDetail();
+    }
+  } catch (e) { console.warn('raeumeEntfernteThemenAuf:', e); }
+}
+
 async function resyncPortalSnapshotsV2() {
   // EINMALIGE HEILUNG: Portal-Snapshots (Lernstand/Themen, Fahrstunden,
   // Sonderfahrten) wurden bis heute nur bei der Code-Erstellung geschrieben.
@@ -4746,7 +4807,9 @@ function listenStudents() {
   });
 
   function verarbeiteSchueler() {
-    if (!window.__snapResyncKick && students.length) { window.__snapResyncKick = true; setTimeout(resyncPortalSnapshotsV2, 1200); }
+    if (!window.__snapResyncKick && students.length) { window.__snapResyncKick = true;
+      setTimeout(resyncPortalSnapshotsV2, 1200);
+      setTimeout(raeumeEntfernteThemenAuf, 2400); }
     students.sort((a,b) => (a.nachname||'').localeCompare(b.nachname||''));
     renderList();
     if (activeId) renderDetail();
@@ -5070,6 +5133,43 @@ const SONDER_B197 = [
 // ── PRÜFUNGSAMPEL: ist der Schüler bereit für die praktische Prüfung? ──
 // Prüft Pflichtfahrten, Fahrstunden-Ziel und ADK-Themen-Stand.
 // Gibt {farbe, text, offen[]} zurück. farbe: 'gruen' | 'gelb' | 'rot'
+// ── AUTOMATISCH MITLAUFENDE THEMEN ─────────────────────────────────
+// "Prüfungsreife festgestellt" wurde bisher von Hand abgehakt, obwohl die
+// Kartei den Ausbildungsstand ohnehin kennt. Der Balken laeuft jetzt von
+// selbst mit: je mehr erledigt ist, desto weiter ist er.
+//
+// DER KREISSCHLUSS, der dabei aufzuloesen war: Dieses Thema stand selbst im
+// Mittelwert, aus dem der Ausbildungsstand gebildet wird. Ein automatisch
+// gesetzter Wert wuerde sich damit selbst hochziehen - der Balken waere
+// nicht mehr Anzeige, sondern Ursache. overallProgress() nimmt automatische
+// Themen deshalb aus der Rechnung heraus.
+//
+// Die oberste Stufe gibt es nur, wenn der Schueler wirklich so weit ist:
+// Pflichtfahrten vollstaendig, Stundenziel erreicht, mindestens 90 % - also
+// genau dann, wenn auch die Ampel auf gruen springt. Die Stufen darunter
+// folgen dem Ausbildungsstand.
+const AUTO_THEMEN = {
+  'Prüfungsreife festgestellt': (s) => {
+    if (pruefungsAmpel(s).farbe === 'gruen') return 5;
+    const p = overallProgress(s);
+    if (p >= 80) return 4;
+    if (p >= 65) return 3;
+    if (p >= 45) return 2;
+    if (p >= 25) return 1;
+    return 0;
+  },
+};
+const istAutoThema  = (t) => Object.prototype.hasOwnProperty.call(AUTO_THEMEN, t);
+const autoThemaWert = (t, s) => { try { return AUTO_THEMEN[t](s) | 0; } catch (e) { return 0; } };
+// EINE Stelle, an der der Wert eines Plan-Themas herkommt: berechnet, wenn
+// das Thema automatisch mitlaeuft, sonst der gespeicherte Wert. Ohne diesen
+// Helfer las jede Zaehlung weiter den gespeicherten Wert - der bei einem
+// automatischen Thema nie wieder geschrieben wird und damit immer 0 waere.
+// Folge waere gewesen: "Alle ADK-Themen beherrscht" nie mehr erreichbar.
+const themaWert = (s, t, suffix) => istAutoThema(t)
+  ? autoThemaWert(t, s)
+  : (((s.themen||{})[t + (suffix||'')]) ?? ((s.themen||{})[t]) ?? 0);
+
 function pruefungsAmpel(s) {
   const klasse = s.klasse || 'B';
   const isA    = klasse === 'A';
@@ -5125,7 +5225,9 @@ function overallProgress(s) {
   const SONDER = isA
     ? [{ key:'ueber', min:5 }, { key:'autobahn', min:4 }, { key:'nacht', min:3 }]
     : isBE ? SONDERFAHRTEN_BE : SONDERFAHRTEN;
-  const allThemen = ADK.flatMap(g => g.items);
+  // Automatische Themen bleiben draussen - sonst speist sich der Wert,
+  // aus dem sie berechnet werden, aus ihnen selbst.
+  const allThemen = ADK.flatMap(g => g.items).filter(x => !istAutoThema(x));
   const themenVals = allThemen.map(t => (s.themen||{})[t]||0);
   const themaAvg = themenVals.length ? themenVals.reduce((a,v)=>a+Math.min(v,4),0)/themenVals.length/4 : 0;
   if (isB197) {
@@ -5475,7 +5577,7 @@ function buildPruefungsCheckliste(s, klasse, ADK, SONDER) {
   // ADK-Lernstand: alle Themen mind. "Beherrscht" (>=4)?
   const adkKeys = (ADK || []).flatMap(g => g.items);
   const suffix = (s.klassen && s.klassen.length>1) ? '__'+klasse : '';
-  const adkOffen = adkKeys.filter(k => ((s.themen||{})[k + (suffix||'')] || (s.themen||{})[k] || 0) < 4).length;
+  const adkOffen = adkKeys.filter(k => themaWert(s, k, suffix) < 4).length;
   items.push({
     done: adkOffen === 0 && adkKeys.length > 0,
     label: adkOffen === 0 ? 'Alle ADK-Themen beherrscht' : `${adkOffen} ADK-Themen noch nicht sicher`,
@@ -5707,6 +5809,14 @@ function renderDetail() {
 
   const themenHTML = ADK.filter(g => g.gruppe !== VZ_GRUPPE_NAME).map(gruppe => {
     const standardItems = gruppe.items.map(t => {
+      // Automatische Themen: Wert wird berechnet, nicht gelesen - und der
+      // Balken ist nicht antippbar. Ein Tipp erklaert stattdessen, warum.
+      if (istAutoThema(t)) {
+        return adkThemaZeile(
+          `${escHtml(t)} <span style="font-size:0.6rem;color:var(--muted);background:var(--surface);`
+          + `border:1px solid var(--border);border-radius:4px;padding:1px 5px;margin-left:4px">automatisch</span>`,
+          autoThemaWert(t, s), () => 'autoThemaHinweis()');
+      }
       const val = (s.themen||{})[t]||0;
       return adkThemaZeile(t, val, themaZiel(t));
     }).join('');
@@ -5727,7 +5837,7 @@ function renderDetail() {
     }).join('');
 
     const allCount = gruppe.items.length + myCustomThemen.filter(t => t.kategorie === gruppe.gruppe).length;
-    const doneCount = gruppe.items.filter(t => ((s.themen||{})[t]||0) >= 4).length
+    const doneCount = gruppe.items.filter(t => themaWert(s, t) >= 4).length
       + myCustomThemen.filter(t => t.kategorie === gruppe.gruppe && ((s.customThemen||{})[t.id]||0) >= 4).length;
     const groupPct = allCount ? Math.round((doneCount/allCount)*100) : 0;
 
@@ -6012,7 +6122,7 @@ function renderAdkGruppenChart(s) {
   const klasse = s.klasse || 'B';
   const ADK = klasse==='A' ? ADK_THEMEN_A : klasse==='BE' ? ADK_THEMEN_BE : ADK_THEMEN;
   const gruppen = ADK.map((g, gi) => {
-    const vals = g.items.map(t => (s.themen||{})[t] || 0);
+    const vals = g.items.map(t => themaWert(s, t));
     const avg = vals.reduce((a,v) => a + Math.min(v,4), 0) / vals.length / 4 * 100;
     return { name: g.gruppe, pct: Math.round(avg), farbe: COLORS[gi % COLORS.length] };
   });
@@ -6669,8 +6779,16 @@ window.changeSonder = async (key, delta) => {
   } catch(e) { console.error('changeSonder:', e); toast('Fehler beim Speichern'); }
 };
 
+window.autoThemaHinweis = () => {
+  toast('Läuft automatisch mit – je weiter die Ausbildung, desto voller.');
+};
+
 window.setThema = async (thema, val) => {
   try {
+    // Sicherheitsnetz: Auch wenn ein alter Knopf noch irgendwo haengt, darf
+    // ein automatisches Thema nicht von Hand ueberschrieben werden - der
+    // gespeicherte Wert wuerde ohnehin nicht mehr angezeigt.
+    if (istAutoThema(thema)) { autoThemaHinweis(); return; }
     const s = getStudent(activeId);
     if (!s) return;
     const th = { ...(s.themen||{}) };
@@ -8297,6 +8415,37 @@ function buildPortalVerkehrszeichen(s) {
   return liste;
 }
 
+// Nur die Themen mitgeben, die im Plan des Schuelers wirklich stehen.
+//
+// Der Grund: Wird ein Thema aus dem Lehrplan genommen ('Liegenbleiben &
+// Absichern'), bleibt der einmal vergebene Wert in s.themen liegen - er wird
+// bewusst NICHT geloescht. Ungefiltert bekaeme das Portal ihn weiter
+// geschickt, und der Schueler saehe das Thema in seinem Lernstand, obwohl es
+// beim Fahrlehrer laengst verschwunden ist. Dasselbe gilt nach einem
+// Klassenwechsel fuer Themen der alten Klasse.
+//
+// overallProgress() rechnet in der Fahrlehrer-App ohnehin nur ueber den Plan
+// der aktuellen Klasse - das Portal macht es damit genauso, statt eine
+// andere Zahl anzuzeigen als der Fahrlehrer sieht.
+//
+// Die Werte selbst bleiben unangetastet in der Datenbank. Kommt ein Thema
+// zurueck in den Plan, ist auch die alte Bewertung wieder da.
+function themenAusPlan(s) {
+  const klasse = s.klasse || 'B';
+  const ADK = klasse === 'A' ? ADK_THEMEN_A : klasse === 'BE' ? ADK_THEMEN_BE : ADK_THEMEN;
+  const alle = s.themen || {};
+  const aus = {};
+  for (const g of ADK) {
+    for (const name of g.items) {
+      // Automatische Themen: der berechnete Stand, damit der Schueler
+      // dasselbe sieht wie der Fahrlehrer - nicht ein alter Handwert.
+      if (istAutoThema(name)) { aus[name] = autoThemaWert(name, s); continue; }
+      if (alle[name] !== undefined) aus[name] = alle[name];
+    }
+  }
+  return aus;
+}
+
 function buildPortalSnapshot(s, code, expiresAt) {
   return {
     id:                s.id || null,
@@ -8308,7 +8457,7 @@ function buildPortalSnapshot(s, code, expiresAt) {
     fahrstunden:       s.fahrstunden || 0,
     zielStunden:       s.zielStunden || 30,
     sonderfahrten:     s.sonderfahrten || {},
-    themen:            s.themen || {},
+    themen:            themenAusPlan(s),
     verkehrszeichen:   buildPortalVerkehrszeichen(s),
     schaltstunden:     s.schaltstunden || 0,
     zielSchaltstunden: s.zielSchaltstunden || 10,
@@ -9666,7 +9815,7 @@ window.exportPDF = () => {
   // ADK Fortschritt berechnen
   const adkHTML = ADK.map(gruppe => {
     const items = gruppe.items.map(item => {
-      const val = (s.themen||{})[item] || 0;
+      const val = themaWert(s, item);
       const farben = ['#666','#f0b429','#f0b429','#3fb950','#3fb950'];
       const formStile = [
         'border-radius:50%;opacity:0.55',
@@ -9681,7 +9830,7 @@ window.exportPDF = () => {
         <td style="padding:3px 8px;text-align:center">${formHTML}</td>
       </tr>`;
     }).join('');
-    const done  = gruppe.items.filter(t => (s.themen||{})[t] >= 4).length;
+    const done  = gruppe.items.filter(t => themaWert(s, t) >= 4).length;
     const total = gruppe.items.length;
     return `
       <tr style="background:#f8f9fa">
