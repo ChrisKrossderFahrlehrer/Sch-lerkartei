@@ -1,0 +1,142 @@
+# Prüfen und Deployen
+#
+# Zweck: Nach einem Merge muss niemand mehr am Mac sitzen und von Hand
+# "firebase deploy" tippen. Der Merge-Knopf auf github.com genügt - auch vom
+# Telefon aus.
+#
+# Zwei Dinge passieren hier:
+#
+#   1. Bei JEDEM Pull Request läuft die vollständige Testsuite. Das Ergebnis
+#      steht als grüner Haken oder rotes Kreuz am PR - man sieht also VOR dem
+#      Antippen, ob der Stand in Ordnung ist.
+#
+#   2. Beim Push auf main wird deployt, ABER ERST NACHDEM die Tests
+#      durchgelaufen sind. Ein roter Test verhindert das Deployen. Das ist
+#      der eigentliche Gewinn: An diesem Backend hängen Zahlungen und
+#      Kontolöschungen - ein kaputter Stand darf dort nicht automatisch
+#      landen, nur weil das Deployen automatisch ist.
+#
+# Deployt wird nur, was sich wirklich geändert hat. Reine Oberflächen-
+# Änderungen (index.html & Co.) gehen weiterhin allein über GitHub Pages und
+# lösen hier gar nichts aus.
+
+name: Prüfen und Deployen
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:      # von Hand auslösbar, falls doch mal nötig
+
+# Nie zwei Deploys gleichzeitig. cancel-in-progress ist bewusst AUS: Ein
+# laufendes Deploy abzubrechen kann die Functions halb aktualisiert
+# zurücklassen.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  pruefen-und-deployen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Volle Historie. Mit einer flachen Kopie (fetch-depth: 2) fehlt bei
+          # einem Push mit mehreren Commits der Vergleichspunkt - der
+          # Vergleich unten schlüge fehl und es würde sicherheitshalber ALLES
+          # deployt. Das Repo ist 12 MB groß, die volle Historie kostet
+          # nichts.
+          fetch-depth: 0
+
+      # Node 22 - dieselbe Version, die die Functions laut package.json
+      # verlangen. Eine andere würde hier grün laufen und dort scheitern.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Der Firestore- und der Auth-Emulator brauchen Java.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # Bewusst mit working-directory statt "npm ci --prefix": --prefix
+      # verhält sich je nach npm-Version unterschiedlich und hat schon
+      # Pakete an der falschen Stelle abgelegt.
+      - name: Abhängigkeiten der Tests
+        working-directory: tests
+        run: npm ci
+
+      # Die Functions brauchen ihre Pakete auch zum DEPLOYEN: firebase-tools
+      # lädt den Code, um die enthaltenen Functions zu ermitteln.
+      - name: Abhängigkeiten der Functions
+        working-directory: functions
+        run: npm ci
+
+      # ── PRÜFEN ────────────────────────────────────────────────────────
+      # Die komplette Suite: statische Prüfungen, Indexdeckung und die
+      # Emulator-Tests (Regeln, Übernahme, Audit, Rechnung, Löschen,
+      # Datenverlust, Aufräumen, Speicher).
+      - name: Testsuite
+        working-directory: tests
+        run: npm test
+
+      # ── WAS MUSS DEPLOYT WERDEN? ──────────────────────────────────────
+      # Nur beim Push auf main. Bei einem Pull Request bleibt es beim Prüfen.
+      - name: Geänderte Bereiche ermitteln
+        id: umfang
+        if: github.event_name != 'pull_request'
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            geaendert="alles"
+          else
+            geaendert=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" || echo alles)
+          fi
+          ziele=""
+          echo "$geaendert" | grep -q '^functions/'            && ziele="$ziele,functions"
+          echo "$geaendert" | grep -q '^firestore\.rules$'     && ziele="$ziele,firestore:rules"
+          echo "$geaendert" | grep -q '^firestore\.indexes\.json$' && ziele="$ziele,firestore:indexes"
+          echo "$geaendert" | grep -q '^storage\.rules$'       && ziele="$ziele,storage"
+          if [ "$geaendert" = "alles" ]; then
+            ziele=",functions,firestore:rules,firestore:indexes,storage"
+          fi
+          ziele="${ziele#,}"
+          echo "ziele=$ziele" >> "$GITHUB_OUTPUT"
+          if [ -z "$ziele" ]; then
+            echo "Nichts zu deployen - es haben sich nur Oberflächen-Dateien geändert."
+          else
+            echo "Wird deployt: $ziele"
+          fi
+
+      # ── DEPLOYEN ──────────────────────────────────────────────────────
+      # Der Schlüssel kommt aus einem GitHub-Secret und wird über eine
+      # Umgebungsvariable in eine Datei geschrieben - nicht direkt in die
+      # Kommandozeile eingesetzt, damit er nicht in Logs oder Prozesslisten
+      # auftaucht.
+      - name: Firebase-Zugang bereitstellen
+        if: steps.umfang.outputs.ziele != ''
+        env:
+          SCHLUESSEL: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$SCHLUESSEL" ]; then
+            echo "::error::Das Secret FIREBASE_SERVICE_ACCOUNT fehlt. Siehe .github/workflows/README.md"
+            exit 1
+          fi
+          printf '%s' "$SCHLUESSEL" > "$RUNNER_TEMP/dienstkonto.json"
+
+      - name: Deployen
+        if: steps.umfang.outputs.ziele != ''
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/dienstkonto.json
+        run: |
+          ./tests/node_modules/.bin/firebase deploy \
+            --only "${{ steps.umfang.outputs.ziele }}" \
+            --project fahrschule-ebc65 \
+            --non-interactive \
+            --message "Automatisch nach ${{ github.sha }}"
+
+      - name: Schlüssel wieder entfernen
+        if: always()
+        run: rm -f "$RUNNER_TEMP/dienstkonto.json"
