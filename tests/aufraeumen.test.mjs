@@ -26,9 +26,20 @@ process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8089';
 process.env.FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099';
 process.env.GCLOUD_PROJECT = process.env.GCLOUD_PROJECT || 'fahrsync-aufraeumen';
 
-const admin = require(join(hier, '..', 'functions', 'node_modules', 'firebase-admin'));
-admin.initializeApp({ projectId: process.env.GCLOUD_PROJECT });
-const db = admin.firestore();
+// Bewusst aus functions/: Der Test soll GENAU die firebase-admin-Fassung
+// benutzen, die auch deployt wird - nicht eine andere aus tests/.
+//
+// Verankert ueber die package.json von functions/, NICHT ueber einen
+// zusammengesetzten Dateipfad: Seit Version 14 gibt firebase-admin seine
+// Unterpfade ueber die "exports"-Tabelle frei, und die greift nur bei
+// Paketnamen. Ein Pfad wie '<...>/firebase-admin/app' laeuft daran vorbei
+// und findet nichts.
+const ausFunctions = createRequire(join(hier, '..', 'functions', 'package.json'));
+const { initializeApp } = ausFunctions('firebase-admin/app');
+const { getFirestore } = ausFunctions('firebase-admin/firestore');
+const { getAuth } = ausFunctions('firebase-admin/auth');
+initializeApp({ projectId: process.env.GCLOUD_PROJECT });
+const db = getFirestore();
 
 const { repariereFehlendeAblaufdaten } = require(join(hier, '..', 'functions', 'loeschen.js'));
 
@@ -158,7 +169,7 @@ await pruefe('expiresAt = null gilt als fehlend', async () => {
 // Pruefungen hier.
 console.log('\nANONYME SITZUNGEN — aufraeumen, aber nur die richtigen');
 
-const auth = admin.auth();
+const auth = getAuth();
 const { loescheAlteAnonymeKonten, istAnonymesKonto } =
   require(join(hier, '..', 'functions', 'loeschen.js'));
 

@@ -10,8 +10,16 @@ const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { setGlobalOptions } = require('firebase-functions/v2');
 const { defineSecret } = require('firebase-functions/params');
 const Stripe = require('stripe');
-const admin = require('firebase-admin');
-admin.initializeApp();
+// firebase-admin 14: Die alte Namensraum-Form - admin.firestore(),
+// admin.auth(), admin.storage(), admin.messaging() - gibt es nicht mehr.
+// Jeder Bereich hat jetzt einen eigenen Unterpfad mit einer eigenen
+// Zugriffsfunktion. Beim Umstieg wurden nur diese Zeilen und die Aufrufe
+// geaendert, an der Logik nichts.
+const { initializeApp } = require('firebase-admin/app');
+const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
+const { getAuth } = require('firebase-admin/auth');
+const { getMessaging } = require('firebase-admin/messaging');
+initializeApp();
 setGlobalOptions({ region: 'europe-west3', maxInstances: 5 });
 
 // Google-Kalender-Sync: Client-Secret liegt NICHT im Code (Repo ist oeffentlich
@@ -31,11 +39,11 @@ const GOOGLE_REDIRECT_URI  = 'https://europe-west3-fahrschule-ebc65.cloudfunctio
 const APP_URL              = 'https://fahrsync.de/kalender.html';
 
 async function pushToLehrer(lehrerUid, title, body, link) {
-  const snap = await admin.firestore().collection('fcmTokens')
+  const snap = await getFirestore().collection('fcmTokens')
     .where('uid', '==', lehrerUid).get();
   if (snap.empty) return;
   const tokens = snap.docs.map(d => d.id);
-  const res = await admin.messaging().sendEachForMulticast({
+  const res = await getMessaging().sendEachForMulticast({
     tokens,
     data: {
       title: title,
@@ -51,7 +59,7 @@ async function pushToLehrer(lehrerUid, title, body, link) {
       if (c.includes('registration-token-not-registered') ||
           c.includes('invalid-registration-token') ||
           c.includes('invalid-argument')) {
-        dels.push(admin.firestore().collection('fcmTokens').doc(tokens[i]).delete());
+        dels.push(getFirestore().collection('fcmTokens').doc(tokens[i]).delete());
       }
     }
   });
@@ -94,11 +102,11 @@ exports.pushNeueNachricht = onDocumentCreated('bookingMessages/{id}', async (eve
 // Geraete-Token eines Fahrschuelers werden ueber die Code-Kennung
 // gefunden (der Schueler hat kein eigenes Konto, nur eine anonyme Sitzung).
 async function pushToSchueler(codeId, title, body) {
-  const snap = await admin.firestore().collection('fcmTokens')
+  const snap = await getFirestore().collection('fcmTokens')
     .where('codeId', '==', codeId).get();
   if (snap.empty) return;
   const tokens = snap.docs.map(d => d.id);
-  const res = await admin.messaging().sendEachForMulticast({
+  const res = await getMessaging().sendEachForMulticast({
     tokens,
     data: { title, body, link: 'https://fahrsync.de/schueler-portal.html' },
     webpush: { headers: { Urgency: 'high', TTL: '86400' } }
@@ -110,7 +118,7 @@ async function pushToSchueler(codeId, title, body) {
       if (c.includes('registration-token-not-registered') ||
           c.includes('invalid-registration-token') ||
           c.includes('invalid-argument')) {
-        dels.push(admin.firestore().collection('fcmTokens').doc(tokens[i]).delete());
+        dels.push(getFirestore().collection('fcmTokens').doc(tokens[i]).delete());
       }
     }
   });
@@ -158,7 +166,7 @@ exports.pushNeueChatNachricht = onDocumentUpdated('accessCodes/{codeId}', async 
 // ══════════ GOOGLE-KALENDER-SYNC (Phase 1: Fahrlehrer, FahrSync -> Google) ══════════
 
 async function refreshAccessTokenIfNeeded(uid, secretValue) {
-  const ref = admin.firestore().collection('calendarTokens').doc(uid);
+  const ref = getFirestore().collection('calendarTokens').doc(uid);
   const snap = await ref.get();
   if (!snap.exists) return null;
   const data = snap.data();
@@ -198,7 +206,7 @@ exports.kalenderOAuthCallback = onRequest({ secrets: [GOOGLE_CLIENT_SECRET] }, a
     const { code, state, error } = req.query;
     if (error || !code || !state) return res.redirect(`${APP_URL}?calsync=error`);
 
-    const stateRef = admin.firestore().collection('oauthStates').doc(String(state));
+    const stateRef = getFirestore().collection('oauthStates').doc(String(state));
     const stateSnap = await stateRef.get();
     if (!stateSnap.exists) return res.redirect(`${APP_URL}?calsync=invalid_state`);
     const { uid } = stateSnap.data();
@@ -218,9 +226,9 @@ exports.kalenderOAuthCallback = onRequest({ secrets: [GOOGLE_CLIENT_SECRET] }, a
     const tokens = await tokenResp.json();
     if (!tokens.access_token) { console.error('Token-Austausch fehlgeschlagen:', tokens); return res.redirect(`${APP_URL}?calsync=error`); }
 
-    const tokenRef = admin.firestore().collection('calendarTokens').doc(uid);
+    const tokenRef = getFirestore().collection('calendarTokens').doc(uid);
     await tokenRef.set({
-      refresh_token: tokens.refresh_token || admin.firestore.FieldValue.delete(),
+      refresh_token: tokens.refresh_token || FieldValue.delete(),
       access_token: tokens.access_token,
       expiry: Date.now() + (tokens.expires_in * 1000),
       connectedAt: Date.now()
@@ -228,10 +236,10 @@ exports.kalenderOAuthCallback = onRequest({ secrets: [GOOGLE_CLIENT_SECRET] }, a
 
     const check = (await tokenRef.get()).data();
     if (!check || !check.refresh_token) {
-      await admin.firestore().collection('calendarStatus').doc(uid).set({ connected: false, error: 'no_refresh_token' }, { merge: true });
+      await getFirestore().collection('calendarStatus').doc(uid).set({ connected: false, error: 'no_refresh_token' }, { merge: true });
       return res.redirect(`${APP_URL}?calsync=no_refresh`);
     }
-    await admin.firestore().collection('calendarStatus').doc(uid).set({ connected: true, connectedAt: Date.now() }, { merge: true });
+    await getFirestore().collection('calendarStatus').doc(uid).set({ connected: true, connectedAt: Date.now() }, { merge: true });
     res.redirect(`${APP_URL}?calsync=success`);
   } catch (e) {
     console.error('kalenderOAuthCallback', e);
@@ -246,12 +254,12 @@ exports.trennKalenderVerbindung = onCall({ region: 'europe-west3' }, async (reqC
   }
   const uid = reqCtx.auth.uid;
   try {
-    await admin.firestore().collection('calendarTokens').doc(uid).delete();
+    await getFirestore().collection('calendarTokens').doc(uid).delete();
   } catch (e) {
     console.warn('trennKalenderVerbindung: Token loeschen fehlgeschlagen', e);
   }
   try {
-    await admin.firestore().collection('calendarStatus').doc(uid)
+    await getFirestore().collection('calendarStatus').doc(uid)
       .set({ connected: false, getrenntAm: Date.now() }, { merge: true });
   } catch (e) {
     console.error('trennKalenderVerbindung: Status setzen fehlgeschlagen', e);
@@ -295,7 +303,7 @@ exports.syncSlotToGoogleCalendar = onDocumentUpdated({ document: 'slots/{slotId}
   if (!wurdeGebucht && !wurdeFreigegeben) return;
 
   try {
-    const tokenSnap = await admin.firestore().collection('calendarTokens').doc(after.lehrerUid).get();
+    const tokenSnap = await getFirestore().collection('calendarTokens').doc(after.lehrerUid).get();
     if (!tokenSnap.exists) return; // Fahrlehrer hat keinen Kalender verbunden
 
     if (wurdeGebucht) {
@@ -304,7 +312,7 @@ exports.syncSlotToGoogleCalendar = onDocumentUpdated({ document: 'slots/{slotId}
         // FIX: 'schueler' (Kalender-eigene Liste) speichert fname/lname,
         // nicht vorname/nachname (das ist nur in der ADK-Kartei so) -
         // dadurch blieb der Name im Google-Kalender-Titel bisher leer.
-        const scSnap = await admin.firestore().collection('schueler').doc(after.bookedBy).get();
+        const scSnap = await getFirestore().collection('schueler').doc(after.bookedBy).get();
         if (scSnap.exists) {
           const name = `${(scSnap.data().fname || '')} ${(scSnap.data().lname || '')}`.trim();
           if (name) titel = `Fahrstunde – ${name}`;
@@ -347,12 +355,12 @@ exports.createStripeCheckoutSession = onCall({ secrets: [STRIPE_SECRET_KEY] }, a
   }
 
   // Dieselbe Zuordnung wie bei PayPal: Fahrschule ODER Solo-Nutzer
-  const userDoc = await admin.firestore().doc(`users/${uid}`).get();
+  const userDoc = await getFirestore().doc(`users/${uid}`).get();
   if (!userDoc.exists) throw new HttpsError('failed-precondition', 'Kein Profil gefunden.');
   const userData = userDoc.data();
   const billingColl = userData.fahrschuleId ? 'fahrschulen' : 'users';
   const billingId   = userData.fahrschuleId || uid;
-  const billingDoc  = await admin.firestore().doc(`${billingColl}/${billingId}`).get();
+  const billingDoc  = await getFirestore().doc(`${billingColl}/${billingId}`).get();
   const b = billingDoc.exists ? billingDoc.data() : {};
   if (!b.rechnungsStrasse || !b.rechnungsPlz || !b.rechnungsOrt) {
     throw new HttpsError('failed-precondition', 'Bitte zuerst eine Rechnungsadresse hinterlegen.');
@@ -420,7 +428,7 @@ exports.createStripeCheckoutSession = onCall({ secrets: [STRIPE_SECRET_KEY] }, a
 // Rechnung. Wird sowohl bei sofortiger Zahlung als auch beim reinen
 // Testphase-Start (0 EUR faellig) gebraucht.
 async function stripeAboAktivieren(billingColl, billingId, plan, planer, subscriptionId) {
-  const billingRef = admin.firestore().doc(`${billingColl}/${billingId}`);
+  const billingRef = getFirestore().doc(`${billingColl}/${billingId}`);
   const billingSnap = await billingRef.get();
   if (!billingSnap.exists) return null;
   const felder = {
@@ -511,12 +519,12 @@ async function stripeVerlaengerungsRechnung(invoice, stripeEventId) {
   const planInfo = RECHNUNG_PLANS[plan];
   if (!planInfo) return;
 
-  const billingSnap = await admin.firestore().doc(`${billingColl}/${billingId}`).get();
+  const billingSnap = await getFirestore().doc(`${billingColl}/${billingId}`).get();
   if (!billingSnap.exists) return;
   const b = billingSnap.data();
   if (!b.rechnungsStrasse || !b.rechnungsPlz || !b.rechnungsOrt) return;
 
-  await admin.firestore().doc(`${billingColl}/${billingId}`).update({ aboLetzteZahlungAm: Date.now() });
+  await getFirestore().doc(`${billingColl}/${billingId}`).update({ aboLetzteZahlungAm: Date.now() });
 
   const betrag = invoice.amount_paid / 100;
   const nummer = await rechnungAnlegen({
@@ -613,8 +621,8 @@ async function versuchErlaubt(kennung, maxProStunde) {
   // personenbezogenes Datum) - eine gekuerzte Pruefsumme genuegt zum Zaehlen.
   const id = require('crypto').createHash('sha256').update(String(kennung)).digest('hex').slice(0, 32);
   try {
-    return await admin.firestore().runTransaction(async (tx) => {
-      const ref = admin.firestore().doc(`rateLimits/${id}`);
+    return await getFirestore().runTransaction(async (tx) => {
+      const ref = getFirestore().doc(`rateLimits/${id}`);
       const snap = await tx.get(ref);
       const jetzt = Date.now();
       const d = snap.exists ? snap.data() : null;
@@ -653,7 +661,7 @@ exports.findeAltenZugangscode = onCall(async (request) => {
     throw new HttpsError('resource-exhausted', 'Zu viele Versuche. Bitte spaeter erneut versuchen.');
   }
 
-  const snap = await admin.firestore().collection('accessCodes')
+  const snap = await getFirestore().collection('accessCodes')
     .where('code', '==', code).limit(1).get();
   if (snap.empty) return { found: false };
   const doc = snap.docs[0];
@@ -672,7 +680,7 @@ exports.adminEmailBestaetigen = onCall(async (request) => {
   const istSuperAdminEmail = auth.token.email === 'chriskoo@mail.de';
   let istSuperAdminRolle = false;
   if (!istSuperAdminEmail) {
-    const eigenesDoc = await admin.firestore().doc(`users/${auth.uid}`).get();
+    const eigenesDoc = await getFirestore().doc(`users/${auth.uid}`).get();
     istSuperAdminRolle = eigenesDoc.exists && eigenesDoc.data().rolle === 'superadmin';
   }
   if (!istSuperAdminEmail && !istSuperAdminRolle) {
@@ -680,8 +688,8 @@ exports.adminEmailBestaetigen = onCall(async (request) => {
   }
   const { email } = request.data || {};
   if (!email) throw new HttpsError('invalid-argument', 'E-Mail fehlt.');
-  const user = await admin.auth().getUserByEmail(email);
-  await admin.auth().updateUser(user.uid, { emailVerified: true });
+  const user = await getAuth().getUserByEmail(email);
+  await getAuth().updateUser(user.uid, { emailVerified: true });
   return { success: true, uid: user.uid };
 });
 
@@ -766,7 +774,7 @@ exports.bestaetigePaypalAbo = onCall(
     }
 
     const uid = auth.uid;
-    const userSnap = await admin.firestore().doc(`users/${uid}`).get();
+    const userSnap = await getFirestore().doc(`users/${uid}`).get();
     if (!userSnap.exists) throw new HttpsError('failed-precondition', 'Nutzerprofil nicht gefunden.');
     const userData = userSnap.data();
 
@@ -784,14 +792,14 @@ exports.bestaetigePaypalAbo = onCall(
     // verschiedenen Konten) verwendet wird, um sich mit einer fremden,
     // echten Zahlung selbst freizuschalten.
     for (const coll of ['fahrschulen', 'users']) {
-      const belegt = await admin.firestore().collection(coll)
+      const belegt = await getFirestore().collection(coll)
         .where('aboSubscriptionId', '==', subscriptionId).limit(1).get();
       if (!belegt.empty && !(coll === billingColl && belegt.docs[0].id === billingId)) {
         throw new HttpsError('failed-precondition', 'Diese Subscription ist bereits einem anderen Konto zugeordnet.');
       }
     }
 
-    await admin.firestore().doc(`${billingColl}/${billingId}`).set({
+    await getFirestore().doc(`${billingColl}/${billingId}`).set({
       abo:               plan,
       aboPlaner:         !!planer,
       aboMaxLehrer:      planInfo.maxLehrer,
@@ -851,14 +859,14 @@ exports.paypalWebhook = onRequest(
 
         // Idempotenz: PayPal kann denselben Webhook mehrfach zustellen -
         // pro Zahlung darf nur eine Rechnung entstehen.
-        const bereits = await admin.firestore().collection('rechnungen')
+        const bereits = await getFirestore().collection('rechnungen')
           .where('paypalSaleId', '==', saleId).limit(1).get();
         if (!bereits.empty) { res.status(200).send('ok - bereits verarbeitet'); return; }
 
         // Zugehoerige Fahrschule/Nutzer anhand der Subscription-ID finden
         let billingColl = null, billingId = null, billingData = null;
         for (const coll of ['fahrschulen', 'users']) {
-          const snap = await admin.firestore().collection(coll)
+          const snap = await getFirestore().collection(coll)
             .where('aboSubscriptionId', '==', subscriptionId).limit(1).get();
           if (!snap.empty) {
             billingColl = coll; billingId = snap.docs[0].id; billingData = snap.docs[0].data();
@@ -888,7 +896,7 @@ exports.paypalWebhook = onRequest(
         });
         if (!nummer) { res.status(200).send('ok - bereits verarbeitet'); return; }
 
-        await admin.firestore().doc(`${billingColl}/${billingId}`).update({ aboLetzteZahlungAm: Date.now() });
+        await getFirestore().doc(`${billingColl}/${billingId}`).update({ aboLetzteZahlungAm: Date.now() });
         console.log('paypalWebhook: Rechnung', nummer, 'erzeugt fuer', billingColl, billingId);
       }
 
@@ -937,7 +945,7 @@ const { loescheAlle, loescheZugangscodesMitBildern, loeschUmfang, loescheKontoHa
 // wuerde nach der Kontoloeschung munter weiter abgebucht - der Kunde haette
 // kein Konto mehr, aber weiter eine monatliche Belastung.
 async function kuendigeLaufendesAbo(billingColl, billingId) {
-  const snap = await admin.firestore().doc(`${billingColl}/${billingId}`).get();
+  const snap = await getFirestore().doc(`${billingColl}/${billingId}`).get();
   if (!snap.exists) return null;
   const b = snap.data();
   const subId = b.aboSubscriptionId;
@@ -972,7 +980,7 @@ exports.kontoLoeschungBeantragen = onCall(
     const auth = request.auth;
     if (!auth) throw new HttpsError('unauthenticated', 'Bitte anmelden.');
     const uid = auth.uid;
-    const userSnap = await admin.firestore().doc(`users/${uid}`).get();
+    const userSnap = await getFirestore().doc(`users/${uid}`).get();
     if (!userSnap.exists) throw new HttpsError('failed-precondition', 'Kein Profil gefunden.');
     const userData = userSnap.data();
 
@@ -989,11 +997,11 @@ exports.kontoLoeschungBeantragen = onCall(
     // also nichts gekuendigt (das Abo der Schule bleibt unberuehrt).
     const gekuendigt = await kuendigeLaufendesAbo(istInhaber ? 'fahrschulen' : 'users', uid);
 
-    await admin.firestore().doc(`users/${uid}`).update({
+    await getFirestore().doc(`users/${uid}`).update({
       geloeschtAm, loeschungAm, aboStatus: 'gekuendigt',
     });
     if (istInhaber) {
-      await admin.firestore().doc(`fahrschulen/${uid}`)
+      await getFirestore().doc(`fahrschulen/${uid}`)
         .update({ geloeschtAm, loeschungAm, aboStatus: 'gekuendigt' }).catch(() => {});
     }
 
@@ -1008,11 +1016,11 @@ exports.kontoLoeschungWiderrufen = onCall(async (request) => {
   if (!auth) throw new HttpsError('unauthenticated', 'Bitte anmelden.');
   const uid = auth.uid;
   const entfernen = {
-    geloeschtAm: admin.firestore.FieldValue.delete(),
-    loeschungAm: admin.firestore.FieldValue.delete(),
+    geloeschtAm: FieldValue.delete(),
+    loeschungAm: FieldValue.delete(),
   };
-  await admin.firestore().doc(`users/${uid}`).update(entfernen);
-  await admin.firestore().doc(`fahrschulen/${uid}`).update(entfernen).catch(() => {});
+  await getFirestore().doc(`users/${uid}`).update(entfernen);
+  await getFirestore().doc(`fahrschulen/${uid}`).update(entfernen).catch(() => {});
   console.log('Kontoloeschung widerrufen von', uid);
   return { success: true };
 });
@@ -1023,7 +1031,7 @@ exports.kontoLoeschungWiderrufen = onCall(async (request) => {
 exports.taeglichesAufraeumen = onSchedule(
   { schedule: 'every day 03:15', timeZone: 'Europe/Berlin', timeoutSeconds: 540, memory: '512MiB' },
   async () => {
-    const db = admin.firestore();
+    const db = getFirestore();
     const jetzt = Date.now();
     const bericht = { konten: 0, codes: 0, nachgetragen: 0, anonym: 0, mails: 0, resets: 0, buchungen: 0, oauth: 0 };
 
@@ -1060,7 +1068,7 @@ exports.taeglichesAufraeumen = onSchedule(
     try {
       bericht.mails = await loescheAlle(
         db.collection('mailQueue').where('createdAt', '<=',
-          admin.firestore.Timestamp.fromMillis(jetzt - 90 * TAG_MS)));
+          Timestamp.fromMillis(jetzt - 90 * TAG_MS)));
     } catch (e) { console.error('mailQueue:', e); }
     try {
       bericht.resets = await loescheAlle(
@@ -1071,7 +1079,7 @@ exports.taeglichesAufraeumen = onSchedule(
     // oauthStates dagegen als Date.now() (Zahl). Vergleicht man hier mit dem
     // falschen Typ, liefert Firestore stillschweigend KEINE Treffer und der
     // Aufraeum-Job laeuft wirkungslos ins Leere.
-    const grenzeTimestamp = admin.firestore.Timestamp.fromMillis(jetzt - 90 * TAG_MS);
+    const grenzeTimestamp = Timestamp.fromMillis(jetzt - 90 * TAG_MS);
     for (const coll of ['bookingRequests', 'bookingMessages']) {
       try {
         bericht.buchungen += await loescheAlle(
@@ -1084,7 +1092,7 @@ exports.taeglichesAufraeumen = onSchedule(
     // damit keine laufende Sitzung getroffen wird.
     try {
       bericht.anonym = await loescheAlteAnonymeKonten(
-        admin.auth(), 60 * TAG_MS, 500, jetzt);
+        getAuth(), 60 * TAG_MS, 500, jetzt);
     } catch (e) { console.error('Anonyme Sitzungen:', e); }
 
     // Kurzlebige CSRF-Marken des Kalender-Logins (eine Stunde reicht)
@@ -1123,7 +1131,7 @@ exports.syncBookedCount = onDocumentUpdated('slots/{slotId}', async (event) => {
   const nachId = nachher.bookedBy || null;
   if (vonId === nachId) return; // keine Buchungsaenderung
 
-  const db = admin.firestore();
+  const db = getFirestore();
   const schritte = [];
   if (vonId)  schritte.push([vonId, -1]);
   if (nachId) schritte.push([nachId, +1]);
@@ -1179,7 +1187,7 @@ exports.uebernehmeSchuelerInFahrschule = onCall(async (request) => {
     throw new HttpsError('permission-denied', 'Nur mit echtem Konto.');
   }
   const uid = auth.uid;
-  const db  = admin.firestore();
+  const db  = getFirestore();
 
   const meinDoc = await db.doc(`users/${uid}`).get();
   if (!meinDoc.exists) throw new HttpsError('failed-precondition', 'Nutzerprofil nicht gefunden.');

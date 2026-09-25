@@ -21,7 +21,7 @@ import { dirname, join } from 'node:path';
 const require = createRequire(import.meta.url);
 const hier = dirname(fileURLToPath(import.meta.url));
 
-// SICHERHEIT: loescheKontoHart ruft admin.auth().deleteUser() und
+// SICHERHEIT: loescheKontoHart ruft getAuth().deleteUser() und
 // admin.storage().deleteFiles() auf. Ohne diese beiden Zeilen wuerde das Modul
 // versuchen, die ECHTE Firebase-Instanz zu erreichen. Beides wird hier fest
 // auf den lokalen Rechner gelenkt, damit ein Testlauf unter keinen Umstaenden
@@ -32,9 +32,20 @@ process.env.STORAGE_EMULATOR_HOST         = '127.0.0.1:9199';
 process.env.FIREBASE_STORAGE_EMULATOR_HOST = '127.0.0.1:9199';
 process.env.GCLOUD_PROJECT                = 'fahrsync-loeschen';
 
-const admin = require(join(hier, '..', 'functions', 'node_modules', 'firebase-admin'));
-admin.initializeApp({ projectId: 'fahrsync-loeschen' });
-const db = admin.firestore();
+// Bewusst aus functions/: Der Test soll GENAU die firebase-admin-Fassung
+// benutzen, die auch deployt wird - nicht eine andere aus tests/.
+//
+// Verankert ueber die package.json von functions/, NICHT ueber einen
+// zusammengesetzten Dateipfad: Seit Version 14 gibt firebase-admin seine
+// Unterpfade ueber die "exports"-Tabelle frei, und die greift nur bei
+// Paketnamen. Ein Pfad wie '<...>/firebase-admin/app' laeuft daran vorbei
+// und findet nichts.
+const ausFunctions = createRequire(join(hier, '..', 'functions', 'package.json'));
+const { initializeApp } = ausFunctions('firebase-admin/app');
+const { getFirestore } = ausFunctions('firebase-admin/firestore');
+const { getAuth } = ausFunctions('firebase-admin/auth');
+initializeApp({ projectId: 'fahrsync-loeschen' });
+const db = getFirestore();
 
 const { loescheKontoHart, gehoertNochDemKonto } = require(join(hier, '..', 'functions', 'loeschen.js'));
 

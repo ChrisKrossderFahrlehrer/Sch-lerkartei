@@ -5,7 +5,14 @@
 // pruefen (tests/loeschen.test.mjs fuehrt loescheKontoHart WIRKLICH aus),
 // statt ihn nur zu behaupten. Die Deploy-Oberflaeche von index.js bleibt
 // unveraendert - dort steht weiterhin genau dasselbe zur Verfuegung.
-const admin = require('firebase-admin');
+// firebase-admin 14: Die alte Namensraum-Form - admin.firestore(),
+// admin.auth(), admin.storage(), admin.messaging() - gibt es nicht mehr.
+// Jeder Bereich hat jetzt einen eigenen Unterpfad mit einer eigenen
+// Zugriffsfunktion. Beim Umstieg wurden nur diese Zeilen und die Aufrufe
+// geaendert, an der Logik nichts.
+const { getFirestore } = require('firebase-admin/firestore');
+const { getAuth } = require('firebase-admin/auth');
+const { getStorage } = require('firebase-admin/storage');
 const CHAT_BUCKET = 'fahrschule-ebc65-eu-storage';
 
 // Loescht alle Dokumente einer Abfrage in Bloecken (Firestore erlaubt
@@ -25,7 +32,7 @@ async function loescheAlle(abfrage, nurWenn = null) {
     marke = snap.docs[snap.docs.length - 1];
     const zuLoeschen = nurWenn ? snap.docs.filter(nurWenn) : snap.docs;
     if (zuLoeschen.length) {
-      const stapel = admin.firestore().batch();
+      const stapel = getFirestore().batch();
       zuLoeschen.forEach(d => stapel.delete(d.ref));
       await stapel.commit();
       geloescht += zuLoeschen.length;
@@ -63,7 +70,7 @@ const gehoertNochDemKonto = (einUid, zuordnungsFeld) => (d) => {
 // auch bei laengst abgelaufenen Codes.
 async function loescheChatBilderServer(codeId) {
   try {
-    await admin.storage().bucket(CHAT_BUCKET).deleteFiles({ prefix: `chat-images/${codeId}/` });
+    await getStorage().bucket(CHAT_BUCKET).deleteFiles({ prefix: `chat-images/${codeId}/` });
   } catch (e) {
     console.warn('Chat-Bilder loeschen fehlgeschlagen fuer', codeId, e.message);
   }
@@ -93,7 +100,7 @@ function loeschUmfang(uid, userData) {
 
 // Harte, endgueltige Loeschung eines Kontos samt aller Daten.
 async function loescheKontoHart(uid) {
-  const db = admin.firestore();
+  const db = getFirestore();
   const userSnap = await db.doc(`users/${uid}`).get();
   const userData = userSnap.exists ? userSnap.data() : {};
   const { istInhaber, fahrschuleId } = loeschUmfang(uid, userData);
@@ -177,7 +184,7 @@ async function loescheKontoHart(uid) {
   // 6) Nutzerprofile und Anmeldekonten zuletzt
   for (const einUid of betroffeneUids) {
     await db.doc(`users/${einUid}`).delete().catch(() => {});
-    await admin.auth().deleteUser(einUid).catch(e => {
+    await getAuth().deleteUser(einUid).catch(e => {
       if (e.code !== 'auth/user-not-found') console.warn('Auth-Konto loeschen:', einUid, e.message);
     });
   }
