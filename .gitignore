@@ -2,4 +2,7 @@ node_modules/
 tests/node_modules/
 *.log
 functions/node_modules/
-functions/package-lock.json
+# functions/package-lock.json gehoert BEWUSST ins Repo:
+# Ohne ihn installiert jeder Deploy - und der Ablauf in
+# .github/workflows/ - andere Unterversionen als die geprueften.
+# 'npm ci' verlangt ihn ausserdem zwingend.
