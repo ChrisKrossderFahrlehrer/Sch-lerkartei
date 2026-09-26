@@ -42,6 +42,14 @@ Das muss einmal am Mac gemacht werden, danach nie wieder.
    | Dienstkontonutzer *(Service Account User)* | damit die Function unter ihrem eigenen Konto starten darf |
    | Cloud Build-Bearbeiter *(Cloud Build Editor)* | Functions werden beim Deployen gebaut |
    | Artifact Registry-Administrator | dort landen die gebauten Abbilder |
+   | **Cloud Scheduler-Administrator** | für `taeglichesAufraeumen` – der nächtliche Job ist ein Scheduler-Auftrag |
+   | **Eventarc-Administrator** | für die 5 Firestore-Auslöser (neue Anfrage, neue Nachricht, Buchungszähler …) |
+   | **Service Usage-Nutzer** *(Service Usage Consumer)* | `firebase deploy` prüft vorab, ob die nötigen Dienste eingeschaltet sind |
+
+   Die letzten drei standen in einer früheren Fassung dieser Liste **nicht** –
+   nachgesehen an den Auslösern in `functions/index.js`: 1× `onSchedule`,
+   5× `onDocumentCreated`/`onDocumentUpdated`. Ohne sie wäre der erste echte
+   Deploy genau dort gescheitert.
 
 5. Beim fertigen Dienstkonto: *Schlüssel → Schlüssel hinzufügen → Neuen
    Schlüssel erstellen → **JSON*** → die Datei wird heruntergeladen
