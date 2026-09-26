@@ -5,7 +5,12 @@
 // PayPal-Zweig. Eine Korrektur an einer Stelle erreichte die andere nicht.
 // Als eigenes Modul laesst er sich ausserdem gegen den Emulator pruefen,
 // ohne die Deploy-Oberflaeche von index.js anzufassen.
-const admin = require('firebase-admin');
+// firebase-admin 14: Die alte Namensraum-Form - admin.firestore(),
+// admin.auth(), admin.storage(), admin.messaging() - gibt es nicht mehr.
+// Jeder Bereich hat jetzt einen eigenen Unterpfad mit einer eigenen
+// Zugriffsfunktion. Beim Umstieg wurden nur diese Zeilen und die Aufrufe
+// geaendert, an der Logik nichts.
+const { getFirestore } = require('firebase-admin/firestore');
 
 const PDFDocument = require('pdfkit');
 
@@ -90,7 +95,7 @@ function baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel, betra
 
 // Rechnungsdaten des Ausstellers - einmal an einer Stelle, nicht je Zahlweg.
 async function rechnungsSteller() {
-  const platDoc = await admin.firestore().doc('platform/impressum').get();
+  const platDoc = await getFirestore().doc('platform/impressum').get();
   const p = platDoc.exists ? platDoc.data() : {};
   return {
     name: p.name || 'Chriskoo', strasse: p.strasse || '',
@@ -125,7 +130,7 @@ async function rechnungAnlegen({
   billingId, empfaengerName, b, plan, planer, planInfo,
   betrag, zahlungsart, docId, referenzFelder, herkunft,
 }) {
-  const db = admin.firestore();
+  const db = getFirestore();
   const counterRef = db.doc('platform/rechnungszaehler');
   const rechnungRef = db.collection('rechnungen').doc(docId);
 

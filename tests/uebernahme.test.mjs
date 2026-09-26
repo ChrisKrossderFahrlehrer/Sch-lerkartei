@@ -18,12 +18,22 @@ import { initializeTestEnvironment } from '@firebase/rules-unit-testing';
 import { doc, setDoc, getDocs, getDoc, query, collection, where, writeBatch } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 const require = createRequire(import.meta.url);
-const { gehoertNochDemKonto } = require('/home/user/Sch-lerkartei/functions/loeschen.js');
-const QUELLE = readFileSync('/home/user/Sch-lerkartei/functions/index.js','utf8');
+// Pfade relativ zu DIESER Datei, nicht fest eingetragen. Hier standen drei
+// absolute Pfade des Rechners, auf dem der Test entstanden ist. Auf jedem
+// anderen Rechner - und im Ablauf unter .github/workflows - bricht das mit
+// "Cannot find module" ab. Aufgefallen ist es erst im ersten CI-Lauf: Auf
+// dem Ursprungsrechner gibt es das Verzeichnis ja.
+const hier = dirname(fileURLToPath(import.meta.url));
+const WURZEL = join(hier, '..');
+
+const { gehoertNochDemKonto } = require(join(WURZEL, 'functions', 'loeschen.js'));
+const QUELLE = readFileSync(join(WURZEL, 'functions', 'index.js'), 'utf8');
 
 const env = await initializeTestEnvironment({ projectId:'uebernahme', firestore:{
-  rules: readFileSync('/home/user/Sch-lerkartei/firestore.rules','utf8'), host:'127.0.0.1', port:8089 }});
+  rules: readFileSync(join(WURZEL, 'firestore.rules'), 'utf8'), host:'127.0.0.1', port:8089 }});
 const SCHULE='schule-uid', LEHRER='lehrer-uid', FREMD='fremd-uid';
 // Alles in EINEM Block: Der Admin-Zugang wird geschlossen, sobald der
 // Rueckruf endet - danach ist die Verbindung tot.

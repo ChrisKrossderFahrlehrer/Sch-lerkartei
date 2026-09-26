@@ -328,6 +328,53 @@ for (const d of DATEI_ALLE) {
 }
 console.log(`  ${datumGeprueft} Dateien durchgesehen${datumOffen ? '' : ' ✓'}`);
 
+// ══ 8 Keine festen Pfade eines bestimmten Rechners ═════════════════════
+// In tests/uebernahme.test.mjs standen drei absolute Pfade des Rechners, auf
+// dem der Test entstanden ist:
+//
+//   require('/home/user/Sch-lerkartei/functions/loeschen.js')
+//
+// Auf diesem Rechner lief das jahrelang. Im ersten CI-Lauf brach es sofort ab
+// ("Cannot find module") - dort heisst das Verzeichnis anders. Genau die Art
+// Fehler, die man selbst nie sieht, weil das eigene Verzeichnis ja existiert.
+//
+// Gemeint sind nur Dateipfade. Adressen im Web (/manifest.json, /icon-192.png)
+// sind etwas anderes und bleiben unberuehrt.
+console.log('\n8) Keine Pfade eines bestimmten Rechners');
+const DURCHSUCHEN = [
+  ...SEITEN, 'sw.js',
+  'functions/index.js', 'functions/loeschen.js', 'functions/rechnung.js',
+  'firebase.json', 'firestore.rules', 'storage.rules',
+  '.github/workflows/pruefen-und-deployen.yml',
+];
+// Auch alle Testdateien - dort ist es zuletzt passiert.
+for (const d of ['statisch', 'indizes', 'rules', 'uebernahme', 'audit', 'rechnung',
+                 'loeschen', 'kein_verlust', 'aufraeumen', 'speicher', 'admin']) {
+  DURCHSUCHEN.push(`tests/${d}.test.mjs`);
+}
+// Nur /home/<name>/ und /Users/<name>/ - das ist eindeutig.
+// Windows-Pfade waren zuerst mit im Muster und haben massenhaft Fehlalarme
+// erzeugt: In einer Zeichenkette wie 'Fehler:\n' steckt die Folge r-Doppel-
+// punkt-Backslash und passte darauf. Windows-Pfade gibt es hier ohnehin nicht.
+const RECHNERPFAD = /(?:\/home\/[\w.-]+\/|\/Users\/[\w.-]+\/)/g;
+let pfadOffen = 0, pfadGeprueft = 0;
+for (const d of DURCHSUCHEN) {
+  const text = lies(d);
+  if (!text) continue;
+  pfadGeprueft++;
+  for (const m of text.matchAll(RECHNERPFAD)) {
+    // Der eigene Erklaertext in dieser Pruefung zaehlt nicht mit.
+    const zeile = text.slice(text.lastIndexOf('\n', m.index) + 1,
+                             text.indexOf('\n', m.index)).trim();
+    if (zeile.startsWith('//') || zeile.startsWith('*') || zeile.startsWith('#')) continue;
+    pfadOffen++;
+    melde(`${d}:${zeileVon(text, m.index)}  fester Pfad "${m[0]}…"`
+        + `\n        Laeuft nur auf einem Rechner. Relativ zur Datei aufloesen`
+        + ` (fileURLToPath/dirname/join).`);
+  }
+}
+console.log(`  ${pfadGeprueft} Dateien durchgesehen${pfadOffen ? '' : ' ✓'}`);
+
 // ══ Ergebnis ═══════════════════════════════════════════════════════════
 console.log(befunde === 0
   ? '\n✓ Keine Befunde.\n'

@@ -22,9 +22,19 @@ const hier = dirname(fileURLToPath(import.meta.url));
 process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8089';
 process.env.GCLOUD_PROJECT = 'fahrsync-rechnung';
 
-const admin = require(join(hier, '..', 'functions', 'node_modules', 'firebase-admin'));
-admin.initializeApp({ projectId: 'fahrsync-rechnung' });
-const db = admin.firestore();
+// Bewusst aus functions/: Der Test soll GENAU die firebase-admin-Fassung
+// benutzen, die auch deployt wird - nicht eine andere aus tests/.
+//
+// Verankert ueber die package.json von functions/, NICHT ueber einen
+// zusammengesetzten Dateipfad: Seit Version 14 gibt firebase-admin seine
+// Unterpfade ueber die "exports"-Tabelle frei, und die greift nur bei
+// Paketnamen. Ein Pfad wie '<...>/firebase-admin/app' laeuft daran vorbei
+// und findet nichts.
+const ausFunctions = createRequire(join(hier, '..', 'functions', 'package.json'));
+const { initializeApp } = ausFunctions('firebase-admin/app');
+const { getFirestore } = ausFunctions('firebase-admin/firestore');
+initializeApp({ projectId: 'fahrsync-rechnung' });
+const db = getFirestore();
 
 const { rechnungAnlegen } = require(join(hier, '..', 'functions', 'rechnung.js'));
 
