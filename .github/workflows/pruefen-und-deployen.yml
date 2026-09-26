@@ -62,6 +62,18 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      # Die Emulatoren sind Java-Archive von zusammen etwa 100 MB und werden
+      # sonst bei JEDEM Lauf neu heruntergeladen - firebase-tools weist im
+      # Protokoll selbst darauf hin. Der Schlüssel enthält die
+      # firebase-tools-Version, damit nach einem Versionswechsel neu geladen
+      # wird statt eine veraltete Fassung zu benutzen.
+      - name: Emulatoren zwischenspeichern
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: emulatoren-${{ runner.os }}-${{ hashFiles('tests/package-lock.json') }}
+          restore-keys: emulatoren-${{ runner.os }}-
+
       # Bewusst mit working-directory statt "npm ci --prefix": --prefix
       # verhält sich je nach npm-Version unterschiedlich und hat schon
       # Pakete an der falschen Stelle abgelegt.
