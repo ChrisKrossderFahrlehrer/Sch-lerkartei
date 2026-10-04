@@ -332,6 +332,24 @@ await pruefe('Freigegebenes Mitglied loescht 120 Termine der Schule in EINER Sam
   ids.forEach(id => b.delete(doc(db, 'slots', id)));
   await assertSucceeds(b.commit());
 });
+console.log('\nGEGENPROBE — Schueler an einen Kollegen uebertragen (index.html, transferStudent)');
+// Die Suche lief vorher ueber users (Abfrage ueber alle Profile) und
+// scheiterte fuer jeden Fahrlehrer. Jetzt ueber usernames/{name}.
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  await setDoc(doc(ctx.firestore(), 'usernames', 'kollege.alt'), { username: 'kollege.alt', uid: ALT, email: 'alt@test.de' });
+});
+await pruefe('Benutzernamen eines Kollegen nachschlagen darf', async () => {
+  await assertSucceeds(getDoc(doc(als(LEHRER), 'usernames', 'kollege.alt')));
+});
+await pruefe('Schueler der Schule an den Kollegen uebertragen darf', async () => {
+  await assertSucceeds(updateDoc(doc(als(LEHRER), 'students', 's-neu'), { uid: ALT }));
+});
+await pruefe('...der Kollege sieht ihn danach', async () => {
+  await assertSucceeds(getDoc(doc(als(ALT), 'students', 's-neu')));
+});
+await pruefe('...und der bisherige Lehrer weiterhin (gehoert ja der Schule)', async () => {
+  await assertSucceeds(getDoc(doc(als(LEHRER), 'students', 's-neu')));
+});
 await pruefe('Wartendes Mitglied behaelt seine EIGENEN Termine', async () => {
   await assertSucceeds(getDoc(doc(als(WARTET), 'slots', 'slot-wartet')));
 });

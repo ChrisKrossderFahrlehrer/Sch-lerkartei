@@ -1896,7 +1896,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 <div class="modal-overlay" id="transfer-modal" onclick="closeModal(event)">
   <div class="modal-sheet">
     <div class="sheet-title">🔄 Schüler übertragen</div>
-    <p style="font-size:0.85rem;color:var(--muted);text-align:center;margin-bottom:16px">Gib den Benutzernamen des Fahrlehrers ein, dem du diesen Schüler übertragen möchtest.</p>
+    <p style="font-size:0.85rem;color:var(--muted);text-align:center;margin-bottom:16px">Gib den Benutzernamen eines Kollegen aus deiner Fahrschule ein, dem du diesen Schüler übertragen möchtest.</p>
     <div class="form-group">
       <label class="form-label">Benutzername des Fahrlehrers</label>
       <input class="form-input" id="inp-transfer-username" type="text" placeholder="z. B. anna.schmidt" autocapitalize="none" autocomplete="off">
@@ -8338,20 +8338,38 @@ window.transferStudent = async () => {
   if (!username) { errEl.textContent = 'Bitte einen Benutzernamen eingeben.'; return; }
 
   const s = getStudent(activeId);
-  const myUsername = currentUser.displayName;
+  if (!s) { errEl.textContent = 'Bitte zuerst einen Schüler öffnen.'; return; }
+
+  // Nur innerhalb der Fahrschule, und nur Schueler, die schon der Fahrschule
+  // gehoeren. Die Firestore-Regeln liessen mehr zu - mit boesen Folgen:
+  // Ein Schueler, der noch unter der EIGENEN Kennung laeuft (eigenstaendiger
+  // Lehrer, oder mitgebracht und nicht uebernommen), ist nach der Uebergabe
+  // fuer NIEMANDEN mehr sichtbar: Der bisherige Lehrer ist nicht mehr
+  // zustaendig, der neue gehoert nicht zu dieser Kennung. Nicht geloescht,
+  // aber verloren.
+  const fsId = currentUser._fahrschuleId;
+  if (!fsId || fsId === currentUser.uid) {
+    errEl.textContent = 'Übertragen geht nur innerhalb einer Fahrschule. Als eigenständiger Fahrlehrer hast du keine Kollegen in der Kartei.';
+    return;
+  }
+  if (s.fahrschuleId !== fsId) {
+    errEl.textContent = 'Dieser Schüler läuft noch unter deiner eigenen Kennung. Übernimm ihn zuerst in die Fahrschule (Einstellungen → Fahrschule), dann kannst du ihn übertragen.';
+    return;
+  }
 
   try {
-    const q = query(collection(db, 'users'), where('username', '==', username));
-    const snap = await new Promise((res, rej) => {
-      const unsub = onSnapshot(q, (s) => { unsub(); res(s); }, rej);
-    });
-
-    if (snap.empty) {
-      errEl.textContent = 'Kein Fahrlehrer mit diesem Benutzernamen gefunden.';
+    // FIX: Hier stand eine Abfrage ueber ALLE Nutzerprofile
+    // (users where username == ...). Die Regeln lassen das zu Recht nur
+    // dem Betreiber zu - die Uebertragung scheiterte deshalb bei JEDEM
+    // Fahrlehrer mit "Fehler bei der Übertragung" (im Emulator belegt).
+    // Die Zuordnung Benutzername -> Konto steht oeffentlich lesbar in
+    // usernames/{name}, genau dafuer ist sie da.
+    const unSnap = await getDoc(doc(db, 'usernames', username));
+    const targetUid = unSnap.exists() ? (unSnap.data().uid || null) : null;
+    if (!targetUid) {
+      errEl.textContent = 'Kein Fahrlehrer mit diesem Benutzernamen gefunden. Hat sich dein Kollege schon einmal angemeldet?';
       return;
     }
-
-    const targetUid = snap.docs[0].data().uid;
     if (targetUid === currentUser.uid) { errEl.textContent = 'Das ist dein eigener Benutzername.'; return; }
 
     await dbUpd(doc(db, 'students', activeId), { uid: targetUid });
