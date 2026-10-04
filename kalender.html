@@ -678,6 +678,8 @@ window.doLogin=async function(){
       const unameLower=eingabe.toLowerCase().trim();
       const unameDoc=await getDoc(doc(db,'usernames',unameLower));
       if(unameDoc.exists()&&unameDoc.data().email){versuche.push(unameDoc.data().email.toLowerCase());}
+      // Bisherige Adresse, solange eine E-Mail-Aenderung unbestaetigt ist (wie index.html)
+      if(unameDoc.exists()&&unameDoc.data().emailVorher){const v=String(unameDoc.data().emailVorher).toLowerCase();if(!versuche.includes(v))versuche.push(v);}
     }catch(e){/* usernames evtl. nicht lesbar - weiter */}
     versuche.push(usernameToEmailKal(eingabe));
   }
@@ -761,6 +763,18 @@ onAuthStateChanged(auth,async user=>{
     }
 
     const fahrschuleId=adkUser.fahrschuleId||user.uid;
+    // Freigabe wie in der Kartei (index.html): Gesperrte kommen nicht hinein,
+    // und wer einer Schule beigetreten ist, wartet auf die Freischaltung.
+    // Die Firestore-Regeln verweigern in beiden Faellen die Daten der Schule -
+    // ohne diese Pruefung saehe man nur einen leeren Kalender voller Fehler.
+    if(adkUser.status==='gesperrt'){
+      zeigeKalenderHinweis('🚫 <b>Dein Konto ist gesperrt.</b><br>Bitte wende dich an den Anbieter.');
+      return;
+    }
+    if(adkUser.status==='ausstehend' && fahrschuleId!==user.uid){
+      zeigeKalenderHinweis('⏳ <b>Freischaltung ausstehend.</b><br>Du bist der Fahrschule beigetreten. Sobald du freigeschaltet bist, steht dir der Kalender zur Verfügung.');
+      return;
+    }
     let fahrschule=null;
     try {
       const fsSnap=await getDoc(doc(db,'fahrschulen',fahrschuleId));

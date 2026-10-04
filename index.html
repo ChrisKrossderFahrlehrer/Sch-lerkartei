@@ -3491,6 +3491,14 @@ window.doLogin = async () => {
       if (unameDoc.exists() && unameDoc.data().email) {
         versuche.push(unameDoc.data().email.toLowerCase());
       }
+      // Die bisherige Adresse, solange eine E-Mail-Aenderung noch nicht
+      // bestaetigt ist (siehe changeEmail). Sonst sperrte sich aus, wer den
+      // Bestaetigungslink nie anklickt: Der Eintrag zeigte schon auf die
+      // neue Adresse, das Konto lief aber noch unter der alten.
+      if (unameDoc.exists() && unameDoc.data().emailVorher) {
+        const vorher = String(unameDoc.data().emailVorher).toLowerCase();
+        if (!versuche.includes(vorher)) versuche.push(vorher);
+      }
     } catch(e) { /* usernames-Sammlung evtl. nicht lesbar – weiter */ }
     // …und als Fallback die alte interne Fake-E-Mail (für Bestandskonten)
     versuche.push(usernameToEmail(eingabe));
@@ -3611,9 +3619,15 @@ window.doRegister = async () => {
     try { await sendEmailVerification(cred.user); } catch(everr) { console.warn('sendEmailVerification:', everr); }
 
     // Benutzername → E-Mail-Zuordnung speichern (für Login per Benutzername)
+    // FIX: 'uid' fehlte. Die Firestore-Regel verlangt sie beim Anlegen - der
+    // Eintrag wurde deshalb bei JEDER Registrierung abgewiesen (und hier
+    // still weggefangen). Folgen: Anmelden per Benutzername ging fuer selbst
+    // registrierte Konten nie, nur per E-Mail; die Doppelt-Pruefung oben
+    // fand nichts, derselbe Benutzername liess sich mehrfach vergeben; und
+    // die Kontoloeschung (sucht per uid) haette den Eintrag nie gefunden.
     try {
       await dbSet(doc(db, 'usernames', unameLower), {
-        username: unameLower, email, createdAt: Date.now()
+        username: unameLower, email, uid: cred.user.uid, createdAt: Date.now()
       });
     } catch(unErr) { console.warn('username-mapping:', unErr); }
 
@@ -4691,6 +4705,27 @@ onAuthStateChanged(auth, async (user) => {
             '🚫 Dein Konto wurde gesperrt. Bitte Kontakt aufnehmen.';
           await signOut(auth);
           return;
+        }
+
+        // Benutzername-Zuordnung nachtragen: Bis zur Korrektur in
+        // handleRegister wurde sie bei keiner Registrierung gespeichert
+        // (fehlende uid). Nur anlegen, wenn es den Eintrag noch nicht gibt -
+        // ein vorhandener, auch fremder, wird nie angefasst. Best effort.
+        // Nicht fuer nachtraeglich angelegte Profile: Deren Benutzername ist
+        // nur aus der E-Mail geraten (z.B. "info") und wuerde sonst einen
+        // Namen belegen, den sich nie jemand ausgesucht hat.
+        if (profil.username && !istSuperadmin && !profil.nacherstellt) {
+          try {
+            const unRef = doc(db, 'usernames', String(profil.username).toLowerCase());
+            const unSnap = await getDoc(unRef);
+            if (!unSnap.exists()) {
+              await dbSet(unRef, {
+                username: String(profil.username).toLowerCase(),
+                email: (user.email || profil.email || '').toLowerCase(),
+                uid: user.uid, createdAt: Date.now(), nachgetragen: true
+              });
+            }
+          } catch(e) { /* nicht kritisch - Anmeldung per E-Mail geht immer */ }
         }
       }
     } catch(e) { /* offline – weiter */ }
@@ -8266,7 +8301,8 @@ window.changeEmail = async () => {
       const uname = profDoc.exists() ? profDoc.data().username : null;
       if (uname) {
         await dbSet(doc(db, 'usernames', uname), {
-          username: uname, email: neueEmail, updatedAt: Date.now()
+          username: uname, email: neueEmail, uid: currentUser.uid,
+          emailVorher: (currentUser.email || '').toLowerCase(), updatedAt: Date.now()
         }, { merge: true });
       }
     } catch(dbErr) { console.warn('emailPending speichern:', dbErr); }
@@ -10563,7 +10599,7 @@ window.erstLoginAbschliessen = async () => {
         await dbUpd(doc(db, 'users', currentUser.uid), { emailPending: mail, emailPendingSince: Date.now() });
         const profDoc = await getDoc(doc(db, 'users', currentUser.uid));
         const uname = profDoc.exists() ? profDoc.data().username : null;
-        if (uname) await dbSet(doc(db, 'usernames', uname), { username: uname, email: mail, updatedAt: Date.now() }, { merge: true });
+        if (uname) await dbSet(doc(db, 'usernames', uname), { username: uname, email: mail, uid: currentUser.uid, emailVorher: (currentUser.email || '').toLowerCase(), updatedAt: Date.now() }, { merge: true });
         toast('Bestätigungs-E-Mail an ' + mail + ' gesendet.');
       } catch(mailErr) {
         console.warn('Erst-Login E-Mail:', mailErr);
