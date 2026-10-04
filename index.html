@@ -51,8 +51,6 @@
 <meta property="og:image" content="https://fahrsync.de/icon-512.png">
 <meta property="og:locale" content="de_DE">
 <meta name="twitter:card" content="summary">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://www.gstatic.com">
 <link rel="manifest" href="./manifest.json">
 <!-- iOS: quadratisches Icon, iOS rundet selbst -->
@@ -63,7 +61,8 @@
 <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png?v=3">
 <link rel="shortcut icon" href="./icon-192.png?v=3">
 <title>ADK – Digitale Kartei für Fahrlehrer | FahrSync</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Manrope:wght@300;400;500;600&display=swap" rel="stylesheet">
+<!-- Schriften lokal statt von Google (DSGVO, siehe werkzeug/schriften-holen.py) -->
+<link href="./schriften/schriften.css" rel="stylesheet">
 <style>
 :root {
   --bg: #0d1117;
