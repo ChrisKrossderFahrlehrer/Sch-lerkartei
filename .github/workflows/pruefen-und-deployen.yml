@@ -97,9 +97,13 @@ jobs:
 
       # ── WAS MUSS DEPLOYT WERDEN? ──────────────────────────────────────
       # Nur beim Push auf main. Bei einem Pull Request bleibt es beim Prüfen.
+      # Nur vom Stand auf main. "Run workflow" laesst sich in GitHub fuer
+      # JEDEN Branch starten - ohne diese Bedingung landete dann ein
+      # ungemergter Arbeitsstand im Live-Backend, an allen Pull-Request-
+      # Pruefungen vorbei. Auf anderen Branches wird nur geprueft.
       - name: Geänderte Bereiche ermitteln
         id: umfang
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             geaendert="alles"

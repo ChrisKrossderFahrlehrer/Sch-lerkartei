@@ -170,4 +170,27 @@ async function rechnungAnlegen({
   });
 }
 
-module.exports = { rechnungAnlegen, baueRechnungsPdf, rechnungsSteller, RECHNUNG_PLANS };
+// Wer bezahlt fuer dieses Konto, und wo liegen Rechnungsadresse und Abo?
+// EINE Stelle fuer PayPal und Stripe, und dieselbe Unterscheidung wie im
+// Browser (index.html, window.__billingDocRef):
+//   - Fahrschul-Inhaber (typ 'fahrschule')   -> fahrschulen/{uid}
+//   - eigenstaendiger Fahrlehrer            -> users/{uid}
+//   - Mitglied einer fremden Fahrschule      -> zahlt nicht selbst (null)
+//
+// FIX: Die Stripe-Funktion hatte eine eigene, abweichende Fassung:
+// "fahrschuleId vorhanden -> fahrschulen". Ein eigenstaendiger Fahrlehrer
+// hat aber fahrschuleId = eigene UID - Stripe suchte seine Rechnungsadresse
+// deshalb in fahrschulen/{uid}, einem Dokument, das es fuer ihn nicht gibt,
+// waehrend die App sie in users/{uid} speichert. Ergebnis: "Bitte zuerst
+// eine Rechnungsadresse hinterlegen", obwohl sie hinterlegt war - per Karte
+// oder Lastschrift konnte kein eigenstaendiger Fahrlehrer bezahlen.
+// Mitglieder einer Schule konnten dagegen ein Abo fuer die Schule
+// abschliessen, was PayPal (zu Recht) ablehnt.
+function abrechnungsZiel(userData, uid) {
+  const u = userData || {};
+  if (u.typ === 'fahrschule') return { billingColl: 'fahrschulen', billingId: uid };
+  if (!u.fahrschuleId || u.fahrschuleId === uid) return { billingColl: 'users', billingId: uid };
+  return null;
+}
+
+module.exports = { rechnungAnlegen, baueRechnungsPdf, rechnungsSteller, RECHNUNG_PLANS, abrechnungsZiel };

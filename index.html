@@ -29,8 +29,8 @@
 <head>
 <meta charset="UTF-8">
 <!-- EmailJS: Benachrichtigung bei neuer Registrierung -->
-<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js" defer></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+<script src="./vendor/emailjs-browser-4.4.1.min.js" defer></script>
+<script src="./vendor/qrcodejs-1.0.0.min.js" defer></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="author" content="ChrisKross der Fahrlehrer (Chriskoo)">
 <meta name="copyright" content="© 2026 ChrisKross der Fahrlehrer – Alle Rechte vorbehalten">
@@ -51,8 +51,6 @@
 <meta property="og:image" content="https://fahrsync.de/icon-512.png">
 <meta property="og:locale" content="de_DE">
 <meta name="twitter:card" content="summary">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://www.gstatic.com">
 <link rel="manifest" href="./manifest.json">
 <!-- iOS: quadratisches Icon, iOS rundet selbst -->
@@ -63,7 +61,8 @@
 <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png?v=3">
 <link rel="shortcut icon" href="./icon-192.png?v=3">
 <title>ADK – Digitale Kartei für Fahrlehrer | FahrSync</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Manrope:wght@300;400;500;600&display=swap" rel="stylesheet">
+<!-- Schriften lokal statt von Google (DSGVO, siehe werkzeug/schriften-holen.py) -->
+<link href="./schriften/schriften.css" rel="stylesheet">
 <style>
 :root {
   --bg: #0d1117;
@@ -1897,7 +1896,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 <div class="modal-overlay" id="transfer-modal" onclick="closeModal(event)">
   <div class="modal-sheet">
     <div class="sheet-title">🔄 Schüler übertragen</div>
-    <p style="font-size:0.85rem;color:var(--muted);text-align:center;margin-bottom:16px">Gib den Benutzernamen des Fahrlehrers ein, dem du diesen Schüler übertragen möchtest.</p>
+    <p style="font-size:0.85rem;color:var(--muted);text-align:center;margin-bottom:16px">Gib den Benutzernamen eines Kollegen aus deiner Fahrschule ein, dem du diesen Schüler übertragen möchtest.</p>
     <div class="form-group">
       <label class="form-label">Benutzername des Fahrlehrers</label>
       <input class="form-input" id="inp-transfer-username" type="text" placeholder="z. B. anna.schmidt" autocapitalize="none" autocomplete="off">
@@ -3491,6 +3490,14 @@ window.doLogin = async () => {
       if (unameDoc.exists() && unameDoc.data().email) {
         versuche.push(unameDoc.data().email.toLowerCase());
       }
+      // Die bisherige Adresse, solange eine E-Mail-Aenderung noch nicht
+      // bestaetigt ist (siehe changeEmail). Sonst sperrte sich aus, wer den
+      // Bestaetigungslink nie anklickt: Der Eintrag zeigte schon auf die
+      // neue Adresse, das Konto lief aber noch unter der alten.
+      if (unameDoc.exists() && unameDoc.data().emailVorher) {
+        const vorher = String(unameDoc.data().emailVorher).toLowerCase();
+        if (!versuche.includes(vorher)) versuche.push(vorher);
+      }
     } catch(e) { /* usernames-Sammlung evtl. nicht lesbar – weiter */ }
     // …und als Fallback die alte interne Fake-E-Mail (für Bestandskonten)
     versuche.push(usernameToEmail(eingabe));
@@ -3611,9 +3618,15 @@ window.doRegister = async () => {
     try { await sendEmailVerification(cred.user); } catch(everr) { console.warn('sendEmailVerification:', everr); }
 
     // Benutzername → E-Mail-Zuordnung speichern (für Login per Benutzername)
+    // FIX: 'uid' fehlte. Die Firestore-Regel verlangt sie beim Anlegen - der
+    // Eintrag wurde deshalb bei JEDER Registrierung abgewiesen (und hier
+    // still weggefangen). Folgen: Anmelden per Benutzername ging fuer selbst
+    // registrierte Konten nie, nur per E-Mail; die Doppelt-Pruefung oben
+    // fand nichts, derselbe Benutzername liess sich mehrfach vergeben; und
+    // die Kontoloeschung (sucht per uid) haette den Eintrag nie gefunden.
     try {
       await dbSet(doc(db, 'usernames', unameLower), {
-        username: unameLower, email, createdAt: Date.now()
+        username: unameLower, email, uid: cred.user.uid, createdAt: Date.now()
       });
     } catch(unErr) { console.warn('username-mapping:', unErr); }
 
@@ -4691,6 +4704,27 @@ onAuthStateChanged(auth, async (user) => {
             '🚫 Dein Konto wurde gesperrt. Bitte Kontakt aufnehmen.';
           await signOut(auth);
           return;
+        }
+
+        // Benutzername-Zuordnung nachtragen: Bis zur Korrektur in
+        // handleRegister wurde sie bei keiner Registrierung gespeichert
+        // (fehlende uid). Nur anlegen, wenn es den Eintrag noch nicht gibt -
+        // ein vorhandener, auch fremder, wird nie angefasst. Best effort.
+        // Nicht fuer nachtraeglich angelegte Profile: Deren Benutzername ist
+        // nur aus der E-Mail geraten (z.B. "info") und wuerde sonst einen
+        // Namen belegen, den sich nie jemand ausgesucht hat.
+        if (profil.username && !istSuperadmin && !profil.nacherstellt) {
+          try {
+            const unRef = doc(db, 'usernames', String(profil.username).toLowerCase());
+            const unSnap = await getDoc(unRef);
+            if (!unSnap.exists()) {
+              await dbSet(unRef, {
+                username: String(profil.username).toLowerCase(),
+                email: (user.email || profil.email || '').toLowerCase(),
+                uid: user.uid, createdAt: Date.now(), nachgetragen: true
+              });
+            }
+          } catch(e) { /* nicht kritisch - Anmeldung per E-Mail geht immer */ }
         }
       }
     } catch(e) { /* offline – weiter */ }
@@ -8266,7 +8300,8 @@ window.changeEmail = async () => {
       const uname = profDoc.exists() ? profDoc.data().username : null;
       if (uname) {
         await dbSet(doc(db, 'usernames', uname), {
-          username: uname, email: neueEmail, updatedAt: Date.now()
+          username: uname, email: neueEmail, uid: currentUser.uid,
+          emailVorher: (currentUser.email || '').toLowerCase(), updatedAt: Date.now()
         }, { merge: true });
       }
     } catch(dbErr) { console.warn('emailPending speichern:', dbErr); }
@@ -8303,20 +8338,38 @@ window.transferStudent = async () => {
   if (!username) { errEl.textContent = 'Bitte einen Benutzernamen eingeben.'; return; }
 
   const s = getStudent(activeId);
-  const myUsername = currentUser.displayName;
+  if (!s) { errEl.textContent = 'Bitte zuerst einen Schüler öffnen.'; return; }
+
+  // Nur innerhalb der Fahrschule, und nur Schueler, die schon der Fahrschule
+  // gehoeren. Die Firestore-Regeln liessen mehr zu - mit boesen Folgen:
+  // Ein Schueler, der noch unter der EIGENEN Kennung laeuft (eigenstaendiger
+  // Lehrer, oder mitgebracht und nicht uebernommen), ist nach der Uebergabe
+  // fuer NIEMANDEN mehr sichtbar: Der bisherige Lehrer ist nicht mehr
+  // zustaendig, der neue gehoert nicht zu dieser Kennung. Nicht geloescht,
+  // aber verloren.
+  const fsId = currentUser._fahrschuleId;
+  if (!fsId || fsId === currentUser.uid) {
+    errEl.textContent = 'Übertragen geht nur innerhalb einer Fahrschule. Als eigenständiger Fahrlehrer hast du keine Kollegen in der Kartei.';
+    return;
+  }
+  if (s.fahrschuleId !== fsId) {
+    errEl.textContent = 'Dieser Schüler läuft noch unter deiner eigenen Kennung. Übernimm ihn zuerst in die Fahrschule (Einstellungen → Fahrschule), dann kannst du ihn übertragen.';
+    return;
+  }
 
   try {
-    const q = query(collection(db, 'users'), where('username', '==', username));
-    const snap = await new Promise((res, rej) => {
-      const unsub = onSnapshot(q, (s) => { unsub(); res(s); }, rej);
-    });
-
-    if (snap.empty) {
-      errEl.textContent = 'Kein Fahrlehrer mit diesem Benutzernamen gefunden.';
+    // FIX: Hier stand eine Abfrage ueber ALLE Nutzerprofile
+    // (users where username == ...). Die Regeln lassen das zu Recht nur
+    // dem Betreiber zu - die Uebertragung scheiterte deshalb bei JEDEM
+    // Fahrlehrer mit "Fehler bei der Übertragung" (im Emulator belegt).
+    // Die Zuordnung Benutzername -> Konto steht oeffentlich lesbar in
+    // usernames/{name}, genau dafuer ist sie da.
+    const unSnap = await getDoc(doc(db, 'usernames', username));
+    const targetUid = unSnap.exists() ? (unSnap.data().uid || null) : null;
+    if (!targetUid) {
+      errEl.textContent = 'Kein Fahrlehrer mit diesem Benutzernamen gefunden. Hat sich dein Kollege schon einmal angemeldet?';
       return;
     }
-
-    const targetUid = snap.docs[0].data().uid;
     if (targetUid === currentUser.uid) { errEl.textContent = 'Das ist dein eigener Benutzername.'; return; }
 
     await dbUpd(doc(db, 'students', activeId), { uid: targetUid });
@@ -10563,7 +10616,7 @@ window.erstLoginAbschliessen = async () => {
         await dbUpd(doc(db, 'users', currentUser.uid), { emailPending: mail, emailPendingSince: Date.now() });
         const profDoc = await getDoc(doc(db, 'users', currentUser.uid));
         const uname = profDoc.exists() ? profDoc.data().username : null;
-        if (uname) await dbSet(doc(db, 'usernames', uname), { username: uname, email: mail, updatedAt: Date.now() }, { merge: true });
+        if (uname) await dbSet(doc(db, 'usernames', uname), { username: uname, email: mail, uid: currentUser.uid, emailVorher: (currentUser.email || '').toLowerCase(), updatedAt: Date.now() }, { merge: true });
         toast('Bestätigungs-E-Mail an ' + mail + ' gesendet.');
       } catch(mailErr) {
         console.warn('Erst-Login E-Mail:', mailErr);

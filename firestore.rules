@@ -58,7 +58,18 @@ service cloud.firestore {
     function isFsAdmin() {
       // FIX: Rolle wird ueberall als 'fahrschul-admin' gespeichert, nicht 'fs_admin'.
       // Ohne diesen Fix war isFsAdmin() IMMER false (Tippfehler-Bug).
-      return isAuth() && userDocExists() && userData().rolle == 'fahrschul-admin';
+      // SICHERHEITS-AUDIT (im Emulator nachgewiesen): Die Rolle allein
+      // genuegte. Die Rolle waehlt man aber bei der Registrierung SELBST -
+      // auch beim Beitritt zu einer fremden Schule. Wer den Fahrschul-Code
+      // kannte, trat als 'fahrschul-admin' bei, blieb zwar 'ausstehend',
+      // durfte aber schon die Profile der Schule lesen und ein zweites,
+      // ebenfalls wartendes Konto selbst freischalten - damit Vollzugriff auf
+      // die fremde Kartei, ganz ohne Freigabe durch einen Menschen.
+      // Inhaber ist nur, wessen Fahrschule die EIGENE ist. Genau so legen
+      // index.html und adk-platform.html Fahrschulen an (Fahrschul-ID = UID
+      // des Inhabers); kein Programmteil kennt einen anderen Fall.
+      return isAuth() && userDocExists() && userData().rolle == 'fahrschul-admin'
+             && userData().get('fahrschuleId', request.auth.uid) == request.auth.uid;
     }
 
     // SICHERHEITS-AUDIT (Cross-Tenant-Kette): Ist das Konto fuer die Fahrschule
@@ -112,8 +123,22 @@ service cloud.firestore {
     // umbiegen und so fremde Kartei-Daten sichtbar/beeinflussbar machen.
     // Nur relevant, wenn die Collection ueberhaupt eine fahrschuleId nutzt
     // (customFields speichert z.B. nur 'uid') - deshalb .get() mit Default.
+    // Zusatz: In eine FREMDE Schule (fahrschuleId != eigene uid) darf nur
+    // schreiben, wer dort freigegeben ist - dieselbe Bedingung wie beim Lesen
+    // (docBelongsToUser). Sonst konnte ein wartendes oder gesperrtes Mitglied
+    // der Schule weiterhin Datensaetze unterschieben.
     function fahrschuleIdOkBeiCreate(data) {
-      return data.get('fahrschuleId', userFsId()) == userFsId();
+      return data.get('fahrschuleId', userFsId()) == userFsId() &&
+             (data.get('fahrschuleId', request.auth.uid) == request.auth.uid ||
+              istFreigegeben());
+    }
+
+    // Mitglied einer Schule im Sinne von "darf ihre gemeinsamen Daten sehen":
+    // die eigene Schule immer, eine fremde nur mit Freigabe. Gleiche Logik
+    // wie docBelongsToUser, fuer Sammlungen ohne uid-Feld (Team-Chat).
+    function schulMitglied(fsId) {
+      return fsId == userFsId() &&
+             (fsId == request.auth.uid || istFreigegeben());
     }
     // 'uid' bleibt bewusst aenderbar (Schueler an Kollegen derselben Schule
     // uebergeben, siehe index.html transferStudent) - nur 'fahrschuleId'
@@ -200,7 +225,11 @@ service cloud.firestore {
       // gleiches Muster wie bookingLinks). Enthält den Fahrschul-Code, damit
       // die bestehende users-Beitritts-Regel greift.
       allow get: if true;
-      allow list: if isAuth() && resource.data.fahrschuleId == userFsId();
+      // Nur die Fahrschule selbst (Fahrschul-ID = UID des Inhabers, siehe
+      // create). Vorher genuegte userFsId() - damit sahen auch wartende und
+      // gesperrte Mitglieder alle noch offenen Einladungs-Links der Schule
+      // und durften sie loeschen.
+      allow list: if isAuth() && resource.data.fahrschuleId == request.auth.uid;
       allow create: if isAuth() && userDocExists() && userData().typ == 'fahrschule'
                     && request.resource.data.fahrschuleId == request.auth.uid
                     && request.resource.data.used == false;
@@ -208,7 +237,7 @@ service cloud.firestore {
                     && request.resource.data.used == true
                     && request.resource.data.fahrschuleId == resource.data.fahrschuleId
                     && request.resource.data.fahrschulCode == resource.data.fahrschulCode;
-      allow delete: if isSuperAdmin() || (isAuth() && resource.data.fahrschuleId == userFsId());
+      allow delete: if isSuperAdmin() || (isAuth() && resource.data.fahrschuleId == request.auth.uid);
     }
     match /rateLimits/{id} {
       // Versuchszaehler der Cloud Functions (Zugangscode-Suche). Wird
@@ -259,8 +288,17 @@ service cloud.firestore {
       allow list:   if isSuperAdmin();
       // Nur der Inhaber selbst (schoolId == eigene uid) oder SuperAdmin darf
       // einen Code-Eintrag anlegen/ändern. Verhindert das Fälschen von Einträgen.
-      allow create, update: if isSuperAdmin() ||
-                               (isRealAccount() && request.resource.data.schoolId == request.auth.uid);
+      // SICHERHEITS-AUDIT (im Emulator nachgewiesen): 'update' pruefte nur
+      // den NEUEN Inhalt. Jedes Konto konnte damit den Eintrag einer FREMDEN
+      // Schule auf sich selbst umbiegen - wer danach den Code der Schule
+      // eingab, landete beim Angreifer statt bei seinem Chef. Aendern darf
+      // jetzt nur, wem der Eintrag schon gehoert. Die App legt Eintraege
+      // ohnehin nur an, wenn es sie noch nicht gibt (index.html, Selbstheilung).
+      allow create: if isSuperAdmin() ||
+                       (isRealAccount() && request.resource.data.schoolId == request.auth.uid);
+      allow update: if isSuperAdmin() ||
+                       (isRealAccount() && resource.data.schoolId == request.auth.uid
+                                        && request.resource.data.schoolId == request.auth.uid);
       allow delete: if isSuperAdmin() ||
                        (isAuth() && resource.data.schoolId == request.auth.uid);
     }
@@ -282,17 +320,38 @@ service cloud.firestore {
       // angelegte Fahrschule konnte sich so von Anfang an selbst
       // 'kalenderAktiv:true' oder ein Abo setzen, ganz ohne SuperAdmin/
       // Zahlung.
+      // SICHERHEITS-AUDIT (im Emulator nachgewiesen): Hier stand
+      // "adminUid == eigene uid ODER fsId == eigene uid". Ueber den ersten
+      // Zweig konnte jedes Konto unter der Kennung eines FREMDEN
+      // eigenstaendigen Fahrlehrers (der noch kein fahrschulen-Dokument hat)
+      // eines anlegen - mit status 'gesperrt'. index.html liest genau dieses
+      // Dokument als Status des Lehrers und meldet ihn sofort ab: Aussperrung
+      // per einem einzigen Schreibvorgang. Beide Registrierungswege legen die
+      // Fahrschule unter der eigenen UID an, mit adminUid = eigene UID.
       allow create: if isRealAccount() &&
-                       (request.resource.data.adminUid == request.auth.uid ||
-                        fsId == request.auth.uid) &&
+                       fsId == request.auth.uid &&
+                       request.resource.data.adminUid == request.auth.uid &&
+                       // Neue Schulen warten auf die Pruefung durch den
+                       // Betreiber - beide Registrierungswege schreiben
+                       // 'ausstehend'. Selbst 'aktiv' setzen ging bisher.
+                       request.resource.data.get('status', 'ausstehend') == 'ausstehend' &&
                        request.resource.data.get('kalenderAktiv', false) == false &&
                        keineAboFelderBeiCreate(request.resource.data);
 
       // UPDATE: Ein FS-Admin darf seine eigene Fahrschule bearbeiten, ABER
       // 'kalenderAktiv' (bezahltes Extra) und alle Abo-Felder duerfen nur
       // der SuperAdmin bzw. die Cloud Functions (Admin SDK) setzen.
+      // SICHERHEITS-AUDIT: Auch 'status' war fuer den Inhaber frei. Damit
+      // konnte er seine Schule selbst von 'ausstehend' (wartet auf Pruefung
+      // durch den Betreiber) oder 'zahlung_offen' (Zahlungssperre) zurueck
+      // auf 'aktiv' setzen. Die App selbst schreibt hier nur eine einzige
+      // Statusaenderung: die automatische Zahlungssperre (index.html,
+      // 'zahlung_offen'). Nur die bleibt erlaubt - Sperren ja, Entsperren
+      // nur durch den Betreiber.
       allow update: if isSuperAdmin() ||
                        (isFsAdmin() && userFsId() == fsId &&
+                        (request.resource.data.get('status', null) == resource.data.get('status', null) ||
+                         request.resource.data.get('status', null) == 'zahlung_offen') &&
                         request.resource.data.get('kalenderAktiv', false)
                           == resource.data.get('kalenderAktiv', false) &&
                         aboFelderUnveraendert(resource.data, request.resource.data) &&
@@ -344,8 +403,14 @@ service cloud.firestore {
                           // der fremden Schule. Jetzt muss ein Mensch
                           // freischalten - die App legt Beitritte ohnehin
                           // bereits als 'ausstehend' an.
+                          // SICHERHEITS-AUDIT: und nur als 'fahrlehrer'. Die
+                          // Rolle 'fahrschul-admin' beim Beitritt zu einer
+                          // FREMDEN Schule war der Einstieg der Kette, die zum
+                          // Vollzugriff fuehrte (siehe isFsAdmin). Die App
+                          // legt Beitretende immer als 'fahrlehrer' an.
                           (fahrschulCodeStimmt() &&
-                           request.resource.data.status == 'ausstehend')
+                           request.resource.data.status == 'ausstehend' &&
+                           request.resource.data.rolle == 'fahrlehrer')
                         )
                       )
                     );
@@ -368,8 +433,19 @@ service cloud.firestore {
                           == resource.data.get('kalenderAktiv', false) &&
                         aboFelderUnveraendert(resource.data, request.resource.data) &&
                         loeschmarkerUnveraendert(resource.data, request.resource.data) &&
+                        // SICHERHEITS-AUDIT (im Emulator nachgewiesen): Hier
+                        // stand "isFsAdmin() ||" - und das galt auch fuer das
+                        // EIGENE Dokument. Ein Konto, das sich als Fahrschule
+                        // registriert (darf jeder, kostenlos), konnte damit
+                        // seine fahrschuleId auf eine FREMDE Schule setzen und
+                        // sich selbst 'aktiv' schalten - ohne Code, ohne
+                        // Freigabe - und las danach deren komplette Kartei.
+                        // Die Verwaltungsrechte des Inhabers gelten jetzt nur
+                        // noch fuer ANDERE Mitglieder seiner Schule, nie fuer
+                        // das eigene Dokument. Fuer sich selbst gelten fuer
+                        // ihn dieselben Regeln wie fuer jeden anderen.
                         (
-                          isFsAdmin() ||
+                          (request.auth.uid != uid && isFsAdmin()) ||
                           request.resource.data.get('status', '')
                             == resource.data.get('status', '') ||
                           // Einzige erlaubte Selbst-Aenderung: das Zuruecksetzen
@@ -380,7 +456,13 @@ service cloud.firestore {
                            fahrschulCodeStimmt())
                         ) &&
                         (
-                          isFsAdmin() ||
+                          // Inhaber gegenueber einem Mitglied: in der Schule
+                          // lassen oder hinaus (zurueck auf dessen eigene uid).
+                          // Vorher durfte er es in JEDE beliebige Schule
+                          // verschieben - ein Mitglied, das er selbst
+                          // kontrolliert, also auch in eine fremde, als 'aktiv'.
+                          (request.auth.uid != uid && isFsAdmin() &&
+                           request.resource.data.fahrschuleId == uid) ||
                           request.resource.data.fahrschuleId == resource.data.fahrschuleId ||
                           request.resource.data.fahrschuleId == request.auth.uid ||
                           // SICHERHEITS-AUDIT: Der nachtraegliche Beitritt zu
@@ -393,8 +475,11 @@ service cloud.firestore {
                           // Vollzugriff auf die fremde Kartei. Ein Wechsel in
                           // eine fremde Schule setzt jetzt zwingend auf
                           // 'ausstehend' zurueck; freischalten kann nur ein
-                          // Mensch.
-                          (fahrschulCodeStimmt() &&
+                          // Mensch. Beitreten kann man nur selbst - der
+                          // Inhaber kann ein Mitglied nicht in eine andere
+                          // Schule schicken.
+                          (request.auth.uid == uid &&
+                           fahrschulCodeStimmt() &&
                            request.resource.data.status == 'ausstehend')
                         )
                       )
@@ -576,11 +661,15 @@ service cloud.firestore {
     // CHAT
     // ══════════════════════════════════════════════════════
     match /chat/{msgId} {
-      allow read:   if isAuth() &&
-                       resource.data.fahrschuleId == userFsId();
+      // SICHERHEITS-AUDIT (im Emulator nachgewiesen): Hier genuegte
+      // "fahrschuleId == userFsId()". Ein GESPERRTES Mitglied las damit den
+      // Team-Chat der Schule weiter mit, und wer den Fahrschul-Code kannte,
+      // trat bei und las ihn schon, waehrend er noch auf Freigabe wartete.
+      // Jetzt dieselbe Freigabe-Bedingung wie bei der Kartei.
+      allow read:   if isAuth() && schulMitglied(resource.data.fahrschuleId);
       allow create: if isAuth() &&
                        request.resource.data.senderUid == request.auth.uid &&
-                       request.resource.data.fahrschuleId == userFsId();
+                       schulMitglied(request.resource.data.fahrschuleId);
       allow update: if false;
       allow delete: if isAuth() &&
                        resource.data.senderUid == request.auth.uid;
@@ -600,7 +689,12 @@ service cloud.firestore {
       // liest ihn, nur die Cloud Functions (Admin SDK) - deshalb jetzt auf
       // die drei tatsaechlich oeffentlichen Dokumente eingegrenzt.
       allow get:   if docId in ['impressum', 'broadcast', 'werbung'];
-      allow list:  if isAuth();
+      // NACHTRAG (im Emulator nachgewiesen): Die Eingrenzung oben war
+      // wirkungslos, solange 'list' fuer jeden Angemeldeten offen stand -
+      // auch fuer anonyme Schueler-Sitzungen. Eine Abfrage der ganzen
+      // Sammlung lieferte den Rechnungszaehler trotzdem. Keine Seite listet
+      // diese Sammlung; alle laden gezielt per get().
+      allow list:  if isSuperAdmin();
       allow write: if isSuperAdmin();
     }
 
@@ -628,8 +722,11 @@ service cloud.firestore {
       // keine App-Funktion nutzt diese Abfrage.
       allow get:    if true;
       allow list:   if isSuperAdmin();
-      allow create: if isAuth() && request.resource.data.uid == request.auth.uid;
-      allow update: if isAuth() && resource.data.uid == request.auth.uid;
+      // isRealAccount(): Benutzernamen gehoeren zu echten Konten. Anonyme
+      // Schueler-Sitzungen konnten sonst beliebig viele Namen belegen.
+      allow create: if isRealAccount() && request.resource.data.uid == request.auth.uid;
+      allow update: if isAuth() && resource.data.uid == request.auth.uid
+                    && request.resource.data.uid == request.auth.uid;
       allow delete: if isAuth() && resource.data.uid == request.auth.uid;
     }
 
@@ -650,15 +747,28 @@ service cloud.firestore {
     function kalMySchool() {
       return get(/databases/$(database)/documents/kalenderUsers/$(request.auth.uid)).data.schoolId;
     }
+    // SICHERHEITS-AUDIT (im Emulator nachgewiesen): Der Kalender kannte die
+    // Freigabe gar nicht. Die schoolId im Kalender-Profil folgt der
+    // fahrschuleId aus users - und die zeigt schon beim BEITRITT auf die
+    // Schule, also waehrend man noch auf Freigabe wartet. Wer den
+    // Fahrschul-Code kannte, sah damit sofort alle Termine, Schueler und
+    // Pruefungen der Schule; ein GESPERRTES Mitglied ebenso weiterhin.
+    // Jetzt gilt dieselbe Bedingung wie in der Kartei: die eigene Schule
+    // immer, eine fremde nur mit Freigabe. Konten ohne ADK-Profil (nur vom
+    // Betreiber angelegt) bleiben unberuehrt, damit niemand ausgesperrt wird.
+    function kalFreigegeben(sid) {
+      return sid == request.auth.uid || !userDocExists() || istFreigegeben();
+    }
     // Gehört ein Dokument mit dieser schoolId zu MEINER Schule? (oder bin ich SuperAdmin)
     function kalOwnsSchool(sid) {
-      return kalIsSuperAdmin() || (kalUserExists() && kalMySchool() == sid);
+      return kalIsSuperAdmin() ||
+             (kalUserExists() && kalMySchool() == sid && kalFreigegeben(sid));
     }
     // Gehört ein Lehrer (per UID) zu meiner Schule? (für Collections ohne schoolId, z.B. blocked)
     function kalLehrerInMySchool(luid) {
       return kalIsSuperAdmin() ||
              (isRealAccount() && luid == request.auth.uid) ||
-             (kalUserExists() &&
+             (kalUserExists() && kalFreigegeben(kalMySchool()) &&
               exists(/databases/$(database)/documents/kalenderUsers/$(luid)) &&
               get(/databases/$(database)/documents/kalenderUsers/$(luid)).data.schoolId == kalMySchool());
     }
@@ -679,7 +789,8 @@ service cloud.firestore {
     match /kalenderUsers/{uid} {
       allow read:   if kalIsSuperAdmin() ||
                        (kalAuth() && request.auth.uid == uid) ||
-                       (kalUserExists() && resource.data.schoolId == kalMySchool());
+                       (kalUserExists() && resource.data.schoolId == kalMySchool()
+                                        && kalFreigegeben(kalMySchool()));
       allow create: if kalIsSuperAdmin() ||
                        (isRealAccount() && request.auth.uid == uid &&
                         request.resource.data.schoolId == kalAdkFahrschuleId());
@@ -692,11 +803,16 @@ service cloud.firestore {
 
     // Fahrschulen im Kalender: nur die eigene
     match /schools/{schoolId} {
-      allow read:   if kalIsSuperAdmin() ||
-                       (kalUserExists() && kalMySchool() == schoolId);
-      allow create: if isRealAccount() && request.resource.data.adminUid == request.auth.uid;
-      allow update: if kalIsSuperAdmin() ||
-                       (kalUserExists() && kalMySchool() == schoolId);
+      allow read:   if kalOwnsSchool(schoolId);
+      // Nur unter der EIGENEN Kennung (Fahrschul-ID = UID des Inhabers).
+      // Vorher genuegte adminUid == eigene uid - damit konnte jedes Konto
+      // unter der Kennung einer fremden Schule ein Kalender-Schulprofil
+      // anlegen, solange dort noch keines lag, und deren Mitgliedern einen
+      // falschen Schulnamen unterschieben. Kein Programmteil legt hier an.
+      allow create: if kalIsSuperAdmin() ||
+                       (isRealAccount() && schoolId == request.auth.uid &&
+                        request.resource.data.adminUid == request.auth.uid);
+      allow update: if kalOwnsSchool(schoolId);
       allow delete: if kalIsSuperAdmin();
     }
 

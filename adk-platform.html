@@ -16,7 +16,7 @@
 <meta name="copyright" content="(c) 2026 ChrisKross der Fahrlehrer - Alle Rechte vorbehalten">
 <meta name="robots" content="noarchive">
 <!-- EmailJS für Benachrichtigungen -->
-<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="./vendor/emailjs-browser-4.4.1.min.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#f0b429">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -25,7 +25,8 @@
 <title>SuperAdmin – FahrSync Plattform</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/png" href="./icon-192.png">
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<!-- Schriften lokal statt von Google (DSGVO, siehe werkzeug/schriften-holen.py) -->
+<link href="./schriften/schriften.css" rel="stylesheet">
 <style>
 /* ── RESET & VARS ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }

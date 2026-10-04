@@ -10,7 +10,7 @@ kein Mac.
 |---|---|
 | Bei jedem Pull Request | Die vollständige Testsuite läuft. Ergebnis steht als ✅ oder ❌ am PR – man sieht vor dem Mergen, ob der Stand in Ordnung ist. |
 | Beim Merge in `main` | Erst die Tests, dann das Deployen. **Ein roter Test verhindert das Deployen.** |
-| Von Hand | Über *Actions → Prüfen und Deployen → Run workflow*. Deployt dann alles. |
+| Von Hand | Über *Actions → Prüfen und Deployen → Run workflow → main*. Deployt dann alles. Auf einem anderen Branch gestartet wird nur geprüft, nie deployt. |
 
 Deployt wird nur, was sich geändert hat:
 

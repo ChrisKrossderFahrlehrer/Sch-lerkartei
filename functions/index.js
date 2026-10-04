@@ -277,7 +277,7 @@ exports.trennKalenderVerbindung = onCall({ region: 'europe-west3' }, async (reqC
 // wechsel eine Rechnung - spaetere automatische Verlaengerungen ueber
 // PayPal loesen aktuell KEINE neue Rechnung aus. Fuer laufende monatliche
 // Rechnungen braeuchte es zusaetzlich einen PayPal-Webhook.
-const { rechnungAnlegen, RECHNUNG_PLANS } = require('./rechnung');
+const { rechnungAnlegen, RECHNUNG_PLANS, abrechnungsZiel } = require('./rechnung');
 
 // (exports.erstelleRechnung ist entfallen - zusammen mit dem Knopf
 //  "Test-Rechnung erzeugen" in der App. Die Funktion war ihrem eigenen
@@ -354,12 +354,12 @@ exports.createStripeCheckoutSession = onCall({ secrets: [STRIPE_SECRET_KEY] }, a
     throw new HttpsError('invalid-argument', 'Ungueltiger Tarif.');
   }
 
-  // Dieselbe Zuordnung wie bei PayPal: Fahrschule ODER Solo-Nutzer
+  // Dieselbe Zuordnung wie bei PayPal und im Browser (abrechnungsZiel)
   const userDoc = await getFirestore().doc(`users/${uid}`).get();
   if (!userDoc.exists) throw new HttpsError('failed-precondition', 'Kein Profil gefunden.');
-  const userData = userDoc.data();
-  const billingColl = userData.fahrschuleId ? 'fahrschulen' : 'users';
-  const billingId   = userData.fahrschuleId || uid;
+  const ziel = abrechnungsZiel(userDoc.data(), uid);
+  if (!ziel) throw new HttpsError('permission-denied', 'Nur der Fahrschul-Inhaber kann ein Abo abschließen.');
+  const { billingColl, billingId } = ziel;
   const billingDoc  = await getFirestore().doc(`${billingColl}/${billingId}`).get();
   const b = billingDoc.exists ? billingDoc.data() : {};
   if (!b.rechnungsStrasse || !b.rechnungsPlz || !b.rechnungsOrt) {
@@ -778,15 +778,10 @@ exports.bestaetigePaypalAbo = onCall(
     if (!userSnap.exists) throw new HttpsError('failed-precondition', 'Nutzerprofil nicht gefunden.');
     const userData = userSnap.data();
 
-    // Dieselbe Ermittlung wie in createStripeCheckoutSession.
-    let billingColl, billingId;
-    if (userData.typ === 'fahrschule') {
-      billingColl = 'fahrschulen'; billingId = uid;
-    } else if (!userData.fahrschuleId || userData.fahrschuleId === uid) {
-      billingColl = 'users'; billingId = uid;
-    } else {
-      throw new HttpsError('permission-denied', 'Nur der Fahrschul-Inhaber kann ein Abo aktivieren.');
-    }
+    // Dieselbe Ermittlung wie in createStripeCheckoutSession (abrechnungsZiel).
+    const ziel = abrechnungsZiel(userData, uid);
+    if (!ziel) throw new HttpsError('permission-denied', 'Nur der Fahrschul-Inhaber kann ein Abo aktivieren.');
+    const { billingColl, billingId } = ziel;
 
     // Verhindert, dass dieselbe Subscription-ID zweimal (bei zwei
     // verschiedenen Konten) verwendet wird, um sich mit einer fremden,
