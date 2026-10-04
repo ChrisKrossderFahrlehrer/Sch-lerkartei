@@ -21,7 +21,7 @@ import {
   initializeTestEnvironment, assertSucceeds, assertFails,
 } from '@firebase/rules-unit-testing';
 import {
-  doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, where,
+  doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, where, writeBatch,
 } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -314,6 +314,23 @@ await pruefe('Freigegebenes Mitglied legt einen Schueler fuer die Schule an', as
 await pruefe('Freigegebenes Mitglied legt sein Kalenderprofil an', async () => {
   await testEnv.withSecurityRulesDisabled(async (ctx) => { await deleteDoc(doc(ctx.firestore(), 'kalenderUsers', LEHRER)); });
   await assertSucceeds(setDoc(doc(als(LEHRER), 'kalenderUsers', LEHRER), { uid: LEHRER, schoolId: SCHULE, role: 'lehrer', approved: true }));
+});
+// Die Freigabe-Pruefung liest ein Dokument mehr (users/{ich}). Firestore
+// begrenzt die nachgeschlagenen Dokumente pro Anfrage - kalender.html loescht
+// Termine aber in Sammelschreibungen von bis zu 450 Stueck. Wiederholte
+// Zugriffe auf dasselbe Dokument zaehlen nur einmal; das hier belegt es.
+await pruefe('Freigegebenes Mitglied loescht 120 Termine der Schule in EINER Sammelschreibung', async () => {
+  const ids = Array.from({ length: 120 }, (_, i) => `massen-${i}`);
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    const b = writeBatch(db);
+    ids.forEach(id => b.set(doc(db, 'slots', id), { schoolId: SCHULE, lehrerUid: SCHULE }));
+    await b.commit();
+  });
+  const db = als(LEHRER);
+  const b = writeBatch(db);
+  ids.forEach(id => b.delete(doc(db, 'slots', id)));
+  await assertSucceeds(b.commit());
 });
 await pruefe('Wartendes Mitglied behaelt seine EIGENEN Termine', async () => {
   await assertSucceeds(getDoc(doc(als(WARTET), 'slots', 'slot-wartet')));

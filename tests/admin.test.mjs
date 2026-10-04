@@ -109,6 +109,21 @@ pruefe('admin.messaging() gibt es nicht mehr', typeof admin.messaging !== 'funct
 pruefe('initializeApp gibt es weiterhin am Standard-Export',
   typeof admin.initializeApp === 'function');
 
+console.log('\nWER ZAHLT? — eine Regel fuer PayPal, Stripe und den Browser');
+// Stripe hatte eine eigene Fassung und suchte die Rechnungsadresse eines
+// eigenstaendigen Fahrlehrers in fahrschulen/{uid} - einem Dokument, das es
+// fuer ihn nicht gibt. Per Karte/Lastschrift konnte er nie bezahlen.
+const { abrechnungsZiel } = ausFunctions('./rechnung.js');
+const ziel = (u, uid) => JSON.stringify(abrechnungsZiel(u, uid));
+pruefe('Fahrschul-Inhaber zahlt ueber fahrschulen/{uid}',
+  ziel({ typ: 'fahrschule', fahrschuleId: 'i1' }, 'i1') === JSON.stringify({ billingColl: 'fahrschulen', billingId: 'i1' }));
+pruefe('Eigenstaendiger Lehrer (fahrschuleId = eigene uid) zahlt ueber users/{uid}',
+  ziel({ typ: 'fahrlehrer', fahrschuleId: 's1' }, 's1') === JSON.stringify({ billingColl: 'users', billingId: 's1' }));
+pruefe('Altkonto ohne fahrschuleId zahlt ueber users/{uid}',
+  ziel({}, 'a1') === JSON.stringify({ billingColl: 'users', billingId: 'a1' }));
+pruefe('Mitglied einer fremden Schule zahlt NICHT selbst',
+  abrechnungsZiel({ typ: 'fahrlehrer', fahrschuleId: 'schule' }, 'm1') === null);
+
 console.log('\nDIE FUNCTIONS LADEN — wie beim Deployen');
 // firebase-tools laedt beim Deployen das Modul, um die enthaltenen Functions
 // zu ermitteln. Scheitert das, scheitert der Deploy.
