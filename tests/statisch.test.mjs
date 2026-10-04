@@ -382,8 +382,12 @@ console.log(`  ${pfadGeprueft} Dateien durchgesehen${pfadOffen ? '' : ' ✓'}`);
 // eine Abmahnwelle. Die Schriften liegen jetzt unter schriften/ (siehe
 // werkzeug/schriften-holen.py). Diese Pruefung haelt eine neu kopierte
 // Google-Zeile auf, bevor sie live geht.
-console.log('\n9) Keine Schriften von Google-Servern');
-const GOOGLE_FONTS = /fonts\.(?:googleapis|gstatic)\.com/g;
+// Dasselbe fuer Skripte von oeffentlichen CDNs (jsdelivr, cdnjs, unpkg):
+// gleiche IP-Weitergabe, dazu ein Einfallstor - "@emailjs/browser@4" holte
+// bei jedem Aufruf die gerade neueste 4.x, ungeprueft, mit Zugriff auf die
+// komplette Kartei. Beide Bibliotheken liegen jetzt fest unter vendor/.
+console.log('\n9) Keine Schriften von Google-Servern, keine Skripte von CDNs');
+const GOOGLE_FONTS = /fonts\.(?:googleapis|gstatic)\.com|cdn\.jsdelivr\.net|cdnjs\.cloudflare\.com|unpkg\.com/g;
 let fontOffen = 0;
 for (const d of [...SEITEN, 'schüler.html', 'sw.js']) {
   const text = lies(d);
@@ -391,8 +395,8 @@ for (const d of [...SEITEN, 'schüler.html', 'sw.js']) {
   for (const m of text.matchAll(GOOGLE_FONTS)) {
     fontOffen++;
     melde(`${d}:${zeileVon(text, m.index)}  laedt von ${m[0]}`
-        + `\n        Schrift lokal einbinden: ./schriften/schriften.css`
-        + ` (fehlt sie dort, werkzeug/schriften-holen.py ergaenzen).`);
+        + `\n        Lokal einbinden: Schriften ueber ./schriften/schriften.css`
+        + ` (werkzeug/schriften-holen.py), Skripte als feste Version unter ./vendor/.`);
   }
 }
 const schriftCss = lies('schriften/schriften.css') || '';
