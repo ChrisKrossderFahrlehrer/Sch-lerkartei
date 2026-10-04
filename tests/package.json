@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node statisch.test.mjs && node indizes.test.mjs && node admin.test.mjs && cd .. && firebase emulators:exec --only firestore,storage,auth --project fahrsync-test \"node tests/rules.test.mjs && node tests/mandanten.test.mjs && node tests/uebernahme.test.mjs && node tests/audit.test.mjs && node tests/rechnung.test.mjs && node tests/loeschen.test.mjs && node tests/kein_verlust.test.mjs && node tests/aufraeumen.test.mjs && node tests/speicher.test.mjs\"",
+    "test": "node statisch.test.mjs && node indizes.test.mjs && node admin.test.mjs && cd .. && firebase emulators:exec --only firestore,storage,auth --project fahrsync-test \"node tests/rules.test.mjs && node tests/mandanten.test.mjs && node tests/uebernahme.test.mjs && node tests/audit.test.mjs && node tests/rechnung.test.mjs && node tests/loeschen.test.mjs && node tests/kein_verlust.test.mjs && node tests/aufraeumen.test.mjs && node tests/abo.test.mjs && node tests/speicher.test.mjs\"",
     "test:statisch": "node statisch.test.mjs",
     "test:regeln": "cd .. && firebase emulators:exec --only firestore --project fahrsync-test \"node tests/rules.test.mjs\"",
     "test:uebernahme": "cd .. && firebase emulators:exec --only firestore --project uebernahme \"node tests/uebernahme.test.mjs\"",
@@ -15,7 +15,8 @@
     "test:indizes": "node indizes.test.mjs",
     "test:aufraeumen": "cd .. && firebase emulators:exec --only firestore,auth --project fahrsync-aufraeumen \"node tests/aufraeumen.test.mjs\"",
     "test:admin": "node admin.test.mjs",
-    "test:mandanten": "cd .. && firebase emulators:exec --only firestore --project fahrsync-mandanten \"node tests/mandanten.test.mjs\""
+    "test:mandanten": "cd .. && firebase emulators:exec --only firestore --project fahrsync-mandanten \"node tests/mandanten.test.mjs\"",
+    "test:abo": "cd .. && firebase emulators:exec --only firestore --project fahrsync-abo \"node tests/abo.test.mjs\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^3.0.4",

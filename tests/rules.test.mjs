@@ -126,6 +126,21 @@ await pruefe('Sich selbst nachtraeglich ein Abo setzen darf NICHT', async () => 
   const db = als(UID_LEHRER_A);
   await assertFails(updateDoc(doc(db, 'users', UID_LEHRER_A), { abo: 'unbegrenzt' }));
 });
+// Kuendigungs-Vormerkung (functions/abo.js): Wer sie loeschen koennte,
+// behielte den bezahlten Tarif nach der Kuendigung fuer immer.
+await pruefe('Eigene Kuendigungs-Vormerkung entfernen darf NICHT', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await updateDoc(doc(ctx.firestore(), 'users', UID_LEHRER_A), {
+      abo: 'solo', aboStatus: 'gekuendigt', aboEndetAm: 1, aboGekuendigteSubscriptionId: 'I-1',
+    });
+  });
+  const db = als(UID_LEHRER_A);
+  await assertFails(updateDoc(doc(db, 'users', UID_LEHRER_A), { aboEndetAm: 9999999999999 }));
+  await assertFails(updateDoc(doc(db, 'users', UID_LEHRER_A), { aboGekuendigteSubscriptionId: null }));
+});
+await pruefe('...eigene Einstellungen aendern geht dabei weiter', async () => {
+  await assertSucceeds(updateDoc(doc(als(UID_LEHRER_A), 'users', UID_LEHRER_A), { bundesland: 'NW' }));
+});
 await pruefe('Sich selbst den Kalender freischalten darf NICHT', async () => {
   const db = als(UID_SCHULE_A);
   await assertFails(updateDoc(doc(db, 'fahrschulen', UID_SCHULE_A), { kalenderAktiv: true }));

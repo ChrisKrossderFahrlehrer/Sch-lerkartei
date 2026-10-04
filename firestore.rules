@@ -163,7 +163,16 @@ service cloud.firestore {
           && after.get('aboAktiviertAm', null)         == before.get('aboAktiviertAm', null)
           && after.get('aboSetByAdmin', null)          == before.get('aboSetByAdmin', null)
           && after.get('aboLetzteZahlungAm', null)     == before.get('aboLetzteZahlungAm', null)
-          && after.get('aboZahlungsart', null)         == before.get('aboZahlungsart', null);
+          && after.get('aboZahlungsart', null)         == before.get('aboZahlungsart', null)
+          // Kuendigungs-Vormerkung (functions/abo.js): Wer sie selbst
+          // loeschen koennte, behielte den bezahlten Tarif nach der
+          // Kuendigung fuer immer.
+          && after.get('aboGekuendigtAm', null)        == before.get('aboGekuendigtAm', null)
+          && after.get('aboEndetAm', null)             == before.get('aboEndetAm', null)
+          && after.get('aboGekuendigteSubscriptionId', null) == before.get('aboGekuendigteSubscriptionId', null)
+          && after.get('aboKuendigungQuelle', null)    == before.get('aboKuendigungQuelle', null)
+          && after.get('aboBeendetAm', null)           == before.get('aboBeendetAm', null)
+          && after.get('aboVorherigeSubscriptionId', null) == before.get('aboVorherigeSubscriptionId', null);
     }
     // FIX: Diese Regel hat 'abo' pauschal mitverboten - und damit zwei
     // Registrierungswege komplett blockiert, die beim Anlegen ganz harmlos
@@ -180,7 +189,9 @@ service cloud.firestore {
     function keineAboFelderBeiCreate(data) {
       return !data.keys().hasAny([
         'aboStatus','aboPlaner','aboMaxLehrer','aboSubscriptionId',
-        'aboPlanId','aboAktiviertAm','aboSetByAdmin','aboLetzteZahlungAm','aboZahlungsart'
+        'aboPlanId','aboAktiviertAm','aboSetByAdmin','aboLetzteZahlungAm','aboZahlungsart',
+        'aboGekuendigtAm','aboEndetAm','aboGekuendigteSubscriptionId','aboKuendigungQuelle',
+        'aboBeendetAm','aboVorherigeSubscriptionId'
       ]) && data.get('abo', 'free') == 'free';
     }
 

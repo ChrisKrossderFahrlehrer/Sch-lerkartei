@@ -643,7 +643,7 @@ import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
 import { getFirestore, enableIndexedDbPersistence,
          collection, doc, addDoc, updateDoc, deleteDoc,
          getDoc, getDocs, setDoc,
-         onSnapshot, query, where, orderBy }                     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+         onSnapshot, query, where, orderBy, deleteField }        from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, listAll, deleteObject }                from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 // ── FIREBASE CONFIG ──────────────────────────────────────────
@@ -1478,13 +1478,21 @@ async function renderAbos() {
 
 const ABO_MAXLEHRER = { free:1, gratis:null, solo:1, bis5:5, bis10:10, bis15:15, unbegrenzt:null, pro_monat:null, pro_jahr:null };
 
+// Setzt der Betreiber einen Tarif von Hand, gilt der - eine noch offene
+// Kuendigungs-Vormerkung (functions/abo.js) wuerde ihn sonst nach Ablauf der
+// 14 Tage nachts wieder auf 'free' stellen.
+const KUENDIGUNG_VERWERFEN = () => ({
+  aboGekuendigtAm: deleteField(), aboEndetAm: deleteField(),
+  aboGekuendigteSubscriptionId: deleteField(), aboKuendigungQuelle: deleteField(),
+});
 window.setUserAbo = async (uid, abo) => {
   try {
     await updateDoc(doc(db,'users',uid), {
       abo,
       aboMaxLehrer:  ABO_MAXLEHRER[abo] === undefined ? null : ABO_MAXLEHRER[abo],
       aboSetByAdmin: true,
-      aboUpdatedAt:  Date.now()
+      aboUpdatedAt:  Date.now(),
+      ...KUENDIGUNG_VERWERFEN()
     });
     toast(`✅ Abo auf "${abo}" gesetzt`);
     renderAbos();
@@ -1499,7 +1507,8 @@ window.setFsAbo = async (fsId, abo) => {
       abo,
       aboMaxLehrer:  ABO_MAXLEHRER[abo] === undefined ? null : ABO_MAXLEHRER[abo],
       aboSetByAdmin: true,
-      aboUpdatedAt:  Date.now()
+      aboUpdatedAt:  Date.now(),
+      ...KUENDIGUNG_VERWERFEN()
     });
     toast(`✅ Abo auf "${abo}" gesetzt`);
     renderAbos();
