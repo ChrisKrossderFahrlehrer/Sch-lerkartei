@@ -278,6 +278,9 @@ exports.trennKalenderVerbindung = onCall({ region: 'europe-west3' }, async (reqC
 // PayPal loesen aktuell KEINE neue Rechnung aus. Fuer laufende monatliche
 // Rechnungen braeuchte es zusaetzlich einen PayPal-Webhook.
 const { rechnungAnlegen, RECHNUNG_PLANS, abrechnungsZiel } = require('./rechnung');
+// Gekuendigte Abos: 14 Tage Nachlauf, dann 'free' - siehe functions/abo.js.
+const { kuendigungVormerken, kuendigungAufheben, abgelaufeneAbosBeenden,
+        KUENDIGUNG_ENTFERNEN } = require('./abo');
 
 // (exports.erstelleRechnung ist entfallen - zusammen mit dem Knopf
 //  "Test-Rechnung erzeugen" in der App. Die Funktion war ihrem eigenen
@@ -439,6 +442,12 @@ async function stripeAboAktivieren(billingColl, billingId, plan, planer, subscri
   // laesst sich ein laufendes Abo spaeter nicht kuendigen (z.B. wenn der
   // Kunde sein Konto loescht, siehe kuendigeLaufendesAbo).
   if (subscriptionId) felder.aboSubscriptionId = subscriptionId;
+  // Ein NEUES Abo hebt eine alte Kuendigungs-Vormerkung auf - sonst stellte
+  // der naechtliche Job das gerade bezahlte Abo trotzdem auf 'free'. Fuer
+  // DASSELBE, bereits gekuendigte Abo nicht: Eine verspaetet zugestellte
+  // Checkout-Meldung darf eine Kuendigung nicht rueckgaengig machen.
+  const alt = billingSnap.data().aboGekuendigteSubscriptionId;
+  if (alt && alt !== subscriptionId) Object.assign(felder, KUENDIGUNG_ENTFERNEN());
   await billingRef.update(felder);
   return billingSnap.data();
 }
@@ -581,6 +590,32 @@ exports.stripeWebhook = onRequest(
         // Dokument-Kennung aus der Rechnungs-ID abgeleitet ist und der zweite
         // Versuch an ALREADY_EXISTS scheitert.
         await stripeVerlaengerungsRechnung(event.data.object, event.id);
+      } else if (event.type === 'customer.subscription.deleted') {
+        // Abo beendet (sofort gekuendigt, oder Ende nach gescheiterten
+        // Zahlungen). 14 Tage Nachlauf, dann 'free' (functions/abo.js).
+        const r = await kuendigungVormerken(getFirestore(), event.data.object.id, Date.now(), 'stripe');
+        console.log('stripeWebhook: Abo beendet', event.data.object.id, r.ergebnis);
+      } else if (event.type === 'customer.subscription.updated') {
+        // "Zum Ende der Periode kuendigen" schaltet Stripe als Aenderung am
+        // laufenden Abo (cancel_at_period_end / cancel_at). Massgeblich ist
+        // der Wechsel: vorher nicht gekuendigt -> jetzt gekuendigt, oder
+        // umgekehrt (Kunde hat es sich anders ueberlegt).
+        const abo = event.data.object;
+        const vorher = (event.data.previous_attributes) || {};
+        const betroffen = ('cancel_at_period_end' in vorher) || ('cancel_at' in vorher);
+        if (betroffen) {
+          const jetztGekuendigt = !!(abo.cancel_at_period_end || abo.cancel_at);
+          const warGekuendigt = !!(
+            ('cancel_at_period_end' in vorher ? vorher.cancel_at_period_end : abo.cancel_at_period_end) ||
+            ('cancel_at' in vorher ? vorher.cancel_at : abo.cancel_at));
+          if (jetztGekuendigt && !warGekuendigt) {
+            const r = await kuendigungVormerken(getFirestore(), abo.id, Date.now(), 'stripe');
+            console.log('stripeWebhook: Kuendigung vorgemerkt', abo.id, r.ergebnis);
+          } else if (!jetztGekuendigt && warGekuendigt) {
+            const r = await kuendigungAufheben(getFirestore(), abo.id);
+            console.log('stripeWebhook: Kuendigung zurueckgenommen', abo.id, r.ergebnis);
+          }
+        }
       } else if (event.type === 'checkout.session.async_payment_failed') {
         const session = event.data.object;
         const { billingColl, billingId } = session.metadata || {};
@@ -802,8 +837,10 @@ exports.bestaetigePaypalAbo = onCall(
       aboPlanId:         erwartetePlanId,
       aboAktiviertAm:    Date.now(),
       aboSetByAdmin:     false,
-      aboStatus:         'aktiv',
       aboZahlungsart:    'paypal',
+      // aboStatus 'aktiv' und das Entfernen einer alten Kuendigungs-
+      // Vormerkung: PayPal hat oben bestaetigt, dass dieses Abo AKTIV ist.
+      ...KUENDIGUNG_ENTFERNEN(),
     }, { merge: true });
 
     return { success: true, maxLehrer: planInfo.maxLehrer };
@@ -893,6 +930,21 @@ exports.paypalWebhook = onRequest(
 
         await getFirestore().doc(`${billingColl}/${billingId}`).update({ aboLetzteZahlungAm: Date.now() });
         console.log('paypalWebhook: Rechnung', nummer, 'erzeugt fuer', billingColl, billingId);
+      } else if (['BILLING.SUBSCRIPTION.CANCELLED', 'BILLING.SUBSCRIPTION.SUSPENDED',
+                  'BILLING.SUBSCRIPTION.EXPIRED'].includes(event.event_type)) {
+        // Gekuendigt (vom Kunden im PayPal-Konto oder von uns), wegen
+        // gescheiterter Zahlungen ausgesetzt, oder abgelaufen: 14 Tage
+        // Nachlauf, dann 'free' (functions/abo.js). Bisher kam davon nichts
+        // an - der bezahlte Tarif blieb fuer immer stehen.
+        const subId = (event.resource || {}).id;
+        const r = await kuendigungVormerken(getFirestore(), subId, Date.now(), 'paypal:' + event.event_type);
+        console.log('paypalWebhook:', event.event_type, subId, r.ergebnis);
+      } else if (['BILLING.SUBSCRIPTION.ACTIVATED', 'BILLING.SUBSCRIPTION.RE-ACTIVATED'].includes(event.event_type)) {
+        // Wieder aktiviert (z.B. nach Aussetzung): Vormerkung aufheben -
+        // aber nur, wenn genau dieses Abo vorgemerkt war.
+        const subId = (event.resource || {}).id;
+        const r = await kuendigungAufheben(getFirestore(), subId);
+        console.log('paypalWebhook:', event.event_type, subId, r.ergebnis);
       }
 
       res.status(200).send('ok');
@@ -1089,6 +1141,12 @@ exports.taeglichesAufraeumen = onSchedule(
       bericht.anonym = await loescheAlteAnonymeKonten(
         getAuth(), 60 * TAG_MS, 500, jetzt);
     } catch (e) { console.error('Anonyme Sitzungen:', e); }
+
+    // 5) Gekuendigte Abos nach 14 Tagen Nachlauf auf 'free' (nichts wird
+    // geloescht, nur der Tarif aendert sich - functions/abo.js).
+    try {
+      bericht.abos = await abgelaufeneAbosBeenden(db, jetzt);
+    } catch (e) { console.error('Gekuendigte Abos:', e); }
 
     // Kurzlebige CSRF-Marken des Kalender-Logins (eine Stunde reicht)
     try {

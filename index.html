@@ -1265,7 +1265,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 
       <!-- Hinweis -->
       <div style="font-size:0.68rem;color:var(--muted);text-align:center;line-height:1.5">
-        Sichere Zahlung über PayPal, Kreditkarte oder SEPA-Lastschrift · Jederzeit kündbar<br>
+        Sichere Zahlung über PayPal, Kreditkarte oder SEPA-Lastschrift · Monatlich kündbar (14 Tage Frist)<br>
         Nach Zahlung wird dein Abo automatisch aktiviert (bei SEPA nach Bestätigung, dauert einige Werktage)
       </div>
     </div>
@@ -1602,6 +1602,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 
       <strong style="color:var(--text)">4. Speicherort & Hosting</strong><br>
       Die Datenbank (Cloud Firestore) wird ausschließlich in Frankfurt am Main (EU, Region europe-west3) betrieben; hierfür findet keine Übermittlung in Drittländer statt. Die Nutzer-Anmeldung (Firebase Authentication) läuft technisch über die globale Infrastruktur des Anbieters Google, die auch außerhalb der EU (u.a. in den USA) verarbeiten kann. Diese Übermittlung ist über die EU-Standardvertragsklauseln (Art. 46 DSGVO) im Rahmen der Google-Auftragsverarbeitungsbedingungen abgesichert. Eine Weitergabe an unbefugte Dritte erfolgt nicht.<br><br>
+      Die Webseiten der App (fahrsync.de) werden über GitHub Pages bereitgestellt, einen Dienst der GitHub, Inc., 88 Colin P. Kelly Jr. Street, San Francisco, CA 94107, USA. Beim Aufruf verarbeitet GitHub die technisch notwendigen Verbindungsdaten – insbesondere IP-Adresse, Datum und Uhrzeit sowie die abgerufene Datei –, um die Seiten auszuliefern und den Dienst gegen Angriffe abzusichern. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an einer sicheren und zuverlässigen Bereitstellung). Dabei kann eine Übermittlung in die USA stattfinden; GitHub ist unter dem EU-US Data Privacy Framework zertifiziert (Art. 45 DSGVO). Über GitHub werden ausschließlich die Programmdateien der App ausgeliefert – Schüler- und Karteidaten liegen nicht bei GitHub, sondern in der oben genannten Datenbank. Schriftarten werden von fahrsync.de selbst ausgeliefert, nicht von Servern Dritter; die Firebase-Programmbibliothek wird von Servern der Google Ireland Ltd. geladen (siehe oben).<br><br>
 
       <strong style="color:var(--text)">5. Google-Kalender-Anbindung (optionales Zusatzmodul)</strong><br>
       Fahrlehrer können optional ihren persönlichen Google-Kalender mit FahrSync verbinden. Dabei fordert FahrSync ausschließlich die Berechtigung „Google Kalenderereignisse verwalten" (Scope: calendar.events) an; auf E-Mails, Kontakte oder andere Google-Dienste wird nicht zugegriffen. FahrSync legt vereinbarte Fahrstunden-Termine als Kalenderereignisse im Google-Kalender des Fahrlehrers an und entfernt sie bei Stornierung; eine Weitergabe an Dritte erfolgt nicht. Der Fahrlehrer kann die Verbindung jederzeit trennen.<br><br>
@@ -2081,12 +2082,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
   <div class="modal-sheet">
     <div class="sheet-title">💳 Abo verwalten &amp; kündigen</div>
     <div style="font-size:0.8rem;line-height:1.65;color:var(--muted);margin-top:12px">
-      Dein Abonnement läuft über PayPal und ist <b style="color:var(--text)">jederzeit zum Ende des Abrechnungsmonats kündbar</b> – ganz ohne Frist oder Angabe von Gründen.<br><br>
+      <div id="abo-kuendigung-stand" style="display:none;background:var(--surface2);border:1px solid var(--accent);border-radius:10px;padding:10px 12px;margin-bottom:12px;color:var(--text)"></div>
+      Dein Abonnement ist <b style="color:var(--text)">mit einer Frist von 14 Tagen zum Ende des Abrechnungsmonats kündbar</b> – ohne Angabe von Gründen. Bitte kündige also spätestens 14 Tage vor Ablauf.<br><br>
       <b style="color:var(--text)">Weg 1 – direkt bei PayPal:</b><br>
-      PayPal-Konto öffnen → Zahlungen → Abonnements → „FahrSync" auswählen → Kündigen. Die Kündigung wirkt zum Ende des bezahlten Zeitraums.<br><br>
-      <b style="color:var(--text)">Weg 2 – per E-Mail:</b><br>
-      Formlose Nachricht an <a href="mailto:kontakt@fahrsync.de?subject=K%C3%BCndigung%20FahrSync-Abo" style="color:var(--accent)">kontakt@fahrsync.de</a> genügt – wir bestätigen den Eingang und das Vertragsende.<br><br>
-      Nach Vertragsende bleiben deine Daten 30 Tage zum Export erhalten und werden danach unwiderruflich gelöscht.
+      PayPal-Konto öffnen → Zahlungen → Abonnements → „FahrSync" auswählen → Kündigen.<br><br>
+      <b style="color:var(--text)">Weg 2 – per E-Mail (auch bei Kreditkarte oder Lastschrift):</b><br>
+      Formlose Nachricht an <a href="mailto:kontakt@fahrsync.de?subject=K%C3%BCndigung%20FahrSync-Abo" style="color:var(--accent)">kontakt@fahrsync.de</a> genügt – wir bestätigen den Eingang.<br><br>
+      <b style="color:var(--text)">Was danach passiert:</b> Nach der Kündigung kannst du die bezahlten Funktionen noch 14 Tage nutzen. Danach läuft dein Konto im kostenlosen Tarif weiter – deine Schüler und alle Daten bleiben erhalten. Wenn du dein Konto ganz löschen möchtest: Einstellungen → „Konto und alle Daten löschen".
     </div>
     <button class="btn-sheet-cancel" onclick="document.getElementById('abo-verwalten-modal').classList.remove('open')" style="margin-top:16px">Schließen</button>
   </div>
@@ -2485,7 +2487,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       </div></div>
       <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
         <div style="font-weight:700;margin-bottom:3px">🧾 Abo verwalten &amp; kündigen</div>
-        <div style="font-size:0.8rem;color:var(--muted)">⚙️ Einstellungen → <b>💳 Abo verwalten &amp; kündigen</b>: Dort stehen beide Wege – direkt im PayPal-Konto (Zahlungen → Abonnements) oder formlos per E-Mail an kontakt@fahrsync.de. Kündigung wirkt zum Ende des Abrechnungsmonats.</div>
+        <div style="font-size:0.8rem;color:var(--muted)">⚙️ Einstellungen → <b>💳 Abo verwalten &amp; kündigen</b>: Dort stehen beide Wege – direkt im PayPal-Konto (Zahlungen → Abonnements) oder formlos per E-Mail an kontakt@fahrsync.de. Kündigung bitte spätestens 14 Tage vor Ende des Abrechnungsmonats; danach noch 14 Tage nutzbar, dann kostenloser Tarif – alle Daten bleiben erhalten.</div>
       </div></div>
       <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
         <div style="font-weight:700;margin-bottom:3px">👥 Fahrlehrer einladen</div>
@@ -4032,7 +4034,23 @@ async function loadAboStatus(uid) {
     }
 
     let src = data;
-    if (!window.__billingOwner && data.fahrschuleId) {
+    if (window.__billingScope === 'fahrschule') {
+      // FIX: Der Inhaber las seinen Tarif aus users/{uid} - bezahlt wird er
+      // aber auf fahrschulen/{uid} (bestaetigePaypalAbo, Stripe-Webhook,
+      // genau wie window.__billingDocRef oben). Ein zahlender Inhaber sah
+      // deshalb weiter "free": Werbebanner, Upgrade-Knopf und die
+      // Einladungsgrenze von 1 Fahrlehrer, obwohl er fuer mehr bezahlt hatte.
+      // Ein bezahlter Tarif der Fahrschule gilt jetzt. Hat sie keinen, bleibt
+      // alles wie bisher (users zuerst) - so verliert niemand einen Tarif, den
+      // der Betreiber frueher direkt am Nutzerprofil gesetzt hat.
+      try {
+        const fsDoc = await getDoc(doc(db, 'fahrschulen', uid));
+        if (fsDoc.exists()) {
+          const fs = fsDoc.data();
+          src = (fs.abo && fs.abo !== 'free') ? { ...data, ...fs } : { ...fs, ...data };
+        }
+      } catch(e) { console.warn('Fahrschul-Abo nicht ladbar:', e); }
+    } else if (!window.__billingOwner && data.fahrschuleId) {
       try {
         const fsDoc = await getDoc(doc(db, 'fahrschulen', data.fahrschuleId));
         if (fsDoc.exists()) src = fsDoc.data();
@@ -4040,6 +4058,8 @@ async function loadAboStatus(uid) {
     }
     aboStatus = src.abo || 'free';
     aboWerbefrei = !!src.werbefrei;
+    // Gekuendigt, laeuft noch (functions/abo.js): Datum fuer die Anzeige.
+    window.__aboEndetAm = (src.aboStatus === 'gekuendigt' && src.aboEndetAm) ? src.aboEndetAm : null;
     // BESTANDSSCHUTZ: Alle Konten, die VOR dem PayPal-Start registriert wurden,
     // nutzen die App dauerhaft kostenlos in vollem Umfang (kein Banner, keine
     // Einladungs-Grenze). Freiwilliges Upgrade (z.B. fuer den Planer) bleibt moeglich.
@@ -4106,6 +4126,17 @@ function updateAboUI() {
   if (upgradeBtn) upgradeBtn.style.display = (!wirktAlsPro && (aboStatus === 'free' || aboStatus === 'bestand') && window.__billingOwner) ? 'block' : 'none';
   const aboBtn = document.getElementById('btn-abo-settings');
   if (aboBtn) aboBtn.style.display = window.__billingOwner ? 'block' : 'none';
+  const stand = document.getElementById('abo-kuendigung-stand');
+  if (stand) {
+    if (window.__aboEndetAm) {
+      stand.textContent = '📅 Dein Abo ist gekündigt. Die bezahlten Funktionen laufen bis '
+        + new Date(window.__aboEndetAm).toLocaleDateString('de-DE')
+        + ', danach geht es im kostenlosen Tarif weiter.';
+      stand.style.display = 'block';
+    } else {
+      stand.style.display = 'none';
+    }
+  }
   const existingBadge = document.getElementById('abo-badge');
   if (existingBadge) existingBadge.remove();
   if (wirktAlsPro) {
@@ -4115,6 +4146,12 @@ function updateAboUI() {
       badge.id = 'abo-badge';
       badge.style.cssText = 'background:var(--accent);color:#0d1117;border-radius:6px;padding:1px 7px;font-size:0.6rem;font-weight:800;margin-left:6px;vertical-align:middle';
       badge.textContent = '⭐ PRO';
+      if (window.__aboEndetAm) {
+        // Gekuendigt: bis wann der Tarif noch laeuft, danach kostenlos.
+        badge.textContent = '⭐ PRO bis ' + new Date(window.__aboEndetAm)
+          .toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+        badge.title = 'Abo gekündigt – danach läuft dein Konto im kostenlosen Tarif weiter, deine Daten bleiben erhalten.';
+      }
       header.appendChild(badge);
     }
   }
@@ -4187,7 +4224,7 @@ function updateTierPriceUI() {
       '<b>FahrSync – ' + p.label + (planerGewuenscht ? ' + Planer (Kalender-Modul)' : '') + '</b> · webbasierte Fahrschul-Software<br>' +
       'Preis: <b>' + priceStr(price) + ' pro Monat</b>' + (setup ? ' zzgl. <b>einmalig ' + priceStr(setup) + '</b> Einrichtungsgebühr' : '') + ' · gemäß § 19 UStG wird keine Umsatzsteuer berechnet<br>' +
       'Testphase: <b>14 Tage kostenlos</b> – danach verlängert sich das Abonnement automatisch als <b>zahlungspflichtiges Monats-Abo</b>, wenn nicht zuvor gekündigt wird<br>' +
-      'Laufzeit: unbefristet · <b>jederzeit zum Ende des Abrechnungsmonats kündbar</b> – direkt in deinem PayPal-Konto (Zahlungen → Abonnements) oder formlos per E-Mail an kontakt@fahrsync.de';
+      'Laufzeit: unbefristet · <b>kündbar mit 14 Tagen Frist zum Ende des Abrechnungsmonats</b> – direkt in deinem PayPal-Konto (Zahlungen → Abonnements) oder formlos per E-Mail an kontakt@fahrsync.de. Nach der Kündigung noch 14 Tage nutzbar, danach kostenloser Tarif, alle Daten bleiben erhalten';
   }
 }
 
@@ -9635,9 +9672,9 @@ window.openImpressum = async () => {
           <strong style="color:var(--text)">§ 3 Testphase und Vertragsschluss</strong><br>
           Die Registrierung eines Kontos ist kostenlos. Ein kostenpflichtiges Abonnement kommt erst durch den Abschluss über den gewählten Zahlungsdienstleister (PayPal oder Stripe) zustande. Jedes Abonnement beginnt mit einer 14-tägigen kostenlosen Testphase. Nach Ablauf der Testphase verlängert sich das Abonnement automatisch als zahlungspflichtiges Monats-Abonnement zum ausgewiesenen Preis, sofern es nicht zuvor gekündigt wird. Auf die Kostenpflicht wird vor Abschluss deutlich hingewiesen.<br><br>
           <strong style="color:var(--text)">§ 4 Preise und Zahlung</strong><br>
-          Es gelten die zum Zeitpunkt der Bestellung in der App ausgewiesenen Preise. Die Abrechnung erfolgt monatlich im Voraus über den vom Kunden gewählten Zahlungsdienstleister (PayPal oder Stripe). Gemäß § 19 UStG wird keine Umsatzsteuer berechnet. Für die Stufe „Unbegrenzt" fällt zusätzlich eine einmalige, nicht erstattungsfähige Einrichtungsgebühr an, die auf der Bestellseite ausgewiesen ist. Preisänderungen werden mindestens sechs Wochen im Voraus per E-Mail oder In-App-Mitteilung angekündigt; dem Kunden steht in diesem Fall ein Sonderkündigungsrecht zum Zeitpunkt des Wirksamwerdens der Änderung zu.<br><br>
+          Es gelten die zum Zeitpunkt der Bestellung in der App ausgewiesenen Preise. Die Abrechnung erfolgt monatlich im Voraus über den vom Kunden gewählten Zahlungsdienstleister (PayPal oder Stripe). Gemäß § 19 UStG wird keine Umsatzsteuer berechnet. Für die Stufe „Unbegrenzt" fällt zusätzlich eine einmalige, nicht erstattungsfähige Einrichtungsgebühr an, die auf der Bestellseite ausgewiesen ist. Der Anbieter ist berechtigt, die Preise zum Beginn eines Abrechnungsmonats angemessen anzupassen, wenn sich die Kosten für die Bereitstellung der Leistung verändern – insbesondere Server- und Hostingkosten, Gebühren der Zahlungsdienstleister, Lizenzkosten sowie allgemeine Betriebskosten. Eine Preisänderung wird mindestens sechs Wochen vor ihrem Wirksamwerden per E-Mail und zusätzlich in der App angekündigt. Der Kunde kann das Abonnement in diesem Fall abweichend von § 5 ohne Einhaltung der 14-tägigen Frist zum Zeitpunkt des Wirksamwerdens der Änderung kündigen (Sonderkündigungsrecht). Kündigt er bis dahin nicht, gilt der neue Preis ab dem angekündigten Zeitpunkt; auf diese Folge und auf das Sonderkündigungsrecht wird in der Ankündigung ausdrücklich hingewiesen. Während einer laufenden kostenlosen Testphase finden keine Preisänderungen statt.<br><br>
           <strong style="color:var(--text)">§ 5 Laufzeit und Kündigung</strong><br>
-          Das Abonnement läuft auf unbestimmte Zeit und ist jederzeit zum Ende des laufenden Abrechnungsmonats kündbar. Bei Zahlung per PayPal erfolgt die Kündigung wahlweise direkt im PayPal-Konto des Kunden (Zahlungen → Abonnements → Kündigen); unabhängig vom gewählten Zahlungsdienstleister genügt außerdem jederzeit eine formlose Kündigung per E-Mail an kontakt@fahrsync.de. Nach Wirksamwerden der Kündigung endet der Zugriff auf die kostenpflichtigen Funktionen; § 10 bleibt unberührt. Ein Wechsel der Preisstufe erfolgt durch Kündigung des bestehenden und Abschluss eines neuen Abonnements.<br><br>
+          Das Abonnement läuft auf unbestimmte Zeit und kann mit einer Frist von 14 Tagen zum Ende des laufenden Abrechnungsmonats gekündigt werden. Bei Zahlung per PayPal erfolgt die Kündigung wahlweise direkt im PayPal-Konto des Kunden (Zahlungen → Abonnements → Kündigen); unabhängig vom gewählten Zahlungsdienstleister genügt außerdem jederzeit eine formlose Kündigung per E-Mail an kontakt@fahrsync.de. Nach Eingang der Kündigung stehen die kostenpflichtigen Funktionen noch 14 Tage zur Verfügung; danach wird das Konto auf den kostenlosen Tarif umgestellt. Die gespeicherten Daten bleiben dabei erhalten; § 10 bleibt unberührt. Ein Wechsel der Preisstufe erfolgt durch Kündigung des bestehenden und Abschluss eines neuen Abonnements.<br><br>
           <strong style="color:var(--text)">§ 6 Zahlungsverzug und Sperrung</strong><br>
           Schlägt eine fällige Abbuchung fehl, unternimmt der jeweilige Zahlungsdienstleister (PayPal oder Stripe) automatisch weitere Einzugsversuche. Bleibt die Zahlung aus, ist der Betreiber berechtigt, den Zugang bis zum Ausgleich der offenen Forderung zu sperren. Während der Sperrung bleiben die Daten des Kunden erhalten.<br><br>
           <strong style="color:var(--text)">§ 7 Nutzungsbedingungen</strong><br>
