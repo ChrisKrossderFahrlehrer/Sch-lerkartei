@@ -14,7 +14,7 @@
 //
 // Starten:  cd tests && npm run test:statisch
 
-import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdtempSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -193,6 +193,18 @@ if (bloeckeZeichen.size === ZEICHEN_IN.length) {
         + `        ${dA}: ${(zA[i] ?? '<Datei zu Ende>').trim()}\n`
         + `        ${dB}: ${(zB[i] ?? '<Datei zu Ende>').trim()}`);
   }
+  // Zu jedem Eintrag muss das Bild existieren - sonst zeigt der Katalog eine
+  // leere Kachel. Seit die Zusatzzeichen selbst gezeichnet werden
+  // (werkzeug/zusatzzeichen-zeichnen.py), stehen Liste und Bilder nicht mehr
+  // automatisch zusammen.
+  let bildFehlt = 0;
+  for (const m of a.matchAll(/^\s*'([^']+)'\s*:\s*\[/gm)) {
+    if (!existsSync(join(WURZEL, 'verkehrszeichen-katalog', m[1] + '.jpg'))) {
+      bildFehlt++;
+      melde(`Zeichen "${m[1]}" steht im Katalog, aber verkehrszeichen-katalog/${m[1]}.jpg fehlt`);
+    }
+  }
+  if (!bildFehlt) console.log('  zu jedem Zeichen gibt es das Bild ✓');
 }
 
 // ══ 6 Eingesetzte Werte in HTML-Attributen ═════════════════════════════

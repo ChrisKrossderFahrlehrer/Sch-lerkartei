@@ -11083,12 +11083,31 @@ const ZEICHEN_KATALOG = {
     '448':['Ausfahrttafel Autobahn','wegweiser'],
     '449':['Ankündigungstafel Autobahn','wegweiser'],
     '453':['Entfernungstafel Autobahn','wegweiser'],
-    '454-10':['Umleitungswegweiser','wegweiser']
+    '454-10':['Umleitungswegweiser','wegweiser'],
+    // Zusatzzeichen - selbst gezeichnet (werkzeug/zusatzzeichen-zeichnen.py),
+    // weil es fuer Texte wie Uhrzeiten keine fertigen Vorlagen gibt.
+    'zz-16-18-h':['Zusatz: 16–18 h','zusatz'],
+    'zz-8-11-16-18-h':['Zusatz: 8–11 h und 16–18 h','zusatz'],
+    'zz-22-6-h':['Zusatz: 22–6 h (nachts)','zusatz'],
+    'zz-werktags':['Zusatz: werktags','zusatz'],
+    'zz-werktags-18-19-h':['Zusatz: werktags 18–19 h','zusatz'],
+    'zz-mo-fr-16-18-h':['Zusatz: Mo–Fr 16–18 h','zusatz'],
+    'zz-mo-fr-sa':['Zusatz: Mo–Fr 7–18 h, Sa 8–13 h','zusatz'],
+    'zz-parkscheibe-2-std':['Zusatz: mit Parkscheibe 2 Std.','zusatz'],
+    'zz-anlieger-frei':['Zusatz: Anlieger frei','zusatz'],
+    'zz-lieferverkehr-frei':['Zusatz: Lieferverkehr frei','zusatz'],
+    'zz-bewohner':['Zusatz: Bewohner mit Parkausweis frei','zusatz'],
+    'zz-taxi-frei':['Zusatz: Taxi frei','zusatz'],
+    'zz-auf-2-km':['Zusatz: auf 2 km (Länge der Strecke)','zusatz'],
+    'zz-200-m':['Zusatz: 200 m (Entfernung)','zusatz'],
+    'zz-bei-naesse':['Zusatz: bei Nässe','zusatz'],
+    'zz-ende':['Zusatz: Ende','zusatz']
 };
 
 const KAT_GRUPPEN = [
   ['alle','Alle'], ['vorfahrt','Vorfahrt & Halt'], ['gefahr','Gefahrzeichen'],
-  ['gebot','Gebotszeichen'], ['verbot','Verbotszeichen'], ['richt','Richtzeichen'], ['wegweiser','Wegweiser']
+  ['gebot','Gebotszeichen'], ['verbot','Verbotszeichen'], ['richt','Richtzeichen'], ['wegweiser','Wegweiser'],
+  ['zusatz','Zusatzzeichen']
 ];
 // ── ZEICHENLISTE ENDE ────────────────────────────────────────────
 let katAktiveGruppe = 'alle';
