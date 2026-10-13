@@ -357,6 +357,29 @@ await pruefe('Solo-Lehrer legt eigene Schueler an', async () => {
   await assertSucceeds(setDoc(doc(als('solo-neu'), 'students', 's-solo'), { uid: 'solo-neu', fahrschuleId: 'solo-neu' }));
 });
 
+console.log('\nSPEICHERN — was index.html (saveToFirestore) mitschicken darf');
+// saveToFirestore schickte bei JEDEM Speichern fahrschuleId = Schule des
+// Bearbeitenden mit. Die Regeln verbieten zu Recht, die Zuordnung nebenbei
+// umzuhaengen - das Speichern scheiterte deshalb fuer mitgebrachte und fuer
+// Alt-Schueler. Seit der Korrektur schickt sie die Zuordnung nicht mehr mit.
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  const db = ctx.firestore();
+  await setDoc(doc(db, 'students', 's-mitgebracht'), { uid: LEHRER, fahrschuleId: LEHRER, vorname: 'Mitgebracht' });
+  await setDoc(doc(db, 'students', 's-alt'), { uid: SOLO, vorname: 'Alt' });
+});
+await pruefe('Mitgebrachten Schueler speichern OHNE fahrschuleId darf (so speichert die App jetzt)', async () => {
+  await assertSucceeds(updateDoc(doc(als(LEHRER), 'students', 's-mitgebracht'), { fahrstunden: 3, lastActivity: 1 }));
+});
+await pruefe('...MIT fahrschuleId der Schule darf NICHT (so scheiterte es vorher)', async () => {
+  await assertFails(updateDoc(doc(als(LEHRER), 'students', 's-mitgebracht'), { fahrstunden: 3, fahrschuleId: SCHULE }));
+});
+await pruefe('Altschueler ohne fahrschuleId speichern OHNE fahrschuleId darf', async () => {
+  await assertSucceeds(updateDoc(doc(als(SOLO), 'students', 's-alt'), { merkNotiz: 'Brille!', merkNotizAuto: true }));
+});
+await pruefe('...MIT fahrschuleId darf NICHT (so scheiterte es vorher)', async () => {
+  await assertFails(updateDoc(doc(als(SOLO), 'students', 's-alt'), { merkNotiz: 'Brille!', fahrschuleId: SOLO }));
+});
+
 console.log('\nGEGENPROBE — oeffentliche und Betreiber-Zugriffe');
 await pruefe('Impressum ohne Anmeldung lesbar', async () => {
   await assertSucceeds(getDoc(doc(ohneAnmeldung(), 'platform', 'impressum')));

@@ -170,7 +170,7 @@ body { overscroll-behavior: none; }
 
 /* ── MOBILE & TABLET IMPROVEMENTS ── */
 /* Mindest-Touch-Targets 44px (Apple HIG) */
-.scope-btn, .btn-main, .btn-sheet-cancel,
+.scope-btn, .btn-main, .btn-sheet-cancel, .btn-secondary,
 .klasse-choice-btn, .s-btn, .step-btn,
 button { min-height: 44px; }
 .s-btn { min-width: 44px; }
@@ -644,7 +644,7 @@ body.beta-dash .badge { font-size: 0.66rem; padding: 3px 9px; }
 }
 /* Neben-Bedienelemente und Eingabefelder: gleiche Kante, gleicher Radius. */
 .style-editorial .btn-back, .style-editorial .btn-icon-sm, .style-editorial .scope-btn,
-.style-editorial .klasse-choice-btn, .style-editorial .btn-sheet-cancel,
+.style-editorial .klasse-choice-btn, .style-editorial .btn-sheet-cancel, .style-editorial .btn-secondary,
 .style-editorial .step-btn, .style-editorial .s-btn,
 .style-editorial .form-input, .style-editorial .search-input,
 .style-editorial .notes-textarea, .style-editorial .save-btn,
@@ -655,7 +655,7 @@ body.beta-dash .badge { font-size: 0.66rem; padding: 3px 9px; }
 }
 .style-editorial .btn-back:active, .style-editorial .btn-icon-sm:active,
 .style-editorial .scope-btn:active, .style-editorial .klasse-choice-btn:active,
-.style-editorial .btn-sheet-cancel:active {
+.style-editorial .btn-sheet-cancel:active, .style-editorial .btn-secondary:active {
   transform: none; box-shadow: none; opacity: 0.82;
 }
 /* Der Fokus-Rahmen muss bleiben: Das pauschale box-shadow:none oben wuerde
@@ -1054,6 +1054,12 @@ body.light .punkte-neon .adk-seg.erreicht::before {
 .sheet-actions { display:flex; gap:10px; margin-top:20px; }
 .btn-sheet-cancel { flex:1; background:var(--surface2); border:1px solid var(--border); color:var(--text); padding:13px; border-radius:12px; font-family:'Manrope',sans-serif; font-weight:600; font-size:0.9rem; cursor:pointer; box-shadow:0 5px 0 rgba(0,0,0,0.5), 0 8px 14px rgba(0,0,0,0.32), inset 0 1px 1px rgba(255,255,255,0.14), inset 0 -2px 3px rgba(0,0,0,0.25); transition:transform 0.12s var(--ease-out); }
 .btn-sheet-cancel:active { transform:translateY(4px); box-shadow:0 1px 0 rgba(0,0,0,0.5), 0 2px 5px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.1); }
+/* FIX: .btn-secondary stand an neun Stellen im HTML (Demo-Knopf auf der
+   Startseite, Name aendern, Einladung kopieren/WhatsApp/E-Mail, Bewertung,
+   Zeichen-Katalog), war aber nirgends gestaltet - der Browser zeigte
+   seinen grauen Standardknopf. Gleiche Optik wie der Abbrechen-Knopf. */
+.btn-secondary { flex:1; display:block; width:100%; background:var(--surface2); border:1px solid var(--border); color:var(--text); padding:13px; border-radius:12px; font-family:'Manrope',sans-serif; font-weight:600; font-size:0.9rem; cursor:pointer; box-shadow:0 5px 0 rgba(0,0,0,0.5), 0 8px 14px rgba(0,0,0,0.32), inset 0 1px 1px rgba(255,255,255,0.14), inset 0 -2px 3px rgba(0,0,0,0.25); transition:transform 0.12s var(--ease-out); }
+.btn-secondary:active { transform:translateY(4px); box-shadow:0 1px 0 rgba(0,0,0,0.5), 0 2px 5px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.1); }
 .btn-sheet-ok { flex:2; background:linear-gradient(180deg, #ffd454, var(--accent)); border:none; color:#0d1117; padding:13px; border-radius:12px; font-family:'Manrope',sans-serif; font-weight:700; font-size:0.9rem; cursor:pointer; box-shadow:0 5px 0 #b87f1c, 0 8px 16px rgba(240,180,41,0.4), inset 0 1px 1px rgba(255,255,255,0.6); transition:transform 0.12s var(--ease-out), box-shadow 0.15s; }
 .btn-sheet-ok:active { transform:translateY(4px); box-shadow:0 1px 0 #b87f1c, 0 2px 6px rgba(240,180,41,0.35), inset 0 1px 1px rgba(255,255,255,0.5); }
 
@@ -2732,6 +2738,40 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 </div>
 
 <!-- NAME ÄNDERN MODAL -->
+<!-- MERK-NOTIZ: bearbeiten -->
+<div class="modal-overlay" id="merknotiz-modal" onclick="closeModal(event)">
+  <div class="modal-sheet">
+    <div class="sheet-title">📌 Merk-Notiz</div>
+    <p style="font-size:0.8rem;color:var(--muted);text-align:center;margin:-4px 0 12px">Für das, was du vor jeder Stunde wissen musst. Nur für Fahrlehrer – der Schüler sieht sie nicht.</p>
+    <div class="form-group">
+      <textarea id="inp-merknotiz" rows="5" maxlength="2000" placeholder="z. B. Brille nicht vergessen · Abholung am Bahnhof · zahlt bar"
+        style="width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;color:var(--text);padding:10px 12px;font-size:0.9rem;font-family:'Manrope',sans-serif;outline:none;resize:vertical;box-sizing:border-box"></textarea>
+    </div>
+    <label style="display:flex;align-items:flex-start;gap:10px;font-size:0.86rem;cursor:pointer;margin:2px 0 14px;line-height:1.4">
+      <input type="checkbox" id="chk-merknotiz-auto" style="width:20px;height:20px;flex-shrink:0;margin-top:1px;accent-color:var(--accent)">
+      <span>🔔 Beim Öffnen der Schülerakte automatisch anzeigen</span>
+    </label>
+    <div style="display:flex;gap:10px">
+      <button class="btn-secondary" style="margin:0" onclick="document.getElementById('merknotiz-modal').classList.remove('open')">Abbrechen</button>
+      <button class="btn-main" onclick="saveMerkNotiz()">Speichern ✓</button>
+    </div>
+    <button onclick="loescheMerkNotiz()" style="width:100%;background:none;border:none;color:var(--danger);font-size:0.8rem;margin-top:12px;cursor:pointer;padding:8px">🗑 Merk-Notiz löschen</button>
+  </div>
+</div>
+
+<!-- MERK-NOTIZ: öffnet sich beim Aufruf der Akte -->
+<div class="modal-overlay" id="merknotiz-anzeige-modal" onclick="closeModal(event)">
+  <div class="modal-sheet">
+    <div class="sheet-title" id="merknotiz-anzeige-titel">📌 Merk-Notiz</div>
+    <div id="merknotiz-anzeige-text" style="background:rgba(240,180,41,0.08);border:1.5px solid var(--accent);border-radius:12px;padding:14px;font-size:0.98rem;line-height:1.5;color:var(--text);white-space:pre-wrap;word-break:break-word;margin-bottom:14px"></div>
+    <div style="display:flex;gap:10px">
+      <button class="btn-secondary" style="margin:0" onclick="openMerkNotizBearbeiten()">✏️ Bearbeiten</button>
+      <button class="btn-main" onclick="document.getElementById('merknotiz-anzeige-modal').classList.remove('open')">Alles klar ✓</button>
+    </div>
+    <button onclick="merkNotizNichtMehrAutomatisch()" style="width:100%;background:none;border:none;color:var(--muted);font-size:0.78rem;margin-top:12px;cursor:pointer;padding:8px">Nicht mehr automatisch anzeigen</button>
+  </div>
+</div>
+
 <div class="modal-overlay" id="name-aendern-modal" onclick="closeModal(event)">
   <div class="modal-sheet">
     <div class="sheet-title">✏️ Name ändern</div>
@@ -5101,11 +5141,23 @@ window.toggleBF17 = async (studentId) => {
 
 async function saveToFirestore(studentId, data) {
   try {
-    const fsId = currentUser?._fahrschuleId || currentUser?.uid;
     const payload = { ...data };
-    // uid + fahrschuleId IMMER mitsenden – migriert Legacy-Dokumente ohne uid
-    if (currentUser?.uid) payload.uid = currentUser.uid;
-    if (fsId && !payload.fahrschuleId) payload.fahrschuleId = fsId;
+    // FIX (im Emulator belegt): Hier wurden bei JEDEM Speichern uid UND
+    // fahrschuleId auf die des Bearbeitenden gesetzt. Drei Folgen:
+    //  1. Ein Fahrlehrer, der einer Fahrschule beigetreten ist, konnte seine
+    //     mitgebrachten (noch nicht uebernommenen) Schueler nicht mehr
+    //     speichern - die Regeln verbieten zu Recht, die Fahrschul-Zuordnung
+    //     nebenbei umzuhaengen: "Keine Berechtigung".
+    //  2. Altschueler ganz ohne fahrschuleId liessen sich aus demselben Grund
+    //     gar nicht speichern.
+    //  3. Bearbeitete ein Kollege einen Schueler der Schule, wurde er still
+    //     zum zustaendigen Fahrlehrer - jede Uebertragung war beim naechsten
+    //     Speichern wieder weg.
+    // Die Zuordnung aendert sich jetzt nur noch dort, wo sie sich aendern
+    // soll (Uebertragen, Uebernahme in die Fahrschule). Nur ein Dokument
+    // ganz ohne Besitzer bekommt wie bisher den Bearbeitenden eingetragen.
+    const vorher = getStudent(studentId);
+    if (currentUser?.uid && vorher && !vorher.uid) payload.uid = currentUser.uid;
     // Letzte Aktivität automatisch stempeln (für Inaktivitäts-Hinweis)
     payload.lastActivity = Date.now();
     await dbUpd(doc(db, 'students', studentId), payload);
@@ -5593,6 +5645,7 @@ window.openDetail = (id) => {
   document.getElementById('detail-header-name').textContent = s.vorname+' '+s.nachname;
   listenProtokoll(id);
   renderDetail();
+  zeigeMerkNotizBeimOeffnen(s);
 };
 
 window.goBack = () => {
@@ -6159,6 +6212,7 @@ function renderDetail() {
         <span style="font-size:0.65rem;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:1px 5px">Nur für Fahrlehrer</span>
       </div>
       <div class="section-body">
+        ${renderMerkNotizBlock(s)}
         <div style="display:flex;gap:8px;margin-bottom:12px">
           <input id="inp-neue-notiz" type="text" placeholder="Neue Notiz… z. B. Einparken klappt jetzt"
             style="flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;color:var(--text);padding:10px 12px;font-size:0.88rem;font-family:'Manrope',sans-serif;outline:none;min-width:0"
@@ -6961,6 +7015,81 @@ window.deletePruefungsversuch = async (ts) => {
     const versuche = (s.pruefungsversuche||[]).filter(v => v.ts !== ts);
     await saveToFirestore(activeId, { pruefungsversuche: versuche });
   } catch(e) { console.error('deletePruefungsversuch:', e); toast('Fehler'); }
+};
+
+// ── MERK-NOTIZ (öffnet sich auf Wunsch beim Betreten der Akte) ───────
+// Kundenwunsch: ein Notizfeld, bei dem man anwaehlen kann, dass es sich
+// automatisch oeffnet, sobald man in die Schuelerakte geht - fuer das, was
+// man vor JEDER Stunde wissen muss (z. B. "Brille!", "Abholung Bahnhof",
+// "Mutter zahlt bar"). Eine einzige Notiz je Schueler, getrennt vom
+// datierten Verlauf darunter. Nur fuer Fahrlehrer: Sie geht NICHT ins
+// Schueler-Portal (buildPortalSnapshot nimmt nur ausdruecklich genannte
+// Felder) und nicht in den Ausbildungsnachweis.
+//   merkNotiz      Text
+//   merkNotizAuto  true = beim Oeffnen der Akte automatisch anzeigen
+//   merkNotizAm    Zeitpunkt der letzten Aenderung
+function renderMerkNotizBlock(s) {
+  const text = (s.merkNotiz || '').trim();
+  const auto = !!s.merkNotizAuto;
+  if (!text) {
+    return '<button onclick="openMerkNotizBearbeiten()" style="width:100%;background:var(--surface2);border:1.5px dashed var(--border);border-radius:10px;color:var(--muted);padding:10px 12px;font-size:0.84rem;cursor:pointer;margin-bottom:12px;text-align:left">'
+      + '📌 Merk-Notiz anlegen <span style="font-size:0.72rem">– auf Wunsch öffnet sie sich bei jedem Aufruf der Akte</span></button>';
+  }
+  return '<div style="background:rgba(240,180,41,0.08);border:1.5px solid var(--accent);border-radius:10px;padding:10px 12px;margin-bottom:12px">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px">'
+    + '<div style="font-weight:700;font-size:0.84rem">📌 Merk-Notiz</div>'
+    + '<button onclick="openMerkNotizBearbeiten()" aria-label="Merk-Notiz bearbeiten" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--text);padding:4px 10px;font-size:0.76rem;cursor:pointer">✏️ Bearbeiten</button>'
+    + '</div>'
+    + '<div style="font-size:0.88rem;color:var(--text);line-height:1.45;white-space:pre-wrap;word-break:break-word">' + escHtml(text) + '</div>'
+    + '<div style="font-size:0.68rem;color:var(--muted);margin-top:6px">'
+    + (auto ? '🔔 Öffnet sich automatisch beim Aufruf der Akte' : 'Öffnet sich nicht automatisch')
+    + '</div></div>';
+}
+
+window.openMerkNotizBearbeiten = () => {
+  const s = getStudent(activeId);
+  if (!s) { toast('Bitte zuerst einen Schüler öffnen.'); return; }
+  document.getElementById('merknotiz-anzeige-modal').classList.remove('open');
+  document.getElementById('inp-merknotiz').value = s.merkNotiz || '';
+  // Neu angelegt: automatisch anzeigen ist vorausgewaehlt - deshalb legt man
+  // so eine Notiz ja an. Bei einer bestehenden gilt die gespeicherte Wahl.
+  document.getElementById('chk-merknotiz-auto').checked = s.merkNotiz ? !!s.merkNotizAuto : true;
+  document.getElementById('merknotiz-modal').classList.add('open');
+  setTimeout(() => document.getElementById('inp-merknotiz').focus(), 150);
+};
+
+window.saveMerkNotiz = async () => {
+  const id = activeId;
+  if (!getStudent(id)) { toast('Bitte zuerst einen Schüler öffnen.'); return; }
+  const text = (document.getElementById('inp-merknotiz').value || '').trim().slice(0, 2000);
+  const auto = document.getElementById('chk-merknotiz-auto').checked;
+  await saveToFirestore(id, { merkNotiz: text, merkNotizAuto: !!(text && auto), merkNotizAm: Date.now() });
+  document.getElementById('merknotiz-modal').classList.remove('open');
+  toast(text ? '📌 Merk-Notiz gespeichert' : 'Merk-Notiz entfernt');
+};
+
+window.loescheMerkNotiz = async () => {
+  if (!confirm('Merk-Notiz löschen?')) return;
+  document.getElementById('inp-merknotiz').value = '';
+  await saveMerkNotiz();
+};
+
+// Beim Oeffnen der Akte (openDetail) - NICHT bei jedem Neuzeichnen, sonst
+// spraenge das Fenster bei jeder Aenderung am Schueler erneut auf.
+function zeigeMerkNotizBeimOeffnen(s) {
+  if (!s || !s.merkNotizAuto || !(s.merkNotiz || '').trim()) return;
+  document.getElementById('merknotiz-anzeige-titel').textContent =
+    '📌 ' + ((s.vorname || '') + ' ' + (s.nachname || '')).trim();
+  document.getElementById('merknotiz-anzeige-text').textContent = s.merkNotiz;
+  document.getElementById('merknotiz-anzeige-modal').classList.add('open');
+}
+
+window.merkNotizNichtMehrAutomatisch = async () => {
+  const id = activeId;
+  if (!getStudent(id)) return;
+  await saveToFirestore(id, { merkNotizAuto: false, merkNotizAm: Date.now() });
+  document.getElementById('merknotiz-anzeige-modal').classList.remove('open');
+  toast('Öffnet sich nicht mehr automatisch – die Notiz bleibt erhalten.');
 };
 
 // ── NOTIZ-HISTORIE (datierte Einträge) ──────────────────────
