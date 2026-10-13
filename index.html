@@ -7034,19 +7034,83 @@ const nmOffen    = (s) => nmAufgaben(s).filter(a => !a.erledigt);
 // Kennungen erzeugen wir selbst; trotzdem nur sichere Zeichen in onclick.
 const nmId = (id) => String(id || '').replace(/[^a-z0-9]/gi, '');
 
+// Wofuer der Fahrlehrer das Feld braucht (Kundenwunsch): Was steht als
+// Naechstes an, was lief schlecht, was muss wiederholt werden. Jeder Eintrag
+// hat deshalb eine Art; die Reihenfolge ist die der Dringlichkeit.
+// Eintraege von vor dieser Unterscheidung gelten als "Als Nächstes".
+const NM_ARTEN = {
+  schlecht:    { icon: '⚠️', label: 'Lief nicht gut', farbe: '#f85149', beispiel: 'z. B. Spurwechsel ohne Schulterblick' },
+  wiederholen: { icon: '🔁', label: 'Wiederholen',    farbe: '#58a6ff', beispiel: 'z. B. Einparken rückwärts' },
+  naechstes:   { icon: '➡️', label: 'Als Nächstes',   farbe: '#f0b429', beispiel: 'z. B. Kreisverkehr, erste Autobahnfahrt' },
+};
+const NM_REIHENFOLGE = ['schlecht', 'wiederholen', 'naechstes'];
+const nmArt = (a) => NM_ARTEN[a && a.art] ? a.art : 'naechstes';
+let nmNeueArt = 'naechstes';   // Auswahl beim Eintragen, bleibt fuer den naechsten Eintrag
+
+function nmZeile(a, imFenster) {
+  const id = nmId(a.id);
+  return '<div style="display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">'
+    + '<input type="checkbox" ' + (a.erledigt ? 'checked ' : '') + 'onchange="nmAufgabeUmschalten(\'' + id + '\', ' + (imFenster ? 'true' : 'false') + ')" aria-label="Erledigt" '
+    + 'style="width:22px;height:22px;flex-shrink:0;margin-top:1px;accent-color:var(--accent2);cursor:pointer">'
+    + '<div style="flex:1;min-width:0;font-size:0.9rem;line-height:1.4;word-break:break-word;'
+    + (a.erledigt ? 'text-decoration:line-through;color:var(--muted)' : 'color:var(--text)') + '">' + escHtml(a.text || '') + '</div>'
+    + (imFenster ? '' : '<button onclick="nmAufgabeLoeschen(\'' + id + '\')" aria-label="Eintrag löschen" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:2px 4px;font-size:0.85rem;flex-shrink:0;min-height:0">🗑</button>')
+    + '</div>';
+}
+
+// Nach Art gruppiert: erst was schlecht lief, dann Wiederholen, dann Neues.
 function nmAufgabenListe(s, imFenster) {
   const liste = imFenster ? nmOffen(s) : nmAufgaben(s);
-  return liste.map(a => {
-    const id = nmId(a.id);
-    return '<div style="display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">'
-      + '<input type="checkbox" ' + (a.erledigt ? 'checked ' : '') + 'onchange="nmAufgabeUmschalten(\'' + id + '\', ' + (imFenster ? 'true' : 'false') + ')" aria-label="Erledigt" '
-      + 'style="width:22px;height:22px;flex-shrink:0;margin-top:1px;accent-color:var(--accent2);cursor:pointer">'
-      + '<div style="flex:1;min-width:0;font-size:0.9rem;line-height:1.4;word-break:break-word;'
-      + (a.erledigt ? 'text-decoration:line-through;color:var(--muted)' : 'color:var(--text)') + '">' + escHtml(a.text || '') + '</div>'
-      + (imFenster ? '' : '<button onclick="nmAufgabeLoeschen(\'' + id + '\')" aria-label="Aufgabe löschen" style="background:none;border:none;color:var(--muted);cursor:pointer;padding:2px 4px;font-size:0.85rem;flex-shrink:0;min-height:0">🗑</button>')
+  return NM_REIHENFOLGE.map(art => {
+    const teil = liste.filter(a => nmArt(a) === art);
+    if (!teil.length) return '';
+    const A = NM_ARTEN[art];
+    return '<div style="margin-top:8px">'
+      + '<div style="font-size:0.7rem;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;color:' + A.farbe + ';margin-bottom:2px">' + A.icon + ' ' + A.label + '</div>'
+      + teil.map(a => nmZeile(a, imFenster)).join('')
       + '</div>';
   }).join('');
 }
+
+// Maengel der letzten gefahrenen Stunde, die noch nicht als offener Eintrag
+// dastehen - als Vorschlag "Wiederholen". Quelle ist das Protokoll, das die
+// Akte ohnehin laedt (listenProtokoll); geplante Stunden zaehlen nicht.
+function nmMaengelVorschlag(s) {
+  if (!s || !Array.isArray(protokollEintraege)) return null;
+  const heute = heuteLokal();
+  const gefahren = protokollEintraege.filter(e => e.studentId === s.id && e.typ !== 'planung'
+    && (e.datum || '') <= heute);
+  if (!gefahren.length) return null;
+  // Die wirklich letzte Stunde - hatte sie keine Maengel, gibt es keinen
+  // Vorschlag (nicht auf eine aeltere Stunde zurueckgreifen).
+  const letzte = gefahren[gefahren.length - 1];
+  if (!Array.isArray(letzte.maengel) || !letzte.maengel.length) return null;
+  const schonDa = new Set(nmOffen(s).map(a => String(a.text || '').trim().toLowerCase()));
+  const neu = [...new Set(letzte.maengel.map(m => String(m || '').trim()).filter(Boolean))]
+    .filter(m => !schonDa.has(m.toLowerCase()));
+  return neu.length ? { datum: letzte.datum, maengel: neu } : null;
+}
+
+function nmArtKnoepfe() {
+  return NM_REIHENFOLGE.slice().reverse().map(art => {
+    const A = NM_ARTEN[art], an = nmNeueArt === art;
+    return '<button type="button" data-nm-art="' + art + '" onclick="nmArtWaehlen(\'' + art + '\')" '
+      + 'style="flex:1;min-height:0;padding:6px 4px;border-radius:8px;font-size:0.72rem;font-weight:700;cursor:pointer;white-space:nowrap;'
+      + 'border:1.5px solid ' + (an ? A.farbe : 'var(--border)') + ';background:' + (an ? 'var(--surface2)' : 'transparent') + ';color:' + (an ? A.farbe : 'var(--muted)') + '">'
+      + A.icon + ' ' + A.label + '</button>';
+  }).join('');
+}
+
+// Nur die Knoepfe und den Platzhalter umstellen - kein Neuzeichnen der
+// Akte, sonst ginge ein schon angefangener Text verloren.
+window.nmArtWaehlen = (art) => {
+  if (!NM_ARTEN[art]) return;
+  nmNeueArt = art;
+  const box = document.getElementById('nm-art-knoepfe');
+  if (box) box.innerHTML = nmArtKnoepfe();
+  const inp = document.getElementById('inp-nm-aufgabe');
+  if (inp) { inp.placeholder = NM_ARTEN[art].beispiel; inp.focus(); }
+};
 
 function renderNaechstesMalBlock(s) {
   const notiz = (s.merkNotiz || '').trim();
@@ -7054,18 +7118,28 @@ function renderNaechstesMalBlock(s) {
   const erledigte = alle.filter(a => a.erledigt).length;
   const auto = !!s.merkNotizAuto;
   const leer = !notiz && !alle.length;
+  const vorschlag = nmMaengelVorschlag(s);
   return '<div class="section-block" style="border:1.5px solid ' + (leer ? 'var(--border)' : 'var(--accent)') + '">'
     + '<div class="section-header">'
     +   '<div class="section-title">📌 Fürs nächste Mal</div>'
-    +   (leer ? '' : '<button onclick="nmAutoUmschalten()" title="Beim Öffnen der Akte automatisch anzeigen" style="background:' + (auto ? 'rgba(240,180,41,0.15)' : 'var(--surface2)') + ';border:1px solid ' + (auto ? 'var(--accent)' : 'var(--border)') + ';color:' + (auto ? 'var(--accent)' : 'var(--muted)') + ';padding:4px 9px;border-radius:8px;font-size:0.7rem;cursor:pointer;font-weight:700;min-height:0">' + (auto ? '🔔 öffnet automatisch' : '🔕 öffnet nicht automatisch') + '</button>')
+    +   (leer ? '<span style="font-size:0.65rem;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:1px 5px">Nur für Fahrlehrer</span>'
+              : '<button onclick="nmAutoUmschalten()" title="Beim Öffnen der Akte automatisch anzeigen" style="background:' + (auto ? 'rgba(240,180,41,0.15)' : 'var(--surface2)') + ';border:1px solid ' + (auto ? 'var(--accent)' : 'var(--border)') + ';color:' + (auto ? 'var(--accent)' : 'var(--muted)') + ';padding:4px 9px;border-radius:8px;font-size:0.7rem;cursor:pointer;font-weight:700;min-height:0">' + (auto ? '🔔 öffnet automatisch' : '🔕 öffnet nicht automatisch') + '</button>')
     + '</div>'
     + '<div class="section-body">'
+    +   (leer ? '<div style="font-size:0.8rem;color:var(--muted);line-height:1.45;margin-bottom:8px">Was steht als Nächstes an, was lief nicht gut, was muss wiederholt werden? Auf Wunsch öffnet sich das hier jedes Mal, wenn du die Akte aufrufst.</div>' : '')
     +   nmAufgabenListe(s, false)
-    +   '<div style="display:flex;gap:8px;margin:' + (alle.length ? '10px' : '0') + ' 0 8px">'
-    +     '<input id="inp-nm-aufgabe" type="text" maxlength="200" placeholder="Aufgabe fürs nächste Mal… z. B. Kreisverkehr üben" '
+    +   (vorschlag
+          ? '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:rgba(88,166,255,0.08);border:1px dashed #58a6ff;border-radius:10px;padding:8px 10px;margin-top:10px">'
+            + '<div style="flex:1;min-width:150px;font-size:0.8rem;line-height:1.4">🔁 Mängel der letzten Stunde (' + escHtml(formatDate(vorschlag.datum)) + '): <b>' + escHtml(vorschlag.maengel.join(', ')) + '</b></div>'
+            + '<button onclick="nmMaengelUebernehmen()" style="background:#58a6ff;border:none;border-radius:8px;color:#0d1117;padding:6px 10px;font-size:0.74rem;font-weight:800;cursor:pointer;min-height:0">＋ zum Wiederholen</button>'
+            + '</div>'
+          : '')
+    +   '<div id="nm-art-knoepfe" style="display:flex;gap:6px;margin:12px 0 6px">' + nmArtKnoepfe() + '</div>'
+    +   '<div style="display:flex;gap:8px;margin:0 0 8px">'
+    +     '<input id="inp-nm-aufgabe" type="text" maxlength="200" placeholder="' + escHtml(NM_ARTEN[nmNeueArt].beispiel) + '" '
     +       'onkeydown="if(event.key===\'Enter\') nmAufgabeHinzu()" '
     +       'style="flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;color:var(--text);padding:10px 12px;font-family:\'Manrope\',sans-serif;outline:none;min-width:0">'
-    +     '<button onclick="nmAufgabeHinzu()" aria-label="Aufgabe hinzufügen" style="background:var(--accent);border:none;border-radius:10px;color:#0d1117;padding:10px 14px;font-weight:700;font-size:0.95rem;cursor:pointer;flex-shrink:0">+</button>'
+    +     '<button onclick="nmAufgabeHinzu()" aria-label="Eintrag hinzufügen" style="background:var(--accent);border:none;border-radius:10px;color:#0d1117;padding:10px 14px;font-weight:700;font-size:0.95rem;cursor:pointer;flex-shrink:0">+</button>'
     +   '</div>'
     +   (notiz
           ? '<div onclick="openMerkNotizBearbeiten()" style="cursor:pointer;background:rgba(240,180,41,0.08);border:1px solid rgba(240,180,41,0.35);border-radius:10px;padding:9px 12px;margin-top:4px">'
@@ -7088,7 +7162,7 @@ window.nmAufgabeHinzu = async () => {
   if (!text) { inp && inp.focus(); return; }
   const liste = nmAufgaben(s);
   if (liste.length >= NM_MAX_AUFGABEN) { toast('Höchstens ' + NM_MAX_AUFGABEN + ' Aufgaben – bitte erledigte entfernen.'); return; }
-  const neu = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), text, erledigt: false, am: Date.now() };
+  const neu = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), text, art: nmNeueArt, erledigt: false, am: Date.now() };
   const felder = { merkAufgaben: [...liste, neu] };
   // Erste Aufgabe: "automatisch anzeigen" ist vorausgewaehlt - dafuer legt
   // man so etwas ja an. Eine bewusst getroffene Wahl bleibt unangetastet.
@@ -7096,6 +7170,27 @@ window.nmAufgabeHinzu = async () => {
   await nmSpeichern(s, felder);
   const neuInp = document.getElementById('inp-nm-aufgabe');
   if (neuInp) { neuInp.value = ''; neuInp.focus(); }
+};
+
+// Vorschlag aus dem Protokoll uebernehmen: jeder Mangel ein Eintrag
+// "Wiederholen".
+window.nmMaengelUebernehmen = async () => {
+  const s = getStudent(activeId);
+  if (!s) return;
+  const v = nmMaengelVorschlag(s);
+  if (!v) return;
+  const liste = nmAufgaben(s);
+  const platz = NM_MAX_AUFGABEN - liste.length;
+  if (platz <= 0) { toast('Höchstens ' + NM_MAX_AUFGABEN + ' Einträge – bitte erledigte entfernen.'); return; }
+  const jetzt = Date.now();
+  const neu = v.maengel.slice(0, platz).map((m, i) => ({
+    id: (jetzt + i).toString(36) + Math.random().toString(36).slice(2, 6),
+    text: m.slice(0, 200), art: 'wiederholen', erledigt: false, am: jetzt,
+  }));
+  const felder = { merkAufgaben: [...liste, ...neu] };
+  if (s.merkNotizAuto === undefined) felder.merkNotizAuto = true;
+  await nmSpeichern(s, felder);
+  toast('🔁 ' + neu.length + ' zum Wiederholen übernommen');
 };
 
 window.nmAufgabeUmschalten = async (id, imFenster) => {
