@@ -420,6 +420,29 @@ for (const m of schriftCss.matchAll(/url\(\.\/([^)]+)\)/g)) {
 }
 console.log(`  ${SEITEN.length + 2} Dateien durchgesehen${fontOffen ? '' : ' ✓'}`);
 
+// ══ 10 Speichern haengt die Zuordnung nicht nebenbei um ════════════════
+// saveToFirestore (index.html) schickte bei JEDEM Speichern uid und
+// fahrschuleId des Bearbeitenden mit. Folgen: mitgebrachte und Alt-Schueler
+// liessen sich nicht mehr speichern ("Keine Berechtigung"), und ein Kollege
+// wurde beim Bearbeiten still zum zustaendigen Fahrlehrer. Die Regel-Seite
+// pruefen tests/mandanten.test.mjs; hier wird festgehalten, dass die
+// Funktion fahrschuleId nicht wieder selbst setzt.
+console.log('\n10) Speichern haengt die Fahrschul-Zuordnung nicht um');
+{
+  const text = lies('index.html') || '';
+  const start = text.indexOf('async function saveToFirestore(');
+  const rumpf = start < 0 ? '' : text.slice(start, text.indexOf('\n}\n', start));
+  if (!rumpf) {
+    melde('index.html: saveToFirestore nicht gefunden');
+  } else if (/payload\.fahrschuleId\s*=/.test(rumpf) ||
+             /payload\.uid\s*=\s*currentUser[^;]*;/.test(rumpf.replace(/if \(currentUser\?\.uid && vorher && !vorher\.uid\) payload\.uid = currentUser\.uid;/, ''))) {
+    melde('index.html: saveToFirestore setzt uid/fahrschuleId wieder pauschal - '
+        + 'das blockiert das Speichern mitgebrachter Schueler und haengt Schueler still um');
+  } else {
+    console.log('  saveToFirestore setzt keine Zuordnung ✓');
+  }
+}
+
 // ══ Ergebnis ═══════════════════════════════════════════════════════════
 console.log(befunde === 0
   ? '\n✓ Keine Befunde.\n'
