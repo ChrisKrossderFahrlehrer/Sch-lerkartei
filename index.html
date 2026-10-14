@@ -2747,10 +2747,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       <textarea id="inp-merknotiz" rows="5" maxlength="2000" placeholder="z. B. Brille nicht vergessen · Abholung am Bahnhof · zahlt bar"
         style="width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;color:var(--text);padding:10px 12px;font-size:0.9rem;font-family:'Manrope',sans-serif;outline:none;resize:vertical;box-sizing:border-box"></textarea>
     </div>
-    <label style="display:flex;align-items:flex-start;gap:10px;font-size:0.86rem;cursor:pointer;margin:2px 0 14px;line-height:1.4">
-      <input type="checkbox" id="chk-merknotiz-auto" style="width:20px;height:20px;flex-shrink:0;margin-top:1px;accent-color:var(--accent)">
-      <span>🔔 „Fürs nächste Mal“ beim Öffnen der Schülerakte automatisch anzeigen</span>
-    </label>
+    <div style="font-size:0.8rem;color:var(--muted);margin:2px 0 6px">„Fürs nächste Mal“ beim Öffnen der Schülerakte anzeigen:</div>
+    <div id="merknotiz-modus-wahl" style="display:flex;gap:6px"></div>
+    <div id="merknotiz-modus-info" style="font-size:0.72rem;color:var(--muted);margin:6px 0 14px;line-height:1.35"></div>
     <div style="display:flex;gap:10px">
       <button class="btn-secondary" style="margin:0" onclick="document.getElementById('merknotiz-modal').classList.remove('open')">Abbrechen</button>
       <button class="btn-main" onclick="saveMerkNotiz()">Speichern ✓</button>
@@ -2763,7 +2762,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 <div class="modal-overlay" id="merknotiz-anzeige-modal" onclick="closeModal(event)">
   <div class="modal-sheet">
     <div class="sheet-title" id="merknotiz-anzeige-titel">📌 Fürs nächste Mal</div>
-    <div id="merknotiz-anzeige-text" style="background:rgba(240,180,41,0.08);border:1.5px solid var(--accent);border-radius:12px;padding:8px 14px 12px;color:var(--text);margin-bottom:14px;max-height:55vh;overflow-y:auto"></div>
+    <div id="merknotiz-anzeige-text" style="background:rgba(240,180,41,0.08);border:1.5px solid var(--accent);border-radius:12px;padding:8px 14px 12px;color:var(--text);margin-bottom:8px;max-height:55vh;overflow-y:auto"></div>
+    <div id="merknotiz-anzeige-info" style="font-size:0.74rem;color:var(--muted);text-align:center;margin-bottom:12px;min-height:2px"></div>
     <div style="display:flex;gap:10px">
       <button class="btn-secondary" style="margin:0" onclick="document.getElementById('merknotiz-anzeige-modal').classList.remove('open');setTimeout(()=>{const e=document.getElementById('inp-nm-aufgabe');if(e){e.scrollIntoView({block:'center'});}},100)">✏️ Bearbeiten</button>
       <button class="btn-main" onclick="document.getElementById('merknotiz-anzeige-modal').classList.remove('open')">Alles klar ✓</button>
@@ -7023,8 +7023,13 @@ window.deletePruefungsversuch = async (ts) => {
 // ueben", "Unterlagen mitbringen"). Deshalb zwei Teile:
 //   merkAufgaben   Liste [{ id, text, erledigt, am, erledigtAm }] zum Abhaken
 //   merkNotiz      freier Hinweis ("Brille!", "Abholung am Bahnhof")
-//   merkNotizAuto  true = beim Oeffnen der Akte automatisch anzeigen
+//   merkNotizAuto  wann sich das Fenster beim Oeffnen der Akte zeigt:
+//                  true = jedes Mal, 'einmal' = beim naechsten Aufruf einmal
+//                  (danach erst wieder, wenn etwas Neues eingetragen wird),
+//                  false = nie
 //   merkNotizAm    Zeitpunkt der letzten Aenderung
+//   merkNotizNeuAm      zuletzt etwas NEUES eingetragen (Eintrag, Hinweistext)
+//   merkNotizGezeigtAm  zuletzt im Modus 'einmal' angezeigt
 // Nur fuer Fahrlehrer: geht NICHT ins Schueler-Portal (buildPortalSnapshot
 // nimmt nur ausdruecklich genannte Felder) und nicht in den
 // Ausbildungsnachweis. Steht ganz oben in der Akte (renderDetail).
@@ -7046,6 +7051,31 @@ const NM_ARTEN = {
 const NM_REIHENFOLGE = ['schlecht', 'wiederholen', 'naechstes'];
 const nmArt = (a) => NM_ARTEN[a && a.art] ? a.art : 'naechstes';
 let nmNeueArt = 'naechstes';   // Auswahl beim Eintragen, bleibt fuer den naechsten Eintrag
+
+// Kundenwunsch: Nicht nur "immer" oder "nie" - auch "beim naechsten Aufruf
+// einmal". Nach dem Anzeigen bleibt es still, bis wieder etwas Neues
+// dazukommt (ein Eintrag, ein geaenderter Hinweis). Abhaken zaehlt nicht.
+const NM_MODI = {
+  immer:  { icon: '🔔', label: 'Immer',  wert: true,     info: 'Öffnet sich bei jedem Aufruf der Akte', kurz: 'Öffnet sich jetzt jedes Mal' },
+  einmal: { icon: '1️⃣', label: 'Einmal', wert: 'einmal', info: 'Öffnet sich beim nächsten Aufruf einmal – danach erst wieder bei neuen Einträgen', kurz: 'Öffnet sich beim nächsten Mal' },
+  aus:    { icon: '🔕', label: 'Aus',    wert: false,    info: 'Öffnet sich nicht automatisch', kurz: 'Öffnet sich nicht automatisch' },
+};
+const NM_MODUS_REIHENFOLGE = ['immer', 'einmal', 'aus'];
+const nmModus = (s) => s && s.merkNotizAuto === 'einmal' ? 'einmal' : (s && s.merkNotizAuto ? 'immer' : 'aus');
+// Wann zuletzt etwas Neues eingetragen wurde. Die Eintraege tragen ihren
+// eigenen Zeitstempel; merkNotizNeuAm deckt den Hinweistext und den Wechsel
+// auf "Einmal" ab.
+const nmNeuAm = (s) => Math.max(Number(s.merkNotizNeuAm) || 0, ...nmOffen(s).map(a => Number(a.am) || 0));
+
+function nmModusKnoepfe(aktiv, klick) {
+  return NM_MODUS_REIHENFOLGE.map(m => {
+    const M = NM_MODI[m], an = aktiv === m;
+    return '<button type="button" data-nm-modus="' + m + '" onclick="' + klick + '(\'' + m + '\')" title="' + escHtml(M.info) + '" '
+      + 'style="flex:1;min-height:0;padding:6px 4px;border-radius:8px;font-size:0.72rem;font-weight:700;cursor:pointer;white-space:nowrap;'
+      + 'border:1.5px solid ' + (an ? 'var(--accent)' : 'var(--border)') + ';background:' + (an ? 'rgba(240,180,41,0.15)' : 'transparent') + ';color:' + (an ? 'var(--accent)' : 'var(--muted)') + '">'
+      + M.icon + ' ' + M.label + '</button>';
+  }).join('');
+}
 
 function nmZeile(a, imFenster) {
   const id = nmId(a.id);
@@ -7116,17 +7146,16 @@ function renderNaechstesMalBlock(s) {
   const notiz = (s.merkNotiz || '').trim();
   const alle = nmAufgaben(s);
   const erledigte = alle.filter(a => a.erledigt).length;
-  const auto = !!s.merkNotizAuto;
+  const modus = nmModus(s);
   const leer = !notiz && !alle.length;
   const vorschlag = nmMaengelVorschlag(s);
   return '<div class="section-block" style="border:1.5px solid ' + (leer ? 'var(--border)' : 'var(--accent)') + '">'
     + '<div class="section-header">'
     +   '<div class="section-title">📌 Fürs nächste Mal</div>'
-    +   (leer ? '<span style="font-size:0.65rem;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:1px 5px">Nur für Fahrlehrer</span>'
-              : '<button onclick="nmAutoUmschalten()" title="Beim Öffnen der Akte automatisch anzeigen" style="background:' + (auto ? 'rgba(240,180,41,0.15)' : 'var(--surface2)') + ';border:1px solid ' + (auto ? 'var(--accent)' : 'var(--border)') + ';color:' + (auto ? 'var(--accent)' : 'var(--muted)') + ';padding:4px 9px;border-radius:8px;font-size:0.7rem;cursor:pointer;font-weight:700;min-height:0">' + (auto ? '🔔 öffnet automatisch' : '🔕 öffnet nicht automatisch') + '</button>')
+    +   '<span style="font-size:0.65rem;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:1px 5px">Nur für Fahrlehrer</span>'
     + '</div>'
     + '<div class="section-body">'
-    +   (leer ? '<div style="font-size:0.8rem;color:var(--muted);line-height:1.45;margin-bottom:8px">Was steht als Nächstes an, was lief nicht gut, was muss wiederholt werden? Auf Wunsch öffnet sich das hier jedes Mal, wenn du die Akte aufrufst.</div>' : '')
+    +   (leer ? '<div style="font-size:0.8rem;color:var(--muted);line-height:1.45;margin-bottom:8px">Was steht als Nächstes an, was lief nicht gut, was muss wiederholt werden? Auf Wunsch öffnet sich das hier, wenn du die Akte aufrufst – jedes Mal oder nur beim nächsten Mal.</div>' : '')
     +   nmAufgabenListe(s, false)
     +   (vorschlag
           ? '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:rgba(88,166,255,0.08);border:1px dashed #58a6ff;border-radius:10px;padding:8px 10px;margin-top:10px">'
@@ -7146,6 +7175,11 @@ function renderNaechstesMalBlock(s) {
             + '<div style="font-size:0.7rem;color:var(--muted);margin-bottom:3px">📝 Hinweis · antippen zum Bearbeiten</div>'
             + '<div style="font-size:0.88rem;color:var(--text);line-height:1.45;white-space:pre-wrap;word-break:break-word">' + escHtml(notiz) + '</div></div>'
           : '<button onclick="openMerkNotizBearbeiten()" style="background:none;border:none;color:var(--muted);font-size:0.78rem;cursor:pointer;padding:4px 0;min-height:0">📝 Hinweis hinzufügen (z. B. „Brille nicht vergessen“)</button>')
+    +   (leer ? '' : '<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">'
+          + '<div style="font-size:0.72rem;color:var(--muted);margin-bottom:5px">Beim Öffnen der Akte anzeigen:</div>'
+          + '<div style="display:flex;gap:6px">' + nmModusKnoepfe(modus, 'nmModusWaehlen') + '</div>'
+          + '<div style="font-size:0.7rem;color:var(--muted);margin-top:5px;line-height:1.35">' + escHtml(NM_MODI[modus].info) + '</div>'
+          + '</div>')
     +   (erledigte ? '<div style="text-align:right;margin-top:6px"><button onclick="nmErledigteEntfernen()" style="background:none;border:none;color:var(--muted);font-size:0.74rem;cursor:pointer;padding:4px 0;min-height:0">✓ ' + erledigte + ' erledigte entfernen</button></div>' : '')
     + '</div></div>';
 }
@@ -7215,12 +7249,19 @@ window.nmErledigteEntfernen = async () => {
   await nmSpeichern(s, { merkAufgaben: nmOffen(s) });
 };
 
-window.nmAutoUmschalten = async () => {
+// Felder fuer einen Moduswechsel. Wer auf "Einmal" stellt, will es beim
+// naechsten Aufruf sehen - auch wenn nichts Neues dazugekommen ist.
+function nmModusFelder(s, modus) {
+  const felder = { merkNotizAuto: NM_MODI[modus].wert };
+  if (modus === 'einmal' && nmModus(s) !== 'einmal') felder.merkNotizNeuAm = Date.now();
+  return felder;
+}
+
+window.nmModusWaehlen = async (modus) => {
   const s = getStudent(activeId);
-  if (!s) return;
-  const an = !s.merkNotizAuto;
-  await nmSpeichern(s, { merkNotizAuto: an });
-  toast(an ? '🔔 Öffnet sich jetzt beim Aufruf der Akte' : '🔕 Öffnet sich nicht mehr automatisch');
+  if (!s || !NM_MODI[modus] || nmModus(s) === modus) return;
+  await nmSpeichern(s, nmModusFelder(s, modus));
+  toast(NM_MODI[modus].icon + ' ' + NM_MODI[modus].kurz);
 };
 
 // Hinweis-Text bearbeiten (eigenes Fenster - ein Textfeld direkt in der
@@ -7231,17 +7272,28 @@ window.openMerkNotizBearbeiten = () => {
   document.getElementById('merknotiz-anzeige-modal').classList.remove('open');
   document.getElementById('inp-merknotiz').value = s.merkNotiz || '';
   const neu = !s.merkNotiz && !nmAufgaben(s).length && s.merkNotizAuto === undefined;
-  document.getElementById('chk-merknotiz-auto').checked = neu ? true : !!s.merkNotizAuto;
+  nmFensterModusWaehlen(neu ? 'immer' : nmModus(s));
   document.getElementById('merknotiz-modal').classList.add('open');
   setTimeout(() => document.getElementById('inp-merknotiz').focus(), 150);
+};
+
+// Auswahl im Hinweis-Fenster - erst beim Speichern uebernommen.
+let nmFensterModus = 'immer';
+window.nmFensterModusWaehlen = (modus) => {
+  if (!NM_MODI[modus]) return;
+  nmFensterModus = modus;
+  document.getElementById('merknotiz-modus-wahl').innerHTML = nmModusKnoepfe(modus, 'nmFensterModusWaehlen');
+  document.getElementById('merknotiz-modus-info').textContent = NM_MODI[modus].info;
 };
 
 window.saveMerkNotiz = async () => {
   const s = getStudent(activeId);
   if (!s) { toast('Bitte zuerst einen Schüler öffnen.'); return; }
   const text = (document.getElementById('inp-merknotiz').value || '').trim().slice(0, 2000);
-  const auto = document.getElementById('chk-merknotiz-auto').checked;
-  await nmSpeichern(s, { merkNotiz: text, merkNotizAuto: !!auto });
+  const felder = { merkNotiz: text, ...nmModusFelder(s, nmFensterModus) };
+  // Ein neuer oder geaenderter Hinweis gilt als "etwas Neues" (Modus Einmal).
+  if (text && text !== (s.merkNotiz || '').trim()) felder.merkNotizNeuAm = Date.now();
+  await nmSpeichern(s, felder);
   document.getElementById('merknotiz-modal').classList.remove('open');
   toast(text ? '📌 Hinweis gespeichert' : 'Hinweis entfernt');
 };
@@ -7264,7 +7316,20 @@ function zeigeNaechstesMalFenster(s, nurAktualisieren) {
   if (!nurAktualisieren) modal.classList.remove('open');
   const notiz = (s.merkNotiz || '').trim();
   const offen = nmOffen(s);
-  if (!nurAktualisieren && (!s.merkNotizAuto || (!notiz && !offen.length))) return;
+  const modus = nmModus(s);
+  if (!nurAktualisieren) {
+    if (modus === 'aus' || (!notiz && !offen.length)) return;
+    // "Einmal": nur, wenn seit dem letzten Anzeigen etwas Neues dazukam.
+    if (modus === 'einmal') {
+      if (nmNeuAm(s) <= (Number(s.merkNotizGezeigtAm) || 0)) return;
+      // Direkt statt ueber saveToFirestore: Das blosse Anschauen ist keine
+      // Aktivitaet am Schueler (lastActivity bleibt) und muss nicht ins Portal.
+      dbUpd(doc(db, 'students', s.id), { merkNotizGezeigtAm: Date.now() })
+        .catch(e => console.warn('merkNotizGezeigtAm:', e));
+    }
+  }
+  document.getElementById('merknotiz-anzeige-info').textContent =
+    modus === 'einmal' ? '1️⃣ Erscheint erst wieder, wenn du etwas Neues einträgst.' : '';
   document.getElementById('merknotiz-anzeige-titel').textContent =
     '📌 Fürs nächste Mal – ' + ((s.vorname || '') + ' ' + (s.nachname || '')).trim();
   document.getElementById('merknotiz-anzeige-text').innerHTML =

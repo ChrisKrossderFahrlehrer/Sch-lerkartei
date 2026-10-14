@@ -1,0 +1,62 @@
+# Webhooks einrichten
+#
+# Schaltet bei PayPal und Stripe die Abo-Ereignisse ein, die das Backend fuer
+# gekuendigte Abos braucht (14 Tage Nachlauf, dann Free - functions/abo.js).
+# Nur von Hand auszuloesen, nie automatisch. Einzelheiten und was das Skript
+# NICHT tut: werkzeug/webhooks-einrichten.mjs
+#
+# Erst "nur-pruefen" laufen lassen: zeigt, was eingeschaltet ist und was
+# fehlt, aendert nichts. Dann "einrichten".
+
+name: Webhooks einrichten
+
+on:
+  workflow_dispatch:
+    inputs:
+      modus:
+        description: 'nur-pruefen = nichts aendern, nur anzeigen; einrichten = fehlende Ereignisse ergaenzen'
+        type: choice
+        options: [nur-pruefen, einrichten]
+        default: nur-pruefen
+
+concurrency:
+  group: webhooks-einrichten
+  cancel-in-progress: false
+
+jobs:
+  webhooks:
+    # Nur vom Stand auf main - wie beim Deployen.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Firebase-Zugang bereitstellen
+        env:
+          SCHLUESSEL: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$SCHLUESSEL" ]; then
+            echo "::error::Das Secret FIREBASE_SERVICE_ACCOUNT fehlt."
+            exit 1
+          fi
+          printf '%s' "$SCHLUESSEL" > "$RUNNER_TEMP/dienstkonto.json"
+
+      - name: Webhooks pruefen / einrichten
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/dienstkonto.json
+          MODUS: ${{ inputs.modus }}
+        run: |
+          if [ "$MODUS" = "einrichten" ]; then
+            node werkzeug/webhooks-einrichten.mjs --einrichten
+          else
+            node werkzeug/webhooks-einrichten.mjs
+          fi
+
+      - name: Zugang entfernen
+        if: always()
+        run: rm -f "$RUNNER_TEMP/dienstkonto.json"

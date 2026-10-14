@@ -93,3 +93,28 @@ aktualisiert zurücklassen.
 Soll ein Schlüssel ungültig gemacht werden: In der Cloud Console beim
 Dienstkonto den Schlüssel löschen, einen neuen erzeugen und das GitHub-Secret
 ersetzen.
+
+## Webhooks einrichten
+
+Gekündigte Abos laufen 14 Tage nach und gehen dann auf Free. Davon erfährt
+das Backend nur, wenn PayPal und Stripe die Kündigung auch melden. Der
+Ablauf *Webhooks einrichten* schaltet die nötigen Ereignisse ein:
+
+- PayPal: `BILLING.SUBSCRIPTION.CANCELLED`, `…SUSPENDED`, `…EXPIRED`,
+  `…ACTIVATED`, `…RE-ACTIVATED`
+- Stripe: `customer.subscription.deleted`, `customer.subscription.updated`
+
+Er **fügt nur hinzu**. Schon eingeschaltete Ereignisse, die Adresse und die
+Signatur bleiben unverändert.
+
+*Actions → Webhooks einrichten → Run workflow → main*
+
+1. Erst mit **nur-pruefen**: Das Protokoll zeigt, was eingeschaltet ist und
+   was fehlt. Es wird nichts geändert.
+2. Dann mit **einrichten**.
+
+Die Zugangsdaten für PayPal und Stripe liest der Ablauf aus dem Secret
+Manager des Projekts – dieselben, die die Functions benutzen. Dafür braucht
+das Dienstkonto zusätzlich die Rolle **Secret Manager-Zugriffsberechtigter**
+*(Secret Manager Secret Accessor)*. Fehlt sie, sagt das Protokoll genau das.
+Nach dem Einrichten kann die Rolle wieder entfernt werden.
