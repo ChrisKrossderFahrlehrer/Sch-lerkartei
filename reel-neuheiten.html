@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="FahrSync Neuheiten">
+<meta name="theme-color" content="#04060a">
+<meta name="robots" content="noindex">
+<title>FahrSync – Neuheiten-Reel</title>
+<!-- Schriften lokal statt von Google (DSGVO, siehe werkzeug/schriften-holen.py) -->
+<link href="./schriften/schriften.css" rel="stylesheet">
+<!--
+  Zweites Reel (9:16) zu den neuen Funktionen: "Fürs nächste Mal" mit den
+  drei Arten, Mängel-Vorschlag aus dem Protokoll, Anzeige beim Öffnen der
+  Akte (Immer / Einmal / Aus) und Zusatzzeichen im Zeichen-Katalog.
+  Gestaltung wie reel.html. Fertiges Video (1080 x 1920, MP4) erzeugt
+  werkzeug/reel-rendern.mjs - dafuer gibt es reel-neuheiten.html?render.
+-->
+<style>
+  :root{
+    --nacht:#070a0f;
+    --flaeche:#0f151f;
+    --flaeche-2:#141c29;
+    --signal:#ffd454;
+    --weiss:#eef3f8;
+    --grau:#78859a;
+    --grau-2:#4b566a;
+    --linie:#212c3c;
+    --gruen:#3fb950;
+    --rot:#f85149;
+    --blau:#58a6ff;
+    --orange:#f0b429;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#04060a;min-height:100vh;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:18px;padding:20px;
+    font-family:'Manrope',-apple-system,sans-serif;color:var(--grau)}
+
+  .stage{position:relative;width:540px;height:960px;flex-shrink:0;overflow:hidden;
+    transform-origin:top center;
+    background:radial-gradient(ellipse 80% 50% at 50% 0%, #131c29 0%, var(--nacht) 60%), var(--nacht)}
+
+  .bahn{position:absolute;left:50%;bottom:-8%;width:300%;height:52%;margin-left:-150%;pointer-events:none;
+    background-image:linear-gradient(rgba(255,212,84,.10) 1px,transparent 1px),
+                     linear-gradient(90deg,rgba(255,212,84,.10) 1px,transparent 1px);
+    background-size:92px 92px;
+    transform:perspective(420px) rotateX(76deg);transform-origin:bottom center;
+    animation:bahn 2.6s linear infinite;
+    -webkit-mask-image:linear-gradient(to top,#000 4%,transparent 72%);
+            mask-image:linear-gradient(to top,#000 4%,transparent 72%)}
+  @keyframes bahn{to{background-position:0 92px,0 0}}
+
+  .kopf{position:absolute;top:38px;left:44px;right:44px;z-index:5;
+    display:flex;justify-content:space-between;align-items:center;
+    font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:500;
+    letter-spacing:.2em;color:var(--grau-2)}
+  .uhr{color:var(--weiss);font-weight:700;letter-spacing:.1em;font-size:13px;transition:color .4s}
+  .uhr.hell{color:var(--signal)}
+  .naht{position:absolute;top:70px;left:44px;right:44px;height:1px;background:var(--linie);z-index:5}
+  .fuss{position:absolute;bottom:38px;left:44px;right:44px;z-index:5;height:2px;
+    background:var(--linie);overflow:hidden}
+  .fuss i{display:block;height:100%;width:0;background:var(--signal)}
+
+  .scene{position:absolute;inset:0;z-index:2;padding:110px 40px 88px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;opacity:0;visibility:hidden}
+  .scene.active{opacity:1;visibility:visible}
+
+  .marke-zeile{font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:500;
+    letter-spacing:.26em;text-transform:uppercase;color:var(--signal);margin-bottom:18px;opacity:.9}
+  h1{font-family:'Syne',sans-serif;font-size:46px;font-weight:800;line-height:1.05;
+    letter-spacing:-.028em;color:var(--weiss)}
+  h2{font-family:'Syne',sans-serif;font-size:40px;font-weight:800;line-height:1.08;
+    letter-spacing:-.025em;color:var(--weiss)}
+  .gelb{color:var(--signal)}
+  .lead{font-size:18px;font-weight:600;line-height:1.5;color:var(--grau);margin-top:18px;max-width:400px}
+
+  .up{opacity:0;transform:translateY(24px)}
+  .active .up{animation:up .58s cubic-bezier(.2,.75,.25,1) forwards}
+  @keyframes up{to{opacity:1;transform:none}}
+  .in{opacity:0;transform:scale(.95)}
+  .active .in{animation:zoom .5s cubic-bezier(.2,.75,.25,1) forwards}
+  @keyframes zoom{to{opacity:1;transform:none}}
+  .d1{animation-delay:.10s}.d2{animation-delay:.24s}.d3{animation-delay:.40s}
+  .d4{animation-delay:.56s}.d5{animation-delay:.72s}.d6{animation-delay:.88s}
+
+  /* 1 · Frage */
+  .fragezeichen{font-family:'Syne',sans-serif;font-size:120px;font-weight:800;color:var(--signal);
+    line-height:1;margin-bottom:22px}
+
+  /* 2 · Marke */
+  .wortmarke{font-family:'Syne',sans-serif;font-size:60px;font-weight:800;color:var(--signal);
+    letter-spacing:-.03em;white-space:nowrap}
+  .regel{width:0;height:2px;background:var(--signal);margin:22px auto 0}
+  .active .regel{animation:regel .8s .35s cubic-bezier(.2,.8,.2,1) forwards}
+  @keyframes regel{to{width:180px}}
+  .neu-plakette{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;
+    letter-spacing:.24em;color:#0d1117;background:var(--signal);border-radius:99px;padding:7px 14px;margin-bottom:22px}
+
+  /* Karten wie in der App */
+  .karte{width:100%;max-width:440px;background:var(--flaeche);border:1.5px solid var(--signal);
+    border-radius:16px;padding:20px 22px 18px;text-align:left;box-shadow:0 30px 70px rgba(0,0,0,.6)}
+  .k-kopf{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;gap:10px}
+  .k-titel{font-family:'Syne',sans-serif;font-size:19px;font-weight:800;color:var(--weiss);white-space:nowrap}
+  .k-meta{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--grau-2);letter-spacing:.08em;white-space:nowrap}
+  .gruppe{margin-top:14px}
+  .g-label{font-size:11.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;margin-bottom:4px}
+  .zeile{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--linie);
+    font-size:16.5px;font-weight:600;color:var(--weiss)}
+  .kast{width:21px;height:21px;border-radius:5px;border:2px solid #c9d1d9;flex-shrink:0;background:#fff}
+  .g-rot .g-label{color:var(--rot)} .g-blau .g-label{color:var(--blau)} .g-orange .g-label{color:var(--orange)}
+
+  .quittung{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:20px;
+    font-size:15.5px;font-weight:700;color:var(--gruen);opacity:0;transform:translateY(8px)}
+  .haken{width:18px;height:18px;flex-shrink:0}
+  .haken path{fill:none;stroke:var(--gruen);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;
+    stroke-dasharray:26;stroke-dashoffset:26}
+  @keyframes haken{to{stroke-dashoffset:0}}
+
+  /* 3 · drei Arten nacheinander */
+  .s3 .gruppe{opacity:0;transform:translateX(-18px)}
+  .active.s3 .gruppe{animation:rein .5s cubic-bezier(.2,.8,.2,1) forwards}
+  .active.s3 .ga{animation-delay:.7s} .active.s3 .gb{animation-delay:1.55s} .active.s3 .gc{animation-delay:2.4s}
+  @keyframes rein{to{opacity:1;transform:none}}
+  .active.s3 .quittung{animation:up .45s 3.4s cubic-bezier(.2,.8,.2,1) forwards}
+  .active.s3 .haken path{animation:haken .4s 3.55s forwards}
+
+  /* 4 · Maengel-Vorschlag */
+  .vs-feld{position:relative;width:100%;max-width:440px;height:150px;margin-top:26px}
+  .vorschlag{position:absolute;left:0;right:0;top:0;background:rgba(88,166,255,.08);border:1.5px dashed var(--blau);
+    border-radius:14px;padding:16px 18px;text-align:left}
+  .vs-text{font-size:15.5px;font-weight:600;color:var(--weiss);line-height:1.45}
+  .vs-text b{font-weight:800}
+  .vs-knopf{position:relative;display:inline-block;margin-top:14px;background:var(--blau);color:#0d1117;
+    border-radius:10px;padding:10px 16px;font-size:15px;font-weight:800}
+  .tipp{position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;
+    background:rgba(255,255,255,.55);opacity:0;transform:scale(.3)}
+  .active.s4 .tipp{animation:tipp .55s 1.9s ease-out forwards}
+  @keyframes tipp{0%{opacity:.9;transform:scale(.3)}100%{opacity:0;transform:scale(2.2)}}
+  .active.s4 .vs-knopf{animation:druck .25s 1.9s ease-out}
+  @keyframes druck{50%{transform:scale(.93)}}
+  .active.s4 .vorschlag{animation:zoom .5s .4s cubic-bezier(.2,.75,.25,1) forwards, raus .3s 2.2s ease-in forwards}
+  @keyframes raus{to{opacity:0;transform:scale(.96) translateY(-6px)}}
+  .ergebnis{position:absolute;left:0;right:0;top:0;opacity:0}
+  .active.s4 .ergebnis{animation:up .5s 2.55s cubic-bezier(.2,.8,.2,1) forwards}
+  .ergebnis .karte{border-color:var(--linie)}
+  .active.s4 .quittung{animation:up .45s 3.3s cubic-bezier(.2,.8,.2,1) forwards}
+  .active.s4 .haken path{animation:haken .4s 3.45s forwards}
+
+  /* 5 · Fenster beim Oeffnen der Akte */
+  .blatt{width:100%;max-width:450px;background:#161b22;border:1px solid var(--linie);border-radius:22px 22px 16px 16px;
+    padding:18px 20px 18px;box-shadow:0 -10px 60px rgba(0,0,0,.7);text-align:left;margin-top:24px;
+    opacity:0;transform:translateY(90px)}
+  .active.s5 .blatt{animation:hoch .7s .6s cubic-bezier(.2,.85,.25,1) forwards}
+  @keyframes hoch{to{opacity:1;transform:none}}
+  .griff{width:40px;height:4px;border-radius:9px;background:#30363d;margin:0 auto 12px}
+  .b-titel{font-family:'Syne',sans-serif;font-size:16px;white-space:nowrap;font-weight:800;color:var(--weiss);text-align:center;margin-bottom:10px}
+  .b-liste{background:rgba(240,180,41,.08);border:1.5px solid var(--orange);border-radius:12px;padding:2px 14px 10px}
+  .b-liste .zeile{font-size:15px;padding:7px 0}
+  .b-liste .gruppe{margin-top:8px}
+  .modus{display:flex;gap:7px;margin-top:14px}
+  .modus span{position:relative;flex:1;text-align:center;font-size:13px;font-weight:700;color:var(--grau);
+    border:1.5px solid var(--linie);border-radius:9px;padding:9px 4px;white-space:nowrap}
+  .modus .an::after{content:'';position:absolute;inset:-1.5px;border-radius:9px;border:2px solid var(--signal);
+    background:rgba(255,212,84,.14);opacity:0}
+  .active.s5 .modus .an{animation:farbe .4s 2.4s forwards}
+  .active.s5 .modus .an::after{animation:einblenden .4s 2.4s forwards}
+  @keyframes farbe{to{color:var(--signal)}}
+  @keyframes einblenden{to{opacity:1}}
+  .modus-info{font-size:13px;font-weight:600;color:var(--grau);text-align:center;margin-top:9px;opacity:0}
+  .active.s5 .modus-info{animation:einblenden .4s 2.7s forwards}
+
+  /* 6 · Zusatzzeichen */
+  .pfosten-reihe{display:flex;gap:14px;justify-content:center;align-items:flex-end;margin-top:28px;width:100%}
+  .pfosten{display:flex;flex-direction:column;align-items:center;width:132px;opacity:0;transform:translateY(40px)}
+  .active.s6 .pfosten{animation:hoch .6s cubic-bezier(.25,1.3,.4,1) forwards}
+  .active.s6 .p1{animation-delay:.55s} .active.s6 .p2{animation-delay:.75s} .active.s6 .p3{animation-delay:.95s}
+  .schild-feld{background:#fbfbfb;border-radius:12px;padding:10px 8px 8px;width:100%;
+    display:flex;flex-direction:column;align-items:center;gap:4px;height:176px;box-shadow:0 20px 40px rgba(0,0,0,.5)}
+  .schild-feld img{display:block}
+  .haupt{width:84px;height:84px}
+  .zusatz{width:100px;height:auto}
+  .stange{width:6px;height:46px;background:linear-gradient(90deg,#5b6575,#9aa4b2,#5b6575)}
+  .p-name{font-size:12px;font-weight:700;color:var(--grau);margin-top:10px;line-height:1.3}
+
+  /* 7 · Abschluss */
+  .domain{font-family:'Syne',sans-serif;font-size:40px;font-weight:800;color:var(--signal);
+    white-space:nowrap;margin-top:10px;letter-spacing:-.015em}
+  .preis{font-size:17.5px;font-weight:800;color:var(--weiss);margin-top:18px}
+  .klein{font-size:14px;font-weight:600;color:var(--grau-2);margin-top:6px}
+  .siegel{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:22px}
+  .siegel span{font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.1em;
+    color:var(--grau-2);border:1px solid var(--linie);border-radius:99px;padding:7px 13px}
+
+  /* Steuerung (nur beim Abspielen im Browser) */
+  .bedien{display:flex;align-items:center;gap:14px}
+  button{font-family:'Manrope',sans-serif;font-size:14px;font-weight:800;background:var(--signal);
+    color:#0d1117;border:none;padding:12px 24px;border-radius:99px;cursor:pointer}
+  button.geist{background:transparent;color:var(--grau);border:1px solid var(--linie)}
+  button:focus-visible{outline:3px solid var(--signal);outline-offset:3px}
+  .hinweis{font-size:12.5px;font-weight:600;color:#3f4859;text-align:center;max-width:540px;line-height:1.55}
+  .zeit{font-family:'JetBrains Mono',monospace;font-size:12px;color:#3f4859}
+  .startdeck{position:absolute;inset:0;z-index:9;background:rgba(4,6,10,.92);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
+  .startdeck p{font-size:15px;font-weight:600;color:var(--grau)}
+  .startdeck.weg{display:none}
+  .buehne-huelle{position:relative;flex-shrink:0}
+  body.klein{gap:0;padding:0;justify-content:center}
+  body.klein .bedien,body.klein .hinweis{display:none}
+  /* Rendern: Buehne 1:1 oben links, ohne Bedienelemente */
+  body.render{padding:0;gap:0;justify-content:flex-start;align-items:flex-start}
+  body.render .bedien,body.render .hinweis,body.render .startdeck{display:none}
+  html,body{overflow:hidden;overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
+</style>
+</head>
+<body>
+
+<div class="buehne-huelle" id="huelle">
+<div class="stage" id="stage">
+  <div class="bahn"></div>
+  <div class="kopf"><span>FAHRSYNC</span><span class="uhr" id="uhr">DI · 15:20</span></div>
+  <div class="naht"></div>
+  <div class="fuss"><i id="fortschritt"></i></div>
+
+  <!-- 1 · Frage -->
+  <div class="scene s1" data-scene="1">
+    <div class="fragezeichen in">?</div>
+    <h1 class="up d1">Was war bei<br>Jonas noch mal?</h1>
+    <p class="lead up d3">Nach der achten Stunde am Tag<br>weiß das keiner mehr aus dem Kopf.</p>
+  </div>
+
+  <!-- 2 · Marke -->
+  <div class="scene s2" data-scene="2">
+    <div class="neu-plakette in">NEU</div>
+    <div class="wortmarke in d1">FahrSync</div>
+    <div class="regel"></div>
+    <p class="lead up d3">📌 Fürs nächste Mal</p>
+  </div>
+
+  <!-- 3 · drei Arten -->
+  <div class="scene s3" data-scene="3">
+    <div class="marke-zeile up">Direkt nach der Stunde</div>
+    <div class="karte in d1">
+      <div class="k-kopf"><span class="k-titel">📌 Fürs nächste Mal</span><span class="k-meta">JONAS K.</span></div>
+      <div class="gruppe g-rot ga">
+        <div class="g-label">⚠️ Lief nicht gut</div>
+        <div class="zeile"><span class="kast"></span>Spurwechsel ohne Schulterblick</div>
+      </div>
+      <div class="gruppe g-blau gb">
+        <div class="g-label">🔁 Wiederholen</div>
+        <div class="zeile"><span class="kast"></span>Einparken rückwärts</div>
+      </div>
+      <div class="gruppe g-orange gc">
+        <div class="g-label">➡️ Als Nächstes</div>
+        <div class="zeile"><span class="kast"></span>Erste Autobahnfahrt</div>
+      </div>
+    </div>
+    <div class="quittung">
+      <svg class="haken" viewBox="0 0 24 24"><path d="M4 12.5 L9.5 18 L20 6"/></svg>
+      Notiert, bevor der Nächste einsteigt
+    </div>
+  </div>
+
+  <!-- 4 · Maengel-Vorschlag -->
+  <div class="scene s4" data-scene="4">
+    <div class="marke-zeile up">Aus dem Protokoll</div>
+    <h2 class="up d1" style="font-size:35px">Mängel werden<br><span class="gelb">Wiederholungen.</span></h2>
+    <div class="vs-feld">
+      <div class="vorschlag in d3">
+        <div class="vs-text">🔁 Mängel der letzten Stunde:<br><b>Kupplung, Vorfahrt rechts vor links</b></div>
+        <div class="vs-knopf">＋ zum Wiederholen<span class="tipp"></span></div>
+      </div>
+      <div class="ergebnis">
+        <div class="karte">
+          <div class="gruppe g-blau" style="margin-top:0">
+            <div class="g-label">🔁 Wiederholen</div>
+            <div class="zeile"><span class="kast"></span>Kupplung</div>
+            <div class="zeile" style="border-bottom:none"><span class="kast"></span>Vorfahrt rechts vor links</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="quittung" style="margin-top:14px">
+      <svg class="haken" viewBox="0 0 24 24"><path d="M4 12.5 L9.5 18 L20 6"/></svg>
+      Ein Tipp. Nichts abtippen.
+    </div>
+  </div>
+
+  <!-- 5 · Fenster beim Oeffnen -->
+  <div class="scene s5" data-scene="5">
+    <div class="marke-zeile up">Nächste Stunde</div>
+    <h2 class="up d1">Akte auf.<br><span class="gelb">Alles im Blick.</span></h2>
+    <div class="blatt">
+      <div class="griff"></div>
+      <div class="b-titel">📌 Fürs nächste Mal – Jonas K.</div>
+      <div class="b-liste">
+        <div class="gruppe g-rot"><div class="g-label">⚠️ Lief nicht gut</div><div class="zeile"><span class="kast"></span>Spurwechsel ohne Schulterblick</div></div>
+        <div class="gruppe g-blau"><div class="g-label">🔁 Wiederholen</div><div class="zeile"><span class="kast"></span>Kupplung</div></div>
+        <div class="gruppe g-orange"><div class="g-label">➡️ Als Nächstes</div><div class="zeile" style="border-bottom:none"><span class="kast"></span>Erste Autobahnfahrt</div></div>
+      </div>
+      <div class="modus"><span>🔔 Immer</span><span class="an">1️⃣ Einmal</span><span>🔕 Aus</span></div>
+      <div class="modus-info">Öffnet sich von selbst – jedes Mal oder nur einmal.</div>
+    </div>
+  </div>
+
+  <!-- 6 · Zusatzzeichen -->
+  <div class="scene s6" data-scene="6">
+    <div class="marke-zeile up">Verkehrszeichen-Katalog</div>
+    <h2 class="up d1" style="font-size:35px">Jetzt mit<br><span class="gelb">Zusatzzeichen.</span></h2>
+    <div class="pfosten-reihe">
+      <div class="pfosten p1">
+        <div class="schild-feld"><img class="haupt" src="verkehrszeichen-katalog/283.jpg" alt=""><img class="zusatz" src="verkehrszeichen-katalog/zz-mo-fr-16-18-h.jpg" alt=""></div>
+        <div class="stange"></div>
+      </div>
+      <div class="pfosten p2">
+        <div class="schild-feld"><img class="haupt" src="verkehrszeichen-katalog/314.jpg" alt=""><img class="zusatz" src="verkehrszeichen-katalog/zz-parkscheibe-2-std.jpg" alt=""></div>
+        <div class="stange"></div>
+      </div>
+      <div class="pfosten p3">
+        <div class="schild-feld"><img class="haupt" src="verkehrszeichen-katalog/250.jpg" alt=""><img class="zusatz" src="verkehrszeichen-katalog/zz-anlieger-frei.jpg" alt=""></div>
+        <div class="stange"></div>
+      </div>
+    </div>
+    <p class="lead up d6" style="margin-top:22px">Auch mit Uhrzeiten. Mit einem Tipp<br>im Lernstand deines Schülers.</p>
+  </div>
+
+  <!-- 7 · Abschluss -->
+  <div class="scene s7" data-scene="7">
+    <h2 class="up">14 Tage<br>kostenlos testen.</h2>
+    <div class="domain up d2">fahrsync.de</div>
+    <div class="preis up d3">Danach ab 9,99 € im Monat</div>
+    <div class="klein up d3">Monatlich kündbar</div>
+    <div class="siegel up d4"><span>SERVER FRANKFURT</span><span>DSGVO-KONFORM</span></div>
+  </div>
+
+  <div class="startdeck" id="startdeck">
+    <button id="start">▶ Abspielen</button>
+    <p>Aufnahme starten, dann hier klicken</p>
+  </div>
+</div>
+</div>
+
+<div class="bedien">
+  <button class="geist" id="neu">Von vorn</button>
+  <span class="zeit" id="zeitEl">0,0 s</span>
+</div>
+<p class="hinweis">
+  Fertiges Video: fahrsync-neuheiten.mp4 (1080 × 1920, erzeugt mit werkzeug/reel-rendern.mjs).
+  Hier im Browser nur zur Vorschau.
+</p>
+
+<script>
+  const ablauf = [
+    { nr:1, dauer:4.2, uhr:'DI · 15:20', hell:false },
+    { nr:2, dauer:2.8, uhr:'DI · 15:20', hell:false },
+    { nr:3, dauer:5.4, uhr:'DI · 15:21', hell:false },
+    { nr:4, dauer:5.0, uhr:'DI · 15:21', hell:false },
+    { nr:5, dauer:5.4, uhr:'DO · 16:00', hell:true  },
+    { nr:6, dauer:5.2, uhr:'DO · 16:00', hell:true  },
+    { nr:7, dauer:4.2, uhr:'DO · 16:00', hell:true  }
+  ];
+  const gesamt = ablauf.reduce((s,x)=>s+x.dauer,0);
+
+  const stage=document.getElementById('stage');
+  const uhr=document.getElementById('uhr');
+  const balken=document.getElementById('fortschritt');
+  const startdeck=document.getElementById('startdeck');
+  const zeitEl=document.getElementById('zeitEl');
+  let timer=[], ticker=null, aktiveNr=0;
+
+  function szeneZeigen(sz){
+    stage.querySelectorAll('.scene').forEach(s=>s.classList.remove('active'));
+    const s=stage.querySelector('[data-scene="'+sz.nr+'"]');
+    if(!s) return;
+    void s.offsetWidth;
+    s.classList.add('active');
+    aktiveNr=sz.nr;
+    uhr.textContent=sz.uhr;
+    uhr.classList.toggle('hell', sz.hell);
+  }
+
+  function stopp(){ timer.forEach(clearTimeout); timer=[]; if(ticker){clearInterval(ticker); ticker=null;} }
+
+  function abspielen(){
+    stopp();
+    startdeck.classList.add('weg');
+    balken.style.transition='none'; balken.style.width='0';
+    void balken.offsetWidth;
+    balken.style.transition='width '+gesamt+'s linear';
+    balken.style.width='100%';
+    let t=0;
+    ablauf.forEach(sz=>{ timer.push(setTimeout(()=>szeneZeigen(sz), t*1000)); t+=sz.dauer; });
+    timer.push(setTimeout(()=>{
+      stage.querySelectorAll('.scene').forEach(s=>s.classList.remove('active'));
+      startdeck.classList.remove('weg'); stopp();
+      zeitEl.textContent='fertig · '+gesamt.toFixed(1).replace('.',',')+' s';
+    }, gesamt*1000));
+    const start=performance.now();
+    ticker=setInterval(()=>{
+      const v=Math.min((performance.now()-start)/1000, gesamt);
+      zeitEl.textContent=v.toFixed(1).replace('.',',')+' s / '+gesamt.toFixed(1).replace('.',',')+' s';
+    },100);
+  }
+
+  // Bild fuer Bild rendern (werkzeug/reel-rendern.mjs): Zeitpunkt t in
+  // Sekunden einstellen, alle Animationen anhalten und genau dorthin setzen.
+  // So entsteht jedes Bild gleich - unabhaengig davon, wie schnell der
+  // Rechner die Bildschirmfotos schafft.
+  window.__zeigeZeit = (t) => {
+    let start=0, sz=ablauf[ablauf.length-1];
+    for (const x of ablauf) { if (t < start + x.dauer) { sz = x; break; } start += x.dauer; }
+    if (sz === ablauf[ablauf.length-1] && t >= gesamt) start = gesamt - sz.dauer;
+    if (aktiveNr !== sz.nr) szeneZeigen(sz);
+    balken.style.transition='none';
+    balken.style.width=(Math.min(t/gesamt,1)*100)+'%';
+    const szene=stage.querySelector('[data-scene="'+sz.nr+'"]');
+    document.getAnimations().forEach(a=>{
+      a.pause();
+      const ziel=a.effect && a.effect.target;
+      a.currentTime = (ziel && szene.contains(ziel)) ? (t-start)*1000 : t*1000;
+    });
+  };
+  window.__gesamt = gesamt;
+
+  const huelle=document.getElementById('huelle');
+  const rendern = new URLSearchParams(location.search).has('render');
+  function skalieren(){
+    if (rendern) { document.body.classList.add('render'); return; }
+    const klein = window.innerWidth < 700;
+    document.body.classList.toggle('klein', klein);
+    const platzH = klein ? window.innerHeight : window.innerHeight - 150;
+    const f = Math.min(window.innerWidth/540, platzH/960);
+    stage.style.transform = 'scale('+f+')';
+    stage.style.transformOrigin = 'top left';
+    huelle.style.width  = (540*f)+'px';
+    huelle.style.height = (960*f)+'px';
+  }
+  skalieren();
+  window.addEventListener('resize', skalieren);
+  window.addEventListener('orientationchange', ()=>setTimeout(skalieren,250));
+  document.getElementById('start').addEventListener('click', abspielen);
+  document.getElementById('neu').addEventListener('click', abspielen);
+</script>
+</body>
+</html>
