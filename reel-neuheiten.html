@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="FahrSync Neuheiten">
+<meta name="theme-color" content="#04060a">
+<meta name="robots" content="noindex">
+<title>FahrSync – Neuheiten-Reel</title>
+<!-- Schriften lokal statt von Google (DSGVO, siehe werkzeug/schriften-holen.py) -->
+<link href="./schriften/schriften.css" rel="stylesheet">
+<!--
+  Zweites Reel (9:16): erklaert "Fürs nächste Mal" in drei Schritten
+  (eintragen - Akte oeffnen - abhaken), den Maengel-Vorschlag, die Anzeige
+  Immer / Einmal / Aus und die Zusatzzeichen im Katalog.
+  Erklaerend gebaut: Untertitel in jeder Szene (Reels laufen meist ohne
+  Ton), Schrittanzeige oben rechts, ein Finger zeigt, wohin man tippt.
+  Gestaltung wie reel.html. Fertiges Video (1080 x 1920, MP4) erzeugt
+  werkzeug/reel-rendern.mjs - dafuer gibt es reel-neuheiten.html?render.
+-->
+<style>
+  :root{
+    --nacht:#070a0f;
+    --flaeche:#0f151f;
+    --flaeche-2:#141c29;
+    --signal:#ffd454;
+    --weiss:#eef3f8;
+    --grau:#78859a;
+    --grau-2:#4b566a;
+    --linie:#212c3c;
+    --gruen:#3fb950;
+    --rot:#f85149;
+    --blau:#58a6ff;
+    --orange:#f0b429;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#04060a;min-height:100vh;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:18px;padding:20px;
+    font-family:'Manrope',-apple-system,sans-serif;color:var(--grau)}
+
+  .stage{position:relative;width:540px;height:960px;flex-shrink:0;overflow:hidden;
+    transform-origin:top center;
+    background:radial-gradient(ellipse 80% 50% at 50% 0%, #131c29 0%, var(--nacht) 60%), var(--nacht)}
+
+  .bahn{position:absolute;left:50%;bottom:-8%;width:300%;height:52%;margin-left:-150%;pointer-events:none;
+    background-image:linear-gradient(rgba(255,212,84,.08) 1px,transparent 1px),
+                     linear-gradient(90deg,rgba(255,212,84,.08) 1px,transparent 1px);
+    background-size:92px 92px;
+    transform:perspective(420px) rotateX(76deg);transform-origin:bottom center;
+    animation:bahn 2.6s linear infinite;
+    -webkit-mask-image:linear-gradient(to top,#000 4%,transparent 72%);
+            mask-image:linear-gradient(to top,#000 4%,transparent 72%)}
+  @keyframes bahn{to{background-position:0 92px,0 0}}
+
+  .kopf{position:absolute;top:38px;left:40px;right:40px;z-index:5;
+    display:flex;justify-content:space-between;align-items:center;
+    font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:500;
+    letter-spacing:.2em;color:var(--grau-2)}
+  .schritt{color:var(--weiss);font-weight:700;letter-spacing:.14em;font-size:12.5px}
+  .schritt.hell{color:#0d1117;background:var(--signal);border-radius:99px;padding:5px 11px}
+  .naht{position:absolute;top:70px;left:40px;right:40px;height:1px;background:var(--linie);z-index:5}
+  .fuss{position:absolute;bottom:34px;left:40px;right:40px;z-index:5;height:2px;
+    background:var(--linie);overflow:hidden}
+  .fuss i{display:block;height:100%;width:0;background:var(--signal)}
+
+  .scene{position:absolute;inset:0;z-index:2;padding:96px 34px 190px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;opacity:0;visibility:hidden}
+  .scene.active{opacity:1;visibility:visible}
+
+  .marke-zeile{font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:500;
+    letter-spacing:.24em;text-transform:uppercase;color:var(--signal);margin-bottom:12px;opacity:.9}
+  h1{font-family:'Syne',sans-serif;font-size:46px;font-weight:800;line-height:1.05;
+    letter-spacing:-.028em;color:var(--weiss)}
+  h2{font-family:'Syne',sans-serif;font-size:38px;font-weight:800;line-height:1.08;
+    letter-spacing:-.025em;color:var(--weiss)}
+  .gelb{color:var(--signal)}
+  .lead{font-size:18px;font-weight:600;line-height:1.5;color:var(--grau);margin-top:18px;max-width:420px}
+
+  .up{opacity:0;transform:translateY(24px)}
+  .active .up{animation:up .58s cubic-bezier(.2,.75,.25,1) forwards}
+  @keyframes up{to{opacity:1;transform:none}}
+  .in{opacity:0;transform:scale(.95)}
+  .active .in{animation:zoom .5s cubic-bezier(.2,.75,.25,1) forwards}
+  @keyframes zoom{to{opacity:1;transform:none}}
+  .d1{animation-delay:.10s}.d2{animation-delay:.24s}.d3{animation-delay:.40s}
+  .d4{animation-delay:.56s}.d5{animation-delay:.72s}.d6{animation-delay:.88s}
+  @keyframes einblenden{to{opacity:1}}
+  @keyframes ausblenden{from{opacity:1}to{opacity:0}}
+
+  /* Untertitel: erklaert jede Szene in einem Satz (Reels laufen stumm) */
+  .ut{position:absolute;left:30px;right:30px;bottom:62px;z-index:6;
+    background:rgba(15,21,31,.94);border:1px solid var(--linie);border-left:3px solid var(--signal);
+    border-radius:12px;padding:13px 16px;text-align:left;
+    font-size:17px;font-weight:600;line-height:1.42;color:var(--weiss);
+    opacity:0;transform:translateY(10px)}
+  .ut b{color:var(--signal);font-weight:800}
+  .active .ut{animation:up .4s var(--a,.5s) cubic-bezier(.2,.8,.2,1) forwards}
+  .active .ut.weg{animation:up .4s var(--a,.5s) cubic-bezier(.2,.8,.2,1) forwards, ausblenden .25s var(--b) forwards}
+
+  /* Finger: zeigt, wohin getippt wird. Sitzt im Ziel (position:relative). */
+  .ziel{position:relative}
+  .finger{position:absolute;left:62%;top:58%;width:0;height:0;z-index:8;pointer-events:none}
+  .finger::before{content:'';position:absolute;left:-24px;top:-24px;width:48px;height:48px;border-radius:50%;
+    background:rgba(255,255,255,.55);opacity:0;transform:scale(.3)}
+  .finger::after{content:'👆';position:absolute;left:-14px;top:-6px;font-size:40px;line-height:1;
+    filter:drop-shadow(0 6px 10px rgba(0,0,0,.6));opacity:0}
+  .active .finger::after{animation:finger 1.15s var(--t) both}
+  .active .finger::before{animation:welle .55s calc(var(--t) + .38s) ease-out both}
+  @keyframes finger{
+    0%{opacity:0;transform:translate(34px,46px)}
+    30%{opacity:1;transform:translate(0,0)}
+    40%{transform:translate(0,4px) scale(.92)}
+    52%{transform:translate(0,0) scale(1)}
+    80%{opacity:1}
+    100%{opacity:0;transform:translate(10px,18px)}}
+  @keyframes welle{0%{opacity:.9;transform:scale(.3)}100%{opacity:0;transform:scale(2.1)}}
+
+  /* Zeitgesteuert ein-/ausblenden: --an / --aus */
+  .kommt{opacity:0}
+  .active .kommt{animation:einblenden .3s var(--an) forwards}
+  .geht{}
+  .active .geht{animation:ausblenden .25s var(--aus) forwards}
+
+  /* App-Bausteine */
+  .karte{width:100%;max-width:450px;background:var(--flaeche);border:1.5px solid var(--signal);
+    border-radius:16px;padding:16px 18px 16px;text-align:left;box-shadow:0 30px 70px rgba(0,0,0,.6)}
+  .k-kopf{display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .k-titel{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:var(--weiss);white-space:nowrap}
+  .k-meta{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--grau-2);letter-spacing:.08em;white-space:nowrap}
+  .gruppe{margin-top:12px}
+  .g-label{font-size:11.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;margin-bottom:2px}
+  .zeile{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--linie);
+    font-size:16px;font-weight:600;color:var(--weiss)}
+  .zeile:last-child{border-bottom:none}
+  .kast{position:relative;width:21px;height:21px;border-radius:5px;border:2px solid #c9d1d9;flex-shrink:0;background:#fff}
+  .g-rot .g-label{color:var(--rot)} .g-blau .g-label{color:var(--blau)} .g-orange .g-label{color:var(--orange)}
+
+  .arten{position:relative;height:36px;margin-top:14px}
+  .arten-reihe{position:absolute;inset:0;display:flex;gap:6px}
+  .art{flex:1;display:flex;align-items:center;justify-content:center;border:1.5px solid var(--linie);border-radius:8px;
+    font-size:12px;font-weight:700;color:var(--grau);white-space:nowrap}
+  .art.an-o{border-color:var(--orange);color:var(--orange);background:var(--flaeche-2)}
+  .art.an-r{border-color:var(--rot);color:var(--rot);background:var(--flaeche-2)}
+  .eingabe-reihe{display:flex;gap:8px;margin-top:8px}
+  .eingabe{position:relative;flex:1;height:42px;border:1.5px solid var(--linie);border-radius:10px;background:var(--flaeche-2);
+    font-size:15px;font-weight:600;color:var(--weiss);display:flex;align-items:center;padding:0 12px;overflow:hidden}
+  .eingabe .platzhalter{position:absolute;left:12px;color:var(--grau-2)}
+  .tippen{position:absolute;left:12px;white-space:nowrap;clip-path:inset(0 100% 0 0)}
+  .active .tippen{animation:schreiben 1.5s steps(30) var(--t) forwards, ausblenden .2s var(--aus) forwards}
+  @keyframes schreiben{to{clip-path:inset(0 0 0 0)}}
+  .plus{width:44px;height:42px;border-radius:10px;background:var(--signal);color:#0d1117;font-size:22px;font-weight:800;
+    display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .aufklappen{max-height:0;opacity:0;overflow:hidden}
+  .active .aufklappen{animation:klappen .45s var(--an) cubic-bezier(.2,.8,.2,1) forwards}
+  @keyframes klappen{to{max-height:90px;opacity:1}}
+
+  /* Maengel-Vorschlag */
+  .vs-feld{position:relative;width:100%;max-width:450px;height:150px;margin-top:22px}
+  .vorschlag{position:absolute;left:0;right:0;top:0;background:rgba(88,166,255,.08);border:1.5px dashed var(--blau);
+    border-radius:14px;padding:15px 17px;text-align:left;opacity:0;transform:scale(.95)}
+  .active .vorschlag{animation:zoom .5s .4s cubic-bezier(.2,.75,.25,1) forwards, raus .3s 2.5s ease-in forwards}
+  @keyframes raus{to{opacity:0;transform:scale(.96) translateY(-6px)}}
+  .vs-text{font-size:15.5px;font-weight:600;color:var(--weiss);line-height:1.45}
+  .vs-knopf{display:inline-block;margin-top:12px;background:var(--blau);color:#0d1117;
+    border-radius:10px;padding:10px 16px;font-size:15px;font-weight:800}
+  .ergebnis{position:absolute;left:0;right:0;top:0;opacity:0}
+  .active .ergebnis{animation:up .5s 2.85s cubic-bezier(.2,.8,.2,1) forwards}
+  .ergebnis .karte{border-color:var(--linie)}
+
+  /* Handy mit Schuelerliste + Fenster */
+  .handy{position:relative;width:100%;max-width:420px;height:420px;margin-top:20px;border-radius:24px;overflow:hidden;
+    background:#0d1117;border:1.5px solid #30363d;box-shadow:0 30px 70px rgba(0,0,0,.6);text-align:left}
+  .h-kopf{padding:14px 18px 10px;font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:var(--weiss);
+    border-bottom:1px solid var(--linie)}
+  .schueler{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--linie)}
+  .ava{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-weight:800;font-size:14px;color:#0d1117;flex-shrink:0}
+  .s-name{font-size:16px;font-weight:700;color:var(--weiss)}
+  .s-info{font-size:12.5px;color:var(--grau)}
+  .dunkel{position:absolute;inset:0;background:rgba(0,0,0,.6);opacity:0}
+  .active .dunkel{animation:einblenden .3s 2.0s forwards}
+  .blatt{position:absolute;left:0;right:0;bottom:0;background:#161b22;border-top:1px solid #30363d;
+    border-radius:20px 20px 0 0;padding:12px 16px 16px;transform:translateY(105%)}
+  .active .blatt{animation:hoch .6s 2.05s cubic-bezier(.2,.85,.25,1) forwards}
+  @keyframes hoch{to{transform:none}}
+  .griff{width:40px;height:4px;border-radius:9px;background:#30363d;margin:0 auto 10px}
+  .b-titel{font-family:'Syne',sans-serif;font-size:15px;font-weight:800;color:var(--weiss);text-align:center;margin-bottom:8px;white-space:nowrap}
+  .b-liste{background:rgba(240,180,41,.08);border:1.5px solid var(--orange);border-radius:12px;padding:0 12px 6px}
+  .b-liste .gruppe{margin-top:7px}
+  .b-liste .zeile{font-size:14.5px;padding:6px 0}
+  .b-knopf{margin-top:10px;background:var(--signal);color:#0d1117;border-radius:10px;padding:10px;text-align:center;font-weight:800;font-size:14.5px}
+
+  /* Modus-Optionen */
+  .optionen{display:flex;flex-direction:column;gap:10px;width:100%;max-width:450px;margin-top:22px}
+  .option{position:relative;display:flex;gap:14px;align-items:center;text-align:left;background:var(--flaeche);
+    border:1.5px solid var(--linie);border-radius:14px;padding:13px 16px;opacity:0;transform:translateX(-18px)}
+  .active .option{animation:rein .45s var(--an) cubic-bezier(.2,.8,.2,1) forwards}
+  @keyframes rein{to{opacity:1;transform:none}}
+  .o-icon{font-size:26px;flex-shrink:0}
+  .o-titel{font-size:17px;font-weight:800;color:var(--weiss)}
+  .o-text{font-size:13.5px;font-weight:600;color:var(--grau);line-height:1.4;margin-top:2px}
+  .option .rahmen{position:absolute;inset:-1.5px;border-radius:14px;border:2px solid var(--signal);
+    background:rgba(255,212,84,.08);opacity:0;pointer-events:none}
+  .active .option .rahmen{animation:einblenden .3s 3.9s forwards}
+
+  /* Abhaken */
+  .haken-kast{position:absolute;inset:-2px;border-radius:5px;background:var(--gruen);border:2px solid var(--gruen);
+    display:flex;align-items:center;justify-content:center;opacity:0}
+  .haken-kast svg{width:14px;height:14px}
+  .haken-kast path{fill:none;stroke:#fff;stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round}
+  .active .haken-kast{animation:einblenden .2s var(--an) forwards}
+  .strich{position:relative}
+  .strich::after{content:'';position:absolute;left:0;top:52%;height:2px;width:0;background:var(--grau)}
+  .active .strich::after{animation:streichen .35s var(--an) forwards}
+  @keyframes streichen{to{width:100%}}
+  .active .strich{animation:grau .35s var(--an) forwards}
+  @keyframes grau{to{color:var(--grau)}}
+
+  /* Zusatzzeichen */
+  .pfad{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:16px;flex-wrap:nowrap}
+  .chip{font-size:13px;font-weight:700;color:var(--weiss);background:var(--flaeche-2);border:1px solid var(--linie);
+    border-radius:99px;padding:7px 11px;white-space:nowrap;opacity:0}
+  .active .chip{animation:einblenden .3s var(--an) forwards}
+  .pfeil{color:var(--signal);font-weight:800;opacity:0}
+  .active .pfeil{animation:einblenden .3s var(--an) forwards}
+  .pfosten-reihe{display:flex;gap:14px;justify-content:center;align-items:flex-start;margin-top:20px;width:100%}
+  .pfosten{display:flex;flex-direction:column;align-items:center;width:128px;opacity:0;transform:translateY(40px)}
+  .active .pfosten{animation:aufstellen .6s cubic-bezier(.25,1.3,.4,1) forwards}
+  @keyframes aufstellen{to{opacity:1;transform:none}}
+  .active .p1{animation-delay:.5s} .active .p2{animation-delay:.7s} .active .p3{animation-delay:.9s}
+  .schild-feld{background:#fbfbfb;border-radius:12px;padding:10px 8px 8px;width:100%;height:170px;
+    display:flex;flex-direction:column;align-items:center;gap:4px;box-shadow:0 20px 40px rgba(0,0,0,.5)}
+  .schild-feld img{display:block}
+  .haupt{width:82px;height:82px}
+  .zusatz{width:98px;height:auto}
+  .stange{width:6px;height:40px;background:linear-gradient(90deg,#5b6575,#9aa4b2,#5b6575)}
+
+  /* Marke / Abschluss */
+  .fragezeichen{font-family:'Syne',sans-serif;font-size:110px;font-weight:800;color:var(--signal);line-height:1;margin-bottom:20px}
+  .wortmarke{font-family:'Syne',sans-serif;font-size:60px;font-weight:800;color:var(--signal);letter-spacing:-.03em;white-space:nowrap}
+  .regel{width:0;height:2px;background:var(--signal);margin:20px auto 0}
+  .active .regel{animation:regel .8s .35s cubic-bezier(.2,.8,.2,1) forwards}
+  @keyframes regel{to{width:180px}}
+  .neu-plakette{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;
+    letter-spacing:.24em;color:#0d1117;background:var(--signal);border-radius:99px;padding:7px 14px;margin-bottom:20px}
+  .schritte{display:flex;gap:8px;justify-content:center;margin-top:24px}
+  .schritte span{font-size:14px;font-weight:700;color:var(--weiss);background:var(--flaeche-2);border:1px solid var(--linie);
+    border-radius:10px;padding:9px 12px;white-space:nowrap}
+  .schritte b{color:var(--signal)}
+  .domain{font-family:'Syne',sans-serif;font-size:40px;font-weight:800;color:var(--signal);white-space:nowrap;margin-top:10px;letter-spacing:-.015em}
+  .preis{font-size:17.5px;font-weight:800;color:var(--weiss);margin-top:18px}
+  .klein{font-size:14px;font-weight:600;color:var(--grau-2);margin-top:6px}
+  .siegel{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:22px}
+  .siegel span{font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.1em;
+    color:var(--grau-2);border:1px solid var(--linie);border-radius:99px;padding:7px 13px}
+
+  /* Steuerung (nur beim Abspielen im Browser) */
+  .bedien{display:flex;align-items:center;gap:14px}
+  button{font-family:'Manrope',sans-serif;font-size:14px;font-weight:800;background:var(--signal);
+    color:#0d1117;border:none;padding:12px 24px;border-radius:99px;cursor:pointer}
+  button.geist{background:transparent;color:var(--grau);border:1px solid var(--linie)}
+  button:focus-visible{outline:3px solid var(--signal);outline-offset:3px}
+  .hinweis{font-size:12.5px;font-weight:600;color:#3f4859;text-align:center;max-width:540px;line-height:1.55}
+  .zeit{font-family:'JetBrains Mono',monospace;font-size:12px;color:#3f4859}
+  .startdeck{position:absolute;inset:0;z-index:9;background:rgba(4,6,10,.92);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
+  .startdeck p{font-size:15px;font-weight:600;color:var(--grau)}
+  .startdeck.weg{display:none}
+  .buehne-huelle{position:relative;flex-shrink:0}
+  body.klein{gap:0;padding:0;justify-content:center}
+  body.klein .bedien,body.klein .hinweis{display:none}
+  body.render{padding:0;gap:0;justify-content:flex-start;align-items:flex-start}
+  body.render .bedien,body.render .hinweis,body.render .startdeck{display:none}
+  html,body{overflow:hidden;overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
+</style>
+</head>
+<body>
+
+<div class="buehne-huelle" id="huelle">
+<div class="stage" id="stage">
+  <div class="bahn"></div>
+  <div class="kopf"><span>FAHRSYNC</span><span class="schritt" id="schritt"></span></div>
+  <div class="naht"></div>
+  <div class="fuss"><i id="fortschritt"></i></div>
+
+  <!-- 1 · Frage -->
+  <div class="scene" data-scene="1">
+    <div class="fragezeichen in">?</div>
+    <h1 class="up d1">Was war bei Jonas<br>noch mal?</h1>
+    <p class="lead up d3">Acht Schüler am Tag. Wer was üben muss,<br>weiß abends keiner mehr aus dem Kopf.</p>
+  </div>
+
+  <!-- 2 · Marke -->
+  <div class="scene" data-scene="2">
+    <div class="neu-plakette in">NEU</div>
+    <div class="wortmarke in d1">FahrSync</div>
+    <div class="regel"></div>
+    <p class="lead up d3" style="font-size:21px;color:var(--weiss)">📌 Fürs nächste Mal</p>
+    <div class="schritte up d6"><span><b>1</b> Eintragen</span><span><b>2</b> Akte öffnen</span><span><b>3</b> Abhaken</span></div>
+    <div class="ut" style="--a:1.4s">Deine Notizen zu jedem Schüler – <b>in drei Schritten</b> erklärt.</div>
+  </div>
+
+  <!-- 3 · Schritt 1: eintragen -->
+  <div class="scene" data-scene="3">
+    <div class="marke-zeile up">Nach der Stunde</div>
+    <h2 class="up d1">Eintragen.</h2>
+    <div class="karte in d2" style="margin-top:18px">
+      <div class="k-kopf"><span class="k-titel">📌 Fürs nächste Mal</span><span class="k-meta">JONAS K.</span></div>
+      <div class="aufklappen" style="--an:5.3s">
+        <div class="gruppe g-rot"><div class="g-label">⚠️ Lief nicht gut</div>
+          <div class="zeile"><span class="kast"></span>Spurwechsel ohne Schulterblick</div></div>
+      </div>
+      <div class="arten">
+        <div class="arten-reihe geht" style="--aus:1.95s">
+          <span class="art an-o">➡️ Als Nächstes</span><span class="art">🔁 Wiederholen</span><span class="art">⚠️ Lief nicht gut</span>
+        </div>
+        <div class="arten-reihe kommt" style="--an:1.95s">
+          <span class="art">➡️ Als Nächstes</span><span class="art">🔁 Wiederholen</span><span class="art an-r ziel">⚠️ Lief nicht gut<span class="finger" style="--t:1.5s"></span></span>
+        </div>
+      </div>
+      <div class="eingabe-reihe">
+        <div class="eingabe">
+          <span class="platzhalter geht" style="--aus:2.9s">z. B. Spurwechsel ohne Schulterblick</span>
+          <span class="tippen" style="--t:2.9s;--aus:5.3s">Spurwechsel ohne Schulterblick</span>
+        </div>
+        <div class="plus ziel">+<span class="finger" style="--t:4.7s"></span></div>
+      </div>
+    </div>
+    <div class="ut weg" style="--a:.6s;--b:4.2s"><b>Art wählen:</b> Lief nicht gut, Wiederholen oder Als Nächstes.</div>
+    <div class="ut" style="--a:4.45s"><b>Stichwort tippen, ＋ drücken</b> – fertig. Das Wichtigste steht immer oben.</div>
+  </div>
+
+  <!-- 4 · Maengel -->
+  <div class="scene" data-scene="4">
+    <div class="marke-zeile up">Noch schneller</div>
+    <h2 class="up d1">Mängel <span class="gelb">übernehmen.</span></h2>
+    <div class="vs-feld">
+      <div class="vorschlag">
+        <div class="vs-text">🔁 Mängel der letzten Stunde:<br><b>Kupplung, Vorfahrt rechts vor links</b></div>
+        <div class="vs-knopf ziel">＋ zum Wiederholen<span class="finger" style="--t:1.85s"></span></div>
+      </div>
+      <div class="ergebnis">
+        <div class="karte">
+          <div class="gruppe g-blau" style="margin-top:0">
+            <div class="g-label">🔁 Wiederholen</div>
+            <div class="zeile"><span class="kast"></span>Kupplung</div>
+            <div class="zeile"><span class="kast"></span>Vorfahrt rechts vor links</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="ut" style="--a:.7s">Hast du im Protokoll <b>Mängel</b> notiert, schlägt FahrSync sie dir <b>zum Wiederholen</b> vor. Ein Tipp genügt.</div>
+  </div>
+
+  <!-- 5 · Schritt 2: Akte oeffnen -->
+  <div class="scene" data-scene="5">
+    <div class="marke-zeile up">Zwei Tage später</div>
+    <h2 class="up d1">Akte öffnen.</h2>
+    <div class="handy in d2">
+      <div class="h-kopf">Schüler</div>
+      <div class="schueler"><span class="ava" style="background:#a371f7">LM</span><div><div class="s-name">Lena Meyer</div><div class="s-info">Klasse B · 14 Stunden</div></div></div>
+      <div class="schueler ziel"><span class="ava" style="background:#3fb950">JK</span><div><div class="s-name">Jonas Klein</div><div class="s-info">Klasse B · 9 Stunden</div></div><span class="finger" style="--t:1.0s;left:40%"></span></div>
+      <div class="schueler"><span class="ava" style="background:#58a6ff">MS</span><div><div class="s-name">Mia Schulz</div><div class="s-info">Klasse A1 · 5 Stunden</div></div></div>
+      <div class="dunkel"></div>
+      <div class="blatt">
+        <div class="griff"></div>
+        <div class="b-titel">📌 Fürs nächste Mal – Jonas Klein</div>
+        <div class="b-liste">
+          <div class="gruppe g-rot"><div class="g-label">⚠️ Lief nicht gut</div><div class="zeile"><span class="kast"></span>Spurwechsel ohne Schulterblick</div></div>
+          <div class="gruppe g-blau"><div class="g-label">🔁 Wiederholen</div><div class="zeile"><span class="kast"></span>Kupplung</div></div>
+          <div class="gruppe g-orange"><div class="g-label">➡️ Als Nächstes</div><div class="zeile"><span class="kast"></span>Erste Autobahnfahrt</div></div>
+        </div>
+        <div class="b-knopf">Alles klar ✓</div>
+      </div>
+    </div>
+    <div class="ut" style="--a:2.5s">Öffnest du die Akte, <b>erscheint alles von selbst</b> – bevor die Stunde losgeht.</div>
+  </div>
+
+  <!-- 6 · Wie oft? -->
+  <div class="scene" data-scene="6">
+    <div class="marke-zeile up">Du entscheidest</div>
+    <h2 class="up d1">Wie oft?</h2>
+    <div class="optionen">
+      <div class="option" style="--an:.6s"><span class="o-icon">🔔</span><div><div class="o-titel">Immer</div><div class="o-text">Bei jedem Öffnen der Akte.</div></div></div>
+      <div class="option ziel" style="--an:1.3s"><span class="rahmen"></span><span class="o-icon">1️⃣</span><div><div class="o-titel">Einmal</div><div class="o-text">Beim nächsten Mal. Danach erst wieder,<br>wenn du etwas Neues einträgst.</div></div><span class="finger" style="--t:3.5s;left:80%"></span></div>
+      <div class="option" style="--an:2.0s"><span class="o-icon">🔕</span><div><div class="o-titel">Aus</div><div class="o-text">Steht nur still in der Akte.</div></div></div>
+    </div>
+    <div class="ut" style="--a:2.6s">Einstellbar mit einem Tipp – direkt in der Akte unter <b>„Fürs nächste Mal“</b>.</div>
+  </div>
+
+  <!-- 7 · Schritt 3: abhaken -->
+  <div class="scene" data-scene="7">
+    <div class="marke-zeile up">Nach dem Üben</div>
+    <h2 class="up d1">Abhaken.</h2>
+    <div class="karte in d2" style="margin-top:20px">
+      <div class="k-kopf"><span class="k-titel">📌 Fürs nächste Mal</span><span class="k-meta">JONAS K.</span></div>
+      <div class="gruppe g-rot"><div class="g-label">⚠️ Lief nicht gut</div>
+        <div class="zeile"><span class="kast ziel"><span class="haken-kast" style="--an:1.6s"><svg viewBox="0 0 24 24"><path d="M5 12.5 L10 17.5 L19 7"/></svg></span><span class="finger" style="--t:1.2s;left:50%;top:50%"></span></span><span class="strich" style="--an:1.65s">Spurwechsel ohne Schulterblick</span></div></div>
+      <div class="gruppe g-blau"><div class="g-label">🔁 Wiederholen</div>
+        <div class="zeile"><span class="kast"></span>Kupplung</div></div>
+    </div>
+    <div class="ut" style="--a:2.1s"><b>Geübt? Abhaken.</b> Beim nächsten Öffnen steht nur noch da, was offen ist.</div>
+  </div>
+
+  <!-- 8 · Zusatzzeichen -->
+  <div class="scene" data-scene="8">
+    <div class="marke-zeile up">Außerdem neu</div>
+    <h2 class="up d1" style="font-size:34px">Zusatzzeichen<br><span class="gelb">im Katalog.</span></h2>
+    <div class="pfosten-reihe">
+      <div class="pfosten p1"><div class="schild-feld"><img class="haupt" src="verkehrszeichen-katalog/283.jpg" alt=""><img class="zusatz" src="verkehrszeichen-katalog/zz-mo-fr-16-18-h.jpg" alt=""></div><div class="stange"></div></div>
+      <div class="pfosten p2"><div class="schild-feld"><img class="haupt" src="verkehrszeichen-katalog/314.jpg" alt=""><img class="zusatz" src="verkehrszeichen-katalog/zz-parkscheibe-2-std.jpg" alt=""></div><div class="stange"></div></div>
+      <div class="pfosten p3"><div class="schild-feld"><img class="haupt" src="verkehrszeichen-katalog/250.jpg" alt=""><img class="zusatz" src="verkehrszeichen-katalog/zz-anlieger-frei.jpg" alt=""></div><div class="stange"></div></div>
+    </div>
+    <div class="pfad">
+      <span class="chip" style="--an:1.6s">📖 Katalog</span><span class="pfeil" style="--an:1.8s">→</span>
+      <span class="chip" style="--an:2.0s">Zusatzzeichen</span><span class="pfeil" style="--an:2.2s">→</span>
+      <span class="chip" style="--an:2.4s">＋ Lernstand</span>
+    </div>
+    <div class="ut" style="--a:2.7s">16 Zusatzzeichen, <b>auch mit Uhrzeiten</b>. Antippen – schon übt dein Schüler sie mit.</div>
+  </div>
+
+  <!-- 9 · Abschluss -->
+  <div class="scene" data-scene="9">
+    <h2 class="up">14 Tage<br>kostenlos testen.</h2>
+    <div class="domain up d2">fahrsync.de</div>
+    <div class="preis up d3">Danach ab 9,99 € im Monat</div>
+    <div class="klein up d3">Monatlich kündbar</div>
+    <div class="siegel up d4"><span>SERVER FRANKFURT</span><span>DSGVO-KONFORM</span></div>
+  </div>
+
+  <div class="startdeck" id="startdeck">
+    <button id="start">▶ Abspielen</button>
+    <p>Vorschau im Browser</p>
+  </div>
+</div>
+</div>
+
+<div class="bedien">
+  <button class="geist" id="neu">Von vorn</button>
+  <span class="zeit" id="zeitEl">0,0 s</span>
+</div>
+<p class="hinweis">
+  Fertiges Video: fahrsync-neuheiten.mp4 (1080 × 1920, erzeugt mit werkzeug/reel-rendern.mjs).
+  Hier im Browser nur zur Vorschau.
+</p>
+
+<script>
+  const ablauf = [
+    { nr:1, dauer:4.2, schritt:'',             hell:false },
+    { nr:2, dauer:4.4, schritt:'NEU',          hell:true  },
+    { nr:3, dauer:8.4, schritt:'SCHRITT 1/3',  hell:true  },
+    { nr:4, dauer:6.2, schritt:'SCHRITT 1/3',  hell:true  },
+    { nr:5, dauer:6.8, schritt:'SCHRITT 2/3',  hell:true  },
+    { nr:6, dauer:6.6, schritt:'SCHRITT 2/3',  hell:true  },
+    { nr:7, dauer:5.6, schritt:'SCHRITT 3/3',  hell:true  },
+    { nr:8, dauer:6.6, schritt:'AUSSERDEM',    hell:false },
+    { nr:9, dauer:4.6, schritt:'',             hell:false }
+  ];
+  const gesamt = ablauf.reduce((s,x)=>s+x.dauer,0);
+
+  const stage=document.getElementById('stage');
+  const schritt=document.getElementById('schritt');
+  const balken=document.getElementById('fortschritt');
+  const startdeck=document.getElementById('startdeck');
+  const zeitEl=document.getElementById('zeitEl');
+  let timer=[], ticker=null, aktiveNr=0;
+
+  function szeneZeigen(sz){
+    stage.querySelectorAll('.scene').forEach(s=>s.classList.remove('active'));
+    const s=stage.querySelector('[data-scene="'+sz.nr+'"]');
+    if(!s) return;
+    void s.offsetWidth;
+    s.classList.add('active');
+    aktiveNr=sz.nr;
+    schritt.textContent=sz.schritt;
+    schritt.classList.toggle('hell', sz.hell && !!sz.schritt);
+  }
+
+  function stopp(){ timer.forEach(clearTimeout); timer=[]; if(ticker){clearInterval(ticker); ticker=null;} }
+
+  function abspielen(){
+    stopp();
+    startdeck.classList.add('weg');
+    balken.style.transition='none'; balken.style.width='0';
+    void balken.offsetWidth;
+    balken.style.transition='width '+gesamt+'s linear';
+    balken.style.width='100%';
+    let t=0;
+    ablauf.forEach(sz=>{ timer.push(setTimeout(()=>szeneZeigen(sz), t*1000)); t+=sz.dauer; });
+    timer.push(setTimeout(()=>{
+      stage.querySelectorAll('.scene').forEach(s=>s.classList.remove('active'));
+      startdeck.classList.remove('weg'); stopp();
+      zeitEl.textContent='fertig · '+gesamt.toFixed(1).replace('.',',')+' s';
+    }, gesamt*1000));
+    const start=performance.now();
+    ticker=setInterval(()=>{
+      const v=Math.min((performance.now()-start)/1000, gesamt);
+      zeitEl.textContent=v.toFixed(1).replace('.',',')+' s / '+gesamt.toFixed(1).replace('.',',')+' s';
+    },100);
+  }
+
+  // Bild fuer Bild rendern (werkzeug/reel-rendern.mjs): Zeitpunkt t in
+  // Sekunden einstellen, alle Animationen anhalten und genau dorthin setzen.
+  // So entsteht jedes Bild gleich - unabhaengig davon, wie schnell der
+  // Rechner die Bildschirmfotos schafft.
+  window.__zeigeZeit = (t) => {
+    let start=0, sz=ablauf[ablauf.length-1];
+    for (const x of ablauf) { if (t < start + x.dauer) { sz = x; break; } start += x.dauer; }
+    if (sz === ablauf[ablauf.length-1] && t >= gesamt) start = gesamt - sz.dauer;
+    if (aktiveNr !== sz.nr) szeneZeigen(sz);
+    balken.style.transition='none';
+    balken.style.width=(Math.min(t/gesamt,1)*100)+'%';
+    const szene=stage.querySelector('[data-scene="'+sz.nr+'"]');
+    document.getAnimations().forEach(a=>{
+      a.pause();
+      const ziel=a.effect && a.effect.target;
+      a.currentTime = (ziel && szene.contains(ziel)) ? (t-start)*1000 : t*1000;
+    });
+  };
+  window.__gesamt = gesamt;
+
+  const huelle=document.getElementById('huelle');
+  const rendern = new URLSearchParams(location.search).has('render');
+  function skalieren(){
+    if (rendern) { document.body.classList.add('render'); return; }
+    const klein = window.innerWidth < 700;
+    document.body.classList.toggle('klein', klein);
+    const platzH = klein ? window.innerHeight : window.innerHeight - 150;
+    const f = Math.min(window.innerWidth/540, platzH/960);
+    stage.style.transform = 'scale('+f+')';
+    stage.style.transformOrigin = 'top left';
+    huelle.style.width  = (540*f)+'px';
+    huelle.style.height = (960*f)+'px';
+  }
+  skalieren();
+  window.addEventListener('resize', skalieren);
+  window.addEventListener('orientationchange', ()=>setTimeout(skalieren,250));
+  document.getElementById('start').addEventListener('click', abspielen);
+  document.getElementById('neu').addEventListener('click', abspielen);
+</script>
+</body>
+</html>
