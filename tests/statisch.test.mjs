@@ -25,7 +25,7 @@ const ABLAGE = mkdtempSync(join(tmpdir(), 'fahrsync-syntax-'));
 
 const SEITEN = ['index.html', 'schueler-portal.html', 'kalender.html', 'adk-platform.html',
                 'start.html', 'schueler.html', '404.html', 'agb.html', 'avv.html',
-                'datenschutz.html', 'impressum.html', 'reel.html', 'reel-neuheiten.html'];
+                'datenschutz.html', 'impressum.html', 'reel.html', 'reel-neuheiten.html', 'reel-werbung.html'];
 const CLIENT = ['index.html', 'kalender.html', 'adk-platform.html', 'schueler-portal.html'];
 
 const lies = (d) => { try { return readFileSync(join(WURZEL, d), 'utf8'); } catch { return null; } };

@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="FahrSync Werbung">
+<meta name="theme-color" content="#04060a">
+<meta name="robots" content="noindex">
+<title>FahrSync – Werbe-Reel</title>
+<!-- Schriften lokal statt von Google (DSGVO, siehe werkzeug/schriften-holen.py) -->
+<link href="./schriften/schriften.css" rel="stylesheet">
+<!--
+  Werbe-Reel (9:16) fuer Anzeigen bei Instagram/Facebook/TikTok: Aufhaenger
+  in den ersten Sekunden, Problem, Loesung, Funktionen, Aufruf zum Testen.
+  Gezeigt wird die ECHTE App: reel-bilder/ sind Bildschirmfotos aus dem
+  Demo-Modus von index.html (Demo-Schueler, keine echten Daten) und aus
+  schueler-portal.html mit nachgebildeten Demo-Daten.
+  Untertitel in jeder Szene (Anzeigen laufen meist stumm).
+  Aussagen nur, was die App wirklich kann (Stand: start.html, index.html);
+  Preis als Endpreis, weil nach § 19 UStG keine Umsatzsteuer berechnet wird.
+  Fertiges Video (1080 x 1920, MP4): werkzeug/reel-rendern.mjs
+    node werkzeug/reel-rendern.mjs reel-werbung.html fahrsync-werbung.mp4
+-->
+<style>
+  :root{
+    --nacht:#070a0f; --flaeche:#0f151f; --flaeche-2:#141c29; --signal:#ffd454;
+    --weiss:#eef3f8; --grau:#78859a; --grau-2:#4b566a; --linie:#212c3c;
+    --gruen:#3fb950; --rot:#f85149; --blau:#58a6ff; --orange:#f0b429;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#04060a;min-height:100vh;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:18px;padding:20px;
+    font-family:'Manrope',-apple-system,sans-serif;color:var(--grau)}
+  .stage{position:relative;width:540px;height:960px;flex-shrink:0;overflow:hidden;
+    background:radial-gradient(ellipse 80% 50% at 50% 0%, #131c29 0%, var(--nacht) 60%), var(--nacht)}
+  .bahn{position:absolute;left:50%;bottom:-8%;width:300%;height:52%;margin-left:-150%;pointer-events:none;
+    background-image:linear-gradient(rgba(255,212,84,.08) 1px,transparent 1px),
+                     linear-gradient(90deg,rgba(255,212,84,.08) 1px,transparent 1px);
+    background-size:92px 92px;transform:perspective(420px) rotateX(76deg);transform-origin:bottom center;
+    animation:bahn 2.6s linear infinite;
+    -webkit-mask-image:linear-gradient(to top,#000 4%,transparent 72%);mask-image:linear-gradient(to top,#000 4%,transparent 72%)}
+  @keyframes bahn{to{background-position:0 92px,0 0}}
+
+  .kopf{position:absolute;top:38px;left:40px;right:40px;z-index:5;display:flex;justify-content:space-between;align-items:center;
+    font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:500;letter-spacing:.2em;color:var(--grau-2)}
+  .etikett{color:#0d1117;background:var(--signal);border-radius:99px;padding:5px 11px;font-weight:700;letter-spacing:.14em;font-size:12px}
+  .etikett:empty{display:none}
+  .naht{position:absolute;top:70px;left:40px;right:40px;height:1px;background:var(--linie);z-index:5}
+  .fuss{position:absolute;bottom:34px;left:40px;right:40px;z-index:5;height:2px;background:var(--linie);overflow:hidden}
+  .fuss i{display:block;height:100%;width:0;background:var(--signal)}
+
+  .scene{position:absolute;inset:0;z-index:2;padding:96px 34px 150px;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;opacity:0;visibility:hidden}
+  .scene.active{opacity:1;visibility:visible}
+  .scene.ohne-ut{padding-bottom:96px}
+  .marke-zeile{font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:500;letter-spacing:.24em;
+    text-transform:uppercase;color:var(--signal);margin-bottom:12px;opacity:.9}
+  h1{font-family:'Syne',sans-serif;font-size:50px;font-weight:800;line-height:1.05;letter-spacing:-.028em;color:var(--weiss)}
+  h2{font-family:'Syne',sans-serif;font-size:32px;font-weight:800;line-height:1.08;letter-spacing:-.025em;color:var(--weiss)}
+  .gelb{color:var(--signal)}
+  .lead{font-size:18px;font-weight:600;line-height:1.5;color:var(--grau);margin-top:16px;max-width:420px}
+
+  .up{opacity:0;transform:translateY(24px)}
+  .active .up{animation:up .55s cubic-bezier(.2,.75,.25,1) forwards}
+  @keyframes up{to{opacity:1;transform:none}}
+  .in{opacity:0;transform:scale(.95)}
+  .active .in{animation:zoom .5s cubic-bezier(.2,.75,.25,1) forwards}
+  @keyframes zoom{to{opacity:1;transform:none}}
+  .d1{animation-delay:.10s}.d2{animation-delay:.24s}.d3{animation-delay:.40s}
+  .d4{animation-delay:.56s}.d5{animation-delay:.72s}.d6{animation-delay:.88s}
+  @keyframes einblenden{to{opacity:1}}
+
+  /* Untertitel */
+  .ut{position:absolute;left:30px;right:30px;bottom:62px;z-index:6;background:rgba(15,21,31,.94);
+    border:1px solid var(--linie);border-left:3px solid var(--signal);border-radius:12px;padding:13px 16px;text-align:left;
+    font-size:17px;font-weight:600;line-height:1.42;color:var(--weiss);opacity:0;transform:translateY(10px)}
+  .ut b{color:var(--signal);font-weight:800}
+  .active .ut{animation:up .4s var(--a,.45s) cubic-bezier(.2,.8,.2,1) forwards}
+
+  /* 1 · Aufhaenger */
+  .riesig{font-family:'Syne',sans-serif;font-size:60px;font-weight:800;color:var(--signal);letter-spacing:-.035em;line-height:1}
+  .zettel-feld{position:relative;width:260px;height:150px;margin-bottom:34px}
+  .zettel{position:absolute;left:60px;top:10px;width:140px;height:132px;background:var(--flaeche);border:1px solid var(--linie);border-radius:5px}
+  .zettel::after{content:'';position:absolute;left:16px;right:16px;top:22px;height:1px;background:var(--linie);
+    box-shadow:0 16px 0 var(--linie),0 32px 0 var(--linie),0 48px 0 var(--linie),0 64px 0 var(--linie),0 80px 0 var(--linie)}
+  .active .z1{animation:fliegen1 1.4s .25s cubic-bezier(.3,.7,.3,1) both}
+  .active .z2{animation:fliegen2 1.4s .35s cubic-bezier(.3,.7,.3,1) both}
+  .active .z3{animation:fliegen3 1.4s .45s cubic-bezier(.3,.7,.3,1) both}
+  @keyframes fliegen1{to{transform:rotate(-16deg) translate(-56px,6px)}}
+  @keyframes fliegen2{to{transform:rotate(7deg) translate(12px,-6px)}}
+  @keyframes fliegen3{to{transform:rotate(21deg) translate(70px,12px)}}
+
+  /* 2 · Problem */
+  .liste{display:flex;flex-direction:column;gap:14px;margin-top:26px;width:100%;max-width:400px}
+  .punkt-zeile{position:relative;display:flex;align-items:center;gap:14px;background:var(--flaeche);border:1px solid var(--linie);
+    border-radius:14px;padding:16px 18px;font-size:20px;font-weight:700;color:var(--weiss);text-align:left;opacity:0;transform:translateX(-18px)}
+  .active .punkt-zeile{animation:rein .45s var(--an) cubic-bezier(.2,.8,.2,1) forwards}
+  @keyframes rein{to{opacity:1;transform:none}}
+  .punkt-zeile .text{position:relative}
+  .punkt-zeile .text::after{content:'';position:absolute;left:-2px;right:-2px;top:52%;height:3px;background:var(--rot);
+    transform:scaleX(0);transform-origin:left;border-radius:2px}
+  .active .punkt-zeile .text::after{animation:streich .35s var(--weg) ease-out forwards}
+  @keyframes streich{to{transform:scaleX(1)}}
+  .active .punkt-zeile .text{animation:verblassen .35s var(--weg) forwards}
+  @keyframes verblassen{to{color:var(--grau)}}
+
+  /* Marke */
+  .wortmarke{font-family:'Syne',sans-serif;font-size:54px;font-weight:800;color:var(--signal);letter-spacing:-.03em;white-space:nowrap}
+
+  /* Handy mit echten Bildschirmen der App */
+  .handy{position:relative;width:290px;height:607px;margin-top:16px;border-radius:40px;background:#05070a;padding:9px;flex-shrink:0;
+    border:2px solid #2b3342;box-shadow:0 40px 80px rgba(0,0,0,.75),0 0 0 1px rgba(255,255,255,.04) inset;
+    opacity:0;transform:translateY(70px) scale(.96)}
+  .active .handy{animation:handy-rein .7s var(--hr,.15s) cubic-bezier(.2,.85,.25,1) forwards}
+  @keyframes handy-rein{to{opacity:1;transform:none}}
+  .handy.schueler{border-color:#2f5b8f}
+  .bildschirm{position:relative;width:100%;height:100%;border-radius:32px;overflow:hidden;background:#0d1117}
+  .bildschirm img{position:absolute;left:0;top:0;width:100%;height:auto;display:block}
+  .bildschirm img.folgt{transform:translateY(100%)}
+  .active .bildschirm img.folgt{animation:bild-hoch .45s var(--an) cubic-bezier(.3,.8,.25,1) forwards}
+  @keyframes bild-hoch{to{transform:none}}
+  .bildschirm img.blende{opacity:0}
+  .active .bildschirm img.blende{animation:einblenden .35s var(--an) forwards}
+  .bildschirm img.zoom{transform-origin:50% 48%}
+  .active .bildschirm img.zoom{animation:heran 2.6s .6s cubic-bezier(.4,0,.2,1) forwards}
+  @keyframes heran{to{transform:scale(1.18)}}
+  .ansicht{position:absolute;top:-13px;left:50%;transform:translateX(-50%);z-index:3;white-space:nowrap;
+    font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.16em;border-radius:99px;padding:5px 10px;
+    background:var(--signal);color:#0d1117}
+  .handy.schueler .ansicht{background:var(--blau)}
+
+  /* Finger: zeigt den Tipp. Position in % des Bildschirms. */
+  .finger{position:absolute;width:0;height:0;z-index:4;pointer-events:none}
+  .finger::before{content:'';position:absolute;left:-22px;top:-22px;width:44px;height:44px;border-radius:50%;
+    background:rgba(255,255,255,.6);opacity:0;transform:scale(.3)}
+  .finger::after{content:'👆';position:absolute;left:-13px;top:-5px;font-size:38px;line-height:1;
+    filter:drop-shadow(0 6px 10px rgba(0,0,0,.6));opacity:0}
+  .active .finger::after{animation:finger 1.1s var(--t) both}
+  .active .finger::before{animation:welle .55s calc(var(--t) + .36s) ease-out both}
+  @keyframes finger{0%{opacity:0;transform:translate(34px,46px)}30%{opacity:1;transform:translate(0,0)}
+    40%{transform:translate(0,4px) scale(.92)}52%{transform:none}80%{opacity:1}100%{opacity:0;transform:translate(10px,18px)}}
+  @keyframes welle{0%{opacity:.9;transform:scale(.3)}100%{opacity:0;transform:scale(2.1)}}
+
+  /* PDF-Blatt */
+  .blatt-pdf{position:relative;width:330px;margin-top:22px;border-radius:8px;overflow:visible;
+    opacity:0;transform:perspective(900px) rotateX(18deg) translateY(60px)}
+  .active .blatt-pdf{animation:blatt-rein .8s .3s cubic-bezier(.2,.85,.25,1) forwards}
+  @keyframes blatt-rein{to{opacity:1;transform:perspective(900px) rotateX(0) translateY(0)}}
+  .blatt-pdf img{display:block;width:100%;border-radius:8px;box-shadow:0 40px 80px rgba(0,0,0,.7)}
+  .blatt-pdf .pdf{position:absolute;right:-16px;bottom:24px;background:var(--rot);color:#fff;font-weight:800;font-size:16px;border-radius:9px;
+    padding:7px 11px;box-shadow:0 8px 20px rgba(0,0,0,.4);opacity:0;transform:scale(.6)}
+  .active .blatt-pdf .pdf{animation:plopp .4s 1.2s cubic-bezier(.3,1.4,.5,1) forwards}
+  @keyframes plopp{to{opacity:1;transform:none}}
+
+  /* Abschluss */
+  .domain{font-family:'Syne',sans-serif;font-size:44px;font-weight:800;color:var(--signal);white-space:nowrap;margin-top:12px;letter-spacing:-.015em}
+  .preis{font-size:18px;font-weight:800;color:var(--weiss);margin-top:18px}
+  .klein{font-size:13.5px;font-weight:600;color:var(--grau);margin-top:6px;line-height:1.5}
+  .knopf{display:inline-block;margin-top:22px;background:var(--signal);color:#0d1117;font-family:'Syne',sans-serif;font-weight:800;font-size:19px;
+    border-radius:14px;padding:15px 28px}
+  .active .knopf.puls{animation:up .5s .5s cubic-bezier(.2,.8,.2,1) forwards, puls 1.2s 1.4s ease-in-out 3}
+  @keyframes puls{50%{transform:scale(1.05)}}
+  .siegel{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:22px}
+  .siegel span{font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.1em;color:var(--grau-2);border:1px solid var(--linie);border-radius:99px;padding:7px 13px}
+
+  /* Steuerung */
+  .bedien{display:flex;align-items:center;gap:14px}
+  button{font-family:'Manrope',sans-serif;font-size:14px;font-weight:800;background:var(--signal);color:#0d1117;border:none;padding:12px 24px;border-radius:99px;cursor:pointer}
+  button.geist{background:transparent;color:var(--grau);border:1px solid var(--linie)}
+  .hinweis{font-size:12.5px;font-weight:600;color:#3f4859;text-align:center;max-width:540px;line-height:1.55}
+  .zeit{font-family:'JetBrains Mono',monospace;font-size:12px;color:#3f4859}
+  .startdeck{position:absolute;inset:0;z-index:9;background:rgba(4,6,10,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
+  .startdeck p{font-size:15px;font-weight:600;color:var(--grau)}
+  .startdeck.weg{display:none}
+  .buehne-huelle{position:relative;flex-shrink:0}
+  body.klein{gap:0;padding:0;justify-content:center}
+  body.klein .bedien,body.klein .hinweis{display:none}
+  body.render{padding:0;gap:0;justify-content:flex-start;align-items:flex-start}
+  body.render .bedien,body.render .hinweis,body.render .startdeck{display:none}
+  html,body{overflow:hidden;overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
+</style>
+</head>
+<body>
+
+<div class="buehne-huelle" id="huelle">
+<div class="stage" id="stage">
+  <div class="bahn"></div>
+  <div class="kopf"><span>FAHRSYNC</span><span class="etikett" id="etikett"></span></div>
+  <div class="naht"></div>
+  <div class="fuss"><i id="fortschritt"></i></div>
+
+  <!-- 1 · Aufhaenger -->
+  <div class="scene ohne-ut" data-scene="1">
+    <div class="zettel-feld"><div class="zettel z3"></div><div class="zettel z2"></div><div class="zettel z1"></div></div>
+    <div class="riesig in">Fahrlehrer?</div>
+    <h2 class="up d3" style="margin-top:14px;font-size:36px">Schluss mit<br>Zettelwirtschaft.</h2>
+  </div>
+
+  <!-- 2 · Problem -->
+  <div class="scene" data-scene="2">
+    <div class="marke-zeile up">Bisher</div>
+    <h2 class="up d1">Kennst du das?</h2>
+    <div class="liste">
+      <div class="punkt-zeile" style="--an:.35s;--weg:1.7s">📇 <span class="text">Karteikarten im Handschuhfach</span></div>
+      <div class="punkt-zeile" style="--an:.6s;--weg:1.9s">📝 <span class="text">Notizzettel überall</span></div>
+      <div class="punkt-zeile" style="--an:.85s;--weg:2.1s">🌙 <span class="text">Abends alles nachtragen</span></div>
+    </div>
+    <div class="ut" style="--a:1.7s">Damit ist jetzt <b>Schluss.</b></div>
+  </div>
+
+  <!-- 3 · Marke + echte App -->
+  <div class="scene" data-scene="3">
+    <div class="wortmarke in">FahrSync</div>
+    <div class="handy" style="--hr:.45s"><span class="ansicht">ECHTE APP</span>
+      <div class="bildschirm"><img src="reel-bilder/liste.jpg" alt=""></div>
+    </div>
+    <div class="ut" style="--a:.9s"><b>Die digitale Kartei für Fahrlehrer.</b> Alle Schüler, auf dem Handy.</div>
+  </div>
+
+  <!-- 4 · Akte -->
+  <div class="scene" data-scene="4">
+    <h2 class="up">Jeder Schüler<br><span class="gelb">auf einen Blick.</span></h2>
+    <div class="handy" style="--hr:0s">
+      <div class="bildschirm">
+        <img src="reel-bilder/liste.jpg" alt="">
+        <img class="folgt" style="--an:.85s" src="reel-bilder/akte-oben.jpg" alt="">
+        <img class="folgt" style="--an:2.2s" src="reel-bilder/pflicht.jpg" alt="">
+        <img class="folgt" style="--an:3.2s" src="reel-bilder/adk.jpg" alt="">
+        <span class="finger" style="--t:.15s;left:50%;top:52%"></span>
+      </div>
+    </div>
+    <div class="ut" style="--a:.9s">Ausbildungsstand, Pflichtfahrten, Lernstand nach Lehrplan – <b>alles in der Akte.</b></div>
+  </div>
+
+  <!-- 5 · Protokoll -->
+  <div class="scene" data-scene="5">
+    <h2 class="up">Protokoll im Auto.<br><span class="gelb">Mit Unterschrift.</span></h2>
+    <div class="handy" style="--hr:0s">
+      <div class="bildschirm">
+        <img src="reel-bilder/protokoll-oben.jpg" alt="">
+        <img class="folgt" style="--an:1.6s" src="reel-bilder/protokoll.jpg" alt="">
+        <span class="finger" style="--t:2.9s;left:69%;top:95%"></span>
+      </div>
+    </div>
+    <div class="ut" style="--a:.7s">Fahrstunde in Sekunden eintragen – der Schüler <b>unterschreibt direkt auf dem Handy.</b></div>
+  </div>
+
+  <!-- 6 · Fuers naechste Mal -->
+  <div class="scene" data-scene="6">
+    <h2 class="up" style="font-size:28px">Nie wieder<br><span class="gelb">„Was war noch mal?“</span></h2>
+    <div class="handy" style="--hr:0s">
+      <div class="bildschirm">
+        <img src="reel-bilder/akte-oben.jpg" alt="">
+        <img class="blende" style="--an:.7s" src="reel-bilder/popup.jpg" alt="">
+      </div>
+    </div>
+    <div class="ut" style="--a:1.0s">Akte auf – und es erscheint, <b>was ansteht</b>, was schlecht lief und was wiederholt werden muss.</div>
+  </div>
+
+  <!-- 7 · Schueler-Portal -->
+  <div class="scene" data-scene="7">
+    <h2 class="up">Deine Schüler<br><span class="gelb">sind im Bilde.</span></h2>
+    <div class="handy schueler" style="--hr:0s"><span class="ansicht">SCHÜLER-ANSICHT</span>
+      <div class="bildschirm">
+        <img src="reel-bilder/portal.jpg" alt="">
+        <img class="folgt" style="--an:2.0s" src="reel-bilder/portal-chat.jpg" alt="">
+        <span class="finger" style="--t:1.35s;left:30%;top:96%"></span>
+      </div>
+    </div>
+    <div class="ut" style="--a:.7s">Eigenes <b>Schüler-Portal</b> mit Lernstand und Chat – ohne App-Installation.</div>
+  </div>
+
+  <!-- 8 · Verkehrszeichen -->
+  <div class="scene" data-scene="8">
+    <h2 class="up">Verkehrszeichen<br><span class="gelb">inklusive.</span></h2>
+    <div class="handy" style="--hr:0s">
+      <div class="bildschirm"><img class="zoom" src="reel-bilder/katalog.jpg" alt=""></div>
+    </div>
+    <div class="ut" style="--a:.7s">Über 100 amtliche Zeichen – jetzt auch <b>Zusatzzeichen mit Uhrzeiten.</b></div>
+  </div>
+
+  <!-- 9 · PDF -->
+  <div class="scene" data-scene="9">
+    <h2 class="up" style="font-size:30px">Ausbildungsnachweis?<br><span class="gelb">Ein Tipp.</span></h2>
+    <div class="blatt-pdf"><img src="reel-bilder/pdf.jpg" alt=""><div class="pdf">PDF ✓</div></div>
+    <div class="ut" style="--a:.6s">Als <b>PDF</b> – fertig zum Drucken oder Weiterschicken.</div>
+  </div>
+
+  <!-- 10 · Aufruf -->
+  <div class="scene ohne-ut" data-scene="10">
+    <h2 class="up" style="font-size:40px">14 Tage<br>kostenlos testen.</h2>
+    <div class="domain up d2">fahrsync.de</div>
+    <div class="knopf puls up">Jetzt testen →</div>
+    <div class="preis up d4">Danach ab 9,99 € im Monat</div>
+    <div class="klein up d4">Endpreis (keine USt. nach § 19 UStG) · monatlich kündbar<br>Für Fahrschulen und selbstständige Fahrlehrer</div>
+    <div class="siegel up d5"><span>SERVER IN FRANKFURT</span><span>KEINE INSTALLATION</span><span>KALENDER OPTIONAL</span></div>
+  </div>
+
+  <div class="startdeck" id="startdeck"><button id="start">▶ Abspielen</button><p>Vorschau im Browser</p></div>
+</div>
+</div>
+
+<div class="bedien"><button class="geist" id="neu">Von vorn</button><span class="zeit" id="zeitEl">0,0 s</span></div>
+<p class="hinweis">Fertiges Video: fahrsync-werbung.mp4 (1080 × 1920, erzeugt mit werkzeug/reel-rendern.mjs). Hier nur Vorschau.</p>
+
+<script>
+  const ablauf = [
+    { nr:1,  dauer:2.7, etikett:'' },
+    { nr:2,  dauer:3.1, etikett:'' },
+    { nr:3,  dauer:3.2, etikett:'' },
+    { nr:4,  dauer:4.4, etikett:'SCHÜLERAKTE' },
+    { nr:5,  dauer:4.2, etikett:'PROTOKOLL' },
+    { nr:6,  dauer:3.6, etikett:'NOTIZEN' },
+    { nr:7,  dauer:4.0, etikett:'SCHÜLER-PORTAL' },
+    { nr:8,  dauer:3.4, etikett:'VERKEHRSZEICHEN' },
+    { nr:9,  dauer:3.0, etikett:'PDF' },
+    { nr:10, dauer:5.0, etikett:'' }
+  ];
+
+  const gesamt = ablauf.reduce((s,x)=>s+x.dauer,0);
+  const stage=document.getElementById('stage'), etikett=document.getElementById('etikett');
+  const balken=document.getElementById('fortschritt'), startdeck=document.getElementById('startdeck'), zeitEl=document.getElementById('zeitEl');
+  let timer=[], ticker=null, aktiveNr=0;
+
+  function szeneZeigen(sz){
+    stage.querySelectorAll('.scene').forEach(s=>s.classList.remove('active'));
+    const s=stage.querySelector('[data-scene="'+sz.nr+'"]');
+    if(!s) return;
+    void s.offsetWidth;
+    s.classList.add('active');
+    aktiveNr=sz.nr;
+    etikett.textContent=sz.etikett;
+  }
+  function stopp(){ timer.forEach(clearTimeout); timer=[]; if(ticker){clearInterval(ticker); ticker=null;} }
+  function abspielen(){
+    stopp(); startdeck.classList.add('weg');
+    balken.style.transition='none'; balken.style.width='0'; void balken.offsetWidth;
+    balken.style.transition='width '+gesamt+'s linear'; balken.style.width='100%';
+    let t=0;
+    ablauf.forEach(sz=>{ timer.push(setTimeout(()=>szeneZeigen(sz), t*1000)); t+=sz.dauer; });
+    timer.push(setTimeout(()=>{ stage.querySelectorAll('.scene').forEach(s=>s.classList.remove('active')); startdeck.classList.remove('weg'); stopp();
+      zeitEl.textContent='fertig · '+gesamt.toFixed(1).replace('.',',')+' s'; }, gesamt*1000));
+    const start=performance.now();
+    ticker=setInterval(()=>{ const v=Math.min((performance.now()-start)/1000, gesamt);
+      zeitEl.textContent=v.toFixed(1).replace('.',',')+' s / '+gesamt.toFixed(1).replace('.',',')+' s'; },100);
+  }
+
+  // Bild fuer Bild rendern (werkzeug/reel-rendern.mjs): alle Animationen
+  // anhalten und auf den Zeitpunkt t setzen.
+  window.__zeigeZeit = (t) => {
+    let start=0, sz=ablauf[ablauf.length-1];
+    for (const x of ablauf) { if (t < start + x.dauer) { sz = x; break; } start += x.dauer; }
+    if (sz === ablauf[ablauf.length-1] && t >= gesamt) start = gesamt - sz.dauer;
+    if (aktiveNr !== sz.nr) szeneZeigen(sz);
+    balken.style.transition='none'; balken.style.width=(Math.min(t/gesamt,1)*100)+'%';
+    const szene=stage.querySelector('[data-scene="'+sz.nr+'"]');
+    document.getAnimations().forEach(a=>{
+      a.pause();
+      const ziel=a.effect && a.effect.target;
+      a.currentTime = (ziel && szene.contains(ziel)) ? (t-start)*1000 : t*1000;
+    });
+  };
+  window.__gesamt = gesamt;
+
+  const huelle=document.getElementById('huelle');
+  const rendern = new URLSearchParams(location.search).has('render');
+  function skalieren(){
+    if (rendern) { document.body.classList.add('render'); return; }
+    const klein = window.innerWidth < 700;
+    document.body.classList.toggle('klein', klein);
+    const platzH = klein ? window.innerHeight : window.innerHeight - 150;
+    const f = Math.min(window.innerWidth/540, platzH/960);
+    stage.style.transform = 'scale('+f+')'; stage.style.transformOrigin = 'top left';
+    huelle.style.width=(540*f)+'px'; huelle.style.height=(960*f)+'px';
+  }
+  skalieren();
+  window.addEventListener('resize', skalieren);
+  window.addEventListener('orientationchange', ()=>setTimeout(skalieren,250));
+  document.getElementById('start').addEventListener('click', abspielen);
+  document.getElementById('neu').addEventListener('click', abspielen);
+</script>
+</body>
+</html>
