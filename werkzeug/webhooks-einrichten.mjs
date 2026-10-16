@@ -88,12 +88,19 @@ async function secretLesen(token, name) {
   const r = await fetch(
     `https://secretmanager.googleapis.com/v1/projects/${PROJEKT}/secrets/${name}/versions/latest:access`,
     { headers: { Authorization: `Bearer ${token}` } });
-  if (r.status === 403) {
-    throw new Error(`Kein Lesezugriff auf das Secret ${name}. Dem Dienstkonto fehlt die Rolle ` +
-      `"Secret Manager-Zugriffsberechtigter" (Secret Manager Secret Accessor) - ` +
-      `siehe .github/workflows/README.md, Abschnitt "Webhooks einrichten".`);
+  if (!r.ok) {
+    // Googles eigene Begruendung mit ausgeben (enthaelt keine Geheimnisse,
+    // nur Rechte-/Projektangaben) - "fehlt die Rolle" ist nur die haeufigste
+    // Ursache, nicht die einzige.
+    const grund = await r.json().then(d => d.error && d.error.message).catch(() => '');
+    if (grund) console.log(`Antwort von Google (${r.status}): ${grund}`);
+    if (r.status === 403) {
+      throw new Error(`Kein Lesezugriff auf das Secret ${name}. Dem Dienstkonto oben fehlt die Rolle ` +
+        `"Secret Manager-Zugriffsberechtigter" (Secret Manager Secret Accessor) - ` +
+        `siehe .github/workflows/README.md, Abschnitt "Webhooks einrichten".`);
+    }
+    throw new Error(`Secret ${name} nicht lesbar (${r.status}).`);
   }
-  if (!r.ok) throw new Error(`Secret ${name} nicht lesbar (${r.status}).`);
   const wert = Buffer.from((await r.json()).payload.data, 'base64').toString('utf8').trim();
   // GitHub schwaerzt den Wert in allen folgenden Protokollzeilen.
   if (process.env.GITHUB_ACTIONS) console.log(`::add-mask::${wert}`);
@@ -204,7 +211,11 @@ async function main() {
                          : 'Modus: NUR PRUEFEN (es wird nichts geaendert)');
   const pfad = process.env.GOOGLE_APPLICATION_CREDENTIALS;
   if (!pfad) throw new Error('GOOGLE_APPLICATION_CREDENTIALS fehlt.');
-  const gToken = await googleToken(JSON.parse(readFileSync(pfad, 'utf8')));
+  const schluessel = JSON.parse(readFileSync(pfad, 'utf8'));
+  // Welches Dienstkonto hinter dem GitHub-Secret steckt - genau diesem muss
+  // die Rolle gegeben werden. Die Adresse ist kein Geheimnis.
+  console.log(`Dienstkonto: ${schluessel.client_email} (Projekt ${schluessel.project_id})`);
+  const gToken = await googleToken(schluessel);
 
   const secrets = {};
   for (const n of ['PAYPAL_CLIENT_ID', 'PAYPAL_CLIENT_SECRET', 'PAYPAL_WEBHOOK_ID', 'STRIPE_SECRET_KEY']) {
