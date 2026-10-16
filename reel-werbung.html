@@ -13,8 +13,11 @@
 <link href="./schriften/schriften.css" rel="stylesheet">
 <!--
   Werbe-Reel (9:16) fuer Anzeigen bei Instagram/Facebook/TikTok: Aufhaenger
-  in den ersten Sekunden, Problem, Loesung, sechs Funktionen, Aufruf zum
-  Testen. Untertitel in jeder Szene (Anzeigen laufen meist stumm).
+  in den ersten Sekunden, Problem, Loesung, Funktionen, Aufruf zum Testen.
+  Gezeigt wird die ECHTE App: reel-bilder/ sind Bildschirmfotos aus dem
+  Demo-Modus von index.html (Demo-Schueler, keine echten Daten) und aus
+  schueler-portal.html mit nachgebildeten Demo-Daten.
+  Untertitel in jeder Szene (Anzeigen laufen meist stumm).
   Aussagen nur, was die App wirklich kann (Stand: start.html, index.html);
   Preis als Endpreis, weil nach § 19 UStG keine Umsatzsteuer berechnet wird.
   Fertiges Video (1080 x 1920, MP4): werkzeug/reel-rendern.mjs
@@ -48,7 +51,7 @@
   .fuss{position:absolute;bottom:34px;left:40px;right:40px;z-index:5;height:2px;background:var(--linie);overflow:hidden}
   .fuss i{display:block;height:100%;width:0;background:var(--signal)}
 
-  .scene{position:absolute;inset:0;z-index:2;padding:96px 34px 190px;display:flex;flex-direction:column;
+  .scene{position:absolute;inset:0;z-index:2;padding:96px 34px 150px;display:flex;flex-direction:column;
     align-items:center;justify-content:center;text-align:center;opacity:0;visibility:hidden}
   .scene.active{opacity:1;visibility:visible}
   .scene.ohne-ut{padding-bottom:96px}
@@ -103,107 +106,53 @@
   .active .punkt-zeile .text{animation:verblassen .35s var(--weg) forwards}
   @keyframes verblassen{to{color:var(--grau)}}
 
-  /* 3 · Marke */
-  .wortmarke{font-family:'Syne',sans-serif;font-size:64px;font-weight:800;color:var(--signal);letter-spacing:-.03em;white-space:nowrap}
-  .regel{width:0;height:2px;background:var(--signal);margin:20px auto 0}
-  .active .regel{animation:regel .8s .3s cubic-bezier(.2,.8,.2,1) forwards}
-  @keyframes regel{to{width:180px}}
+  /* Marke */
+  .wortmarke{font-family:'Syne',sans-serif;font-size:54px;font-weight:800;color:var(--signal);letter-spacing:-.03em;white-space:nowrap}
 
-  /* Karten */
-  .karte{width:100%;max-width:440px;background:var(--flaeche);border:1px solid var(--linie);border-radius:16px;
-    padding:18px 20px;text-align:left;box-shadow:0 30px 70px rgba(0,0,0,.6);margin-top:20px}
-  .k-kopf{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
-  .k-name{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--weiss);white-space:nowrap}
-  .k-meta{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--grau-2);letter-spacing:.08em;white-space:nowrap}
-  .chips{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 14px}
-  .chip{font-size:12.5px;font-weight:700;color:var(--grau);background:var(--flaeche-2);border:1px solid var(--linie);border-radius:6px;padding:6px 10px}
-  .sigfeld{border-top:1px solid var(--linie);padding-top:10px}
-  .siglabel{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--grau-2)}
-  .sig svg{width:100%;height:64px;display:block;margin-top:2px}
-  .sig path{fill:none;stroke:var(--weiss);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:760;stroke-dashoffset:760}
-  .active .sig path{animation:schreiben 1.5s .6s cubic-bezier(.45,0,.5,1) forwards}
-  @keyframes schreiben{to{stroke-dashoffset:0}}
-  .quittung{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:16px;font-size:15.5px;font-weight:700;color:var(--gruen);opacity:0;transform:translateY(8px)}
-  .active .quittung{animation:up .45s var(--an,2.2s) cubic-bezier(.2,.8,.2,1) forwards}
-  .haken{width:18px;height:18px;flex-shrink:0}
-  .haken path{fill:none;stroke:var(--gruen);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:26;stroke-dashoffset:26}
-  .active .haken path{animation:hakenzug .4s calc(var(--an,2.2s) + .15s) forwards}
-  @keyframes hakenzug{to{stroke-dashoffset:0}}
+  /* Handy mit echten Bildschirmen der App */
+  .handy{position:relative;width:290px;height:607px;margin-top:16px;border-radius:40px;background:#05070a;padding:9px;flex-shrink:0;
+    border:2px solid #2b3342;box-shadow:0 40px 80px rgba(0,0,0,.75),0 0 0 1px rgba(255,255,255,.04) inset;
+    opacity:0;transform:translateY(70px) scale(.96)}
+  .active .handy{animation:handy-rein .7s var(--hr,.15s) cubic-bezier(.2,.85,.25,1) forwards}
+  @keyframes handy-rein{to{opacity:1;transform:none}}
+  .handy.schueler{border-color:#2f5b8f}
+  .bildschirm{position:relative;width:100%;height:100%;border-radius:32px;overflow:hidden;background:#0d1117}
+  .bildschirm img{position:absolute;left:0;top:0;width:100%;height:auto;display:block}
+  .bildschirm img.folgt{transform:translateY(100%)}
+  .active .bildschirm img.folgt{animation:bild-hoch .45s var(--an) cubic-bezier(.3,.8,.25,1) forwards}
+  @keyframes bild-hoch{to{transform:none}}
+  .bildschirm img.blende{opacity:0}
+  .active .bildschirm img.blende{animation:einblenden .35s var(--an) forwards}
+  .bildschirm img.zoom{transform-origin:50% 48%}
+  .active .bildschirm img.zoom{animation:heran 2.6s .6s cubic-bezier(.4,0,.2,1) forwards}
+  @keyframes heran{to{transform:scale(1.18)}}
+  .ansicht{position:absolute;top:-13px;left:50%;transform:translateX(-50%);z-index:3;white-space:nowrap;
+    font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.16em;border-radius:99px;padding:5px 10px;
+    background:var(--signal);color:#0d1117}
+  .handy.schueler .ansicht{background:var(--blau)}
 
-  /* Ring + Pflichtfahrten */
-  .ring-feld{position:relative;width:200px;height:200px;margin-top:18px}
-  .ring-feld svg{width:100%;height:100%;transform:rotate(-90deg)}
-  .ring-bg{fill:none;stroke:var(--flaeche-2);stroke-width:11}
-  .ring-vg{fill:none;stroke:var(--signal);stroke-width:11;stroke-linecap:round;stroke-dasharray:596;stroke-dashoffset:596}
-  .active .ring-vg{animation:ring 1.5s .35s cubic-bezier(.25,.8,.3,1) forwards}
-  @keyframes ring{to{stroke-dashoffset:131}}
-  .ring-mitte{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
-  .ring-zahl{font-family:'Syne',sans-serif;font-size:46px;font-weight:800;color:var(--weiss);line-height:1}
-  .ring-txt{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.18em;color:var(--grau-2);margin-top:6px}
-  .pflicht{display:flex;flex-direction:column;gap:9px;width:100%;max-width:340px;margin-top:22px}
-  .pf{display:flex;align-items:center;gap:12px}
-  .pf-name{font-size:13.5px;font-weight:600;color:var(--grau);width:96px;text-align:left;flex-shrink:0}
-  .pf-bar{flex:1;height:7px;border-radius:99px;background:var(--flaeche-2);overflow:hidden}
-  .pf-bar i{display:block;height:100%;width:0;border-radius:99px;background:var(--signal)}
-  .pf-zahl{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--grau-2);width:42px;text-align:right}
-  .active .pf1 i{animation:b1 .9s .7s cubic-bezier(.25,.8,.3,1) forwards}
-  .active .pf2 i{animation:b2 .9s .85s cubic-bezier(.25,.8,.3,1) forwards}
-  .active .pf3 i{animation:b3 .9s 1s cubic-bezier(.25,.8,.3,1) forwards}
-  @keyframes b1{to{width:100%}} @keyframes b2{to{width:75%}} @keyframes b3{to{width:67%}}
+  /* Finger: zeigt den Tipp. Position in % des Bildschirms. */
+  .finger{position:absolute;width:0;height:0;z-index:4;pointer-events:none}
+  .finger::before{content:'';position:absolute;left:-22px;top:-22px;width:44px;height:44px;border-radius:50%;
+    background:rgba(255,255,255,.6);opacity:0;transform:scale(.3)}
+  .finger::after{content:'👆';position:absolute;left:-13px;top:-5px;font-size:38px;line-height:1;
+    filter:drop-shadow(0 6px 10px rgba(0,0,0,.6));opacity:0}
+  .active .finger::after{animation:finger 1.1s var(--t) both}
+  .active .finger::before{animation:welle .55s calc(var(--t) + .36s) ease-out both}
+  @keyframes finger{0%{opacity:0;transform:translate(34px,46px)}30%{opacity:1;transform:translate(0,0)}
+    40%{transform:translate(0,4px) scale(.92)}52%{transform:none}80%{opacity:1}100%{opacity:0;transform:translate(10px,18px)}}
+  @keyframes welle{0%{opacity:.9;transform:scale(.3)}100%{opacity:0;transform:scale(2.1)}}
 
-  /* Handy (Schueler-Portal) */
-  .handy{position:relative;width:300px;height:430px;margin-top:20px;border-radius:30px;overflow:hidden;background:#0d1117;
-    border:2px solid #30363d;box-shadow:0 30px 70px rgba(0,0,0,.6);text-align:left;padding:22px 18px}
-  .p-gruss{font-family:'Syne',sans-serif;font-size:19px;font-weight:800;color:var(--weiss)}
-  .p-sub{font-size:12.5px;color:var(--grau);margin-top:2px}
-  .p-karte{margin-top:14px;background:var(--flaeche);border:1px solid var(--linie);border-radius:14px;padding:12px 14px}
-  .p-titel{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--grau)}
-  .p-balken{height:9px;border-radius:99px;background:var(--flaeche-2);margin-top:8px;overflow:hidden}
-  .p-balken i{display:block;height:100%;width:0;background:var(--gruen);border-radius:99px}
-  .active .p-balken i{animation:p78 1.1s .5s cubic-bezier(.25,.8,.3,1) forwards}
-  @keyframes p78{to{width:78%}}
-  .p-zahl{font-size:13px;font-weight:700;color:var(--weiss);margin-top:6px}
-  .blase{max-width:82%;margin-top:12px;padding:10px 13px;border-radius:14px;font-size:14px;font-weight:600;line-height:1.35;opacity:0;transform:translateY(10px)}
-  .blase.fl{background:var(--flaeche-2);color:var(--weiss);border-bottom-left-radius:4px}
-  .blase.sch{background:var(--blau);color:#0d1117;margin-left:auto;border-bottom-right-radius:4px}
-  .active .blase{animation:up .4s var(--an) cubic-bezier(.2,.8,.2,1) forwards}
-  .blase small{display:block;font-size:10.5px;font-weight:700;opacity:.65;margin-bottom:2px}
-
-  /* Fuers naechste Mal */
-  .gruppe{margin-top:10px}
-  .g-label{font-size:11.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;margin-bottom:2px}
-  .zeile{display:flex;align-items:center;gap:12px;padding:7px 0;border-bottom:1px solid var(--linie);font-size:15.5px;font-weight:600;color:var(--weiss)}
-  .gruppe:last-child .zeile{border-bottom:none}
-  .kast{width:20px;height:20px;border-radius:5px;border:2px solid #c9d1d9;flex-shrink:0;background:#fff}
-  .g-rot .g-label{color:var(--rot)} .g-blau .g-label{color:var(--blau)} .g-orange .g-label{color:var(--orange)}
-  .blatt{border:1.5px solid var(--orange);background:#161b22;opacity:0;transform:translateY(60px)}
-  .active .blatt{animation:hoch .6s .45s cubic-bezier(.2,.85,.25,1) forwards}
-  @keyframes hoch{to{opacity:1;transform:none}}
-
-  /* Kalender */
-  .woche{width:100%;max-width:400px;background:var(--flaeche);border:1px solid var(--linie);border-radius:14px;padding:16px 14px 14px;
-    box-shadow:0 30px 70px rgba(0,0,0,.6);margin-top:20px}
-  .w-kopf{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-bottom:9px}
-  .w-kopf span{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--grau-2);text-align:center}
-  .w-netz{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}
-  .zelle{height:34px;border-radius:6px;background:var(--flaeche-2);border:1px solid var(--linie)}
-  .zelle.belegt{background:rgba(255,212,84,.12);border-color:rgba(255,212,84,.3)}
-  .zelle.neu{opacity:0;transform:scale(.7);background:var(--signal);border-color:var(--signal)}
-  .active .zelle.neu{animation:plopp .45s 1.1s cubic-bezier(.3,1.4,.5,1) forwards}
+  /* PDF-Blatt */
+  .blatt-pdf{position:relative;width:330px;margin-top:22px;border-radius:8px;overflow:visible;
+    opacity:0;transform:perspective(900px) rotateX(18deg) translateY(60px)}
+  .active .blatt-pdf{animation:blatt-rein .8s .3s cubic-bezier(.2,.85,.25,1) forwards}
+  @keyframes blatt-rein{to{opacity:1;transform:perspective(900px) rotateX(0) translateY(0)}}
+  .blatt-pdf img{display:block;width:100%;border-radius:8px;box-shadow:0 40px 80px rgba(0,0,0,.7)}
+  .blatt-pdf .pdf{position:absolute;right:-16px;bottom:24px;background:var(--rot);color:#fff;font-weight:800;font-size:16px;border-radius:9px;
+    padding:7px 11px;box-shadow:0 8px 20px rgba(0,0,0,.4);opacity:0;transform:scale(.6)}
+  .active .blatt-pdf .pdf{animation:plopp .4s 1.2s cubic-bezier(.3,1.4,.5,1) forwards}
   @keyframes plopp{to{opacity:1;transform:none}}
-  .sync{display:flex;align-items:center;justify-content:center;gap:9px;margin-top:18px;font-size:15px;font-weight:700;color:var(--weiss);opacity:0}
-  .active .sync{animation:up .45s 1.7s cubic-bezier(.2,.8,.2,1) forwards}
-  .sync b{color:var(--signal);font-weight:800}
-
-  /* PDF */
-  .dok{position:relative;width:210px;height:240px;margin-top:22px;background:#fbfbfb;border-radius:10px;box-shadow:0 30px 60px rgba(0,0,0,.6);
-    padding:22px 18px;text-align:left}
-  .dok .t{font-family:'Syne',sans-serif;font-size:14px;line-height:1.15;font-weight:800;color:#0d1117}
-  .dok .l{height:6px;border-radius:3px;background:#d0d7de;margin-top:10px}
-  .dok .l.k{width:60%} .dok .l.m{width:80%}
-  .dok .pdf{position:absolute;right:-14px;bottom:20px;background:var(--rot);color:#fff;font-weight:800;font-size:15px;border-radius:8px;padding:6px 10px;
-    box-shadow:0 8px 20px rgba(0,0,0,.4);opacity:0;transform:scale(.6)}
-  .active .dok .pdf{animation:plopp .4s .9s cubic-bezier(.3,1.4,.5,1) forwards}
 
   /* Abschluss */
   .domain{font-family:'Syne',sans-serif;font-size:44px;font-weight:800;color:var(--signal);white-space:nowrap;margin-top:12px;letter-spacing:-.015em}
@@ -254,100 +203,89 @@
     <div class="marke-zeile up">Bisher</div>
     <h2 class="up d1">Kennst du das?</h2>
     <div class="liste">
-      <div class="punkt-zeile" style="--an:.4s;--weg:1.9s">📇 <span class="text">Karteikarten im Handschuhfach</span></div>
-      <div class="punkt-zeile" style="--an:.65s;--weg:2.1s">📝 <span class="text">Notizzettel überall</span></div>
-      <div class="punkt-zeile" style="--an:.9s;--weg:2.3s">🌙 <span class="text">Abends alles nachtragen</span></div>
+      <div class="punkt-zeile" style="--an:.35s;--weg:1.7s">📇 <span class="text">Karteikarten im Handschuhfach</span></div>
+      <div class="punkt-zeile" style="--an:.6s;--weg:1.9s">📝 <span class="text">Notizzettel überall</span></div>
+      <div class="punkt-zeile" style="--an:.85s;--weg:2.1s">🌙 <span class="text">Abends alles nachtragen</span></div>
     </div>
-    <div class="ut" style="--a:1.9s">Damit ist jetzt <b>Schluss.</b></div>
+    <div class="ut" style="--a:1.7s">Damit ist jetzt <b>Schluss.</b></div>
   </div>
 
-  <!-- 3 · Marke -->
-  <div class="scene ohne-ut" data-scene="3">
+  <!-- 3 · Marke + echte App -->
+  <div class="scene" data-scene="3">
     <div class="wortmarke in">FahrSync</div>
-    <div class="regel"></div>
-    <p class="lead up d3" style="font-size:21px;color:var(--weiss)">Die digitale Kartei für Fahrlehrer.</p>
-    <p class="lead up d5" style="margin-top:8px">Alles zu jedem Schüler – an einem Ort, auf dem Handy.</p>
+    <div class="handy" style="--hr:.45s"><span class="ansicht">ECHTE APP</span>
+      <div class="bildschirm"><img src="reel-bilder/liste.jpg" alt=""></div>
+    </div>
+    <div class="ut" style="--a:.9s"><b>Die digitale Kartei für Fahrlehrer.</b> Alle Schüler, auf dem Handy.</div>
   </div>
 
-  <!-- 4 · Protokoll -->
+  <!-- 4 · Akte -->
   <div class="scene" data-scene="4">
-    <h2 class="up">Stunde eintragen.<br><span class="gelb">Unterschrift drauf.</span></h2>
-    <div class="karte in d2">
-      <div class="k-kopf"><span class="k-name">Lena M.</span><span class="k-meta">KL. B · 14. STD</span></div>
-      <div class="chips"><span class="chip">Überland</span><span class="chip">Kreisverkehr</span><span class="chip">Schulterblick</span></div>
-      <div class="sigfeld">
-        <div class="siglabel">Unterschrift Schüler</div>
-        <div class="sig"><svg viewBox="0 0 336 72" aria-hidden="true"><path d="M12 54 C38 16,50 10,56 26 C62 42,50 58,42 54 C34 50,42 30,64 26 C86 22,94 44,110 44 C126 44,130 22,144 20 C158 18,156 46,172 46 C188 46,190 18,206 18 C222 18,218 50,238 46 C260 42,266 26,298 30 C314 32,320 38,328 34"/></svg></div>
+    <h2 class="up">Jeder Schüler<br><span class="gelb">auf einen Blick.</span></h2>
+    <div class="handy" style="--hr:0s">
+      <div class="bildschirm">
+        <img src="reel-bilder/liste.jpg" alt="">
+        <img class="folgt" style="--an:.85s" src="reel-bilder/akte-oben.jpg" alt="">
+        <img class="folgt" style="--an:2.2s" src="reel-bilder/pflicht.jpg" alt="">
+        <img class="folgt" style="--an:3.2s" src="reel-bilder/adk.jpg" alt="">
+        <span class="finger" style="--t:.15s;left:50%;top:52%"></span>
       </div>
     </div>
-    <div class="quittung" style="--an:2.2s"><svg class="haken" viewBox="0 0 24 24"><path d="M4 12.5 L9.5 18 L20 6"/></svg>Fertig, bevor der Motor aus ist</div>
-    <div class="ut" style="--a:.6s"><b>Fahrstunden-Protokoll</b> direkt im Auto – mit Unterschrift des Schülers.</div>
+    <div class="ut" style="--a:.9s">Ausbildungsstand, Pflichtfahrten, Lernstand nach Lehrplan – <b>alles in der Akte.</b></div>
   </div>
 
-  <!-- 5 · Ausbildungsstand -->
+  <!-- 5 · Protokoll -->
   <div class="scene" data-scene="5">
-    <h2 class="up">Ausbildungsstand<br><span class="gelb">auf einen Blick.</span></h2>
-    <div class="ring-feld in d1">
-      <svg viewBox="0 0 210 210" aria-hidden="true"><circle class="ring-bg" cx="105" cy="105" r="95"/><circle class="ring-vg" cx="105" cy="105" r="95"/></svg>
-      <div class="ring-mitte"><span class="ring-zahl">78%</span><span class="ring-txt">AUSBILDUNGSSTAND</span></div>
-    </div>
-    <div class="pflicht">
-      <div class="pf pf1"><span class="pf-name">Überland</span><span class="pf-bar"><i></i></span><span class="pf-zahl">5/5</span></div>
-      <div class="pf pf2"><span class="pf-name">Autobahn</span><span class="pf-bar"><i></i></span><span class="pf-zahl">3/4</span></div>
-      <div class="pf pf3"><span class="pf-name">Nachtfahrt</span><span class="pf-bar"><i></i></span><span class="pf-zahl">2/3</span></div>
-    </div>
-    <div class="ut" style="--a:.6s">Nach Lehrplan, mit Pflichtfahrten – bis zur <b>Prüfungsreife.</b></div>
-  </div>
-
-  <!-- 6 · Schueler-Portal -->
-  <div class="scene" data-scene="6">
-    <h2 class="up">Deine Schüler<br><span class="gelb">sind im Bilde.</span></h2>
-    <div class="handy in d2">
-      <div class="p-gruss">Hallo Lena 👋</div>
-      <div class="p-sub">Dein Lernstand bei FahrSync</div>
-      <div class="p-karte"><div class="p-titel">Ausbildung</div><div class="p-balken"><i></i></div><div class="p-zahl">78 % geschafft</div></div>
-      <div class="blase fl" style="--an:1.4s"><small>Fahrlehrer</small>Super gefahren! Nächstes Mal Autobahn 🚗</div>
-      <div class="blase sch" style="--an:2.1s"><small>Lena</small>Yes, freu mich! 🙌</div>
-    </div>
-    <div class="ut" style="--a:.6s">Im <b>Schüler-Portal</b> sehen sie ihren Lernstand – und chatten direkt mit dir.</div>
-  </div>
-
-  <!-- 7 · Fuers naechste Mal -->
-  <div class="scene" data-scene="7">
-    <h2 class="up" style="font-size:28px">Nie wieder<br><span class="gelb">„Was war noch mal?“</span></h2>
-    <div class="karte blatt">
-      <div class="k-kopf"><span class="k-name" style="font-size:17px">📌 Fürs nächste Mal</span><span class="k-meta">JONAS K.</span></div>
-      <div class="gruppe g-rot"><div class="g-label">⚠️ Lief nicht gut</div><div class="zeile"><span class="kast"></span>Spurwechsel ohne Schulterblick</div></div>
-      <div class="gruppe g-blau"><div class="g-label">🔁 Wiederholen</div><div class="zeile"><span class="kast"></span>Kupplung</div></div>
-      <div class="gruppe g-orange"><div class="g-label">➡️ Als Nächstes</div><div class="zeile"><span class="kast"></span>Erste Autobahnfahrt</div></div>
-    </div>
-    <div class="ut" style="--a:.9s">Akte auf – und du siehst sofort, <b>was ansteht</b> und was wiederholt werden muss.</div>
-  </div>
-
-  <!-- 8 · Kalender -->
-  <div class="scene" data-scene="8">
-    <h2 class="up">Schüler buchen<br><span class="gelb">selbst.</span></h2>
-    <div class="woche in d2">
-      <div class="w-kopf"><span>MO</span><span>DI</span><span>MI</span><span>DO</span><span>FR</span></div>
-      <div class="w-netz">
-        <div class="zelle belegt"></div><div class="zelle"></div><div class="zelle belegt"></div><div class="zelle"></div><div class="zelle belegt"></div>
-        <div class="zelle"></div><div class="zelle belegt"></div><div class="zelle"></div><div class="zelle neu"></div><div class="zelle"></div>
-        <div class="zelle belegt"></div><div class="zelle"></div><div class="zelle belegt"></div><div class="zelle"></div><div class="zelle"></div>
+    <h2 class="up">Protokoll im Auto.<br><span class="gelb">Mit Unterschrift.</span></h2>
+    <div class="handy" style="--hr:0s">
+      <div class="bildschirm">
+        <img src="reel-bilder/protokoll-oben.jpg" alt="">
+        <img class="folgt" style="--an:1.6s" src="reel-bilder/protokoll.jpg" alt="">
+        <span class="finger" style="--t:2.9s;left:69%;top:95%"></span>
       </div>
     </div>
-    <div class="sync">Landet direkt in deinem <b>Google&nbsp;Kalender</b></div>
-    <div class="ut" style="--a:.6s"><b>Kalender mit Online-Buchung</b> – als Zusatzmodul, wenn du es brauchst.</div>
+    <div class="ut" style="--a:.7s">Fahrstunde in Sekunden eintragen – der Schüler <b>unterschreibt direkt auf dem Handy.</b></div>
+  </div>
+
+  <!-- 6 · Fuers naechste Mal -->
+  <div class="scene" data-scene="6">
+    <h2 class="up" style="font-size:28px">Nie wieder<br><span class="gelb">„Was war noch mal?“</span></h2>
+    <div class="handy" style="--hr:0s">
+      <div class="bildschirm">
+        <img src="reel-bilder/akte-oben.jpg" alt="">
+        <img class="blende" style="--an:.7s" src="reel-bilder/popup.jpg" alt="">
+      </div>
+    </div>
+    <div class="ut" style="--a:1.0s">Akte auf – und es erscheint, <b>was ansteht</b>, was schlecht lief und was wiederholt werden muss.</div>
+  </div>
+
+  <!-- 7 · Schueler-Portal -->
+  <div class="scene" data-scene="7">
+    <h2 class="up">Deine Schüler<br><span class="gelb">sind im Bilde.</span></h2>
+    <div class="handy schueler" style="--hr:0s"><span class="ansicht">SCHÜLER-ANSICHT</span>
+      <div class="bildschirm">
+        <img src="reel-bilder/portal.jpg" alt="">
+        <img class="folgt" style="--an:2.0s" src="reel-bilder/portal-chat.jpg" alt="">
+        <span class="finger" style="--t:1.35s;left:30%;top:96%"></span>
+      </div>
+    </div>
+    <div class="ut" style="--a:.7s">Eigenes <b>Schüler-Portal</b> mit Lernstand und Chat – ohne App-Installation.</div>
+  </div>
+
+  <!-- 8 · Verkehrszeichen -->
+  <div class="scene" data-scene="8">
+    <h2 class="up">Verkehrszeichen<br><span class="gelb">inklusive.</span></h2>
+    <div class="handy" style="--hr:0s">
+      <div class="bildschirm"><img class="zoom" src="reel-bilder/katalog.jpg" alt=""></div>
+    </div>
+    <div class="ut" style="--a:.7s">Über 100 amtliche Zeichen – jetzt auch <b>Zusatzzeichen mit Uhrzeiten.</b></div>
   </div>
 
   <!-- 9 · PDF -->
   <div class="scene" data-scene="9">
-    <h2 class="up">Nachweis?<br><span class="gelb">Ein Tipp.</span></h2>
-    <div class="dok in d2">
-      <div class="t">Ausbildungs-<br>nachweis</div>
-      <div class="l"></div><div class="l m"></div><div class="l k"></div><div class="l"></div><div class="l m"></div><div class="l"></div><div class="l k"></div><div class="l m"></div>
-      <div class="pdf">PDF ✓</div>
-    </div>
-    <div class="ut" style="--a:.5s"><b>Ausbildungsnachweis</b> und Protokolle als PDF – fertig zum Drucken.</div>
+    <h2 class="up" style="font-size:30px">Ausbildungsnachweis?<br><span class="gelb">Ein Tipp.</span></h2>
+    <div class="blatt-pdf"><img src="reel-bilder/pdf.jpg" alt=""><div class="pdf">PDF ✓</div></div>
+    <div class="ut" style="--a:.6s">Als <b>PDF</b> – fertig zum Drucken oder Weiterschicken.</div>
   </div>
 
   <!-- 10 · Aufruf -->
@@ -357,7 +295,7 @@
     <div class="knopf puls up">Jetzt testen →</div>
     <div class="preis up d4">Danach ab 9,99 € im Monat</div>
     <div class="klein up d4">Endpreis (keine USt. nach § 19 UStG) · monatlich kündbar<br>Für Fahrschulen und selbstständige Fahrlehrer</div>
-    <div class="siegel up d5"><span>SERVER IN FRANKFURT</span><span>KEINE INSTALLATION</span></div>
+    <div class="siegel up d5"><span>SERVER IN FRANKFURT</span><span>KEINE INSTALLATION</span><span>KALENDER OPTIONAL</span></div>
   </div>
 
   <div class="startdeck" id="startdeck"><button id="start">▶ Abspielen</button><p>Vorschau im Browser</p></div>
@@ -369,17 +307,18 @@
 
 <script>
   const ablauf = [
-    { nr:1,  dauer:2.8, etikett:'' },
-    { nr:2,  dauer:3.6, etikett:'' },
-    { nr:3,  dauer:2.8, etikett:'' },
-    { nr:4,  dauer:3.9, etikett:'PROTOKOLL' },
-    { nr:5,  dauer:3.4, etikett:'AUSBILDUNG' },
-    { nr:6,  dauer:3.8, etikett:'SCHÜLER-PORTAL' },
-    { nr:7,  dauer:3.4, etikett:'NOTIZEN' },
-    { nr:8,  dauer:3.4, etikett:'KALENDER' },
-    { nr:9,  dauer:2.8, etikett:'PDF' },
+    { nr:1,  dauer:2.7, etikett:'' },
+    { nr:2,  dauer:3.1, etikett:'' },
+    { nr:3,  dauer:3.2, etikett:'' },
+    { nr:4,  dauer:4.4, etikett:'SCHÜLERAKTE' },
+    { nr:5,  dauer:4.2, etikett:'PROTOKOLL' },
+    { nr:6,  dauer:3.6, etikett:'NOTIZEN' },
+    { nr:7,  dauer:4.0, etikett:'SCHÜLER-PORTAL' },
+    { nr:8,  dauer:3.4, etikett:'VERKEHRSZEICHEN' },
+    { nr:9,  dauer:3.0, etikett:'PDF' },
     { nr:10, dauer:5.0, etikett:'' }
   ];
+
   const gesamt = ablauf.reduce((s,x)=>s+x.dauer,0);
   const stage=document.getElementById('stage'), etikett=document.getElementById('etikett');
   const balken=document.getElementById('fortschritt'), startdeck=document.getElementById('startdeck'), zeitEl=document.getElementById('zeitEl');
