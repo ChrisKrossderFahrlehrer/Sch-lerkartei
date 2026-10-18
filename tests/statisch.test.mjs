@@ -443,6 +443,41 @@ console.log('\n10) Speichern haengt die Fahrschul-Zuordnung nicht um');
   }
 }
 
+// ══ 11 Rechtstexte: Kopie in der App = Webseite ═══════════════════════
+// AGB und Datenschutzerklaerung stehen zweimal im Projekt: als eigene Seite
+// (agb.html, datenschutz.html) und als Fenster in der App (index.html). Die
+// Datenschutz-Kopie in der App war unbemerkt hinter der Webseite
+// zurueckgeblieben - wer sich registrierte, las eine aeltere Fassung als
+// die verlinkte. Verglichen wird der reine Text, nicht das Markup.
+console.log('\n11) Rechtstexte: Kopie in der App = Webseite');
+{
+  const nurText = (t) => t.replace(/<[^>]+>/g, ' ')
+    .replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+  const app = lies('index.html') || '';
+  const paare = [
+    { datei: 'agb.html', anfang: '§ 1 Leistungsgegenstand', ende: 'der Sitz des Betreibers.' },
+    { datei: 'datenschutz.html', anfang: '1. Verantwortlicher', ende: null },
+  ];
+  for (const { datei, anfang, ende } of paare) {
+    const seite = lies(datei) || '';
+    const haupt = seite.slice(seite.indexOf('<main'), seite.indexOf('</main>'));
+    let soll = nurText(haupt);
+    soll = soll.slice(soll.indexOf(anfang));
+    if (ende) soll = soll.slice(0, soll.indexOf(ende) + ende.length);
+    const appText = nurText(app);
+    const i = appText.indexOf(anfang);
+    const ist = i < 0 ? '' : appText.slice(i, i + soll.length);
+    if (!soll || ist !== soll) {
+      let n = 0;
+      while (n < soll.length && soll[n] === ist[n]) n++;
+      melde(`index.html: Kopie von ${datei} weicht ab (ab "…${soll.slice(Math.max(0, n - 40), n + 40)}…")`);
+    } else {
+      console.log(`  ${datei} = Kopie in der App ✓`);
+    }
+  }
+}
+
 // ══ Ergebnis ═══════════════════════════════════════════════════════════
 console.log(befunde === 0
   ? '\n✓ Keine Befunde.\n'

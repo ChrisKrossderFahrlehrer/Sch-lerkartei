@@ -28,7 +28,7 @@ const { getFirestore } = ausFunctions('firebase-admin/firestore');
 initializeApp({ projectId: process.env.GCLOUD_PROJECT });
 const db = getFirestore();
 
-const { kuendigungVormerken, kuendigungAufheben, abgelaufeneAbosBeenden } =
+const { kuendigungVormerken, kuendigungAufheben, abgelaufeneAbosBeenden, kuendigungsEnde } =
   require(join(hier, '..', 'functions', 'abo.js'));
 
 const TAG = 86400000;
@@ -120,6 +120,36 @@ await pruefe('Das neue Abo wird nach 14 Tagen NICHT auf free gestellt', async ()
   gleich(d.abo, 'bis5', 'abo');
   gleich(d.aboSubscriptionId, 'I-NEU', 'aboSubscriptionId');
   gleich('aboEndetAm' in d, false, 'alte Vormerkung entfernt');
+});
+
+console.log('\nBEZAHLTER ZEITRAUM WIRD NICHT VERKUERZT');
+// Kundenschutz: Wer kurz nach der Monatszahlung kuendigt, behaelt den
+// bezahlten Monat. Wer kurz vor Ablauf kuendigt, behaelt trotzdem 14 Tage.
+await pruefe('Rechenregel: bezahlt bis in 25 Tagen -> Ende in 25 Tagen', async () => {
+  gleich(kuendigungsEnde(T0, T0 + 25 * TAG), T0 + 25 * TAG, 'Ende');
+});
+await pruefe('Rechenregel: bezahlt bis in 3 Tagen -> trotzdem 14 Tage', async () => {
+  gleich(kuendigungsEnde(T0, T0 + 3 * TAG), T0 + 14 * TAG, 'Ende');
+});
+await pruefe('Rechenregel: kein Zeitraum bekannt -> 14 Tage', async () => {
+  gleich(kuendigungsEnde(T0, null), T0 + 14 * TAG, 'Ende');
+  gleich(kuendigungsEnde(T0, 0), T0 + 14 * TAG, 'Ende');
+});
+await db.doc('users/fruehkuendiger').set({
+  abo: 'bis5', aboStatus: 'aktiv', aboSubscriptionId: 'I-FRUEH', fahrschuleId: 'fruehkuendiger',
+});
+await pruefe('Kuendigung 2 Tage nach der Zahlung: Tarif bis zum Ende des bezahlten Monats', async () => {
+  const r = await kuendigungVormerken(db, 'I-FRUEH', T0, 'paypal', T0 + 28 * TAG);
+  gleich(r.ergebnis, 'vorgemerkt', 'Ergebnis');
+  gleich((await lies('users/fruehkuendiger')).aboEndetAm, T0 + 28 * TAG, 'aboEndetAm');
+});
+await pruefe('...nach 20 Tagen (vorher waere schon Schluss gewesen) noch bezahlter Tarif', async () => {
+  await abgelaufeneAbosBeenden(db, T0 + 20 * TAG);
+  gleich((await lies('users/fruehkuendiger')).abo, 'bis5', 'abo');
+});
+await pruefe('...nach 28 Tagen free', async () => {
+  await abgelaufeneAbosBeenden(db, T0 + 28 * TAG);
+  gleich((await lies('users/fruehkuendiger')).abo, 'free', 'abo');
 });
 
 console.log('\nKUENDIGUNG ZURUECKGENOMMEN');

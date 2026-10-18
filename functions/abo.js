@@ -1,4 +1,5 @@
-// Gekuendigte Abos: 14 Tage weiter nutzbar, danach kostenloser Tarif.
+// Gekuendigte Abos: bis zum Ende des bezahlten Zeitraums weiter nutzbar,
+// mindestens aber 14 Tage; danach kostenloser Tarif.
 //
 // Vorher: Kuendigte ein Kunde sein Abo bei PayPal oder Stripe, erfuhr die App
 // davon nichts. Die Abo-Felder blieben auf dem bezahlten Tarif stehen - wer
@@ -7,8 +8,13 @@
 // Jetzt (Entscheidung des Betreibers):
 //   - Die Kuendigung muss 14 Tage vor Ablauf erfolgen (AGB § 5).
 //   - Meldet PayPal oder Stripe die Kuendigung, laufen die bezahlten
-//     Funktionen noch 14 Tage weiter. Danach stellt taeglichesAufraeumen das
-//     Konto auf 'free' um.
+//     Funktionen bis zum Ende des bezahlten Zeitraums weiter, mindestens
+//     aber noch 14 Tage. Danach stellt taeglichesAufraeumen das Konto auf
+//     'free' um.
+//     Warum "mindestens" und nicht fest 14 Tage: Wer kurz nach der
+//     Monatszahlung kuendigt, haette sonst zwei bezahlte Wochen verloren -
+//     bezahlt, aber nicht geliefert. Wer erst kurz vor Ablauf kuendigt,
+//     behaelt wie zugesagt noch 14 Tage.
 //   - Es wird NICHTS geloescht. Kartei, Schueler, Protokolle bleiben, nur der
 //     Tarif aendert sich. Loeschen ist ein eigener Weg (Konto loeschen, § 10).
 //
@@ -35,14 +41,22 @@ async function findeAbo(db, subscriptionId) {
 // Kuendigung vormerken. Mehrfach-Meldungen (Webhooks werden wiederholt
 // zugestellt; Stripe meldet erst "zum Periodenende gekuendigt", spaeter
 // "beendet") verschieben das Ende NICHT nach hinten - es zaehlt die erste.
-async function kuendigungVormerken(db, subscriptionId, jetzt = Date.now(), quelle = '') {
+// bezahltBis: Ende des laufenden (bezahlten oder Test-) Zeitraums in ms,
+// soweit PayPal/Stripe es mitliefern; sonst null.
+function kuendigungsEnde(jetzt, bezahltBis) {
+  const mindestens = jetzt + NACHLAUF_TAGE * TAG_MS;
+  const bis = Number(bezahltBis) || 0;
+  return bis > mindestens ? bis : mindestens;
+}
+
+async function kuendigungVormerken(db, subscriptionId, jetzt = Date.now(), quelle = '', bezahltBis = null) {
   const d = await findeAbo(db, subscriptionId);
   if (!d) return { ergebnis: 'kein-treffer' };
   const b = d.data();
   if (b.aboGekuendigteSubscriptionId === subscriptionId && b.aboEndetAm) {
     return { ergebnis: 'schon-vorgemerkt', pfad: d.ref.path, endetAm: b.aboEndetAm };
   }
-  const endetAm = jetzt + NACHLAUF_TAGE * TAG_MS;
+  const endetAm = kuendigungsEnde(jetzt, bezahltBis);
   await d.ref.update({
     aboStatus: 'gekuendigt',
     aboGekuendigtAm: jetzt,
@@ -77,7 +91,7 @@ function KUENDIGUNG_ENTFERNEN() {
   };
 }
 
-// Naechtlich: alle Abos, deren 14 Tage um sind, auf 'free' stellen.
+// Naechtlich: alle Abos, deren Nachlauf um ist, auf 'free' stellen.
 // Sicherung: Nur wenn das gekuendigte Abo noch das aktuelle ist. Hat der
 // Kunde inzwischen ein neues abgeschlossen (andere Kennung), bleibt der
 // Tarif und nur die alte Vormerkung wird entfernt.
@@ -121,5 +135,5 @@ async function abgelaufeneAbosBeenden(db, jetzt = Date.now(), hoechstens = 200) 
 
 module.exports = {
   kuendigungVormerken, kuendigungAufheben, abgelaufeneAbosBeenden,
-  KUENDIGUNG_ENTFERNEN, findeAbo, NACHLAUF_TAGE,
+  KUENDIGUNG_ENTFERNEN, findeAbo, NACHLAUF_TAGE, kuendigungsEnde,
 };
