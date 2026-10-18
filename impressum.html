@@ -26,7 +26,19 @@
   <a class="back" href="./">← Zur Startseite</a>
   <h1>Impressum</h1>
   <div class="sub">Angaben gemäß § 5 DDG</div>
-  <div id="imp-content"><div id="imp-loading">Lädt…</div></div>
+  <!-- Steht sofort da und bleibt stehen, falls das Skript gar nicht laedt;
+       wird sonst durch die vollstaendigen Angaben aus der Datenbank ersetzt. -->
+  <div id="imp-content">
+    <div class="block">
+      <h2>👤 Verantwortlich</h2>
+      <p><strong>Christopher Korting</strong></p>
+    </div>
+    <div class="block">
+      <h2>📱 Kontakt</h2>
+      <p>✉️ <a href="mailto:kontakt@fahrsync.de">kontakt@fahrsync.de</a></p>
+    </div>
+    <div id="imp-loading">Vollständige Angaben werden geladen…</div>
+  </div>
 </div>
 
 <script type="module">
@@ -45,58 +57,68 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+// Die Werte kommen aus der Datenbank und landen per innerHTML im Text UND in
+// Attributen (mailto:, https://) - deshalb an der Quelle entwerten.
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
+  ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+
+// Das Impressum muss ständig erreichbar sein. Laedt die Datenbank nicht
+// (offline, Werbeblocker, Stoerung), stand hier frueher nur "konnte nicht
+// geladen werden" - jetzt erscheinen wenigstens Betreiber und Kontakt.
+let d = {}, geladen = false;
 try {
   const snap = await getDoc(doc(db, 'platform', 'impressum'));
-  const d = snap.exists() ? snap.data() : {};
-  const name    = d.name    || 'Chriskoo';
-  const inhaber = d.inhaber || '';
-  const strasse = d.strasse || '';
-  const plz     = d.plz     || '';
-  const ort     = d.ort     || 'Deutschland';
-  const tel     = d.tel     || '';
-  const email   = d.email   || 'kontakt@fahrsync.de';
-  const web     = d.web     || 'fahrsync.de';
-  const steuernr = d.steuernummer  || '050/240/09485';
-  const wIdNr    = d.wirtschaftsId || 'DE464533862';
-
-  document.getElementById('imp-content').innerHTML = `
-    <div class="block">
-      <h2>👤 Verantwortlich</h2>
-      <p>
-        <strong>${name}</strong><br>
-        ${inhaber ? inhaber + '<br>' : ''}
-        ${strasse ? strasse + '<br>' : ''}
-        ${(plz || ort) ? (plz + ' ' + ort).trim() : ''}
-      </p>
-    </div>
-    <div class="block">
-      <h2>📱 Kontakt</h2>
-      <p>
-        ${tel   ? '📞 ' + tel + '<br>' : ''}
-        ${email ? '✉️ <a href="mailto:'+email+'">'+email+'</a><br>' : ''}
-        ${web   ? '🌐 <a href="https://'+web+'">'+web+'</a>' : ''}
-      </p>
-    </div>
-    <div class="block">
-      <h2>🧾 Steuerliche Angaben</h2>
-      <p>
-        Wirtschafts-Identifikationsnummer gem. § 5 DDG: ${wIdNr}<br>
-        Steuernummer: ${steuernr}
-      </p>
-    </div>
-    <div class="block">
-      <h2>🔒 Datenschutz</h2>
-      <p>Informationen zur Verarbeitung personenbezogener Daten findest du in unserer <a href="./datenschutz.html">Datenschutzerklärung</a>.</p>
-    </div>
-    <div class="block">
-      <h2>⚖️ Haftungshinweis</h2>
-      <p style="color:var(--muted);font-size:0.85rem">Trotz sorgfältiger inhaltlicher Kontrolle übernehmen wir keine Haftung für die Inhalte externer Links. Für den Inhalt der verlinkten Seiten sind ausschließlich deren Betreiber verantwortlich.</p>
-    </div>
-  `;
+  d = snap.exists() ? snap.data() : {};
+  geladen = true;
 } catch(e) {
-  document.getElementById('imp-content').innerHTML = '<div class="block"><p style="color:var(--muted)">Impressum konnte nicht geladen werden. Bitte versuche es später erneut.</p></div>';
   console.error('Impressum laden:', e);
 }
+
+const name    = esc(d.name    || 'Christopher Korting');
+const inhaber = esc(d.inhaber || '');
+const strasse = esc(d.strasse || '');
+const plz     = esc(d.plz     || '');
+const ort     = esc(d.ort     || '');
+const tel     = esc(d.tel     || '');
+const email   = esc(d.email   || 'kontakt@fahrsync.de');
+const web     = esc(d.web     || 'fahrsync.de');
+// Die Steuernummer gehoert auf Rechnungen, nicht ins Impressum (§ 5 DDG
+// verlangt sie nicht; oeffentlich zeigen wird wegen Missbrauchsgefahr
+// abgeraten). Sie bleibt in der Datenbank und auf den Rechnungen erhalten.
+const wIdNr   = esc(d.wirtschaftsId || 'DE464533862');
+
+document.getElementById('imp-content').innerHTML = `
+  ${geladen ? '' : '<div class="block"><p style="color:var(--muted)">Die Anschrift konnte gerade nicht geladen werden – bitte Seite neu laden.</p></div>'}
+  <div class="block">
+    <h2>👤 Verantwortlich</h2>
+    <p>
+      <strong>${name}</strong><br>
+      ${inhaber ? inhaber + '<br>' : ''}
+      ${strasse ? strasse + '<br>' : ''}
+      ${(plz + ' ' + ort).trim()}
+    </p>
+  </div>
+  <div class="block">
+    <h2>📱 Kontakt</h2>
+    <p>
+      ${tel   ? '📞 ' + tel + '<br>' : ''}
+      ${email ? '✉️ <a href="mailto:'+email+'">'+email+'</a><br>' : ''}
+      ${web   ? '🌐 <a href="https://'+web+'">'+web+'</a>' : ''}
+    </p>
+  </div>
+  <div class="block">
+    <h2>🧾 Steuerliche Angaben</h2>
+    <p>Wirtschafts-Identifikationsnummer gem. § 5 DDG: ${wIdNr}</p>
+  </div>
+  <div class="block">
+    <h2>🔒 Datenschutz</h2>
+    <p>Informationen zur Verarbeitung personenbezogener Daten findest du in unserer <a href="./datenschutz.html">Datenschutzerklärung</a>.</p>
+  </div>
+  <div class="block">
+    <h2>⚖️ Haftungshinweis</h2>
+    <p style="color:var(--muted);font-size:0.85rem">Trotz sorgfältiger inhaltlicher Kontrolle übernehmen wir keine Haftung für die Inhalte externer Links. Für den Inhalt der verlinkten Seiten sind ausschließlich deren Betreiber verantwortlich.</p>
+  </div>
+`;
 </script>
 </body>
 </html>
