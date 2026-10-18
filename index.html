@@ -2517,7 +2517,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 <div class="screen" id="screen-impressum">
   <div class="header">
     <button class="btn-back" onclick="closeImpressum()">←</button>
-    <div><div class="header-title">Impressum</div><div class="header-sub">Angaben gemäß § 5 TMG</div></div>
+    <div><div class="header-title">Impressum</div><div class="header-sub">Angaben gemäß § 5 DDG</div></div>
     <div style="width:38px"></div>
   </div>
   <div class="detail-scroll" style="padding:20px 18px;display:flex;flex-direction:column;gap:20px" id="impressum-body">
@@ -10125,14 +10125,15 @@ window.openImpressum = async () => {
   // Gleich beim Auslesen entwerten: Die Werte gehen unten in Textinhalt UND
   // in Attribute (href="mailto:…", href="https://…"), die per Verkettung
   // zusammengesetzt werden. An der Quelle ist es eine Stelle statt acht.
-  const name    = escHtml(platImp.name    || 'Chriskoo');
+  const name    = escHtml(platImp.name    || 'Christopher Korting');
   const inhaber = escHtml(platImp.inhaber || '');
   const strasse = escHtml(platImp.strasse || '');
   const plz     = escHtml(platImp.plz    || '');
-  const ort     = escHtml(platImp.ort    || 'Deutschland');
+  const ort     = escHtml(platImp.ort    || '');
   const tel     = escHtml(platImp.tel || '');
   const email   = escHtml(platImp.email  || 'kontakt@fahrsync.de');
   const web     = escHtml(platImp.web    || 'fahrsync.de');
+  const wIdNr   = escHtml(platImp.wirtschaftsId || 'DE464533862-00001');
   const fsnr    = '';
 
   const logoHTML = fsLogo
@@ -10153,7 +10154,7 @@ window.openImpressum = async () => {
           <strong>${name}</strong><br>
           ${inhaber ? inhaber + '<br>' : ''}
           ${strasse ? strasse + '<br>' : ''}
-          ${(plz || ort) ? (plz + ' ' + ort).trim() : ''}
+          ${(plz + ' ' + ort).trim()}
         </div>
       </div>
     </div>
@@ -10166,6 +10167,15 @@ window.openImpressum = async () => {
           ${email ? '✉️ <a href="mailto:'+email+'" style="color:var(--accent);text-decoration:none">'+email+'</a><br>' : ''}
           ${web   ? '🌐 <a href="https://'+web+'" style="color:var(--accent);text-decoration:none">'+web+'</a>' : ''}
           ${!tel&&!email&&!web ? 'Keine Kontaktdaten hinterlegt.' : ''}
+        </div>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <div class="section-header"><div class="section-title">🧾 Steuerliche Angaben</div></div>
+      <div class="section-body">
+        <div style="font-size:0.9rem;line-height:1.8;color:var(--muted)">
+          Wirtschafts-Identifikationsnummer gem. § 5 DDG: ${wIdNr}
         </div>
       </div>
     </div>

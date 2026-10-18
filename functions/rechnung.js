@@ -98,7 +98,7 @@ async function rechnungsSteller() {
   const platDoc = await getFirestore().doc('platform/impressum').get();
   const p = platDoc.exists ? platDoc.data() : {};
   return {
-    name: p.name || 'Chriskoo', strasse: p.strasse || '',
+    name: p.name || 'Christopher Korting', strasse: p.strasse || '',
     plz: p.plz || '', ort: p.ort || '',
     email: p.email || 'kontakt@fahrsync.de', web: p.web || 'fahrsync.de',
     steuernummer: p.steuernummer || '050/240/09485',
