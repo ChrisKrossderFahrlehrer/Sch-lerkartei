@@ -147,11 +147,21 @@ jobs:
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/dienstkonto.json
         run: |
-          ./tests/node_modules/.bin/firebase deploy \
+          konto=$(node -e 'try{console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).client_email||"?")}catch(e){console.log("?")}' "$GOOGLE_APPLICATION_CREDENTIALS")
+          echo "Dienstkonto: $konto"
+          if ! ./tests/node_modules/.bin/firebase deploy \
             --only "${{ steps.umfang.outputs.ziele }}" \
             --project fahrschule-ebc65 \
             --non-interactive \
-            --message "Automatisch nach ${{ github.sha }}"
+            --message "Automatisch nach ${{ github.sha }}"; then
+            # Die Firebase-CLI meldet oft nur "Failed to ...". Der eigentliche
+            # Grund (z. B. fehlende Berechtigung) steht in firebase-debug.log -
+            # nur die Fehlermeldungen daraus ausgeben, keine Anfragen.
+            echo "::group::Grund laut firebase-debug.log"
+            grep -hoE '"(message|status)": *"[^"]*"|HTTP Error: [0-9]+[^"]*' firebase-debug.log 2>/dev/null | sort -u | head -20 || true
+            echo "::endgroup::"
+            exit 1
+          fi
 
       - name: Schlüssel wieder entfernen
         if: always()
