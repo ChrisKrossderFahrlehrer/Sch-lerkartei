@@ -182,63 +182,149 @@ body.light {
   --shadow-md: 0 12px 30px rgba(16,24,40,0.10);
 }
 /* Schrift: Ueberschriften in Manrope statt Syne, ohne Versalien */
-.style-klar .header-title, .style-klar .app-title, .style-klar .stat-val, .style-klar .avatar,
-.style-klar .profile-name, .style-klar .stunden-big, .style-klar .s-val, .style-klar .sheet-title,
-.style-klar .dash-kpi-val, .style-klar .section-title, .style-klar .login-logo {
+:is(.style-klar,.style-glas) .header-title, :is(.style-klar,.style-glas) .app-title, :is(.style-klar,.style-glas) .stat-val, :is(.style-klar,.style-glas) .avatar,
+:is(.style-klar,.style-glas) .profile-name, :is(.style-klar,.style-glas) .stunden-big, :is(.style-klar,.style-glas) .s-val, :is(.style-klar,.style-glas) .sheet-title,
+:is(.style-klar,.style-glas) .dash-kpi-val, :is(.style-klar,.style-glas) .section-title, :is(.style-klar,.style-glas) .login-logo {
   font-family: 'Manrope', sans-serif; letter-spacing: -0.015em;
 }
-.style-klar .section-title { text-transform: none; font-size: 1rem; font-weight: 800; color: var(--text); letter-spacing: -0.01em; }
-.style-klar .header-title, .style-klar .sheet-title { font-weight: 800; }
+:is(.style-klar,.style-glas) .section-title { text-transform: none; font-size: 1rem; font-weight: 800; color: var(--text); letter-spacing: -0.01em; }
+:is(.style-klar,.style-glas) .header-title, :is(.style-klar,.style-glas) .sheet-title { font-weight: 800; }
 /* Karten: kein Rahmen, weicher Schatten, mehr Luft */
-.style-klar .section-block { border: none; border-radius: 22px; box-shadow: var(--shadow-sm); margin-bottom: 14px; }
-.style-klar .section-header { border-bottom: none; padding: 16px 18px 2px; }
-.style-klar .section-body { padding: 10px 18px 18px; }
-.style-klar .student-card {
+:is(.style-klar,.style-glas) .section-block { border: none; border-radius: 22px; box-shadow: var(--shadow-sm); margin-bottom: 14px; }
+:is(.style-klar,.style-glas) .section-header { border-bottom: none; padding: 16px 18px 2px; }
+:is(.style-klar,.style-glas) .section-body { padding: 10px 18px 18px; }
+:is(.style-klar,.style-glas) .student-card {
   background: var(--surface); border: 1px solid transparent; border-radius: 20px;
   box-shadow: var(--shadow-sm); padding: 14px 16px;
 }
-.style-klar .student-card:active { transform: scale(0.985); box-shadow: var(--shadow-sm); border-color: transparent; }
-@media (hover:hover) { .style-klar .student-card:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); border-color: transparent; } }
-.style-klar .stat-chip { border: none; background: var(--surface); box-shadow: var(--shadow-sm); border-radius: 14px; }
-.style-klar .stats-row { border-bottom: none; }
-.style-klar .modal-sheet { border-radius: 26px 26px 0 0; }
-.style-klar .login-box { border: none; border-radius: 26px; box-shadow: var(--shadow-md); }
+:is(.style-klar,.style-glas) .student-card:active { transform: scale(0.985); box-shadow: var(--shadow-sm); border-color: transparent; }
+@media (hover:hover) { :is(.style-klar,.style-glas) .student-card:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); border-color: transparent; } }
+:is(.style-klar,.style-glas) .stat-chip { border: none; background: var(--surface); box-shadow: var(--shadow-sm); border-radius: 14px; }
+:is(.style-klar,.style-glas) .stats-row { border-bottom: none; }
+:is(.style-klar,.style-glas) .modal-sheet { border-radius: 26px 26px 0 0; }
+:is(.style-klar,.style-glas) .login-box { border: none; border-radius: 26px; box-shadow: var(--shadow-md); }
 /* Kopfzeilen: Milchglas statt Flaeche mit Linie */
-.style-klar .header, .style-klar .list-header {
+:is(.style-klar,.style-glas) .header, :is(.style-klar,.style-glas) .list-header {
   background: color-mix(in srgb, var(--surface) 78%, transparent);
   -webkit-backdrop-filter: saturate(1.5) blur(16px); backdrop-filter: saturate(1.5) blur(16px);
   border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
 }
 /* Knoepfe: flach, ohne 3D-Kante; Druck = leichtes Verkleinern */
-.style-klar .btn-main, .style-klar .btn-sheet-ok {
+:is(.style-klar,.style-glas) .btn-main, :is(.style-klar,.style-glas) .btn-sheet-ok {
   background: var(--accent); box-shadow: none; border-radius: 14px; font-weight: 800;
 }
-.style-klar .btn-main:active, .style-klar .btn-sheet-ok:active { transform: scale(0.98); box-shadow: none; }
-.style-klar .btn-secondary, .style-klar .btn-sheet-cancel, .style-klar .btn-back, .style-klar .btn-icon-sm,
-.style-klar .scope-btn, .style-klar .klasse-choice-btn {
+:is(.style-klar,.style-glas) .btn-main:active, :is(.style-klar,.style-glas) .btn-sheet-ok:active { transform: scale(0.98); box-shadow: none; }
+:is(.style-klar,.style-glas) .btn-secondary, :is(.style-klar,.style-glas) .btn-sheet-cancel, :is(.style-klar,.style-glas) .btn-back, :is(.style-klar,.style-glas) .btn-icon-sm,
+:is(.style-klar,.style-glas) .scope-btn, :is(.style-klar,.style-glas) .klasse-choice-btn {
   box-shadow: none; border-color: transparent; background: var(--surface2); border-radius: 12px;
 }
-.style-klar .btn-back, .style-klar .btn-icon-sm { border-radius: 50%; }
-.style-klar .btn-secondary:active, .style-klar .btn-sheet-cancel:active, .style-klar .btn-back:active,
-.style-klar .btn-icon-sm:active, .style-klar .scope-btn:active, .style-klar .klasse-choice-btn:active {
+:is(.style-klar,.style-glas) .btn-back, :is(.style-klar,.style-glas) .btn-icon-sm { border-radius: 50%; }
+:is(.style-klar,.style-glas) .btn-secondary:active, :is(.style-klar,.style-glas) .btn-sheet-cancel:active, :is(.style-klar,.style-glas) .btn-back:active,
+:is(.style-klar,.style-glas) .btn-icon-sm:active, :is(.style-klar,.style-glas) .scope-btn:active, :is(.style-klar,.style-glas) .klasse-choice-btn:active {
   transform: scale(0.96); box-shadow: none;
 }
-.style-klar .scope-btn.active { border-color: var(--accent); }
-.style-klar .step-btn, .style-klar .s-btn { border-color: transparent; }
-.style-klar .fab { background: var(--accent); box-shadow: 0 10px 28px rgba(0,0,0,0.35); }
+:is(.style-klar,.style-glas) .scope-btn.active { border-color: var(--accent); }
+:is(.style-klar,.style-glas) .step-btn, :is(.style-klar,.style-glas) .s-btn { border-color: transparent; }
+:is(.style-klar,.style-glas) .fab { background: var(--accent); box-shadow: 0 10px 28px rgba(0,0,0,0.35); }
 /* Filter und Suche */
-.style-klar .filter-chip { background: var(--surface); border-color: transparent; box-shadow: none; }
-.style-klar .filter-chip.active { background: var(--accent); box-shadow: none; }
-.style-klar .search-input { background: var(--surface); border-color: transparent; box-shadow: none; border-radius: 14px; }
-.style-klar .search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
-.style-klar .form-input { border-color: transparent; border-radius: 12px; }
-.style-klar .form-input:focus { border-color: var(--accent); }
-.style-klar .tabs { border-radius: 12px; }
+:is(.style-klar,.style-glas) .filter-chip { background: var(--surface); border-color: transparent; box-shadow: none; }
+:is(.style-klar,.style-glas) .filter-chip.active { background: var(--accent); box-shadow: none; }
+:is(.style-klar,.style-glas) .search-input { background: var(--surface); border-color: transparent; box-shadow: none; border-radius: 14px; }
+:is(.style-klar,.style-glas) .search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+:is(.style-klar,.style-glas) .form-input { border-color: transparent; border-radius: 12px; }
+:is(.style-klar,.style-glas) .form-input:focus { border-color: var(--accent); }
+:is(.style-klar,.style-glas) .tabs { border-radius: 12px; }
 /* Ueberschriften, die die alte Schrift direkt im Element tragen (auch die
    per JavaScript erzeugten) - ohne jede Stelle einzeln anzufassen */
-.style-klar [style*="Syne"] { font-family: 'Manrope', sans-serif !important; letter-spacing: -0.015em !important; }
-.style-klar [style*="Syne"][style*="uppercase"] { text-transform: none !important; letter-spacing: -0.005em !important; font-size: 0.95rem !important; color: var(--text) !important; }
-.style-klar .abc-header { font-family: 'Manrope', sans-serif; text-transform: none; letter-spacing: 0; font-size: 0.85rem; font-weight: 800; }
+:is(.style-klar,.style-glas) [style*="Syne"] { font-family: 'Manrope', sans-serif !important; letter-spacing: -0.015em !important; }
+:is(.style-klar,.style-glas) [style*="Syne"][style*="uppercase"] { text-transform: none !important; letter-spacing: -0.005em !important; font-size: 0.95rem !important; color: var(--text) !important; }
+:is(.style-klar,.style-glas) .abc-header { font-family: 'Manrope', sans-serif; text-transform: none; letter-spacing: 0; font-size: 0.85rem; font-weight: 800; }
+/* Stil "Glas" - angelehnt an Apples "Liquid Glass" (iOS 26): Flaechen
+   aus durchscheinendem Glas mit Lichtkante oben, farbiger Hintergrund
+   schimmert durch. Uebernimmt den Aufbau von "Klar" (flache Knoepfe,
+   Schrift, Abstaende - siehe :is(.style-klar,.style-glas) oben) und
+   aendert nur das Material.
+   Leistung: Echte Unschaerfe (backdrop-filter) nur dort, wo Inhalt
+   darunter durchlaeuft - Kopfzeilen, Fenster, Plus-Knopf, Buchstaben-
+   Leiste. Karten sind nur durchscheinend: Der Hintergrund ist ein weicher
+   Verlauf, Unschaerfe saehe dort gleich aus und kostete auf aelteren
+   Handys bei langen Listen spuerbar Akku und Fluessigkeit.
+   Funktioniert auch in Safari (-webkit-backdrop-filter). */
+.style-glas {
+  --bg: rgba(8,10,16,0.35);
+  --surface: rgba(255,255,255,0.075);
+  --surface2: rgba(255,255,255,0.11);
+  --border: rgba(255,255,255,0.16);
+  --text: #f3f5f9;
+  --muted: rgba(228,234,245,0.66);
+  --radius: 22px;
+  --glas-licht: inset 0 1px 0 rgba(255,255,255,0.30), inset 0 -1px 0 rgba(255,255,255,0.06);
+  --shadow-sm: var(--glas-licht), 0 10px 30px rgba(0,0,0,0.30);
+  --shadow-md: var(--glas-licht), 0 16px 40px rgba(0,0,0,0.40);
+}
+body.style-glas {
+  background:
+    radial-gradient(60% 42% at 12% 8%, rgba(240,180,41,0.38), transparent 62%),
+    radial-gradient(55% 40% at 92% 30%, rgba(88,166,255,0.32), transparent 62%),
+    radial-gradient(65% 48% at 35% 96%, rgba(163,113,247,0.30), transparent 62%),
+    #06080c;
+  background-attachment: fixed;
+}
+.style-glas.light {
+  --bg: rgba(255,255,255,0.35);
+  --surface: rgba(255,255,255,0.55);
+  --surface2: rgba(255,255,255,0.70);
+  --border: rgba(255,255,255,0.75);
+  --text: #11141a;
+  --muted: rgba(30,36,48,0.62);
+  --glas-licht: inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -1px 0 rgba(255,255,255,0.35);
+  --shadow-sm: var(--glas-licht), 0 8px 24px rgba(30,40,70,0.10);
+  --shadow-md: var(--glas-licht), 0 14px 34px rgba(30,40,70,0.16);
+}
+body.style-glas.light {
+  background:
+    radial-gradient(60% 42% at 12% 8%, rgba(240,180,41,0.45), transparent 62%),
+    radial-gradient(55% 40% at 92% 30%, rgba(88,166,255,0.40), transparent 62%),
+    radial-gradient(65% 48% at 35% 96%, rgba(163,113,247,0.32), transparent 62%),
+    #eef1f7;
+  background-attachment: fixed;
+}
+/* Glasflaechen: Verlauf von hell oben-links nach transparent, Lichtkante */
+.style-glas .section-block, .style-glas .student-card, .style-glas .stat-chip,
+.style-glas .login-box, .style-glas .dash-kpi {
+  background: linear-gradient(140deg, rgba(255,255,255,0.13), rgba(255,255,255,0.035) 60%);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+.style-glas.light .section-block, .style-glas.light .student-card, .style-glas.light .stat-chip,
+.style-glas.light .login-box, .style-glas.light .dash-kpi {
+  background: linear-gradient(140deg, rgba(255,255,255,0.80), rgba(255,255,255,0.45) 60%);
+}
+/* Echte Unschaerfe nur, wo Inhalt darunter durchlaeuft */
+.style-glas .header, .style-glas .list-header, .style-glas .modal-sheet, .style-glas .abc-header {
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8); backdrop-filter: blur(24px) saturate(1.8);
+  border-color: var(--border);
+}
+.style-glas .modal-sheet { box-shadow: var(--glas-licht), 0 -10px 40px rgba(0,0,0,0.35); background: color-mix(in srgb, #10131a 62%, transparent); }
+.style-glas.light .modal-sheet { background: rgba(255,255,255,0.72); }
+.style-glas .modal-overlay { background: rgba(0,0,0,0.30); }
+.style-glas .profile-strip { background: transparent; }
+/* Knoepfe: Glas mit Lichtkante; Haupt-Knopf bleibt Gold, bekommt Glanz */
+.style-glas .btn-secondary, .style-glas .btn-sheet-cancel, .style-glas .btn-back, .style-glas .btn-icon-sm,
+.style-glas .scope-btn, .style-glas .klasse-choice-btn, .style-glas .filter-chip, .style-glas .search-input {
+  background: rgba(255,255,255,0.10); border: 1px solid var(--border); box-shadow: var(--glas-licht);
+}
+.style-glas.light .btn-secondary, .style-glas.light .btn-sheet-cancel, .style-glas.light .btn-back, .style-glas.light .btn-icon-sm,
+.style-glas.light .scope-btn, .style-glas.light .klasse-choice-btn, .style-glas.light .filter-chip, .style-glas.light .search-input {
+  background: rgba(255,255,255,0.62);
+}
+.style-glas .btn-main, .style-glas .btn-sheet-ok, .style-glas .filter-chip.active, .style-glas .fab {
+  background: linear-gradient(180deg, rgba(255,255,255,0.35), rgba(255,255,255,0) 55%), var(--accent);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), 0 8px 24px color-mix(in srgb, var(--accent) 35%, transparent);
+  border: 1px solid rgba(255,255,255,0.35);
+}
+.style-glas .fab { -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 html,body { height:100%; overflow:hidden; -webkit-text-size-adjust:100%; text-size-adjust:100%; }
 body { font-family:'Manrope',sans-serif; background:var(--bg); color:var(--text); display:flex; flex-direction:column; }
@@ -11770,6 +11856,7 @@ const STILE = [
   { id: 'style-neumorph',name: 'Neumorphism',   beschreibung: 'Weich, wie aus einem Guss, kaum Kanten.' },
   { id: 'style-editorial',name:'Editorial',     beschreibung: 'Ruhig und gleichmaessig: Papier, Haarlinie, Schrift.', punkt: '4px' },
   { id: 'style-klar',    name: 'Klar',          beschreibung: 'Zeitgemäß und ruhig: flache Knöpfe, klare Schrift, weiche Karten.' },
+  { id: 'style-glas',    name: 'Glas',          beschreibung: 'Wie Apples Liquid Glass: durchscheinende Flächen, Lichtkanten, farbiger Hintergrund.' },
 ];
 
 function previewKachel(stil) {
