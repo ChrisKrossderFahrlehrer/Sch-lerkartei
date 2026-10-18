@@ -277,7 +277,7 @@ exports.trennKalenderVerbindung = onCall({ region: 'europe-west3' }, async (reqC
 // wechsel eine Rechnung - spaetere automatische Verlaengerungen ueber
 // PayPal loesen aktuell KEINE neue Rechnung aus. Fuer laufende monatliche
 // Rechnungen braeuchte es zusaetzlich einen PayPal-Webhook.
-const { rechnungAnlegen, RECHNUNG_PLANS, abrechnungsZiel } = require('./rechnung');
+const { rechnungAnlegen, RECHNUNG_PLANS, abrechnungsZiel, rechnungsBeschreibung } = require('./rechnung');
 // Gekuendigte Abos: 14 Tage Nachlauf, dann 'free' - siehe functions/abo.js.
 const { kuendigungVormerken, kuendigungAufheben, abgelaufeneAbosBeenden,
         KUENDIGUNG_ENTFERNEN } = require('./abo');
@@ -481,10 +481,16 @@ async function stripeAboAktivierenUndRechnung(session, stripeEventId, zahlungsar
     return;
   }
 
-  const betrag = planer === '1' ? planInfo.pricePlaner : planInfo.price;
+  // Betrag = was Stripe wirklich eingezogen hat (amount_total, in Cent).
+  // Bei "Unbegrenzt" ist das waehrend der Testphase nur die Einrichtungs-
+  // gebuehr, nicht der Monatspreis.
+  const monatspreis = planer === '1' ? planInfo.pricePlaner : planInfo.price;
+  const einrichtung = planer === '1' ? planInfo.setupPlaner : planInfo.setup;
+  const betrag = session.amount_total / 100;
   const nummer = await rechnungAnlegen({
     billingId, empfaengerName: b.name || 'Kunde', b, plan,
     planer: planer === '1', planInfo, betrag, zahlungsart,
+    beschreibung: rechnungsBeschreibung(planInfo.label, betrag, monatspreis, einrichtung),
     docId: `stripe_${session.id}`,
     referenzFelder: { stripeSessionId: session.id },
     herkunft: 'stripeWebhook',
@@ -592,7 +598,8 @@ exports.stripeWebhook = onRequest(
         await stripeVerlaengerungsRechnung(event.data.object, event.id);
       } else if (event.type === 'customer.subscription.deleted') {
         // Abo beendet (sofort gekuendigt, oder Ende nach gescheiterten
-        // Zahlungen). 14 Tage Nachlauf, dann 'free' (functions/abo.js).
+        // Zahlungen). Der bezahlte Zeitraum ist damit vorbei - 14 Tage
+        // Nachlauf, dann 'free' (functions/abo.js).
         const r = await kuendigungVormerken(getFirestore(), event.data.object.id, Date.now(), 'stripe');
         console.log('stripeWebhook: Abo beendet', event.data.object.id, r.ergebnis);
       } else if (event.type === 'customer.subscription.updated') {
@@ -609,7 +616,13 @@ exports.stripeWebhook = onRequest(
             ('cancel_at_period_end' in vorher ? vorher.cancel_at_period_end : abo.cancel_at_period_end) ||
             ('cancel_at' in vorher ? vorher.cancel_at : abo.cancel_at));
           if (jetztGekuendigt && !warGekuendigt) {
-            const r = await kuendigungVormerken(getFirestore(), abo.id, Date.now(), 'stripe');
+            // Bis wann ist bezahlt (oder laeuft die Testphase)? cancel_at ist
+            // bei "zum Periodenende kuendigen" genau dieses Ende. Seit der
+            // API-Version 2025-03-31 steht current_period_end nicht mehr am
+            // Abo, sondern an den Positionen - beide Formen lesen.
+            const posten = (abo.items && abo.items.data && abo.items.data[0]) || {};
+            const bisSek = abo.cancel_at || abo.current_period_end || posten.current_period_end || abo.trial_end || 0;
+            const r = await kuendigungVormerken(getFirestore(), abo.id, Date.now(), 'stripe', bisSek * 1000);
             console.log('stripeWebhook: Kuendigung vorgemerkt', abo.id, r.ergebnis);
           } else if (!jetztGekuendigt && warGekuendigt) {
             const r = await kuendigungAufheben(getFirestore(), abo.id);
@@ -917,10 +930,13 @@ exports.paypalWebhook = onRequest(
           res.status(200).send('ok - keine Rechnungsadresse hinterlegt'); return;
         }
 
-        const betrag = betragBezahlt || (billingData.aboPlaner ? planInfo.pricePlaner : planInfo.price);
+        const monatspreis = billingData.aboPlaner ? planInfo.pricePlaner : planInfo.price;
+        const einrichtung = billingData.aboPlaner ? planInfo.setupPlaner : planInfo.setup;
+        const betrag = betragBezahlt || monatspreis;
         const nummer = await rechnungAnlegen({
           billingId, empfaengerName: billingData.name || 'Kunde', b: billingData,
           plan: billingData.abo, planer: !!billingData.aboPlaner, planInfo, betrag,
+          beschreibung: rechnungsBeschreibung(planInfo.label, betrag, monatspreis, einrichtung),
           zahlungsart: 'PayPal',
           docId: `paypal_${saleId}`,
           referenzFelder: { paypalSaleId: saleId, paypalSubscriptionId: subscriptionId },
@@ -936,8 +952,12 @@ exports.paypalWebhook = onRequest(
         // gescheiterter Zahlungen ausgesetzt, oder abgelaufen: 14 Tage
         // Nachlauf, dann 'free' (functions/abo.js). Bisher kam davon nichts
         // an - der bezahlte Tarif blieb fuer immer stehen.
-        const subId = (event.resource || {}).id;
-        const r = await kuendigungVormerken(getFirestore(), subId, Date.now(), 'paypal:' + event.event_type);
+        // Bis wann ist bezahlt? PayPal nennt den naechsten Abbuchungstermin
+        // (= Ende des laufenden Zeitraums), soweit noch vorhanden.
+        const abo = event.resource || {};
+        const subId = abo.id;
+        const naechste = Date.parse(((abo.billing_info || {}).next_billing_time) || '') || null;
+        const r = await kuendigungVormerken(getFirestore(), subId, Date.now(), 'paypal:' + event.event_type, naechste);
         console.log('paypalWebhook:', event.event_type, subId, r.ergebnis);
       } else if (['BILLING.SUBSCRIPTION.ACTIVATED', 'BILLING.SUBSCRIPTION.RE-ACTIVATED'].includes(event.event_type)) {
         // Wieder aktiviert (z.B. nach Aussetzung): Vormerkung aufheben -

@@ -36,7 +36,7 @@ const { getFirestore } = ausFunctions('firebase-admin/firestore');
 initializeApp({ projectId: 'fahrsync-rechnung' });
 const db = getFirestore();
 
-const { rechnungAnlegen } = require(join(hier, '..', 'functions', 'rechnung.js'));
+const { rechnungAnlegen, rechnungsBeschreibung } = require(join(hier, '..', 'functions', 'rechnung.js'));
 
 let bestanden = 0, fehlgeschlagen = 0;
 async function pruefe(beschreibung, fn) {
@@ -116,6 +116,21 @@ await pruefe('Alle vergebenen Nummern sind eindeutig und lueckenlos', async () =
     }
   }
   console.log('      vergeben:', nummern.join(', '));
+});
+
+console.log('\nRECHNUNGSTEXT PASST ZUR ZAHLUNG');
+// Bei "Unbegrenzt" zieht Stripe beim Abschluss nur die Einrichtungsgebuehr
+// ein (Monatspreis erst nach der Testphase). Die Rechnung muss das sagen.
+await pruefe('Nur Einrichtungsgebuehr bezahlt -> "einmalige Einrichtungsgebühr"', async () => {
+  gleich(rechnungsBeschreibung('Unbegrenzt', 42.99, 34.99, 42.99), 'Unbegrenzt – einmalige Einrichtungsgebühr', 'Text');
+});
+await pruefe('Gebuehr und Monat zusammen -> beides genannt', async () => {
+  gleich(rechnungsBeschreibung('Unbegrenzt', 77.98, 34.99, 42.99),
+    'Unbegrenzt – einmalige Einrichtungsgebühr und monatliches Abonnement', 'Text');
+});
+await pruefe('Normale Monatszahlung -> "monatliches Abonnement"', async () => {
+  gleich(rechnungsBeschreibung('Solo', 9.99, 9.99, undefined), 'Solo – monatliches Abonnement', 'Text');
+  gleich(rechnungsBeschreibung('Unbegrenzt', 34.99, 34.99, 42.99), 'Unbegrenzt – monatliches Abonnement', 'Text');
 });
 
 console.log(`\n${bestanden} bestanden, ${fehlgeschlagen} fehlgeschlagen\n`);

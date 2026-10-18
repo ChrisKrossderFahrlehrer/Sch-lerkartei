@@ -36,7 +36,7 @@ const PAYPAL_PLAN_IDS = {
   unbegrenzt: { id: 'P-22Y05276M00023207NJFE4ZA', idPlaner: 'P-4SF532859T7264908NJFE5PQ', maxLehrer: null },
 };
 
-function baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel, betrag, zahlungsart }) {
+function baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel, betrag, zahlungsart, beschreibung }) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 56 });
     const chunks = [];
@@ -74,7 +74,7 @@ function baueRechnungsPdf({ nummer, datum, steller, empfaenger, planLabel, betra
     doc.moveTo(56, top + 16).lineTo(539, top + 16).strokeColor('#ccc').stroke();
 
     const rowY = top + 26;
-    doc.text(`${planLabel} – monatliches Abonnement`, 56, rowY, { width: 300 });
+    doc.text(beschreibung || `${planLabel} – monatliches Abonnement`, 56, rowY, { width: 300 });
     doc.text(`${betrag.toFixed(2).replace('.', ',')} €`, 400, rowY, { width: 140, align: 'right' });
     doc.moveTo(56, rowY + 20).lineTo(539, rowY + 20).strokeColor('#ccc').stroke();
 
@@ -128,7 +128,7 @@ const RECHNUNG_LAENDER = { DE: '', AT: 'Österreich', CH: 'Schweiz', XX: '' };
 // gebaut; das kostet Rechenzeit, aber nie eine Nummer.
 async function rechnungAnlegen({
   billingId, empfaengerName, b, plan, planer, planInfo,
-  betrag, zahlungsart, docId, referenzFelder, herkunft,
+  betrag, zahlungsart, docId, referenzFelder, herkunft, beschreibung,
 }) {
   const db = getFirestore();
   const counterRef = db.doc('platform/rechnungszaehler');
@@ -155,7 +155,7 @@ async function rechnungAnlegen({
 
     const datum = new Date().toLocaleDateString('de-DE');
     const pdfBuffer = await baueRechnungsPdf({
-      nummer, datum, steller, empfaenger, planLabel: planInfo.label, betrag, zahlungsart,
+      nummer, datum, steller, empfaenger, planLabel: planInfo.label, betrag, zahlungsart, beschreibung,
     });
 
     // Jetzt schreiben: Zaehler und Rechnung gehen gemeinsam durch oder gar nicht.
@@ -163,11 +163,27 @@ async function rechnungAnlegen({
     tx.create(rechnungRef, {
       nummer, empfaengerId: billingId, empfaengerName: empfaenger.name,
       plan, planer: !!planer, betrag, datum, erstelltAm: Date.now(),
+      ...(beschreibung ? { beschreibung } : {}),
       pdfBase64: pdfBuffer.toString('base64'),
       ...referenzFelder,
     });
     return nummer;
   });
+}
+
+// Was steht auf der Rechnung? Die Rechnung muss zur tatsaechlichen Zahlung
+// passen. Bei "Unbegrenzt" zieht Stripe beim Abschluss NUR die einmalige
+// Einrichtungsgebuehr ein (der Monatspreis beginnt erst nach der
+// Testphase); bisher stand auf dieser Rechnung trotzdem "monatliches
+// Abonnement" ueber den Monatspreis - Betrag und Text passten nicht zur
+// Abbuchung. Gilt genauso, wenn PayPal die Gebuehr als eigene Zahlung meldet.
+function rechnungsBeschreibung(label, betrag, monatspreis, einrichtung) {
+  const gleich = (a, b) => Math.abs(Number(a) - Number(b)) < 0.005;
+  if (einrichtung && gleich(betrag, einrichtung)) return `${label} – einmalige Einrichtungsgebühr`;
+  if (einrichtung && gleich(betrag, Number(einrichtung) + Number(monatspreis))) {
+    return `${label} – einmalige Einrichtungsgebühr und monatliches Abonnement`;
+  }
+  return `${label} – monatliches Abonnement`;
 }
 
 // Wer bezahlt fuer dieses Konto, und wo liegen Rechnungsadresse und Abo?
@@ -193,4 +209,4 @@ function abrechnungsZiel(userData, uid) {
   return null;
 }
 
-module.exports = { rechnungAnlegen, baueRechnungsPdf, rechnungsSteller, RECHNUNG_PLANS, abrechnungsZiel };
+module.exports = { rechnungAnlegen, baueRechnungsPdf, rechnungsSteller, RECHNUNG_PLANS, abrechnungsZiel, rechnungsBeschreibung };
