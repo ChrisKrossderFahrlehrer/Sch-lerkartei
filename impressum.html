@@ -85,7 +85,7 @@ const web     = esc(d.web     || 'fahrsync.de');
 // Die Steuernummer gehoert auf Rechnungen, nicht ins Impressum (§ 5 DDG
 // verlangt sie nicht; oeffentlich zeigen wird wegen Missbrauchsgefahr
 // abgeraten). Sie bleibt in der Datenbank und auf den Rechnungen erhalten.
-const wIdNr   = esc(d.wirtschaftsId || 'DE464533862');
+const wIdNr   = esc(d.wirtschaftsId || 'DE464533862-00001');
 
 document.getElementById('imp-content').innerHTML = `
   ${geladen ? '' : '<div class="block"><p style="color:var(--muted)">Die Anschrift konnte gerade nicht geladen werden – bitte Seite neu laden.</p></div>'}
