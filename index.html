@@ -5692,7 +5692,7 @@ window.renderList = () => {
     list.innerHTML=`<div class="empty-state"><div class="ei">🚗</div><p>Noch keine Schüler angelegt.<br>Tippe auf <strong>+ Neu</strong>, um zu starten.</p></div>`; return;
   }
   if (!filtered.length) {
-    const msg = activeFilter === 'archiv' ? 'Das Archiv ist leer.<br>Hier landen Schüler mit bestandener Prüfung und gelöschte Schüler.' : 'Keine Schüler für diesen Filter.';
+    const msg = activeFilter === 'archiv' ? `Das Archiv ist leer.<br>Hier landen Schüler mit bestandener Prüfung und gelöschte Schüler.<br>Gelöschte werden nach ${PAPIERKORB_TAGE} Tagen endgültig gelöscht.` : 'Keine Schüler für diesen Filter.';
     list.innerHTML=`<div class="empty-state"><div class="ei">${activeFilter==='archiv'?'📦':'🔍'}</div><p>${msg}</p></div>`; return;
   }
 
@@ -5706,7 +5706,12 @@ window.renderList = () => {
         ${hinweis ? `<div style="font-size:0.74rem;color:var(--muted);margin:0 0 8px;line-height:1.45">${hinweis}</div>` : ''}
         ${liste.map(s => renderStudentCard(s)).join('')}
       </div>` : '';
-    list.innerHTML = block('🎓 Fertig', fertig, '')
+    // Immer sichtbar, auch wenn (noch) niemand gelöscht wurde.
+    const info = `<div style="display:flex;gap:10px;align-items:flex-start;background:rgba(88,166,255,0.08);border:1px solid rgba(88,166,255,0.3);border-radius:12px;padding:12px 14px;margin:4px 0 14px;font-size:0.8rem;line-height:1.5;color:var(--text)">
+        <span style="font-size:1.1rem">ℹ️</span>
+        <span>Gelöschte Schüler werden <strong>nach ${PAPIERKORB_TAGE} Tagen automatisch endgültig gelöscht</strong> – samt Protokoll, Chat und Fotos. Bis dahin kannst du sie in ihrer Kartei mit „↩️ Wiederherstellen" zurückholen. Schüler mit bestandener Prüfung bleiben dauerhaft im Archiv.</span>
+      </div>`;
+    list.innerHTML = info + block('🎓 Fertig', fertig, '')
       + block('🗑️ Gelöscht', geloescht, `Wiederherstellbar bis zum angezeigten Datum, danach endgültig gelöscht.`);
     renderAbcBar([]);
     return;
@@ -6444,7 +6449,7 @@ function renderDetail() {
     banner.style.display = 'none';
     gBanner.style.display = 'flex';
     document.getElementById('geloescht-banner-text').textContent =
-      `🗑️ Gelöscht – wird am ${new Date(endgueltigLoeschenAm(s)).toLocaleDateString('de-DE')} endgültig entfernt. Portal-Zugang gesperrt.`;
+      `🗑️ Gelöscht – wird ${PAPIERKORB_TAGE} Tage nach dem Löschen, am ${new Date(endgueltigLoeschenAm(s)).toLocaleDateString('de-DE')}, endgültig entfernt. Portal-Zugang gesperrt.`;
     document.getElementById('detail-header-sub').textContent = '🗑️ Gelöscht';
   } else if (s.archiviert) {
     gBanner.style.display = 'none';
