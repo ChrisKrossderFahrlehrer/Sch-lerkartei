@@ -1789,7 +1789,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 
       <strong style="color:var(--text)">7. Speicherdauer und Löschung</strong><br>
       Daten werden gespeichert, solange das Nutzungsverhältnis besteht. Sie können die Löschung Ihres Kontos jederzeit selbst in der App auslösen (Einstellungen → „Konto und alle Daten löschen"). Nach der Beantragung läuft eine Frist von 30 Tagen, innerhalb derer die Löschung zurückgenommen werden kann; danach werden sämtliche Konto- und Schülerdaten durch einen automatisch laufenden Löschvorgang unwiderruflich entfernt – einschließlich Chatverlauf, Chat-Bildern, Zugangscodes und Terminen.<br><br>
-      Löscht ein Fahrlehrer einzelne Schüler, werden diese zunächst für 30 Tage in das Archiv der App verschoben (Bereich „Gelöscht“) und können in dieser Zeit wiederhergestellt werden; der Zugang zum Schüler-Portal wird sofort gesperrt. Nach Ablauf der 30 Tage oder auf ausdrücklichen Wunsch („Endgültig löschen“) werden Kartei, Protokoll, Chatverlauf und Chat-Bilder unwiderruflich entfernt.<br><br>
+      Löscht ein Fahrlehrer einzelne Schüler, werden diese zunächst für 90 Tage in das Archiv der App verschoben (Bereich „Gelöscht“) und können in dieser Zeit wiederhergestellt werden; der Zugang zum Schüler-Portal wird sofort gesperrt. Nach Ablauf der 90 Tage oder auf ausdrücklichen Wunsch („Endgültig löschen“) werden Kartei, Protokoll, Chatverlauf und Chat-Bilder unwiderruflich entfernt.<br><br>
       Unabhängig davon gelten folgende Aufbewahrungsgrenzen:<br>
       • Zugangscodes samt Chatverlauf und Chat-Bildern: spätestens 90 Tage nach Ablauf des Codes<br>
       • Passwort-Zurücksetzungsanfragen: 30 Tage<br>
@@ -2657,7 +2657,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       </div></div>
       <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
         <div style="font-weight:700;margin-bottom:3px">🗑️ Schüler löschen</div>
-        <div style="font-size:0.8rem;color:var(--muted)">Gelöschte Schüler landen im „📦 Archiv" unter „Gelöscht" und können dort 30 Tage lang wiederhergestellt werden. Danach werden sie samt Protokoll, Chat und Fotos endgültig gelöscht. Der Portal-Zugang wird sofort gesperrt.</div>
+        <div style="font-size:0.8rem;color:var(--muted)">Gelöschte Schüler landen im „📦 Archiv" unter „Gelöscht" und können dort 90 Tage lang wiederhergestellt werden. Danach werden sie samt Protokoll, Chat und Fotos endgültig gelöscht. Der Portal-Zugang wird sofort gesperrt.</div>
       </div></div>
       <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
         <div style="font-weight:700;margin-bottom:3px">🔄 Schüler übertragen</div>
@@ -7985,7 +7985,7 @@ let undoTimer = null;
 // löschen") läuft die bisherige vollständige Löschung (DSGVO Art. 17).
 // Der Portal-Zugang wird sofort gesperrt: Die Regeln lassen einen Schüler
 // an einen abgelaufenen Code nicht mehr heran.
-const PAPIERKORB_TAGE = 30;
+const PAPIERKORB_TAGE = 90;
 function istGeloescht(s) { return !!s && s.archivGrund === 'geloescht'; }
 function alleOhnePapierkorb() { return students.filter(s => !istGeloescht(s)); }
 function endgueltigLoeschenAm(s) { return (s.geloeschtAm || Date.now()) + PAPIERKORB_TAGE * 86400000; }

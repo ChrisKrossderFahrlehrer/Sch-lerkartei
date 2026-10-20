@@ -1062,7 +1062,7 @@ async function renderAnalytics() {
         getDocs(query(collection(db,'users'),       where('fahrschuleId','==',fs.id), where('rolle','==','fahrlehrer'))),
         getDocs(query(collection(db,'protokoll'),   where('fahrschuleId','==',fs.id))),
       ]);
-      // Gelöschte Schüler liegen 30 Tage im Papierkorb der App - nicht mitzählen.
+      // Gelöschte Schüler liegen 90 Tage im Papierkorb der App - nicht mitzählen.
       const schueler = schuelerSnap.docs.map(d => d.data()).filter(s => s.archivGrund !== 'geloescht');
       return {
         id: fs.id,
@@ -1094,7 +1094,7 @@ async function renderAnalytics() {
         getDocs(query(collection(db,'students'), where('fahrschuleId','==',l.id))),
         getDocs(query(collection(db,'protokoll'), where('fahrschuleId','==',l.id))),
       ]);
-      // Gelöschte Schüler liegen 30 Tage im Papierkorb der App - nicht mitzählen.
+      // Gelöschte Schüler liegen 90 Tage im Papierkorb der App - nicht mitzählen.
       const schueler = schuelerSnap.docs.map(d => d.data()).filter(s => s.archivGrund !== 'geloescht');
       return {
         id: l.id, name: l.name || 'Fahrlehrer', stadt: 'Eigenständig',
