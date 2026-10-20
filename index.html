@@ -1789,6 +1789,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 
       <strong style="color:var(--text)">7. Speicherdauer und Löschung</strong><br>
       Daten werden gespeichert, solange das Nutzungsverhältnis besteht. Sie können die Löschung Ihres Kontos jederzeit selbst in der App auslösen (Einstellungen → „Konto und alle Daten löschen"). Nach der Beantragung läuft eine Frist von 30 Tagen, innerhalb derer die Löschung zurückgenommen werden kann; danach werden sämtliche Konto- und Schülerdaten durch einen automatisch laufenden Löschvorgang unwiderruflich entfernt – einschließlich Chatverlauf, Chat-Bildern, Zugangscodes und Terminen.<br><br>
+      Löscht ein Fahrlehrer einzelne Schüler, werden diese zunächst für 90 Tage in das Archiv der App verschoben (Bereich „Gelöscht“) und können in dieser Zeit wiederhergestellt werden; der Zugang zum Schüler-Portal wird sofort gesperrt. Nach Ablauf der 90 Tage oder auf ausdrücklichen Wunsch („Endgültig löschen“) werden Kartei, Protokoll, Chatverlauf und Chat-Bilder unwiderruflich entfernt.<br><br>
       Unabhängig davon gelten folgende Aufbewahrungsgrenzen:<br>
       • Zugangscodes samt Chatverlauf und Chat-Bildern: spätestens 90 Tage nach Ablauf des Codes<br>
       • Passwort-Zurücksetzungsanfragen: 30 Tage<br>
@@ -1874,7 +1875,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       <button class="filter-chip"        data-filter="reif"    onclick="setFilter('reif')">🏆 Prüfungsreif</button>
       <button class="filter-chip"        data-filter="theorie" onclick="setFilter('theorie')">📋 Theorie offen</button>
       <button class="filter-chip"        data-filter="sonder"  onclick="setFilter('sonder')">⚠️ Pflichtf. offen</button>
-      <button class="filter-chip"        data-filter="archiv"  onclick="setFilter('archiv')">🎓 Archiv</button>
+      <button class="filter-chip"        data-filter="archiv"  onclick="setFilter('archiv')">📦 Archiv</button>
     </div>
   </div>
   <div id="broadcast-banner" style="display:none"></div>
@@ -1940,6 +1941,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
   <div id="pruefung-banner" style="display:none;background:rgba(63,185,80,0.12);border-bottom:1px solid rgba(63,185,80,0.3);padding:10px 18px;display:none;align-items:center;justify-content:space-between;gap:10px">
     <span style="font-size:0.82rem;color:var(--accent2);font-weight:600">🎓 Prüfung bestanden – Archiviert</span>
     <button onclick="unarchiveStudent()" style="font-size:0.75rem;background:none;border:1px solid var(--accent2);color:var(--accent2);border-radius:8px;padding:4px 10px;cursor:pointer">Rückgängig</button>
+  </div>
+  <div id="geloescht-banner" style="display:none;background:rgba(248,81,73,0.10);border-bottom:1px solid rgba(248,81,73,0.3);padding:10px 18px;align-items:center;justify-content:space-between;gap:10px">
+    <span style="font-size:0.8rem;color:var(--danger);font-weight:600;line-height:1.4" id="geloescht-banner-text">🗑️ Gelöscht</span>
+    <button onclick="wiederherstellenAktiv()" style="font-size:0.75rem;background:none;border:1px solid var(--danger);color:var(--danger);border-radius:8px;padding:4px 10px;cursor:pointer;white-space:nowrap">↩️ Wiederherstellen</button>
   </div>
   <div class="profile-strip" id="profile-strip"></div>
   <div class="detail-scroll" id="detail-body"></div>
@@ -2648,7 +2653,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       </div></div>
       <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
         <div style="font-weight:700;margin-bottom:3px">🎓 Prüfung bestanden</div>
-        <div style="font-size:0.8rem;color:var(--muted)">Großer grüner Button unten in der Kartei. Schüler wird archiviert und über Filter „🎓 Archiv" noch sichtbar.</div>
+        <div style="font-size:0.8rem;color:var(--muted)">Großer grüner Button unten in der Kartei. Schüler wird archiviert und über Filter „📦 Archiv" noch sichtbar.</div>
+      </div></div>
+      <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
+        <div style="font-weight:700;margin-bottom:3px">🗑️ Schüler löschen</div>
+        <div style="font-size:0.8rem;color:var(--muted)">Gelöschte Schüler landen im „📦 Archiv" unter „Gelöscht" und können dort 90 Tage lang wiederhergestellt werden. Danach werden sie samt Protokoll, Chat und Fotos endgültig gelöscht. Der Portal-Zugang wird sofort gesperrt.</div>
       </div></div>
       <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
         <div style="font-weight:700;margin-bottom:3px">🔄 Schüler übertragen</div>
@@ -5097,7 +5106,8 @@ function listenStudents() {
   function verarbeiteSchueler() {
     if (!window.__snapResyncKick && students.length) { window.__snapResyncKick = true;
       setTimeout(resyncPortalSnapshotsV2, 1200);
-      setTimeout(raeumeEntfernteThemenAuf, 2400); }
+      setTimeout(raeumeEntfernteThemenAuf, 2400);
+      setTimeout(() => raeumePapierkorbAuf().catch(e => console.warn('Papierkorb:', e)), 5000); }
     students.sort((a,b) => (a.nachname||'').localeCompare(b.nachname||''));
     renderList();
     if (activeId) renderDetail();
@@ -5667,9 +5677,11 @@ window.renderList = () => {
   }
 
   // stats
-  const total=students.length;
-  const active=students.filter(s=>(s.fahrstunden||0)>0).length;
-  const done=students.filter(s=>SONDERFAHRTEN.every(f=>(s.sonderfahrten||{})[f.key]>=f.min)).length;
+  // Gelöschte (Papierkorb im Archiv) zählen nicht mehr mit.
+  const sichtbar=students.filter(s=>!istGeloescht(s));
+  const total=sichtbar.length;
+  const active=sichtbar.filter(s=>(s.fahrstunden||0)>0).length;
+  const done=sichtbar.filter(s=>SONDERFAHRTEN.every(f=>(s.sonderfahrten||{})[f.key]>=f.min)).length;
   document.getElementById('stats-row').innerHTML=`
     <div class="stat-chip"><div class="stat-val">${total}</div><div class="stat-lbl">Schüler</div></div>
     <div class="stat-chip"><div class="stat-val">${active}</div><div class="stat-lbl">Aktiv</div></div>
@@ -5680,8 +5692,29 @@ window.renderList = () => {
     list.innerHTML=`<div class="empty-state"><div class="ei">🚗</div><p>Noch keine Schüler angelegt.<br>Tippe auf <strong>+ Neu</strong>, um zu starten.</p></div>`; return;
   }
   if (!filtered.length) {
-    const msg = activeFilter === 'archiv' ? 'Noch keine archivierten Schüler.' : 'Keine Schüler für diesen Filter.';
-    list.innerHTML=`<div class="empty-state"><div class="ei">${activeFilter==='archiv'?'🎓':'🔍'}</div><p>${msg}</p></div>`; return;
+    const msg = activeFilter === 'archiv' ? `Das Archiv ist leer.<br>Hier landen Schüler mit bestandener Prüfung und gelöschte Schüler.<br>Gelöschte werden nach ${PAPIERKORB_TAGE} Tagen endgültig gelöscht.` : 'Keine Schüler für diesen Filter.';
+    list.innerHTML=`<div class="empty-state"><div class="ei">${activeFilter==='archiv'?'📦':'🔍'}</div><p>${msg}</p></div>`; return;
+  }
+
+  // Archiv: zwei Bereiche statt ABC - Fertige oben, Gelöschte darunter
+  // (die zuletzt gelöschten zuerst, mit verbleibender Frist).
+  if (activeFilter === 'archiv') {
+    const fertig = applySingleSort(filtered.filter(s => !istGeloescht(s)));
+    const geloescht = filtered.filter(istGeloescht).sort((a,b) => (b.geloeschtAm||0) - (a.geloeschtAm||0));
+    const block = (titel, liste, hinweis) => liste.length ? `<div class="abc-group">
+        <div class="abc-header" style="display:flex;align-items:center;gap:6px">${titel} <span style="opacity:0.6;font-weight:600">(${liste.length})</span></div>
+        ${hinweis ? `<div style="font-size:0.74rem;color:var(--muted);margin:0 0 8px;line-height:1.45">${hinweis}</div>` : ''}
+        ${liste.map(s => renderStudentCard(s)).join('')}
+      </div>` : '';
+    // Immer sichtbar, auch wenn (noch) niemand gelöscht wurde.
+    const info = `<div style="display:flex;gap:10px;align-items:flex-start;background:rgba(88,166,255,0.08);border:1px solid rgba(88,166,255,0.3);border-radius:12px;padding:12px 14px;margin:4px 0 14px;font-size:0.8rem;line-height:1.5;color:var(--text)">
+        <span style="font-size:1.1rem">ℹ️</span>
+        <span>Gelöschte Schüler werden <strong>nach ${PAPIERKORB_TAGE} Tagen automatisch endgültig gelöscht</strong> – samt Protokoll, Chat und Fotos. Auf ihre Akte im Schüler-Portal haben sie ab dem Löschen <strong>keinen Zugriff mehr</strong>. Bis dahin kannst du sie in ihrer Kartei mit „↩️ Wiederherstellen" zurückholen. Schüler mit bestandener Prüfung bleiben dauerhaft im Archiv.</span>
+      </div>`;
+    list.innerHTML = info + block('🎓 Fertig', fertig, '')
+      + block('🗑️ Gelöscht', geloescht, `Wiederherstellbar bis zum angezeigten Datum, danach endgültig gelöscht.`);
+    renderAbcBar([]);
+    return;
   }
 
   // Sortierung anwenden (nach gewähltem Modus)
@@ -5741,7 +5774,9 @@ function renderStudentCard(s) {
   const ampelPunkt = ampelKarte.farbe === 'gruen' ? '🟢' : ampelKarte.farbe === 'gelb' ? '🟡' : '🔴';
   const ampelDot = `<span title="${escHtml(ampelKarte.text)}" style="font-size:0.7rem;margin-right:3px">${ampelPunkt}</span>`;
   const meta=['#'+getSchuelerNr(s), klasseLabel, a?a+' Jahre':null, (s.fahrstunden||0)+' Std.', s.theorieBestanden?'📋 Theorie ✓':null].filter(Boolean).join(' · ');
-  const badge = pct>=90?'<span class="badge badge-green">Prüfungsreif</span>':pct>=60?'<span class="badge badge-amber">Guter Fortschritt</span>':pct>0?'<span class="badge badge-blue">In Ausbildung</span>':'<span class="badge badge-gray">Neu</span>';
+  const badge = istGeloescht(s)?`<span class="badge badge-gray">🗑️ Endgültig am ${new Date(endgueltigLoeschenAm(s)).toLocaleDateString('de-DE')}</span>`
+    : s.archiviert?'<span class="badge badge-green">🎓 Fertig</span>':
+    pct>=90?'<span class="badge badge-green">Prüfungsreif</span>':pct>=60?'<span class="badge badge-amber">Guter Fortschritt</span>':pct>0?'<span class="badge badge-blue">In Ausbildung</span>':'<span class="badge badge-gray">Neu</span>';
 
   // 🔔 Ungelesene Nachrichten + Termin-Reaktionen
   const unread = teacherUnreadMap[s.id];
@@ -6404,15 +6439,24 @@ function renderDetail() {
       <div class="section-body">${renderCustomFields(s)}</div>
     </div>
     ${renderPruefungsversuche(s)}
-    <button class="delete-btn" onclick="deleteStudent()">🗑 Schüler löschen</button>
+    <button class="delete-btn" onclick="deleteStudent()">${istGeloescht(s) ? '🗑 Endgültig löschen' : '🗑 Schüler löschen'}</button>
     ${!s.archiviert ? `<button onclick="pruefungBestanden()" style="width:100%;margin:0 0 32px;padding:16px;background:var(--accent2);border:none;border-radius:var(--radius);color:#fff;font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;cursor:pointer;letter-spacing:0.02em">🎓 Prüfung bestanden!</button>` : ''}`;
 
   // Show/hide archive banner
   const banner = document.getElementById('pruefung-banner');
-  if (s.archiviert) {
+  const gBanner = document.getElementById('geloescht-banner');
+  if (istGeloescht(s)) {
+    banner.style.display = 'none';
+    gBanner.style.display = 'flex';
+    document.getElementById('geloescht-banner-text').textContent =
+      `🗑️ Gelöscht – wird ${PAPIERKORB_TAGE} Tage nach dem Löschen, am ${new Date(endgueltigLoeschenAm(s)).toLocaleDateString('de-DE')}, endgültig entfernt. Portal-Zugang gesperrt.`;
+    document.getElementById('detail-header-sub').textContent = '🗑️ Gelöscht';
+  } else if (s.archiviert) {
+    gBanner.style.display = 'none';
     banner.style.display = 'flex';
     document.getElementById('detail-header-sub').textContent = '🎓 Archiviert';
   } else {
+    gBanner.style.display = 'none';
     banner.style.display = 'none';
     document.getElementById('detail-header-sub').textContent = 'Schüler-Kartei';
   }
@@ -6895,7 +6939,7 @@ function renderCustomFields(s) {
 window.pruefungBestanden = async () => {
   const s = getStudent(activeId);
   if (!s) return;
-  if (!confirm(`${s.vorname} ${s.nachname} als „Prüfung bestanden" archivieren?\n\nSie werden aus der aktiven Liste entfernt und sind im 🎓 Archiv-Filter noch sichtbar.`)) return;
+  if (!confirm(`${s.vorname} ${s.nachname} als „Prüfung bestanden" archivieren?\n\nSie werden aus der aktiven Liste entfernt und sind im 📦 Archiv noch sichtbar.`)) return;
   try {
     await saveToFirestore(activeId, { archiviert: true, archiviertAm: Date.now() });
     toast(`🎓 ${s.vorname} ${s.nachname} – Herzlichen Glückwunsch!`);
@@ -7038,7 +7082,7 @@ async function syncProtokollSnapshot(studentId) {
     for (const cd of cs.docs) {
       await dbUpd(doc(db,'accessCodes',cd.id), {
         protokollSnapshot: _proto,
-        expiresAt: Date.now() + CODE_LAUFZEIT_MS
+        expiresAt: neueCodeLaufzeit(studentId)
       });
       n++;
     }
@@ -7598,7 +7642,7 @@ window.savePruefKommentar = async () => {
     await Promise.all(snap.docs.map(d =>
       dbUpd(doc(db,'accessCodes',d.id), {
         'studentSnapshot.pruefKommentar': pruefKommentar,
-        expiresAt: Date.now() + CODE_LAUFZEIT_MS
+        expiresAt: neueCodeLaufzeit(activeId)
       })
     ));
     toast('✓ Kommentar gespeichert – sofort für Schüler sichtbar');
@@ -7610,6 +7654,7 @@ window.savePruefKommentar = async () => {
 
 // ── Code-Gültigkeit manuell verlängern (Code bleibt gleich!) ──
 window.verlaengereCode = async () => {
+  if (istGeloescht(getStudent(activeId))) { toast('🗑️ Schüler ist gelöscht – erst wiederherstellen'); return; }
   try {
     const q    = query(collection(db,'accessCodes'), where('studentId','==',activeId), where('teacherUid','==',currentUser.uid));
     const snap = await getDocs(q);
@@ -7724,7 +7769,7 @@ window.sendTeacherMessage = async () => {
   };
   try {
     const newMsgs = [...(teacherChatData?.messages || []), msg].slice(-50);
-    await dbUpd(doc(db,'accessCodes',teacherChatDocId), { messages: newMsgs, expiresAt: Date.now() + CODE_LAUFZEIT_MS });
+    await dbUpd(doc(db,'accessCodes',teacherChatDocId), { messages: newMsgs, expiresAt: neueCodeLaufzeit(activeId) });
     teacherChatData = { ...teacherChatData, messages: newMsgs };
     renderTeacherChat();
     toast('✓ Nachricht gesendet');
@@ -7831,7 +7876,7 @@ window.savePlannedLesson = async () => {
     if (snap.empty) { toast('⚠️ Code nicht gefunden'); return; }
     const docRef   = snap.docs[0];
     const existing = docRef.data().plannedLessons || [];
-    await dbUpd(doc(db,'accessCodes',docRef.id), { plannedLessons: [...existing, newLesson], expiresAt: Date.now() + CODE_LAUFZEIT_MS });
+    await dbUpd(doc(db,'accessCodes',docRef.id), { plannedLessons: [...existing, newLesson], expiresAt: neueCodeLaufzeit(activeId) });
     document.getElementById('plan-lesson-modal').classList.remove('open');
     if (__planLessonVonCode) document.getElementById('code-modal').classList.add('open');
     const tag = datum.split('-').reverse().join('.');
@@ -7937,34 +7982,108 @@ function renderGamification(s, proto) {
 let zuletztGeloeschterStudent = null;
 let undoTimer = null;
 
+// ── PAPIERKORB IM ARCHIV ─────────────────────────────────────
+// "Löschen" entfernt einen Schüler nicht mehr sofort, sondern legt ihn ins
+// Archiv (Bereich "Gelöscht"). Dort bleibt er PAPIERKORB_TAGE lang samt
+// Protokoll, Chat und Fotos wiederherstellbar - ein versehentliches Löschen
+// war vorher nach einer Minute endgültig. Danach (oder per "Endgültig
+// löschen") läuft die bisherige vollständige Löschung (DSGVO Art. 17).
+// Der Portal-Zugang wird sofort gesperrt: Die Regeln lassen einen Schüler
+// an einen abgelaufenen Code nicht mehr heran.
+const PAPIERKORB_TAGE = 90;
+function istGeloescht(s) { return !!s && s.archivGrund === 'geloescht'; }
+function alleOhnePapierkorb() { return students.filter(s => !istGeloescht(s)); }
+function endgueltigLoeschenAm(s) { return (s.geloeschtAm || Date.now()) + PAPIERKORB_TAGE * 86400000; }
+// Neue Ablaufzeit fuer einen Portal-Code: Bei einem geloeschten Schueler
+// bleibt er gesperrt, auch wenn noch etwas an ihm gespeichert wird.
+function neueCodeLaufzeit(studentId) {
+  return istGeloescht(getStudent(studentId)) ? Date.now() : Date.now() + CODE_LAUFZEIT_MS;
+}
+
+async function setzePortalCodesAblauf(studentId, bis) {
+  try {
+    const snap = await getDocs(query(collection(db,'accessCodes'),
+      where('studentId','==',studentId), where('teacherUid','==',currentUser.uid)));
+    for (const d of snap.docs) await dbUpd(doc(db,'accessCodes',d.id), { expiresAt: bis });
+  } catch(e) { console.warn('Portal-Code Ablauf setzen:', e); }
+}
+
 window.deleteStudent = async () => {
   const s = getStudent(activeId);
   if (!s) return;
-  if (!confirm('Schüler wirklich löschen?')) return;
-  // Komplette Daten sichern (für eventuelles Rückgängig)
-  const backup = { id: activeId, data: { ...s } };
-  delete backup.data.id; // id nicht doppelt speichern
+  if (istGeloescht(s)) return endgueltigLoeschen();
+  if (!confirm(`${s.vorname} ${s.nachname} löschen?\n\n`
+    + `Der Schüler kommt ins 📦 Archiv unter „Gelöscht“ und kann dort ${PAPIERKORB_TAGE} Tage lang `
+    + `wiederhergestellt werden. Danach wird er endgültig gelöscht.\n\n`
+    + `Er hat ab sofort keinen Zugriff mehr auf seine Akte im Schüler-Portal.`)) return;
+  const id = activeId;
   try {
-    await dbDel(doc(db,'students',activeId));
+    const jetzt = Date.now();
+    await dbUpd(doc(db,'students',id), {
+      archiviert: true, archiviertAm: jetzt, archivGrund: 'geloescht',
+      geloeschtAm: jetzt, geloeschtVon: currentUser?.uid || null, pinned: false
+    });
+    await setzePortalCodesAblauf(id, jetzt);
     activeId = null;
     goBack();
-    const geloeschteId = backup.id;
-    // Offene Aufraeum-Arbeit vormerken, falls die App vor Ablauf der
-    // Rueckgaengig-Frist geschlossen wird (siehe holeOffeneLoeschungenNach).
-    offeneLoeschungVormerken(geloeschteId);
-    zeigeUndoBalken(`🗑️ ${escHtml(s.vorname)} ${escHtml(s.nachname)} gelöscht`, async () => {
-      // Rückgängig: Schüler mit gleicher ID wiederherstellen
-      try {
-        await dbSet(doc(db,'students',backup.id), backup.data);
-        offeneLoeschungAbhaken(geloeschteId);
-        toast('✓ Wiederhergestellt');
-      } catch(e) { console.error('undo student:', e); toast('❌ Wiederherstellen fehlgeschlagen'); }
-    }, async () => {
-      // Endgültige Löschung der personenbezogenen Begleitdaten (DSGVO Art. 17)
-      await loescheSchuelerBegleitdaten(geloeschteId);
-    });
+    zeigeUndoBalken(`🗑️ ${escHtml(s.vorname)} ${escHtml(s.nachname)} ins Archiv gelegt`,
+      () => schuelerWiederherstellen(id));
   } catch(e) { console.error('deleteStudent:', e); toast('❌ Fehler beim Löschen: ' + e.message); }
 };
+
+async function schuelerWiederherstellen(id) {
+  try {
+    await dbUpd(doc(db,'students',id), {
+      archiviert: false, archiviertAm: null, archivGrund: null,
+      geloeschtAm: null, geloeschtVon: null
+    });
+    await setzePortalCodesAblauf(id, Date.now() + CODE_LAUFZEIT_MS);
+    toast('✓ Wiederhergestellt');
+  } catch(e) { console.error('Wiederherstellen:', e); toast('❌ Wiederherstellen fehlgeschlagen'); }
+}
+
+// Endgueltig: Schueler-Dokument UND Begleitdaten (Chat, Fotos, Protokoll).
+async function schuelerEndgueltigLoeschen(id) {
+  // Vormerken, damit das Aufraeumen nachgeholt wird, falls die App
+  // mittendrin geschlossen wird (siehe holeOffeneLoeschungenNach).
+  offeneLoeschungVormerken(id);
+  await dbDel(doc(db,'students',id));
+  await loescheSchuelerBegleitdaten(id);
+}
+
+window.endgueltigLoeschen = async () => {
+  const s = getStudent(activeId);
+  if (!s) return;
+  if (!confirm(`${s.vorname} ${s.nachname} jetzt ENDGÜLTIG löschen?\n\n`
+    + `Kartei, Protokoll, Chat und Fotos werden unwiderruflich entfernt.`)) return;
+  const id = activeId;
+  try {
+    activeId = null;
+    goBack();
+    await schuelerEndgueltigLoeschen(id);
+    toast('🗑️ Endgültig gelöscht');
+  } catch(e) { console.error('endgueltigLoeschen:', e); toast('❌ Fehler beim Löschen: ' + e.message); }
+};
+
+window.wiederherstellenAktiv = async () => {
+  if (!activeId) return;
+  await schuelerWiederherstellen(activeId);
+};
+
+// Beim Start: Schueler, deren Frist im Papierkorb abgelaufen ist, endgueltig
+// loeschen. Nur die eigenen - die Begleitdaten (Codes, Protokoll) gehoeren
+// dem zustaendigen Fahrlehrer und lassen sich nur von ihm entfernen.
+async function raeumePapierkorbAuf() {
+  if (!currentUser || window.__DEMO) return;
+  const faellig = students.filter(s => istGeloescht(s)
+    && (s.uid === currentUser.uid || s.geloeschtVon === currentUser.uid)
+    && endgueltigLoeschenAm(s) <= Date.now());
+  for (const s of faellig) {
+    try { await schuelerEndgueltigLoeschen(s.id); }
+    catch(e) { console.warn('Papierkorb aufraeumen:', s.id, e); }
+  }
+  if (faellig.length) console.info('Papierkorb: endgueltig geloescht', faellig.length);
+}
 
 // ── UNDO-BALKEN: zeigt für 6 Sekunden einen "Rückgängig"-Button ──
 function zeigeUndoBalken(text, undoCallback, nachAblaufCallback) {
@@ -8162,6 +8281,9 @@ window.closeDashboard = () => {
 };
 
 function renderDashboard() {
+  // Gelöschte (Papierkorb im Archiv) fliessen in keine Kennzahl ein - sonst
+  // zaehlten sie als "Bestanden" und als Neuanmeldung.
+  const students = alleOhnePapierkorb();
   const aktive = students.filter(s => !s.archiviert);
   const archiviert = students.filter(s => s.archiviert);
   const total = aktive.length;
@@ -8354,7 +8476,7 @@ window.exportAlleDaten = () => {
         s.fahrstunden||0, s.theorieBestanden?'ja':'nein',
         (s.sonderfahrten||{}).ueber||0, (s.sonderfahrten||{}).autobahn||0, (s.sonderfahrten||{}).nacht||0,
         Math.min(overallProgress(s),100),
-        s.archiviert?'ja':'nein',
+        istGeloescht(s)?'gelöscht':(s.archiviert?'ja':'nein'),
         s.createdAt ? new Date(s.createdAt).toLocaleDateString('de-DE') : ''
       ].map(escape).join(';'));
       const csv = '\uFEFF' + headers.join(';') + '\n' + zeilen.join('\n'); // BOM für Excel-Umlaute
@@ -9179,6 +9301,7 @@ window.generateCode = async () => {
   const expiresAt = Date.now() + CODE_LAUFZEIT_MS;
   const s = getStudent(activeId);
   if (!s) { toast('Kein Schüler ausgewählt'); return; }
+  if (istGeloescht(s)) { toast('🗑️ Schüler ist gelöscht – erst wiederherstellen'); return; }
 
   try {
     // Alte Codes für diesen Schüler löschen

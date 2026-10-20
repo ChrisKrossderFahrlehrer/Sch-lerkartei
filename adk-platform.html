@@ -1062,13 +1062,14 @@ async function renderAnalytics() {
         getDocs(query(collection(db,'users'),       where('fahrschuleId','==',fs.id), where('rolle','==','fahrlehrer'))),
         getDocs(query(collection(db,'protokoll'),   where('fahrschuleId','==',fs.id))),
       ]);
-      const schueler = schuelerSnap.docs.map(d => d.data());
+      // Gelöschte Schüler liegen 90 Tage im Papierkorb der App - nicht mitzählen.
+      const schueler = schuelerSnap.docs.map(d => d.data()).filter(s => s.archivGrund !== 'geloescht');
       return {
         id: fs.id,
         name: fs.name,
         stadt: fs.stadt,
         registriert: fs.createdAt,
-        anzahlSchueler:  schuelerSnap.size,
+        anzahlSchueler:  schueler.length,
         anzahlAktiv:     schueler.filter(s => !s.archiviert).length,
         anzahlArchiviert:schueler.filter(s => s.archiviert).length,
         anzahlLehrer:    lehrerSnap.size,
@@ -1093,11 +1094,12 @@ async function renderAnalytics() {
         getDocs(query(collection(db,'students'), where('fahrschuleId','==',l.id))),
         getDocs(query(collection(db,'protokoll'), where('fahrschuleId','==',l.id))),
       ]);
-      const schueler = schuelerSnap.docs.map(d => d.data());
+      // Gelöschte Schüler liegen 90 Tage im Papierkorb der App - nicht mitzählen.
+      const schueler = schuelerSnap.docs.map(d => d.data()).filter(s => s.archivGrund !== 'geloescht');
       return {
         id: l.id, name: l.name || 'Fahrlehrer', stadt: 'Eigenständig',
         registriert: l.createdAt,
-        anzahlSchueler:  schuelerSnap.size,
+        anzahlSchueler:  schueler.length,
         anzahlAktiv:     schueler.filter(s => !s.archiviert).length,
         anzahlArchiviert:schueler.filter(s => s.archiviert).length,
         anzahlLehrer:    1,
@@ -2274,7 +2276,7 @@ async function renderFsAdmin() {
     // Schüler-Statistiken
     const q = query(collection(db, 'students'), where('fahrschuleId', '==', currentProfil.fahrschuleId));
     const snap = await getDocs(q);
-    const schueler = snap.docs.map(d => d.data());
+    const schueler = snap.docs.map(d => d.data()).filter(s => s.archivGrund !== 'geloescht');
     const aktive   = schueler.filter(s => !s.archiviert).length;
     const archiv   = schueler.filter(s => s.archiviert).length;
 
