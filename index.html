@@ -5709,7 +5709,7 @@ window.renderList = () => {
     // Immer sichtbar, auch wenn (noch) niemand gelöscht wurde.
     const info = `<div style="display:flex;gap:10px;align-items:flex-start;background:rgba(88,166,255,0.08);border:1px solid rgba(88,166,255,0.3);border-radius:12px;padding:12px 14px;margin:4px 0 14px;font-size:0.8rem;line-height:1.5;color:var(--text)">
         <span style="font-size:1.1rem">ℹ️</span>
-        <span>Gelöschte Schüler werden <strong>nach ${PAPIERKORB_TAGE} Tagen automatisch endgültig gelöscht</strong> – samt Protokoll, Chat und Fotos. Bis dahin kannst du sie in ihrer Kartei mit „↩️ Wiederherstellen" zurückholen. Schüler mit bestandener Prüfung bleiben dauerhaft im Archiv.</span>
+        <span>Gelöschte Schüler werden <strong>nach ${PAPIERKORB_TAGE} Tagen automatisch endgültig gelöscht</strong> – samt Protokoll, Chat und Fotos. Auf ihre Akte im Schüler-Portal haben sie ab dem Löschen <strong>keinen Zugriff mehr</strong>. Bis dahin kannst du sie in ihrer Kartei mit „↩️ Wiederherstellen" zurückholen. Schüler mit bestandener Prüfung bleiben dauerhaft im Archiv.</span>
       </div>`;
     list.innerHTML = info + block('🎓 Fertig', fertig, '')
       + block('🗑️ Gelöscht', geloescht, `Wiederherstellbar bis zum angezeigten Datum, danach endgültig gelöscht.`);
@@ -8015,7 +8015,7 @@ window.deleteStudent = async () => {
   if (!confirm(`${s.vorname} ${s.nachname} löschen?\n\n`
     + `Der Schüler kommt ins 📦 Archiv unter „Gelöscht“ und kann dort ${PAPIERKORB_TAGE} Tage lang `
     + `wiederhergestellt werden. Danach wird er endgültig gelöscht.\n\n`
-    + `Sein Zugang zum Schüler-Portal wird sofort gesperrt.`)) return;
+    + `Er hat ab sofort keinen Zugriff mehr auf seine Akte im Schüler-Portal.`)) return;
   const id = activeId;
   try {
     const jetzt = Date.now();
