@@ -5098,7 +5098,9 @@ function listenStudents() {
       // Bedingungen erfuellen (meiner UND zur Schule gehoerend).
       const nachId = new Map();
       teile.forEach(liste => liste.forEach(s => nachId.set(s.id, s)));
-      students = [...nachId.values()];
+      // Endgültig zum Löschen freigegeben: Der Server entfernt ihn gleich -
+      // die App zeigt ihn schon jetzt nirgends mehr.
+      students = [...nachId.values()].filter(s => !s.sofortLoeschen);
       verarbeiteSchueler();
     }, (err) => { console.warn('listenStudents:', err); }));
   });
@@ -5106,8 +5108,7 @@ function listenStudents() {
   function verarbeiteSchueler() {
     if (!window.__snapResyncKick && students.length) { window.__snapResyncKick = true;
       setTimeout(resyncPortalSnapshotsV2, 1200);
-      setTimeout(raeumeEntfernteThemenAuf, 2400);
-      setTimeout(() => raeumePapierkorbAuf().catch(e => console.warn('Papierkorb:', e)), 5000); }
+      setTimeout(raeumeEntfernteThemenAuf, 2400); }
     students.sort((a,b) => (a.nachname||'').localeCompare(b.nachname||''));
     renderList();
     if (activeId) renderDetail();
@@ -7986,26 +7987,24 @@ let undoTimer = null;
 // "Löschen" entfernt einen Schüler nicht mehr sofort, sondern legt ihn ins
 // Archiv (Bereich "Gelöscht"). Dort bleibt er PAPIERKORB_TAGE lang samt
 // Protokoll, Chat und Fotos wiederherstellbar - ein versehentliches Löschen
-// war vorher nach einer Minute endgültig. Danach (oder per "Endgültig
-// löschen") läuft die bisherige vollständige Löschung (DSGVO Art. 17).
-// Der Portal-Zugang wird sofort gesperrt: Die Regeln lassen einen Schüler
-// an einen abgelaufenen Code nicht mehr heran.
+// war vorher nach einer Minute endgültig.
+//
+// Die App setzt nur die Markierung. Portal sperren / wieder freigeben und
+// das endgültige Löschen erledigt der Server (functions/papierkorb.js):
+// Die App darf Codes und Protokoll eines ANDEREN Fahrlehrers nicht
+// anfassen, und ein Gerät ohne Netz oder eine nie wieder geöffnete App hätte
+// Sperre bzw. Löschung sonst verhindert.
 const PAPIERKORB_TAGE = 90;
 function istGeloescht(s) { return !!s && s.archivGrund === 'geloescht'; }
 function alleOhnePapierkorb() { return students.filter(s => !istGeloescht(s)); }
-function endgueltigLoeschenAm(s) { return (s.geloeschtAm || Date.now()) + PAPIERKORB_TAGE * 86400000; }
+function endgueltigLoeschenAm(s) {
+  // Gleiche Rechnung wie der nächtliche Server-Job (papierkorbLeeren).
+  return (s.geloeschtAm || s.archiviertAm || Date.now()) + PAPIERKORB_TAGE * 86400000;
+}
 // Neue Ablaufzeit fuer einen Portal-Code: Bei einem geloeschten Schueler
 // bleibt er gesperrt, auch wenn noch etwas an ihm gespeichert wird.
 function neueCodeLaufzeit(studentId) {
   return istGeloescht(getStudent(studentId)) ? Date.now() : Date.now() + CODE_LAUFZEIT_MS;
-}
-
-async function setzePortalCodesAblauf(studentId, bis) {
-  try {
-    const snap = await getDocs(query(collection(db,'accessCodes'),
-      where('studentId','==',studentId), where('teacherUid','==',currentUser.uid)));
-    for (const d of snap.docs) await dbUpd(doc(db,'accessCodes',d.id), { expiresAt: bis });
-  } catch(e) { console.warn('Portal-Code Ablauf setzen:', e); }
 }
 
 window.deleteStudent = async () => {
@@ -8021,9 +8020,11 @@ window.deleteStudent = async () => {
     const jetzt = Date.now();
     await dbUpd(doc(db,'students',id), {
       archiviert: true, archiviertAm: jetzt, archivGrund: 'geloescht',
-      geloeschtAm: jetzt, geloeschtVon: currentUser?.uid || null, pinned: false
+      geloeschtAm: jetzt, geloeschtVon: currentUser?.uid || null, pinned: false,
+      // Vorheriger Archiv-Stand: Ein schon fertiger Schüler soll beim
+      // Wiederherstellen wieder "Fertig" sein, nicht plötzlich aktiv.
+      vorLoeschung: { archiviert: !!s.archiviert, archiviertAm: s.archiviertAm || null, pinned: !!s.pinned }
     });
-    await setzePortalCodesAblauf(id, jetzt);
     activeId = null;
     goBack();
     zeigeUndoBalken(`🗑️ ${escHtml(s.vorname)} ${escHtml(s.nachname)} ins Archiv gelegt`,
@@ -8032,23 +8033,14 @@ window.deleteStudent = async () => {
 };
 
 async function schuelerWiederherstellen(id) {
+  const v = (getStudent(id) || {}).vorLoeschung || {};
   try {
     await dbUpd(doc(db,'students',id), {
-      archiviert: false, archiviertAm: null, archivGrund: null,
-      geloeschtAm: null, geloeschtVon: null
+      archiviert: !!v.archiviert, archiviertAm: v.archiviertAm || null, pinned: !!v.pinned,
+      archivGrund: null, geloeschtAm: null, geloeschtVon: null, vorLoeschung: null
     });
-    await setzePortalCodesAblauf(id, Date.now() + CODE_LAUFZEIT_MS);
     toast('✓ Wiederhergestellt');
   } catch(e) { console.error('Wiederherstellen:', e); toast('❌ Wiederherstellen fehlgeschlagen'); }
-}
-
-// Endgueltig: Schueler-Dokument UND Begleitdaten (Chat, Fotos, Protokoll).
-async function schuelerEndgueltigLoeschen(id) {
-  // Vormerken, damit das Aufraeumen nachgeholt wird, falls die App
-  // mittendrin geschlossen wird (siehe holeOffeneLoeschungenNach).
-  offeneLoeschungVormerken(id);
-  await dbDel(doc(db,'students',id));
-  await loescheSchuelerBegleitdaten(id);
 }
 
 window.endgueltigLoeschen = async () => {
@@ -8060,7 +8052,10 @@ window.endgueltigLoeschen = async () => {
   try {
     activeId = null;
     goBack();
-    await schuelerEndgueltigLoeschen(id);
+    // Der Server löscht daraufhin alles - auch Chat und Protokoll anderer
+    // Fahrlehrer. Bis dahin blendet die App den Schüler schon aus.
+    if (window.__DEMO) await dbDel(doc(db,'students',id));
+    else await dbUpd(doc(db,'students',id), { sofortLoeschen: true });
     toast('🗑️ Endgültig gelöscht');
   } catch(e) { console.error('endgueltigLoeschen:', e); toast('❌ Fehler beim Löschen: ' + e.message); }
 };
@@ -8069,21 +8064,6 @@ window.wiederherstellenAktiv = async () => {
   if (!activeId) return;
   await schuelerWiederherstellen(activeId);
 };
-
-// Beim Start: Schueler, deren Frist im Papierkorb abgelaufen ist, endgueltig
-// loeschen. Nur die eigenen - die Begleitdaten (Codes, Protokoll) gehoeren
-// dem zustaendigen Fahrlehrer und lassen sich nur von ihm entfernen.
-async function raeumePapierkorbAuf() {
-  if (!currentUser || window.__DEMO) return;
-  const faellig = students.filter(s => istGeloescht(s)
-    && (s.uid === currentUser.uid || s.geloeschtVon === currentUser.uid)
-    && endgueltigLoeschenAm(s) <= Date.now());
-  for (const s of faellig) {
-    try { await schuelerEndgueltigLoeschen(s.id); }
-    catch(e) { console.warn('Papierkorb aufraeumen:', s.id, e); }
-  }
-  if (faellig.length) console.info('Papierkorb: endgueltig geloescht', faellig.length);
-}
 
 // ── UNDO-BALKEN: zeigt für 6 Sekunden einen "Rückgängig"-Button ──
 function zeigeUndoBalken(text, undoCallback, nachAblaufCallback) {
@@ -11276,7 +11256,7 @@ async function ladeHeutigeTermine() {
     for (const t of termine) {
       const ks = kalSchueler[t.bookedBy];
       t._name = ks ? `${ks.fname || ''} ${ks.lname || ''}`.trim() : 'Schüler';
-      const adk = ks ? students.find(st => norm(st.vorname) === norm(ks.fname) && norm(st.nachname) === norm(ks.lname)) : null;
+      const adk = ks ? students.find(st => !istGeloescht(st) && norm(st.vorname) === norm(ks.fname) && norm(st.nachname) === norm(ks.lname)) : null;
       t._adkId = adk ? adk.id : null;
     }
     renderHeutigeTermine(termine);

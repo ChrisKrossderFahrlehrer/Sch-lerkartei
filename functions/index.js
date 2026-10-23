@@ -1092,6 +1092,25 @@ exports.kontoLoeschungWiderrufen = onCall(async (request) => {
   return { success: true };
 });
 
+// ── Papierkorb im Archiv ────────────────────────────────────────────
+// Loescht jemand einen Schueler (archivGrund 'geloescht'), wird sein Portal
+// sofort gesperrt; beim Wiederherstellen wieder freigegeben; auf Wunsch
+// ("Endgueltig loeschen") sofort vollstaendig entfernt. Serverseitig, weil
+// die App Codes und Protokoll anderer Fahrlehrer nicht anfassen darf.
+const { papierkorbAenderung, papierkorbLeeren } = require('./papierkorb');
+
+exports.papierkorbSchueler = onDocumentUpdated('students/{studentId}', async (event) => {
+  const vorher = event.data?.before?.data();
+  const nachher = event.data?.after?.data();
+  // Schneller Ausstieg fuer die vielen gewoehnlichen Speichervorgaenge.
+  const relevant = (d) => d && (d.archivGrund === 'geloescht' || d.sofortLoeschen === true);
+  if (!relevant(vorher) && !relevant(nachher)) return;
+  try {
+    const r = await papierkorbAenderung(getFirestore(), event.params.studentId, vorher, nachher);
+    if (r !== 'nichts') console.log('Papierkorb', event.params.studentId, r);
+  } catch (e) { console.error('papierkorbSchueler:', e); }
+});
+
 // ── Taeglicher Aufraeum-Job ─────────────────────────────────────────
 // Setzt sowohl die 30-Tage-Frist als auch alle uebrigen Aufbewahrungs-
 // grenzen durch. Laeuft nachts, wenn niemand arbeitet.
@@ -1161,6 +1180,13 @@ exports.taeglichesAufraeumen = onSchedule(
       bericht.anonym = await loescheAlteAnonymeKonten(
         getAuth(), 60 * TAG_MS, 500, jetzt);
     } catch (e) { console.error('Anonyme Sitzungen:', e); }
+
+    // 4b) Papierkorb im Archiv: geloeschte Schueler nach 90 Tagen endgueltig
+    // entfernen (functions/papierkorb.js) - auch wenn die App des
+    // Fahrlehrers nie wieder geoeffnet wird.
+    try {
+      bericht.papierkorb = await papierkorbLeeren(db, jetzt);
+    } catch (e) { console.error('Papierkorb:', e); }
 
     // 5) Gekuendigte Abos nach 14 Tagen Nachlauf auf 'free' (nichts wird
     // geloescht, nur der Tarif aendert sich - functions/abo.js).
