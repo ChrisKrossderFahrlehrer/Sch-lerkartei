@@ -884,8 +884,8 @@ body.beta-dash .badge { font-size: 0.66rem; padding: 3px 9px; }
    gesperrter Versalien. Die brachen auf dem Handy um ("FUERS NAECHSTE /
    MAL") und wirkten unruhig. Die anderen Stile behalten ihre eigene Form
    (Editorial setzt bewusst Versalien). */
-body:not([class*="style-"]) .section-title { text-transform:none; letter-spacing:0; font-size:0.95rem; color:var(--text); }
-body:not([class*="style-"]) .abc-header { text-transform:none; letter-spacing:0.02em; }
+body:not([class*="style-"]) .section-title { font-family:'Manrope',sans-serif; text-transform:none; letter-spacing:-0.01em; font-size:1rem; color:var(--text); }
+body:not([class*="style-"]) .abc-header { font-family:'Manrope',sans-serif; text-transform:none; letter-spacing:0.02em; }
 .section-body { padding:14px 16px; }
 
 .fahrstunden-display { display:flex; align-items:center; gap:16px; margin-bottom:14px; }
@@ -6100,7 +6100,7 @@ function renderDetail() {
     const cnt=(s.sonderfahrten||{})[f.key]||0, done=cnt>=f.min;
     return `<div class="sonder-item${done?' done':''}">
       <div class="sonder-icon">${f.icon}</div>
-      <div class="sonder-name">${f.name}</div>
+      <div class="sonder-name">${String(f.name).replace('/', '/\u200B')}</div>
       <div class="sonder-stepper">
         <button class="s-btn" onclick="changeSonder('${f.key}',-1)">−</button>
         <span class="s-val">${cnt}</span>
@@ -7335,7 +7335,7 @@ function nmAufgabenListe(s, imFenster) {
     if (!teil.length) return '';
     const A = NM_ARTEN[art];
     return '<div style="margin-top:8px">'
-      + '<div style="font-size:0.7rem;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;color:' + A.farbe + ';margin-bottom:2px">' + A.icon + ' ' + A.label + '</div>'
+      + '<div style="font-size:0.78rem;font-weight:800;color:' + A.farbe + ';margin-bottom:2px">' + A.icon + ' ' + A.label + '</div>'
       + teil.map(a => nmZeile(a, imFenster)).join('')
       + '</div>';
   }).join('');

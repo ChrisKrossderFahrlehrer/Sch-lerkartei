@@ -12,138 +12,183 @@
 <link href="./schriften/schriften.css" rel="stylesheet">
 <style>
   /* Leitidee: Eine Fahrausbildung ist eine Strecke. Die gestrichelte
-     Mittellinie fuehrt durch die Seite; an ihr liegen die Stationen in der
-     Reihenfolge, in der sie in der Ausbildung vorkommen. Gelb ist Schild-
-     und Markierungsgelb, Gruen steht nur fuer "fertig". Alle Aussagen und
-     Bilder stammen aus der echten App. */
+     Mittellinie fuehrt durch die Seite; die Stationen stehen daran wie
+     runde blaue Gebotszeichen (vgl. Zeichen 275) - in der Reihenfolge, in
+     der sie in der Ausbildung vorkommen. Gelb ist Markierungsgelb wie in der
+     App. Alle Aussagen und Bilder stammen aus der echten App. */
   :root {
     --asphalt: #16191e;
-    --asphalt-hell: #1f242b;
-    --kante: #2e343d;
+    --asphalt-hell: #1e232a;
+    --kante: #2d333c;
     --weiss: #eef1f4;
-    --grau: #9aa3ad;
+    --grau: #9ba4ae;
     --gelb: #f0b429;
-    --gruen: #3fb950;
+    --schildblau: #0f5ea8;
   }
   * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
+  html { scroll-behavior: smooth; scroll-padding-top: 80px; }
   @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
   body {
     margin: 0; background: var(--asphalt); color: var(--weiss);
-    font-family: 'Manrope', sans-serif; font-size: 1rem; line-height: 1.6;
+    font-family: 'Manrope', sans-serif; font-size: 1.0625rem; line-height: 1.6;
     -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
+    -webkit-font-smoothing: antialiased;
   }
   a { color: inherit; }
-  a:focus-visible, button:focus-visible { outline: 2px solid var(--gelb); outline-offset: 3px; border-radius: 6px; }
-  .rahmen { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
-  h1, h2, h3 { font-family: 'Syne', sans-serif; line-height: 1.15; margin: 0; }
+  :focus-visible { outline: 2px solid var(--gelb); outline-offset: 3px; border-radius: 8px; }
+  .rahmen { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+  h1, h2 { font-family: 'Syne', sans-serif; font-weight: 700; letter-spacing: -0.015em; line-height: 1.12; margin: 0; }
+  h3 { font-family: 'Manrope', sans-serif; font-weight: 800; letter-spacing: -0.01em; line-height: 1.3; margin: 0; }
 
-  /* Kopf */
-  .kopf { display: flex; align-items: center; justify-content: space-between; padding: 20px 0; }
-  .wortmarke { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.35rem; color: var(--gelb); text-decoration: none; letter-spacing: -0.01em; min-height: 44px; display: inline-flex; align-items: center; }
-  .kopf a.anmelden { text-decoration: none; font-weight: 700; font-size: 0.95rem; padding: 10px 16px; border: 1.5px solid var(--kante); border-radius: 10px; min-height: 44px; display: inline-flex; align-items: center; }
-  .kopf a.anmelden:hover { border-color: var(--grau); }
+  /* Kopfleiste: bleibt beim Scrollen oben, Milchglas */
+  .kopf-band {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(22, 25, 30, 0.78);
+    -webkit-backdrop-filter: saturate(160%) blur(14px); backdrop-filter: saturate(160%) blur(14px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .kopf { display: flex; align-items: center; gap: 28px; height: 68px; }
+  .wortmarke { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.3rem; color: var(--gelb); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; margin-right: auto; }
+  .kopf nav { display: flex; gap: 24px; }
+  .kopf nav a { text-decoration: none; color: var(--grau); font-weight: 600; font-size: 0.95rem; min-height: 44px; display: inline-flex; align-items: center; }
+  .kopf nav a:hover { color: var(--weiss); }
+  .kopf .anmelden { text-decoration: none; font-weight: 700; font-size: 0.95rem; padding: 0 16px; border: 1.5px solid var(--kante); border-radius: 10px; min-height: 44px; display: inline-flex; align-items: center; }
+  .kopf .anmelden:hover { border-color: var(--grau); }
 
-  /* Einstieg: Text links, echtes Handybild rechts */
-  .einstieg { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 48px; align-items: center; padding: 40px 0 72px; }
-  .einstieg h1 { font-size: clamp(2.1rem, 5vw, 3.4rem); font-weight: 800; letter-spacing: -0.02em; max-width: 14ch; }
-  .einstieg .lead { font-size: 1.12rem; color: var(--grau); max-width: 46ch; margin: 20px 0 30px; }
+  /* Einstieg */
+  .einstieg { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 56px; align-items: center; padding: 72px 0 96px; }
+  .einstieg h1 { font-size: clamp(2.3rem, 4.6vw, 3.6rem); max-width: 15ch; }
+  .einstieg .lead { font-size: 1.2rem; color: var(--grau); max-width: 44ch; margin: 24px 0 32px; }
   .knoepfe { display: flex; flex-wrap: wrap; gap: 12px; }
-  .knopf { display: inline-flex; align-items: center; justify-content: center; min-height: 52px; padding: 0 24px; border-radius: 12px; font-weight: 800; font-size: 1rem; text-decoration: none; }
+  .knopf { display: inline-flex; align-items: center; justify-content: center; min-height: 52px; padding: 0 26px; border-radius: 12px; font-weight: 800; font-size: 1rem; text-decoration: none; }
   .knopf.haupt { background: var(--gelb); color: #16191e; }
-  .knopf.haupt:hover { background: #ffc94d; }
+  .knopf.haupt:hover { background: #f7c440; }
   .knopf.neben { border: 1.5px solid var(--kante); color: var(--weiss); }
   .knopf.neben:hover { border-color: var(--grau); }
-  .hinweis { font-size: 0.88rem; color: var(--grau); margin-top: 14px; }
+  .hinweis { font-size: 0.92rem; color: var(--grau); margin: 16px 0 0; }
 
-  .handy { width: 100%; max-width: 300px; justify-self: center; border-radius: 34px; padding: 10px; background: #0b0d10; border: 1px solid var(--kante); }
-  .handy img { display: block; width: 100%; height: auto; border-radius: 26px; }
+  .handy { border-radius: 40px; padding: 11px; background: #0a0c0f; border: 1px solid #343b45; box-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.7); }
+  .handy img { display: block; width: 100%; height: auto; border-radius: 30px; }
+  .einstieg .handy { width: 100%; max-width: 330px; justify-self: center; }
 
-  /* Die Strecke: gestrichelte Mittellinie mit Stationen */
-  .strecke-kopf { max-width: 640px; margin-bottom: 40px; }
-  .strecke-kopf h2 { font-size: clamp(1.6rem, 3.4vw, 2.2rem); font-weight: 800; }
-  .strecke-kopf p { color: var(--grau); margin: 12px 0 0; }
-  .strecke { position: relative; padding-left: 56px; }
+  /* Die Strecke */
+  .abschnitt-kopf { max-width: 640px; margin-bottom: 56px; }
+  .abschnitt-kopf h2, .preise h2, .fragen h2, .schluss h2, .nebenspur h2 { font-size: clamp(1.75rem, 3.2vw, 2.4rem); }
+  .abschnitt-kopf p { color: var(--grau); margin: 14px 0 0; font-size: 1.1rem; }
+  .strecke { position: relative; list-style: none; margin: 0; padding: 0 0 0 76px; }
   .strecke::before {
-    content: ''; position: absolute; left: 19px; top: 8px; bottom: 8px; width: 4px;
-    background: repeating-linear-gradient(to bottom, var(--weiss) 0 22px, transparent 22px 40px);
-    opacity: 0.55;
+    content: ''; position: absolute; left: 25px; top: 26px; bottom: 26px; width: 4px;
+    background: repeating-linear-gradient(to bottom, var(--weiss) 0 24px, transparent 24px 44px);
+    opacity: 0.5;
   }
-  .station { position: relative; display: grid; grid-template-columns: 1fr 220px; gap: 32px; align-items: start; padding: 8px 0 56px; }
+  .station { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 64px; align-items: start; padding-bottom: 96px; }
+  /* Der Text laeuft neben dem Bild mit, statt oben allein zu stehen */
+  .station > div:first-of-type { position: sticky; top: 112px; }
   .station:last-child { padding-bottom: 0; }
-  .station .marke {
-    position: absolute; left: -56px; top: 8px; width: 42px; height: 42px; border-radius: 50%;
-    background: var(--asphalt); border: 3px solid var(--gelb); color: var(--gelb);
-    font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.05rem;
+  .schild {
+    position: absolute; left: -76px; top: -6px; z-index: 1; width: 54px; height: 54px; border-radius: 50%;
+    background: var(--schildblau); border: 4px solid #fff; box-shadow: 0 0 0 1.5px #c7ccd2;
+    color: #fff; font-family: 'Manrope', sans-serif; font-weight: 800; font-size: 1.35rem;
     display: flex; align-items: center; justify-content: center;
   }
-  .station.ziel .marke { border-color: var(--gruen); color: var(--gruen); }
-  .station h3 { font-size: 1.35rem; font-weight: 700; margin-top: 6px; }
-  .station p { color: var(--grau); margin: 10px 0 0; max-width: 52ch; }
-  .station .bild { border-radius: 22px; padding: 7px; background: #0b0d10; border: 1px solid var(--kante); }
-  .station .bild img { display: block; width: 100%; height: auto; border-radius: 16px; }
+  .station h3 { font-size: 1.45rem; margin-top: 10px; }
+  .station p { color: var(--grau); margin: 12px 0 0; max-width: 42ch; font-size: 1.12rem; }
+  .blatt { border-radius: 14px; overflow: hidden; border: 1px solid #343b45; background: #fff; aspect-ratio: 4 / 5; box-shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.7); }
+  .blatt img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
 
-  /* Nebenspur: Schueler-Portal und Planer */
-  .nebenspur { display: grid; grid-template-columns: 220px 1fr; gap: 32px; align-items: center; margin-top: 88px; padding: 32px; border: 1.5px dashed var(--kante); border-radius: 20px; }
-  .nebenspur h2 { font-size: 1.6rem; font-weight: 800; }
-  .nebenspur p { color: var(--grau); margin: 12px 0 0; }
-  .nebenspur .bild { border-radius: 22px; padding: 7px; background: #0b0d10; border: 1px solid var(--kante); }
-  .nebenspur .bild img { display: block; width: 100%; height: auto; border-radius: 16px; }
-  .nebenspur ul { margin: 16px 0 0; padding-left: 20px; color: var(--grau); }
-  .nebenspur li { margin-bottom: 6px; }
+  /* Nebenspur: Schueler-Portal */
+  .nebenspur { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 56px; align-items: center; margin-top: 128px; padding: 48px; background: var(--asphalt-hell); border-radius: 28px; }
+  .nebenspur p { color: var(--grau); margin: 14px 0 0; max-width: 50ch; }
+  .nebenspur ul { margin: 20px 0 0; padding: 0; list-style: none; }
+  .nebenspur li { position: relative; padding-left: 26px; margin-bottom: 10px; }
+  .nebenspur li::before { content: ''; position: absolute; left: 0; top: 0.62em; width: 12px; height: 4px; border-radius: 2px; background: var(--gelb); }
 
-  /* Preise als echte Tabelle */
-  .preise { margin-top: 96px; }
-  .preise h2 { font-size: clamp(1.6rem, 3.4vw, 2.2rem); font-weight: 800; }
-  .preise > p { color: var(--grau); margin: 12px 0 28px; max-width: 60ch; }
-  .tabelle-rand { overflow-x: auto; border: 1px solid var(--kante); border-radius: 16px; }
-  table { width: 100%; border-collapse: collapse; min-width: 420px; }
-  th, td { padding: 14px 18px; text-align: left; }
-  th { font-weight: 700; color: var(--grau); font-size: 0.9rem; border-bottom: 1px solid var(--kante); }
+  /* Preise */
+  .preise { margin-top: 128px; }
+  .preise > p { color: var(--grau); margin: 14px 0 32px; max-width: 60ch; font-size: 1.1rem; }
+  .tabelle-rand { overflow-x: auto; border: 1px solid var(--kante); border-radius: 18px; }
+  table { width: 100%; border-collapse: collapse; min-width: 440px; }
+  th, td { padding: 16px 22px; text-align: left; }
+  th { font-weight: 700; color: var(--grau); font-size: 0.92rem; border-bottom: 1px solid var(--kante); background: var(--asphalt-hell); }
   td { border-bottom: 1px solid var(--kante); }
   tr:last-child td { border-bottom: none; }
   td.betrag, th.betrag { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
   td.betrag { font-weight: 700; }
-  .klein { font-size: 0.88rem; color: var(--grau); margin-top: 14px; max-width: 70ch; }
+  .klein { font-size: 0.92rem; color: var(--grau); margin-top: 16px; max-width: 72ch; }
+
+  /* Fragen */
+  .fragen { margin-top: 128px; display: grid; grid-template-columns: 0.8fr 1.2fr; gap: 56px; }
+  .fragen p.unter { color: var(--grau); margin: 14px 0 0; }
+  details { border-bottom: 1px solid var(--kante); }
+  details:first-of-type { border-top: 1px solid var(--kante); }
+  summary { cursor: pointer; list-style: none; padding: 20px 40px 20px 0; font-weight: 700; position: relative; min-height: 44px; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: '+'; position: absolute; right: 6px; top: 50%; transform: translateY(-50%); font-size: 1.5rem; font-weight: 400; color: var(--grau); transition: transform 0.2s; }
+  details[open] summary::after { transform: translateY(-50%) rotate(45deg); }
+  @media (prefers-reduced-motion: reduce) { summary::after { transition: none; } }
+  details p { color: var(--grau); margin: 0 0 20px; max-width: 60ch; }
 
   /* Fakten und Schluss */
-  .fakten { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; margin-top: 96px; padding-top: 40px; border-top: 1px solid var(--kante); }
-  .fakten h3 { font-size: 1.05rem; font-weight: 700; }
-  .fakten p { color: var(--grau); margin: 8px 0 0; font-size: 0.95rem; }
-  .schluss { text-align: left; margin: 96px 0 72px; }
-  .schluss h2 { font-size: clamp(1.6rem, 3.4vw, 2.2rem); font-weight: 800; margin-bottom: 20px; }
+  .fakten { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; margin-top: 128px; }
+  .fakten h3 { font-size: 1.1rem; }
+  .fakten p { color: var(--grau); margin: 8px 0 0; font-size: 1rem; }
+  .schluss { margin: 128px 0 96px; padding: 56px; border-radius: 28px; background: var(--gelb); color: #16191e; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 24px; }
+  .schluss h2 { max-width: 18ch; }
+  .schluss .knopf.haupt { background: #16191e; color: var(--weiss); }
+  .schluss .knopf.haupt:hover { background: #262b33; }
+  .schluss .knopf.neben { border-color: rgba(22, 25, 30, 0.35); color: #16191e; }
+  .schluss .knopf.neben:hover { border-color: #16191e; }
+  .schluss :focus-visible { outline-color: #16191e; }
 
-  footer { border-top: 1px solid var(--kante); padding: 24px 0 40px; font-size: 0.88rem; color: var(--grau); display: flex; flex-wrap: wrap; gap: 8px 20px; }
-  footer a { color: var(--grau); min-height: 44px; display: inline-flex; align-items: center; }
-  footer span { min-height: 44px; display: inline-flex; align-items: center; }
+  footer { border-top: 1px solid var(--kante); padding: 24px 0 48px; font-size: 0.92rem; color: var(--grau); display: flex; flex-wrap: wrap; gap: 4px 24px; }
+  footer a, footer span { color: var(--grau); min-height: 44px; display: inline-flex; align-items: center; }
+  footer a:hover { color: var(--weiss); }
 
-  @media (max-width: 820px) {
-    .einstieg { grid-template-columns: 1fr; gap: 36px; padding-top: 16px; }
-    .handy { max-width: 250px; }
-    .station { grid-template-columns: 1fr; gap: 20px; }
-    .station .bild { max-width: 230px; }
-    .nebenspur { grid-template-columns: 1fr; padding: 24px; }
-    .nebenspur .bild { max-width: 230px; order: 2; }
-    .fakten { grid-template-columns: 1fr; gap: 24px; }
+  @media (max-width: 900px) {
+    .kopf nav { display: none; }
+    .einstieg { grid-template-columns: 1fr; gap: 48px; padding: 40px 0 72px; }
+    .einstieg .handy { max-width: 270px; }
+    .station { grid-template-columns: 1fr; gap: 24px; padding-bottom: 72px; }
+    .station > div:first-of-type { position: static; }
+    .station .handy, .station .blatt { max-width: 250px; }
+    .nebenspur { grid-template-columns: 1fr; padding: 28px; gap: 32px; }
+    .nebenspur .handy { max-width: 250px; order: 2; }
+    .fragen { grid-template-columns: 1fr; gap: 24px; }
+    .fakten { grid-template-columns: 1fr; gap: 28px; }
+    .schluss { padding: 32px 24px; }
+  }
+  @media (max-width: 520px) {
+    .rahmen { padding: 0 20px; }
+    .knoepfe .knopf { flex: 1 1 100%; }
+    .strecke { padding-left: 64px; }
+    .strecke::before { left: 21px; }
+    .schild { left: -64px; width: 46px; height: 46px; font-size: 1.15rem; border-width: 3px; }
+    .station h3 { font-size: 1.3rem; margin-top: 6px; }
   }
 </style>
 </head>
 <body>
-<div class="rahmen">
 
-  <header class="kopf">
+<div class="kopf-band">
+  <header class="rahmen kopf">
     <a class="wortmarke" href="./start.html">FahrSync</a>
+    <nav aria-label="Seitenbereiche">
+      <a href="#ablauf">So funktioniert’s</a>
+      <a href="#preise">Preise</a>
+      <a href="#fragen">Fragen</a>
+    </nav>
     <a class="anmelden" href="./index.html">Anmelden</a>
   </header>
+</div>
 
+<div class="rahmen">
   <main>
     <section class="einstieg">
       <div>
         <h1>Die Schülerkartei, die mit ins Auto kommt.</h1>
         <p class="lead">
-          Ausbildungsstand nach amtlichem Lehrplan, Fahrstunden-Protokoll mit Unterschrift und
-          Pflichtfahrten – für jeden Schüler an einem Ort, auf dem Handy. Statt Karteikarte,
-          Papiernachweis und Notizzettel.
+          Ausbildungsstand, Fahrstunden-Protokoll mit Unterschrift und Pflichtfahrten – für jeden
+          Schüler an einem Ort, auf dem Handy. Statt Karteikarte, Papiernachweis und Notizzettel.
         </p>
         <div class="knoepfe">
           <a class="knopf haupt" href="./index.html?start=registrieren">14 Tage kostenlos testen</a>
@@ -152,73 +197,73 @@
         <p class="hinweis">Danach ab 9,99 € im Monat, monatlich kündbar. Die Demo läuft ohne Anmeldung im Browser.</p>
       </div>
       <div class="handy">
-        <img src="./reel-bilder/akte-oben.jpg" width="780" height="1688"
-             alt="Schüler-Kartei in FahrSync: Name, Führerscheinklasse, Fortschritt in Prozent und die nächsten Aufgaben">
+        <img src="./start-bilder/akte-oben.jpg" width="780" height="1688"
+             alt="Schüler-Kartei in FahrSync: Name, Klasse, Fortschritt in Prozent und die Aufgaben fürs nächste Mal">
       </div>
     </section>
 
-    <section aria-labelledby="strecke-titel">
-      <div class="strecke-kopf">
-        <h2 id="strecke-titel">Von der ersten Stunde bis zur Prüfung</h2>
+    <section id="ablauf" aria-labelledby="ablauf-titel">
+      <div class="abschnitt-kopf">
+        <h2 id="ablauf-titel">Von der ersten Stunde bis zur Prüfung</h2>
         <p>So begleitet FahrSync eine Ausbildung – in der Reihenfolge, in der sie im Alltag passiert.</p>
       </div>
 
-      <ol class="strecke" style="list-style:none;margin:0">
+      <ol class="strecke">
         <li class="station">
-          <span class="marke" aria-hidden="true">1</span>
           <div>
+            <span class="schild" aria-hidden="true">1</span>
             <h3>Schüler anlegen</h3>
             <p>Name, Geburtsdatum und Klasse – B, B197, BE oder A. Die Liste zeigt sofort, wer
               wie weit ist und wer lange keine Stunde mehr hatte.</p>
           </div>
-          <div class="bild"><img src="./reel-bilder/liste.jpg" width="780" height="1688" loading="lazy"
-               alt="Schülerliste mit Suche, Filtern nach Klasse und Fortschrittsanzeige je Schüler"></div>
+          <div class="handy"><img src="./start-bilder/liste.jpg" width="780" height="1688" loading="lazy"
+               alt="Schülerliste mit Suche, Filtern nach Klasse und Fortschritt je Schüler"></div>
         </li>
         <li class="station">
-          <span class="marke" aria-hidden="true">2</span>
           <div>
+            <span class="schild" aria-hidden="true">2</span>
             <h3>Fahrstunde eintragen</h3>
-            <p>Datum, Inhalt und Mängel der Stunde, der Schüler unterschreibt direkt auf dem
-              Display. Was nicht gut lief, landet auf Wunsch gleich in „Fürs nächste Mal“.</p>
+            <p>Inhalt und Mängel der Stunde antippen, eine Notiz dazu, und der Schüler unterschreibt
+              direkt auf dem Display. Was nicht gut lief, landet auf Wunsch gleich in „Fürs nächste Mal“.</p>
           </div>
-          <div class="bild"><img src="./reel-bilder/protokoll.jpg" width="780" height="1688" loading="lazy"
-               alt="Fahrstunden-Protokoll mit Datum, Inhalt und Unterschrift"></div>
+          <div class="handy"><img src="./start-bilder/protokoll.jpg" width="780" height="1688" loading="lazy"
+               alt="Neuer Protokolleintrag mit Mängeln, Notiz und Unterschrift des Schülers"></div>
         </li>
         <li class="station">
-          <span class="marke" aria-hidden="true">3</span>
           <div>
+            <span class="schild" aria-hidden="true">3</span>
             <h3>Ausbildungsstand bewerten</h3>
             <p>Jedes Thema der Ausbildungsdiagrammkarte in Stufen bewerten. Der Gesamtfortschritt
-              rechnet sich selbst, über 90 amtliche Verkehrszeichen sind gleich mit dabei.</p>
+              rechnet sich selbst; über 90 amtliche Verkehrszeichen sind gleich mit dabei.</p>
           </div>
-          <div class="bild"><img src="./reel-bilder/adk.jpg" width="780" height="1688" loading="lazy"
+          <div class="handy"><img src="./start-bilder/adk.jpg" width="780" height="1688" loading="lazy"
                alt="Ausbildungsdiagrammkarte mit Bewertungsstufen je Thema"></div>
         </li>
         <li class="station">
-          <span class="marke" aria-hidden="true">4</span>
           <div>
+            <span class="schild" aria-hidden="true">4</span>
             <h3>Pflichtfahrten im Blick</h3>
-            <p>Überland, Autobahn und Nacht zählen mit. Was bis zur Prüfung noch fehlt, steht oben
-              in der Akte – ohne Nachrechnen.</p>
+            <p>Fahrstunden, Überland, Autobahn und Nacht zählen mit. Was bis zur Prüfung noch fehlt,
+              steht oben in der Akte – ohne Nachrechnen.</p>
           </div>
-          <div class="bild"><img src="./reel-bilder/pflicht.jpg" width="780" height="1688" loading="lazy"
-               alt="Übersicht der Pflichtfahrten mit erledigten und offenen Fahrten"></div>
+          <div class="handy"><img src="./start-bilder/pflicht.jpg" width="780" height="1688" loading="lazy"
+               alt="Fahrstunden und Pflichtfahrten mit erledigten und offenen Fahrten"></div>
         </li>
-        <li class="station ziel">
-          <span class="marke" aria-hidden="true">5</span>
+        <li class="station">
           <div>
+            <span class="schild" aria-hidden="true">5</span>
             <h3>Prüfungsreif – mit Nachweis</h3>
             <p>Den Ausbildungsnachweis als PDF erzeugen, ausdrucken oder weitergeben. Nach der
               bestandenen Prüfung wandert der Schüler ins Archiv.</p>
           </div>
-          <div class="bild"><img src="./reel-bilder/pdf.jpg" width="760" height="718" loading="lazy"
-               alt="Ausbildungsnachweis als PDF"></div>
+          <div class="blatt"><img src="./start-bilder/pdf.jpg" width="1588" height="2246" loading="lazy"
+               alt="Ausbildungsnachweis als PDF mit Fahrstunden, Pflichtfahrten und Ausbildungsdiagrammkarte"></div>
         </li>
       </ol>
     </section>
 
     <section class="nebenspur" aria-labelledby="portal-titel">
-      <div class="bild"><img src="./reel-bilder/portal.jpg" width="780" height="1688" loading="lazy"
+      <div class="handy"><img src="./reel-bilder/portal.jpg" width="780" height="1688" loading="lazy"
            alt="Schüler-Portal: der Schüler sieht seinen Lernstand"></div>
       <div>
         <h2 id="portal-titel">Deine Schüler sind mit dabei</h2>
@@ -232,10 +277,10 @@
       </div>
     </section>
 
-    <section class="preise" aria-labelledby="preise-titel">
+    <section class="preise" id="preise" aria-labelledby="preise-titel">
       <h2 id="preise-titel">Preise</h2>
-      <p>14 Tage kostenlos testen. Danach monatlich, monatlich kündbar. Der Preis richtet sich nach
-        der Zahl der Fahrlehrer; der Planer mit Online-Buchung ist optional.</p>
+      <p>14 Tage kostenlos testen, danach monatlich und monatlich kündbar. Der Preis richtet sich
+        nach der Zahl der Fahrlehrer; der Planer mit Online-Buchung ist optional.</p>
       <div class="tabelle-rand">
         <table>
           <thead>
@@ -256,11 +301,52 @@
         SEPA-Lastschrift. Es gelten die <a href="./agb.html">AGB</a>.</p>
     </section>
 
+    <section class="fragen" id="fragen" aria-labelledby="fragen-titel">
+      <div>
+        <h2 id="fragen-titel">Häufige Fragen</h2>
+        <p class="unter">Noch etwas offen? Schreib an <a href="mailto:kontakt@fahrsync.de">kontakt@fahrsync.de</a>.</p>
+      </div>
+      <div>
+        <details>
+          <summary>Was passiert nach den 14 Tagen?</summary>
+          <p>Für die weitere Nutzung brauchst du ein Abo ab 9,99 € im Monat. Vor der Zahlung siehst
+            du Preis, Laufzeit und Kündigung auf einen Blick.</p>
+        </details>
+        <details>
+          <summary>Wie kann ich kündigen?</summary>
+          <p>Monatlich – bei PayPal direkt im PayPal-Konto, sonst formlos per E-Mail. Die bezahlten
+            Funktionen laufen bis zum Ende des bezahlten Zeitraums weiter, mindestens noch 14 Tage.
+            Deine Daten bleiben dabei erhalten.</p>
+        </details>
+        <details>
+          <summary>Wo liegen die Daten meiner Schüler?</summary>
+          <p>Die Datenbank läuft in Frankfurt am Main. Zwischen dir und FahrSync gilt ein
+            Auftragsverarbeitungsvertrag; Einzelheiten stehen in der
+            <a href="./datenschutz.html">Datenschutzerklärung</a>.</p>
+        </details>
+        <details>
+          <summary>Brauchen meine Schüler eine App?</summary>
+          <p>Nein. Das Schüler-Portal läuft im Browser; der Schüler meldet sich mit dem Zugangscode
+            an, den du in seiner Akte erzeugst.</p>
+        </details>
+        <details>
+          <summary>Kann ich mit meinem Team arbeiten?</summary>
+          <p>Ja. Fahrlehrer treten deiner Fahrschule mit einem Fahrschul-Code bei. Die Preisstufe
+            richtet sich nach der Zahl der Fahrlehrer.</p>
+        </details>
+        <details>
+          <summary>Läuft FahrSync auf meinem Handy?</summary>
+          <p>Ja – auf iPhone, Android, Tablet und Computer, jeweils im Browser. Auf dem Handy lässt
+            es sich wie eine App auf den Startbildschirm legen.</p>
+        </details>
+      </div>
+    </section>
+
     <section class="fakten" aria-label="Gut zu wissen">
       <div>
         <h3>Daten in Deutschland</h3>
-        <p>Die Datenbank läuft in Frankfurt am Main. Ein Auftragsverarbeitungsvertrag ist
-          Teil der Registrierung.</p>
+        <p>Die Datenbank läuft in Frankfurt am Main. Der Auftragsverarbeitungsvertrag ist Teil
+          der Registrierung.</p>
       </div>
       <div>
         <h3>Für Fahrschulen und Fahrlehrer</h3>
@@ -269,13 +355,12 @@
       </div>
       <div>
         <h3>Ohne Installation</h3>
-        <p>FahrSync läuft im Browser auf Handy, Tablet und Computer und lässt sich wie eine App
-          auf den Startbildschirm legen.</p>
+        <p>Läuft im Browser auf Handy, Tablet und Computer. Kein App-Store, keine Updates von Hand.</p>
       </div>
     </section>
 
-    <section class="schluss">
-      <h2>Probier es mit deinen eigenen Schülern aus.</h2>
+    <section class="schluss" aria-labelledby="schluss-titel">
+      <h2 id="schluss-titel">Probier es mit deinen eigenen Schülern aus.</h2>
       <div class="knoepfe">
         <a class="knopf haupt" href="./index.html?start=registrieren">14 Tage kostenlos testen</a>
         <a class="knopf neben" href="./index.html?start=demo">Demo ansehen</a>
