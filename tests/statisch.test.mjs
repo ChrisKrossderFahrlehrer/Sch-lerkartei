@@ -355,13 +355,13 @@ console.log(`  ${datumGeprueft} Dateien durchgesehen${datumOffen ? '' : ' ✓'}`
 console.log('\n8) Keine Pfade eines bestimmten Rechners');
 const DURCHSUCHEN = [
   ...SEITEN, 'sw.js',
-  'functions/index.js', 'functions/loeschen.js', 'functions/rechnung.js', 'functions/abo.js',
+  'functions/index.js', 'functions/loeschen.js', 'functions/rechnung.js', 'functions/abo.js', 'functions/papierkorb.js',
   'firebase.json', 'firestore.rules', 'storage.rules',
   '.github/workflows/pruefen-und-deployen.yml',
 ];
 // Auch alle Testdateien - dort ist es zuletzt passiert.
 for (const d of ['statisch', 'indizes', 'rules', 'mandanten', 'uebernahme', 'audit', 'rechnung',
-                 'loeschen', 'kein_verlust', 'aufraeumen', 'abo', 'speicher', 'admin']) {
+                 'loeschen', 'kein_verlust', 'aufraeumen', 'abo', 'speicher', 'admin', 'papierkorb']) {
   DURCHSUCHEN.push(`tests/${d}.test.mjs`);
 }
 // Nur /home/<name>/ und /Users/<name>/ - das ist eindeutig.
