@@ -47,6 +47,25 @@ async function portalFreigeben(db, studentId, vorher, jetzt = Date.now()) {
   return n;
 }
 
+// Uebergang: Schueler, die geloescht wurden, bevor es diesen Trigger gab,
+// haben keine gemerkten Ablaufzeiten - die App hatte ihre Codes beim
+// Loeschen selbst auf "jetzt" gesetzt. Wieder geoeffnet werden genau die
+// Codes, die zum Loeschzeitpunkt abgelaufen sind (Spielraum fuer
+// Uhrabweichung); frueher abgelaufene bleiben zu.
+async function portalFreigebenAlt(db, studentId, geloeschtAm, jetzt = Date.now()) {
+  if (!geloeschtAm) return 0;
+  const snap = await db.collection('accessCodes').where('studentId', '==', studentId).get();
+  let n = 0;
+  for (const d of snap.docs) {
+    const bis = d.get('expiresAt');
+    if (typeof bis !== 'number' || bis > jetzt) continue;
+    if (Math.abs(bis - geloeschtAm) > 10 * 60 * 1000) continue;
+    await d.ref.update({ expiresAt: jetzt + 365 * TAG_MS });
+    n++;
+  }
+  return n;
+}
+
 // Schueler samt Begleitdaten endgueltig entfernen: Zugangscodes (Chat,
 // Name, Planung) mit Chat-Fotos, Protokoll, zuletzt das Schueler-Dokument.
 async function schuelerEndgueltigLoeschen(db, studentId) {
@@ -75,7 +94,9 @@ async function papierkorbAenderung(db, studentId, vorher, nachher, jetzt = Date.
     return 'gesperrt';
   }
   if (warGeloescht && !istJetzt) {
-    await portalFreigeben(db, studentId, nachher.portalAblaufVorher || vorher.portalAblaufVorher, jetzt);
+    const gemerkt = nachher.portalAblaufVorher || vorher.portalAblaufVorher;
+    if (gemerkt) await portalFreigeben(db, studentId, gemerkt, jetzt);
+    else await portalFreigebenAlt(db, studentId, vorher.geloeschtAm, jetzt);
     await ref.update({ portalAblaufVorher: FieldValue.delete(), portalGesperrtAm: FieldValue.delete() });
     return 'freigegeben';
   }

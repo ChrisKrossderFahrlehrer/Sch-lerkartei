@@ -106,6 +106,19 @@ await pruefe('Protokoll und Chat sind noch da', async () => {
   gleich((await lies('accessCodes/CODEA1')).messages.length, 1, 'Chat');
 });
 
+console.log('\nUEBERGANG: GELOESCHT VOR DIESEM TRIGGER');
+// Die App hatte selbst gesperrt (expiresAt = Loeschzeit), nichts gemerkt.
+await db.doc('students/u').set({ uid: 'lehrerB', vorname: 'Ute', ...LOESCHEN(T0) });
+await db.doc('accessCodes/CODEU1').set({ studentId: 'u', teacherUid: 'lehrerB', expiresAt: T0 + 2000 });
+await db.doc('accessCodes/CODEU2').set({ studentId: 'u', teacherUid: 'lehrerB', expiresAt: T0 - 30 * TAG });
+await pruefe('Wiederherstellen ohne Merkliste -> beim Loeschen gesperrter Code wieder offen', async () => {
+  gleich(await aendere('u', { archiviert: false, archiviertAm: null, archivGrund: null, geloeschtAm: null }, T0 + 5 * TAG), 'freigegeben', 'Ergebnis');
+  gleich((await lies('accessCodes/CODEU1')).expiresAt, T0 + 5 * TAG + 365 * TAG, 'Code U1');
+});
+await pruefe('... aber ein schon vorher abgelaufener Code bleibt zu', async () => {
+  gleich((await lies('accessCodes/CODEU2')).expiresAt, T0 - 30 * TAG, 'Code U2');
+});
+
 console.log(`\nNACH ${PAPIERKORB_TAGE} TAGEN`);
 await db.doc('students/alt').set({ uid: 'lehrerB', vorname: 'Alt', ...LOESCHEN(T0 - 91 * TAG) });
 await db.doc('accessCodes/CODEALT').set({ studentId: 'alt', teacherUid: 'lehrerC', expiresAt: T0 - 91 * TAG });
