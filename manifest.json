@@ -1,7 +1,7 @@
 {
-  "name": "ADK – Digitale Kartei",
-  "short_name": "ADK",
-  "description": "ADK – Digitale Fahrschul-Kartei für Fahrlehrer",
+  "name": "FahrSync – Digitale Kartei",
+  "short_name": "FahrSync",
+  "description": "FahrSync – Digitale Fahrschul-Kartei für Fahrlehrer",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait",

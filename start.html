@@ -5,92 +5,290 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FahrSync – Die digitale Kartei für Fahrlehrer</title>
 <link rel="canonical" href="https://fahrsync.de/start.html">
-<meta name="description" content="FahrSync ist eine webbasierte Verwaltungssoftware für Fahrschulen und Fahrlehrer: digitale Schülerkartei, Ausbildungsnachweis, Fahrstunden-Protokoll, Schüler-Portal und optionaler Kalender mit Online-Buchung.">
+<meta name="description" content="FahrSync ist eine webbasierte Verwaltungssoftware für Fahrschulen und Fahrlehrer: digitale Schülerkartei, Ausbildungsnachweis, Fahrstunden-Protokoll, Schüler-Portal und optionaler Kalender mit Online-Buchung. 14 Tage kostenlos testen.">
+<meta name="theme-color" content="#16191e">
+<link rel="icon" type="image/png" href="./icon-192.png?v=3">
 <!-- Schriften lokal statt von Google (DSGVO, siehe werkzeug/schriften-holen.py) -->
 <link href="./schriften/schriften.css" rel="stylesheet">
 <style>
+  /* Leitidee: Eine Fahrausbildung ist eine Strecke. Die gestrichelte
+     Mittellinie fuehrt durch die Seite; an ihr liegen die Stationen in der
+     Reihenfolge, in der sie in der Ausbildung vorkommen. Gelb ist Schild-
+     und Markierungsgelb, Gruen steht nur fuer "fertig". Alle Aussagen und
+     Bilder stammen aus der echten App. */
   :root {
-    --bg: #0d1117; --surface: #161b22; --surface2: #1c2330; --border: #30363d;
-    --text: #e6edf3; --muted: #7d8590; --accent: #f0b429; --accent2: #3fb950; --blue: #58a6ff;
+    --asphalt: #16191e;
+    --asphalt-hell: #1f242b;
+    --kante: #2e343d;
+    --weiss: #eef1f4;
+    --grau: #9aa3ad;
+    --gelb: #f0b429;
+    --gruen: #3fb950;
   }
   * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
   body {
-    margin: 0; background: var(--bg); color: var(--text);
-    font-family: 'Manrope', sans-serif; line-height: 1.6;
+    margin: 0; background: var(--asphalt); color: var(--weiss);
+    font-family: 'Manrope', sans-serif; font-size: 1rem; line-height: 1.6;
     -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
   }
-  .wrap { max-width: 640px; margin: 0 auto; padding: 40px 20px 60px; }
-  .brand { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.6rem; color: var(--accent); text-align: center; }
-  h1 { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.5rem; text-align: center; margin: 8px 0 6px; line-height: 1.3; }
-  .sub { text-align: center; color: var(--muted); font-size: 0.95rem; margin-bottom: 32px; }
-  .lead { font-size: 1rem; color: var(--text); text-align: center; margin-bottom: 32px; }
-  .cta-wrap { text-align: center; margin-bottom: 40px; }
-  .cta {
-    display: inline-block; background: var(--accent); color: #0d1117; font-weight: 800;
-    font-family: 'Syne', sans-serif; text-decoration: none; padding: 14px 32px;
-    border-radius: 12px; font-size: 1.02rem;
+  a { color: inherit; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--gelb); outline-offset: 3px; border-radius: 6px; }
+  .rahmen { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+  h1, h2, h3 { font-family: 'Syne', sans-serif; line-height: 1.15; margin: 0; }
+
+  /* Kopf */
+  .kopf { display: flex; align-items: center; justify-content: space-between; padding: 20px 0; }
+  .wortmarke { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.35rem; color: var(--gelb); text-decoration: none; letter-spacing: -0.01em; min-height: 44px; display: inline-flex; align-items: center; }
+  .kopf a.anmelden { text-decoration: none; font-weight: 700; font-size: 0.95rem; padding: 10px 16px; border: 1.5px solid var(--kante); border-radius: 10px; min-height: 44px; display: inline-flex; align-items: center; }
+  .kopf a.anmelden:hover { border-color: var(--grau); }
+
+  /* Einstieg: Text links, echtes Handybild rechts */
+  .einstieg { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 48px; align-items: center; padding: 40px 0 72px; }
+  .einstieg h1 { font-size: clamp(2.1rem, 5vw, 3.4rem); font-weight: 800; letter-spacing: -0.02em; max-width: 14ch; }
+  .einstieg .lead { font-size: 1.12rem; color: var(--grau); max-width: 46ch; margin: 20px 0 30px; }
+  .knoepfe { display: flex; flex-wrap: wrap; gap: 12px; }
+  .knopf { display: inline-flex; align-items: center; justify-content: center; min-height: 52px; padding: 0 24px; border-radius: 12px; font-weight: 800; font-size: 1rem; text-decoration: none; }
+  .knopf.haupt { background: var(--gelb); color: #16191e; }
+  .knopf.haupt:hover { background: #ffc94d; }
+  .knopf.neben { border: 1.5px solid var(--kante); color: var(--weiss); }
+  .knopf.neben:hover { border-color: var(--grau); }
+  .hinweis { font-size: 0.88rem; color: var(--grau); margin-top: 14px; }
+
+  .handy { width: 100%; max-width: 300px; justify-self: center; border-radius: 34px; padding: 10px; background: #0b0d10; border: 1px solid var(--kante); }
+  .handy img { display: block; width: 100%; height: auto; border-radius: 26px; }
+
+  /* Die Strecke: gestrichelte Mittellinie mit Stationen */
+  .strecke-kopf { max-width: 640px; margin-bottom: 40px; }
+  .strecke-kopf h2 { font-size: clamp(1.6rem, 3.4vw, 2.2rem); font-weight: 800; }
+  .strecke-kopf p { color: var(--grau); margin: 12px 0 0; }
+  .strecke { position: relative; padding-left: 56px; }
+  .strecke::before {
+    content: ''; position: absolute; left: 19px; top: 8px; bottom: 8px; width: 4px;
+    background: repeating-linear-gradient(to bottom, var(--weiss) 0 22px, transparent 22px 40px);
+    opacity: 0.55;
   }
-  .features { display: flex; flex-direction: column; gap: 14px; margin-bottom: 40px; }
-  .feature { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; display: flex; gap: 14px; align-items: flex-start; }
-  .feature .icon { font-size: 1.4rem; flex-shrink: 0; }
-  .feature .title { font-weight: 700; font-size: 0.92rem; margin-bottom: 3px; }
-  .feature .desc { color: var(--muted); font-size: 0.84rem; }
-  .fuer-wen { background: var(--surface2); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; margin-bottom: 40px; font-size: 0.88rem; color: var(--muted); }
-  .fuer-wen strong { color: var(--text); }
-  footer { text-align: center; font-size: 0.74rem; color: var(--muted); padding-top: 20px; border-top: 1px solid var(--border); }
-  footer a { color: var(--muted); text-decoration: underline; }
+  .station { position: relative; display: grid; grid-template-columns: 1fr 220px; gap: 32px; align-items: start; padding: 8px 0 56px; }
+  .station:last-child { padding-bottom: 0; }
+  .station .marke {
+    position: absolute; left: -56px; top: 8px; width: 42px; height: 42px; border-radius: 50%;
+    background: var(--asphalt); border: 3px solid var(--gelb); color: var(--gelb);
+    font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.05rem;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .station.ziel .marke { border-color: var(--gruen); color: var(--gruen); }
+  .station h3 { font-size: 1.35rem; font-weight: 700; margin-top: 6px; }
+  .station p { color: var(--grau); margin: 10px 0 0; max-width: 52ch; }
+  .station .bild { border-radius: 22px; padding: 7px; background: #0b0d10; border: 1px solid var(--kante); }
+  .station .bild img { display: block; width: 100%; height: auto; border-radius: 16px; }
+
+  /* Nebenspur: Schueler-Portal und Planer */
+  .nebenspur { display: grid; grid-template-columns: 220px 1fr; gap: 32px; align-items: center; margin-top: 88px; padding: 32px; border: 1.5px dashed var(--kante); border-radius: 20px; }
+  .nebenspur h2 { font-size: 1.6rem; font-weight: 800; }
+  .nebenspur p { color: var(--grau); margin: 12px 0 0; }
+  .nebenspur .bild { border-radius: 22px; padding: 7px; background: #0b0d10; border: 1px solid var(--kante); }
+  .nebenspur .bild img { display: block; width: 100%; height: auto; border-radius: 16px; }
+  .nebenspur ul { margin: 16px 0 0; padding-left: 20px; color: var(--grau); }
+  .nebenspur li { margin-bottom: 6px; }
+
+  /* Preise als echte Tabelle */
+  .preise { margin-top: 96px; }
+  .preise h2 { font-size: clamp(1.6rem, 3.4vw, 2.2rem); font-weight: 800; }
+  .preise > p { color: var(--grau); margin: 12px 0 28px; max-width: 60ch; }
+  .tabelle-rand { overflow-x: auto; border: 1px solid var(--kante); border-radius: 16px; }
+  table { width: 100%; border-collapse: collapse; min-width: 420px; }
+  th, td { padding: 14px 18px; text-align: left; }
+  th { font-weight: 700; color: var(--grau); font-size: 0.9rem; border-bottom: 1px solid var(--kante); }
+  td { border-bottom: 1px solid var(--kante); }
+  tr:last-child td { border-bottom: none; }
+  td.betrag, th.betrag { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.betrag { font-weight: 700; }
+  .klein { font-size: 0.88rem; color: var(--grau); margin-top: 14px; max-width: 70ch; }
+
+  /* Fakten und Schluss */
+  .fakten { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; margin-top: 96px; padding-top: 40px; border-top: 1px solid var(--kante); }
+  .fakten h3 { font-size: 1.05rem; font-weight: 700; }
+  .fakten p { color: var(--grau); margin: 8px 0 0; font-size: 0.95rem; }
+  .schluss { text-align: left; margin: 96px 0 72px; }
+  .schluss h2 { font-size: clamp(1.6rem, 3.4vw, 2.2rem); font-weight: 800; margin-bottom: 20px; }
+
+  footer { border-top: 1px solid var(--kante); padding: 24px 0 40px; font-size: 0.88rem; color: var(--grau); display: flex; flex-wrap: wrap; gap: 8px 20px; }
+  footer a { color: var(--grau); min-height: 44px; display: inline-flex; align-items: center; }
+  footer span { min-height: 44px; display: inline-flex; align-items: center; }
+
+  @media (max-width: 820px) {
+    .einstieg { grid-template-columns: 1fr; gap: 36px; padding-top: 16px; }
+    .handy { max-width: 250px; }
+    .station { grid-template-columns: 1fr; gap: 20px; }
+    .station .bild { max-width: 230px; }
+    .nebenspur { grid-template-columns: 1fr; padding: 24px; }
+    .nebenspur .bild { max-width: 230px; order: 2; }
+    .fakten { grid-template-columns: 1fr; gap: 24px; }
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1 class="brand">FahrSync</h1>
-  <div class="sub" style="font-weight:600;font-size:1.05rem;color:var(--text);margin-bottom:6px">Die digitale Kartei für Fahrlehrer</div>
-  <div class="sub">Webbasierte Verwaltungssoftware für Fahrschulen und Fahrlehrer</div>
+<div class="rahmen">
 
-  <p class="lead">
-    FahrSync ersetzt Papier-Ausbildungsnachweis, Karteikarten und lose Notizzettel durch eine
-    digitale Schülerkartei: Ausbildungsstand, Fahrstunden-Protokoll und Lernfortschritt jedes
-    Schülers an einem Ort – dazu ein eigenes Portal für die Fahrschüler und optional ein
-    Termin-Kalender mit Online-Buchung.
-  </p>
+  <header class="kopf">
+    <a class="wortmarke" href="./start.html">FahrSync</a>
+    <a class="anmelden" href="./index.html">Anmelden</a>
+  </header>
 
-  <div class="cta-wrap">
-    <a class="cta" href="./index.html">Anmelden →</a>
-  </div>
+  <main>
+    <section class="einstieg">
+      <div>
+        <h1>Die Schülerkartei, die mit ins Auto kommt.</h1>
+        <p class="lead">
+          Ausbildungsstand nach amtlichem Lehrplan, Fahrstunden-Protokoll mit Unterschrift und
+          Pflichtfahrten – für jeden Schüler an einem Ort, auf dem Handy. Statt Karteikarte,
+          Papiernachweis und Notizzettel.
+        </p>
+        <div class="knoepfe">
+          <a class="knopf haupt" href="./index.html?start=registrieren">14 Tage kostenlos testen</a>
+          <a class="knopf neben" href="./index.html?start=demo">Demo ansehen</a>
+        </div>
+        <p class="hinweis">Danach ab 9,99 € im Monat, monatlich kündbar. Die Demo läuft ohne Anmeldung im Browser.</p>
+      </div>
+      <div class="handy">
+        <img src="./reel-bilder/akte-oben.jpg" width="780" height="1688"
+             alt="Schüler-Kartei in FahrSync: Name, Führerscheinklasse, Fortschritt in Prozent und die nächsten Aufgaben">
+      </div>
+    </section>
 
-  <div class="features">
-    <div class="feature">
-      <div class="icon">📋</div>
-      <div><div class="title">Digitale Schülerkartei</div><div class="desc">Ausbildungsstand nach amtlichem Lehrplan, Fahrstunden-Protokoll, Sonderfahrten und Notizen je Schüler.</div></div>
-    </div>
-    <div class="feature">
-      <div class="icon">🚦</div>
-      <div><div class="title">Verkehrszeichen-Katalog</div><div class="desc">Über 90 amtliche Verkehrszeichen zur Bewertung der Schüler-Kenntnis, direkt in der Akte.</div></div>
-    </div>
-    <div class="feature">
-      <div class="icon">📱</div>
-      <div><div class="title">Schüler-Portal</div><div class="desc">Fahrschüler sehen ihren Lernstand selbst ein und können direkt mit dem Fahrlehrer chatten.</div></div>
-    </div>
-    <div class="feature">
-      <div class="icon">📅</div>
-      <div><div class="title">Kalender &amp; Online-Buchung</div><div class="desc">Optionales Zusatzmodul: Termine verwalten, Schüler buchen freie Zeiten selbst.</div></div>
-    </div>
-    <div class="feature">
-      <div class="icon">📄</div>
-      <div><div class="title">PDF-Export</div><div class="desc">Ausbildungsnachweis und Protokolle als PDF exportieren.</div></div>
-    </div>
-  </div>
+    <section aria-labelledby="strecke-titel">
+      <div class="strecke-kopf">
+        <h2 id="strecke-titel">Von der ersten Stunde bis zur Prüfung</h2>
+        <p>So begleitet FahrSync eine Ausbildung – in der Reihenfolge, in der sie im Alltag passiert.</p>
+      </div>
 
-  <div class="fuer-wen">
-    <strong>Für wen:</strong> Fahrschulen und selbstständige Fahrlehrer in Deutschland. Das Angebot
-    richtet sich an Unternehmer im Sinne des § 14 BGB, nicht an Verbraucher.
-  </div>
+      <ol class="strecke" style="list-style:none;margin:0">
+        <li class="station">
+          <span class="marke" aria-hidden="true">1</span>
+          <div>
+            <h3>Schüler anlegen</h3>
+            <p>Name, Geburtsdatum und Klasse – B, B197, BE oder A. Die Liste zeigt sofort, wer
+              wie weit ist und wer lange keine Stunde mehr hatte.</p>
+          </div>
+          <div class="bild"><img src="./reel-bilder/liste.jpg" width="780" height="1688" loading="lazy"
+               alt="Schülerliste mit Suche, Filtern nach Klasse und Fortschrittsanzeige je Schüler"></div>
+        </li>
+        <li class="station">
+          <span class="marke" aria-hidden="true">2</span>
+          <div>
+            <h3>Fahrstunde eintragen</h3>
+            <p>Datum, Inhalt und Mängel der Stunde, der Schüler unterschreibt direkt auf dem
+              Display. Was nicht gut lief, landet auf Wunsch gleich in „Fürs nächste Mal“.</p>
+          </div>
+          <div class="bild"><img src="./reel-bilder/protokoll.jpg" width="780" height="1688" loading="lazy"
+               alt="Fahrstunden-Protokoll mit Datum, Inhalt und Unterschrift"></div>
+        </li>
+        <li class="station">
+          <span class="marke" aria-hidden="true">3</span>
+          <div>
+            <h3>Ausbildungsstand bewerten</h3>
+            <p>Jedes Thema der Ausbildungsdiagrammkarte in Stufen bewerten. Der Gesamtfortschritt
+              rechnet sich selbst, über 90 amtliche Verkehrszeichen sind gleich mit dabei.</p>
+          </div>
+          <div class="bild"><img src="./reel-bilder/adk.jpg" width="780" height="1688" loading="lazy"
+               alt="Ausbildungsdiagrammkarte mit Bewertungsstufen je Thema"></div>
+        </li>
+        <li class="station">
+          <span class="marke" aria-hidden="true">4</span>
+          <div>
+            <h3>Pflichtfahrten im Blick</h3>
+            <p>Überland, Autobahn und Nacht zählen mit. Was bis zur Prüfung noch fehlt, steht oben
+              in der Akte – ohne Nachrechnen.</p>
+          </div>
+          <div class="bild"><img src="./reel-bilder/pflicht.jpg" width="780" height="1688" loading="lazy"
+               alt="Übersicht der Pflichtfahrten mit erledigten und offenen Fahrten"></div>
+        </li>
+        <li class="station ziel">
+          <span class="marke" aria-hidden="true">5</span>
+          <div>
+            <h3>Prüfungsreif – mit Nachweis</h3>
+            <p>Den Ausbildungsnachweis als PDF erzeugen, ausdrucken oder weitergeben. Nach der
+              bestandenen Prüfung wandert der Schüler ins Archiv.</p>
+          </div>
+          <div class="bild"><img src="./reel-bilder/pdf.jpg" width="760" height="718" loading="lazy"
+               alt="Ausbildungsnachweis als PDF"></div>
+        </li>
+      </ol>
+    </section>
+
+    <section class="nebenspur" aria-labelledby="portal-titel">
+      <div class="bild"><img src="./reel-bilder/portal.jpg" width="780" height="1688" loading="lazy"
+           alt="Schüler-Portal: der Schüler sieht seinen Lernstand"></div>
+      <div>
+        <h2 id="portal-titel">Deine Schüler sind mit dabei</h2>
+        <p>Mit einem Zugangscode sehen Fahrschüler ihren eigenen Stand im Schüler-Portal – im
+          Browser, ohne eigenes Konto.</p>
+        <ul>
+          <li>Lernstand, Protokoll und geplante Fahrstunden</li>
+          <li>Chat mit dem Fahrlehrer, auch mit Fotos</li>
+          <li>Optional: Planer mit Online-Buchung freier Termine</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="preise" aria-labelledby="preise-titel">
+      <h2 id="preise-titel">Preise</h2>
+      <p>14 Tage kostenlos testen. Danach monatlich, monatlich kündbar. Der Preis richtet sich nach
+        der Zahl der Fahrlehrer; der Planer mit Online-Buchung ist optional.</p>
+      <div class="tabelle-rand">
+        <table>
+          <thead>
+            <tr><th scope="col">Stufe</th><th scope="col" class="betrag">Ohne Planer</th><th scope="col" class="betrag">Mit Planer</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Solo (1 Fahrlehrer)</td><td class="betrag">9,99 €</td><td class="betrag">13,99 €</td></tr>
+            <tr><td>bis 5 Fahrlehrer</td><td class="betrag">12,99 €</td><td class="betrag">16,99 €</td></tr>
+            <tr><td>bis 10 Fahrlehrer</td><td class="betrag">20,99 €</td><td class="betrag">25,99 €</td></tr>
+            <tr><td>bis 15 Fahrlehrer</td><td class="betrag">26,99 €</td><td class="betrag">34,99 €</td></tr>
+            <tr><td>Unbegrenzt</td><td class="betrag">34,99 €</td><td class="betrag">40,99 €</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="klein">Alle Preise pro Monat. Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.
+        Bei „Unbegrenzt“ fällt einmalig eine Einrichtungsgebühr von 42,99 € an (mit Planer 45,99 €),
+        fällig bei Abschluss – auch während der Testphase. Bezahlung per PayPal, Kreditkarte oder
+        SEPA-Lastschrift. Es gelten die <a href="./agb.html">AGB</a>.</p>
+    </section>
+
+    <section class="fakten" aria-label="Gut zu wissen">
+      <div>
+        <h3>Daten in Deutschland</h3>
+        <p>Die Datenbank läuft in Frankfurt am Main. Ein Auftragsverarbeitungsvertrag ist
+          Teil der Registrierung.</p>
+      </div>
+      <div>
+        <h3>Für Fahrschulen und Fahrlehrer</h3>
+        <p>Für selbstständige Fahrlehrer und Fahrschulen mit Team in Deutschland. Das Angebot
+          richtet sich an Unternehmer im Sinne des § 14 BGB, nicht an Verbraucher.</p>
+      </div>
+      <div>
+        <h3>Ohne Installation</h3>
+        <p>FahrSync läuft im Browser auf Handy, Tablet und Computer und lässt sich wie eine App
+          auf den Startbildschirm legen.</p>
+      </div>
+    </section>
+
+    <section class="schluss">
+      <h2>Probier es mit deinen eigenen Schülern aus.</h2>
+      <div class="knoepfe">
+        <a class="knopf haupt" href="./index.html?start=registrieren">14 Tage kostenlos testen</a>
+        <a class="knopf neben" href="./index.html?start=demo">Demo ansehen</a>
+      </div>
+    </section>
+  </main>
 
   <footer>
-    © 2026 FahrSync ·
-    <a href="./impressum.html">Impressum</a> ·
-    <a href="./datenschutz.html">Datenschutz</a> ·
+    <span>© 2026 FahrSync</span>
+    <a href="./impressum.html">Impressum</a>
+    <a href="./datenschutz.html">Datenschutz</a>
     <a href="./agb.html">AGB</a>
+    <a href="./avv.html">AVV</a>
   </footer>
 </div>
 </body>

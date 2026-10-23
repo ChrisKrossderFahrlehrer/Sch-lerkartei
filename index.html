@@ -41,7 +41,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="ADK">
-<meta name="application-name" content="ADK – Digitale Kartei">
+<meta name="application-name" content="FahrSync">
 <meta name="description" content="FahrSync ADK – die digitale Schülerkartei für Fahrlehrer: Ausbildungsnachweis, Fahrstunden-Protokoll mit Unterschrift, Lernkurve & Kalender. DSGVO-konform.">
 <link rel="canonical" href="https://fahrsync.de/">
 <meta property="og:type" content="website">
@@ -60,7 +60,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png?v=3">
 <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png?v=3">
 <link rel="shortcut icon" href="./icon-192.png?v=3">
-<title>ADK – Digitale Kartei für Fahrlehrer | FahrSync</title>
+<title>FahrSync – Digitale Kartei für Fahrlehrer</title>
 <!-- Schriften lokal statt von Google (DSGVO, siehe werkzeug/schriften-holen.py) -->
 <link href="./schriften/schriften.css" rel="stylesheet">
 <style>
@@ -70,7 +70,7 @@
   --surface2: #1c2330;
   --border: #30363d;
   --text: #e6edf3;
-  --muted: #7d8590;
+  --muted: #8b949e;   /* vorher #7d8590: nur 4,2:1 auf Flächen, WCAG AA verlangt 4,5:1 */
   --accent: #f0b429;
   --accent2: #3fb950;
   --danger: #f85149;
@@ -90,7 +90,7 @@ body.light {
   --surface2: #edf0f4;
   --border: #d0d7de;
   --text: #1a1f27;
-  --muted: #6b7280;
+  --muted: #5b6472;   /* vorher #6b7280: 4,2:1 auf surface2 */
   --accent: #d4920a;
   --accent2: #2d8a3e;
   --danger: #c0392b;
@@ -177,7 +177,7 @@ body.light {
 }
 .style-klar.light {
   --bg: #f4f5f8; --surface: #ffffff; --surface2: #eef0f4; --border: #e2e5eb;
-  --text: #12151b; --muted: #687083;
+  --text: #12151b; --muted: #5d6577;
   --shadow-sm: 0 1px 2px rgba(16,24,40,0.05), 0 6px 18px rgba(16,24,40,0.06);
   --shadow-md: 0 12px 30px rgba(16,24,40,0.10);
 }
@@ -595,7 +595,9 @@ body.light .student-card { box-shadow:0 3px 0 rgba(16,24,40,0.12), 0 7px 16px rg
 @keyframes cardIn { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .student-card.card-in { animation:none; } }
 
-.avatar { width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:'Syne',sans-serif; font-weight:700; font-size:0.95rem; color:white; flex-shrink:0; box-shadow:inset 0 2px 3px rgba(255,255,255,0.4), inset 0 -4px 7px rgba(0,0,0,0.28), 0 3px 9px rgba(0,0,0,0.4); text-shadow:0 1px 2px rgba(0,0,0,0.35); }
+.avatar { width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:'Syne',sans-serif; font-weight:700; font-size:0.95rem; color:#0d1117; flex-shrink:0; box-shadow:inset 0 2px 3px rgba(255,255,255,0.4), inset 0 -4px 7px rgba(0,0,0,0.28), 0 3px 9px rgba(0,0,0,0.4); }
+/* Initialen dunkel statt weiss: Weiss erreichte auf allen acht Kreisfarben
+   nur 1,9-3,4:1 (auf Gelb kaum lesbar), dunkel 5,7-10:1. */
 .sc-name { font-weight:700; font-size:0.92rem; }
 .sc-meta { font-size:0.72rem; color:var(--muted); margin-top:2px; }
 .sc-right { margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
@@ -878,6 +880,12 @@ body.beta-dash .badge { font-size: 0.66rem; padding: 3px 9px; }
 .section-block { background:var(--surface); border:1px solid var(--border); border-radius:16px; margin-bottom:12px; overflow:hidden; box-shadow:var(--shadow-sm); }
 .section-header { padding:13px 16px 11px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
 .section-title { font-family:'Syne',sans-serif; font-size:0.8rem; font-weight:800; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); }
+/* Standard-Stil: Abschnittsueberschriften in normaler Schreibweise statt
+   gesperrter Versalien. Die brachen auf dem Handy um ("FUERS NAECHSTE /
+   MAL") und wirkten unruhig. Die anderen Stile behalten ihre eigene Form
+   (Editorial setzt bewusst Versalien). */
+body:not([class*="style-"]) .section-title { text-transform:none; letter-spacing:0; font-size:0.95rem; color:var(--text); }
+body:not([class*="style-"]) .abc-header { text-transform:none; letter-spacing:0.02em; }
 .section-body { padding:14px 16px; }
 
 .fahrstunden-display { display:flex; align-items:center; gap:16px; margin-bottom:14px; }
@@ -935,12 +943,13 @@ body.beta-dash .badge { font-size: 0.66rem; padding: 3px 9px; }
 .adk-kopf .thema-name { flex:1; }
 .adk-stand { font-size:0.7rem; font-weight:700; white-space:nowrap; letter-spacing:0.01em; flex-shrink:0; }
 .adk-balken { display:flex; gap:3px; }
-/* Der Knopf ist 26px hoch (Tippflaeche), der sichtbare Balken nur 10px.
-   Das min-height:26px muss sein, weil weiter oben alle button-Elemente
+/* Der Knopf ist 32px hoch (Tippflaeche; vorher 26px - knapp ueber dem
+   WCAG-Minimum von 24px, unterwegs schwer zu treffen), der sichtbare
+   Balken bleibt 12px. Das min-height muss sein, weil weiter oben alle button-Elemente
    pauschal min-height:44px bekommen - das wuerde die Zeile sonst
    unnoetig aufblaehen. */
 .adk-seg {
-  flex:1; height:26px; min-height:26px; padding:0; border:none; background:none;
+  flex:1; height:32px; min-height:32px; padding:0; border:none; background:none;
   cursor:pointer; display:flex; align-items:center; justify-content:center;
   /* Ohne min-width:0 waere die automatische Mindestbreite eines Flex-Kindes
      seine Inhaltsbreite. Setzt eine Oberflaeche der Markierung eine feste
@@ -1159,7 +1168,7 @@ body.light .punkte-neon .adk-seg.erreicht::before {
 
 .notes-textarea { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:12px; font-family:'Manrope',sans-serif; font-size:0.88rem; color:var(--text); resize:none; min-height:100px; outline:none; line-height:1.6; }
 .notes-textarea:focus { border-color:var(--accent); }
-.save-btn { background:var(--accent2); color:white; border:none; padding:11px 20px; border-radius:10px; font-family:'Manrope',sans-serif; font-weight:600; font-size:0.88rem; cursor:pointer; width:100%; margin-top:10px; }
+.save-btn { background:var(--accent2); color:#0d1117; border:none; padding:11px 20px; border-radius:10px; font-family:'Manrope',sans-serif; font-weight:600; font-size:0.88rem; cursor:pointer; width:100%; margin-top:10px; }
 .save-btn:active { opacity:0.8; }
 .delete-btn { background:rgba(248,81,73,0.1); border:1px solid rgba(248,81,73,0.3); color:var(--danger); padding:11px; border-radius:10px; font-family:'Manrope',sans-serif; font-size:0.85rem; cursor:pointer; width:100%; margin-top:6px; }
 
@@ -1646,17 +1655,17 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     <div class="tabs">
       <button class="tab-btn active" id="tab-login" onclick="switchTab('login')">Anmelden</button>
       <button class="tab-btn" id="tab-register" onclick="switchTab('register')">Registrieren</button>
-      <button class="tab-btn" id="tab-schueler" onclick="switchTab('schueler')">📋 Meine Akte</button>
+      <button class="tab-btn" id="tab-schueler" onclick="switchTab('schueler')">🎓 Für Schüler</button>
     </div>
     <div id="login-form">
       <div class="form-group">
         <label class="form-label">Benutzername oder E-Mail</label>
-        <input class="form-input" id="login-username" type="text" placeholder="Benutzername oder E-Mail" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false">
+        <input class="form-input" id="login-username" aria-label="Benutzername oder E-Mail" type="text" placeholder="Benutzername oder E-Mail" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false">
         <div style="font-size:0.7rem;color:var(--muted);margin-top:4px">Du kannst dich mit deinem Benutzernamen oder deiner E-Mail anmelden</div>
       </div>
       <div class="form-group">
         <label class="form-label">Passwort</label>
-        <input class="form-input" id="login-pw" type="password" placeholder="••••••••" autocomplete="current-password">
+        <input class="form-input" id="login-pw" aria-label="Passwort" type="password" placeholder="••••••••" autocomplete="current-password">
       </div>
       <button class="btn-main" id="btn-login" onclick="doLogin()">Anmelden</button>
       <button class="btn-secondary" onclick="startDemo()" style="margin-top:10px">🎮 Demo ansehen (24 h)</button>
@@ -1857,7 +1866,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     </div>
     <div class="search-wrap">
       <span class="search-icon">🔍</span>
-      <input class="search-input" id="search" placeholder="Schüler suchen…" oninput="renderList()">
+      <input class="search-input" id="search" aria-label="Schüler suchen" placeholder="Schüler suchen…" oninput="renderList()">
       <button id="search-clear" onclick="clearSearch()" style="display:none;background:none;border:none;color:var(--muted);font-size:1rem;cursor:pointer;padding:0 8px;position:absolute;right:4px;top:50%;transform:translateY(-50%)">✕</button>
     </div>
     <div class="filter-row" id="filter-row">
@@ -2649,7 +2658,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       </div></div>
       <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
         <div style="font-weight:700;margin-bottom:3px">🔑 Schüler-Zugangscode</div>
-        <div style="font-size:0.8rem;color:var(--muted)">🔑 Button in der Kartei generiert einen Zugangscode. Schüler kann damit im Login-Bereich „Meine Akte" seine eigene Kartei (nur lesen) einsehen.</div>
+        <div style="font-size:0.8rem;color:var(--muted)">🔑 Button in der Kartei generiert einen Zugangscode. Schüler kann damit im Login-Bereich „Für Schüler" seine eigene Kartei (nur lesen) einsehen.</div>
       </div></div>
       <div class="section-block" style="margin-bottom:8px"><div class="section-body" style="padding:12px 14px">
         <div style="font-weight:700;margin-bottom:3px">🎓 Prüfung bestanden</div>
@@ -5046,7 +5055,15 @@ onAuthStateChanged(auth, async (user) => {
     if (btnReg) { btnReg.disabled = false; btnReg.textContent = 'Konto erstellen'; }
     const authErr = document.getElementById('auth-error');
     if (authErr) authErr.textContent = '';
-    switchTab('login');
+    // Einstieg von der Startseite: index.html?start=registrieren oeffnet
+    // gleich die Registrierung, ?start=demo die Demo. Nur beim ersten
+    // Abmelde-Zustand nach dem Laden, damit ein spaeteres Abmelden normal
+    // auf "Anmelden" landet.
+    const einstieg = !window.__einstiegGenutzt && new URLSearchParams(location.search).get('start');
+    window.__einstiegGenutzt = true;
+    if (einstieg === 'registrieren') switchTab('register');
+    else if (einstieg === 'demo') { switchTab('login'); setTimeout(() => { try { startDemo(); } catch(e) {} }, 0); }
+    else switchTab('login');
   }
  } finally {
   const __authOverlay = document.getElementById('auth-resolving-overlay');
@@ -6059,19 +6076,19 @@ function renderDetail() {
         <div class="section-title">🎓 Führerscheinklasse</div>
       </div>
       <div class="section-body" style="padding:12px 16px">
-        <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
           <div>
-            <span style="background:${badge.color};color:${badge.text};border:1px solid ${badge.border};border-radius:8px;padding:4px 12px;font-size:0.82rem;font-weight:700">${badge.label}</span>
+            <span style="background:${badge.color};color:${badge.text};border:1px solid ${badge.border};border-radius:8px;padding:4px 12px;font-size:0.82rem;font-weight:700;white-space:nowrap;display:inline-block">${badge.label}</span>
             ${alleKlassen ? `<div style="font-size:0.7rem;color:var(--muted);margin-top:4px">Aktiv: ${alleKlassen.map(k=>klasseNamenMap[k]||k).join(' + ')}</div>` : ''}
             ${isB197 ? `<div style="font-size:0.7rem;color:var(--muted);margin-top:6px">⚙️ Schaltstunden: ${s.schaltstunden||0}/${s.zielSchaltstunden||10} · Testfahrt: ${s.testfahrtBestanden?'✅':'⏳'}</div>` : ''}
             ${isBE   ? `<div style="font-size:0.7rem;color:var(--muted);margin-top:4px">Voraussetzung: Klasse B vorhanden · keine Theorieprüfung</div>` : ''}
             ${isBAuto? `<div style="font-size:0.7rem;color:var(--muted);margin-top:4px">Nur Automatikgetriebe · keine Schaltberechtigung</div>` : ''}
           </div>
           <div style="display:flex;gap:8px;white-space:nowrap">
-            <button onclick="openLernziele()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:10px;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:'Manrope',sans-serif">🎯</button>
-            <button onclick="openAbschlussSig()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:10px;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:'Manrope',sans-serif">✍️</button>
-            <button onclick="exportPDF()" style="background:var(--accent);border:1px solid var(--accent);color:#0d1117;padding:8px 14px;border-radius:10px;font-size:0.78rem;font-weight:700;cursor:pointer;font-family:'Manrope',sans-serif">📄 PDF</button>
-            <button onclick="openOptionsMenu()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:10px;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:'Manrope',sans-serif">⚙️</button>
+            <button onclick="openLernziele()" aria-label="Lernziele" title="Lernziele" style="min-height:44px;min-width:44px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:10px;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:'Manrope',sans-serif">🎯</button>
+            <button onclick="openAbschlussSig()" aria-label="Unterschrift" title="Unterschrift" style="min-height:44px;min-width:44px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:10px;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:'Manrope',sans-serif">✍️</button>
+            <button onclick="exportPDF()" style="min-height:44px;background:var(--accent);border:1px solid var(--accent);color:#0d1117;padding:8px 14px;border-radius:10px;font-size:0.78rem;font-weight:700;cursor:pointer;font-family:'Manrope',sans-serif">📄 PDF</button>
+            <button onclick="openOptionsMenu()" aria-label="Weitere Optionen" title="Weitere Optionen" style="min-height:44px;min-width:44px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:10px;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:'Manrope',sans-serif">⚙️</button>
           </div>
         </div>
       </div>
@@ -6222,7 +6239,7 @@ function renderDetail() {
           <div class="stepper">
             <button class="step-btn" onclick="changeStunden(-1)">−</button>
             <div style="position:relative">
-              <input id="stunden-input" type="number" min="0" max="999" value="${fs}"
+              <input id="stunden-input" aria-label="Anzahl Fahrstunden" type="number" min="0" max="999" value="${fs}"
                 style="width:58px;height:40px;text-align:center;font-family:'Syne',sans-serif;font-weight:800;font-size:1rem;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);outline:none;-moz-appearance:textfield"
                 onchange="setStundenDirekt(this.value)"
                 onfocus="this.select()">
@@ -6259,7 +6276,7 @@ function renderDetail() {
         <span style="font-size:0.65rem;color:var(--accent2);background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:4px;padding:1px 5px">✓ Für Schüler sichtbar</span>
       </div>
       <div class="section-body">
-        <textarea class="notes-textarea" id="pruef-kommentar-ta"
+        <textarea class="notes-textarea" id="pruef-kommentar-ta" aria-label="Kommentar zur Prüfungsreife"
           placeholder="z. B. Bereit für die Prüfung! Noch etwas Übung beim Einparken nötig…"
           style="min-height:90px">${escapeHtmlEigen(s.pruefKommentar||'')}</textarea>
         <div style="display:flex;gap:8px;margin-top:8px">
@@ -6426,7 +6443,7 @@ function renderDetail() {
       </div>
       <div class="section-body">
         <div style="display:flex;gap:8px;margin-bottom:12px">
-          <input id="inp-neue-notiz" type="text" placeholder="Neue Notiz… z. B. Einparken klappt jetzt"
+          <input id="inp-neue-notiz" aria-label="Neue Notiz" type="text" placeholder="Neue Notiz… z. B. Einparken klappt jetzt"
             style="flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;color:var(--text);padding:10px 12px;font-size:0.88rem;font-family:'Manrope',sans-serif;outline:none;min-width:0"
             onkeydown="if(event.key==='Enter') addNotiz()"
             onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
@@ -6441,7 +6458,7 @@ function renderDetail() {
     </div>
     ${renderPruefungsversuche(s)}
     <button class="delete-btn" onclick="deleteStudent()">${istGeloescht(s) ? '🗑 Endgültig löschen' : '🗑 Schüler löschen'}</button>
-    ${!s.archiviert ? `<button onclick="pruefungBestanden()" style="width:100%;margin:0 0 32px;padding:16px;background:var(--accent2);border:none;border-radius:var(--radius);color:#fff;font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;cursor:pointer;letter-spacing:0.02em">🎓 Prüfung bestanden!</button>` : ''}`;
+    ${!s.archiviert ? `<button onclick="pruefungBestanden()" style="width:100%;margin:0 0 32px;padding:16px;background:var(--accent2);border:none;border-radius:var(--radius);color:#0d1117;font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;cursor:pointer;letter-spacing:0.02em">🎓 Prüfung bestanden!</button>` : ''}`;
 
   // Show/hide archive banner
   const banner = document.getElementById('pruefung-banner');
@@ -7293,7 +7310,7 @@ function nmModusKnoepfe(aktiv, klick) {
   return NM_MODUS_REIHENFOLGE.map(m => {
     const M = NM_MODI[m], an = aktiv === m;
     return '<button type="button" data-nm-modus="' + m + '" onclick="' + klick + '(\'' + m + '\')" title="' + escHtml(M.info) + '" '
-      + 'style="flex:1;min-height:0;padding:6px 4px;border-radius:8px;font-size:0.72rem;font-weight:700;cursor:pointer;white-space:nowrap;'
+      + 'style="flex:1;min-height:40px;padding:6px 4px;border-radius:8px;font-size:0.72rem;font-weight:700;cursor:pointer;white-space:nowrap;'
       + 'border:1.5px solid ' + (an ? 'var(--accent)' : 'var(--border)') + ';background:' + (an ? 'rgba(240,180,41,0.15)' : 'transparent') + ';color:' + (an ? 'var(--accent)' : 'var(--muted)') + '">'
       + M.icon + ' ' + M.label + '</button>';
   }).join('');
@@ -7347,7 +7364,7 @@ function nmArtKnoepfe() {
   return NM_REIHENFOLGE.slice().reverse().map(art => {
     const A = NM_ARTEN[art], an = nmNeueArt === art;
     return '<button type="button" data-nm-art="' + art + '" onclick="nmArtWaehlen(\'' + art + '\')" '
-      + 'style="flex:1;min-height:0;padding:6px 4px;border-radius:8px;font-size:0.72rem;font-weight:700;cursor:pointer;white-space:nowrap;'
+      + 'style="flex:1;min-height:40px;padding:6px 4px;border-radius:8px;font-size:0.72rem;font-weight:700;cursor:pointer;white-space:nowrap;'
       + 'border:1.5px solid ' + (an ? A.farbe : 'var(--border)') + ';background:' + (an ? 'var(--surface2)' : 'transparent') + ';color:' + (an ? A.farbe : 'var(--muted)') + '">'
       + A.icon + ' ' + A.label + '</button>';
   }).join('');
@@ -7382,15 +7399,15 @@ function renderNaechstesMalBlock(s) {
     +   (vorschlag
           ? '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:rgba(88,166,255,0.08);border:1px dashed #58a6ff;border-radius:10px;padding:8px 10px;margin-top:10px">'
             + '<div style="flex:1;min-width:150px;font-size:0.8rem;line-height:1.4">🔁 Mängel der letzten Stunde (' + escHtml(formatDate(vorschlag.datum)) + '): <b>' + escHtml(vorschlag.maengel.join(', ')) + '</b></div>'
-            + '<button onclick="nmMaengelUebernehmen()" style="background:#58a6ff;border:none;border-radius:8px;color:#0d1117;padding:6px 10px;font-size:0.74rem;font-weight:800;cursor:pointer;min-height:0">＋ zum Wiederholen</button>'
+            + '<button onclick="nmMaengelUebernehmen()" style="background:#58a6ff;border:none;border-radius:8px;color:#0d1117;padding:6px 10px;font-size:0.74rem;font-weight:800;cursor:pointer;min-height:40px">＋ zum Wiederholen</button>'
             + '</div>'
           : '')
     +   '<div id="nm-art-knoepfe" style="display:flex;gap:6px;margin:12px 0 6px">' + nmArtKnoepfe() + '</div>'
     +   '<div style="display:flex;gap:8px;margin:0 0 8px">'
-    +     '<input id="inp-nm-aufgabe" type="text" maxlength="200" placeholder="' + escHtml(NM_ARTEN[nmNeueArt].beispiel) + '" '
+    +     '<input id="inp-nm-aufgabe" aria-label="Neuer Eintrag fürs nächste Mal" type="text" maxlength="200" placeholder="' + escHtml(NM_ARTEN[nmNeueArt].beispiel) + '" '
     +       'onkeydown="if(event.key===\'Enter\') nmAufgabeHinzu()" '
     +       'style="flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;color:var(--text);padding:10px 12px;font-family:\'Manrope\',sans-serif;outline:none;min-width:0">'
-    +     '<button onclick="nmAufgabeHinzu()" aria-label="Eintrag hinzufügen" style="background:var(--accent);border:none;border-radius:10px;color:#0d1117;padding:10px 14px;font-weight:700;font-size:0.95rem;cursor:pointer;flex-shrink:0">+</button>'
+    +     '<button onclick="nmAufgabeHinzu()" aria-label="Eintrag hinzufügen" style="min-width:44px;background:var(--accent);border:none;border-radius:10px;color:#0d1117;padding:10px 14px;font-weight:700;font-size:0.95rem;cursor:pointer;flex-shrink:0">+</button>'
     +   '</div>'
     +   (notiz
           ? '<div onclick="openMerkNotizBearbeiten()" style="cursor:pointer;background:rgba(240,180,41,0.08);border:1px solid rgba(240,180,41,0.35);border-radius:10px;padding:9px 12px;margin-top:4px">'
@@ -9692,7 +9709,7 @@ function renderSchuelerAnsicht(s, protokoll) {
       + '</div>'
 
       + '<div style="text-align:center;font-size:0.75rem;color:var(--muted);padding:16px 0">'
-      + 'Nur-Lesen Ansicht · ADK – Digitale Kartei'
+      + 'Nur-Lesen Ansicht · FahrSync'
       + '</div>'
 
       + '</div>';
@@ -10247,7 +10264,7 @@ window.openImpressum = async () => {
     <div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:24px 0 8px">
       ${logoHTML}
       <div style="font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;color:var(--accent)">${name}</div>
-      <div style="font-size:0.78rem;color:var(--muted)">ADK – Digitale Kartei</div>
+      <div style="font-size:0.78rem;color:var(--muted)">FahrSync – Digitale Kartei für Fahrlehrer</div>
     </div>
 
     <div class="section-block">
@@ -10377,7 +10394,7 @@ window.openImpressum = async () => {
 
     <div style="background:rgba(240,180,41,0.08);border:1px solid rgba(240,180,41,0.2);border-radius:12px;padding:14px;margin-top:4px">
       <div style="font-size:0.78rem;line-height:1.6;color:var(--muted);text-align:center">
-        <strong style="color:var(--accent)">ADK – Digitale Kartei</strong><br>
+        <strong style="color:var(--accent)">FahrSync – Digitale Kartei</strong><br>
         Entwickelt von ${escHtml(platImp.name||'Chriskoo')} · ${escHtml(platImp.web||'fahrsync.de')}<br>
         © ${new Date().getFullYear()} ${escHtml(platImp.name||'Chriskoo')} · Alle Rechte vorbehalten<br>
         <span style="font-size:0.7rem">Version 1.0 · Powered by Firebase · Made in Germany 🇩🇪</span>
@@ -10524,7 +10541,7 @@ window.exportiereDatenPDF = async () => {
       .foot{margin-top:30px;font-size:11px;color:#888;border-top:1px solid #ddd;padding-top:12px}
     </style></head><body>
     <h1>📋 Datenauskunft gemäß Art. 15 DSGVO</h1>
-    <p style="font-size:12px;color:#666">Erstellt am ${new Date().toLocaleString('de-DE')} · ADK – Digitale Kartei</p>
+    <p style="font-size:12px;color:#666">Erstellt am ${new Date().toLocaleString('de-DE')} · FahrSync</p>
 
     <h2>Stammdaten</h2>
     <div class="row"><div class="label">Vorname</div><div>${escHtml(daten.stammdaten.vorname)}</div></div>
@@ -10747,7 +10764,7 @@ window.exportPDF = () => {
   </div>
 
   <div class="footer">
-    <span>ADK – Digitale Kartei · fahrsync.de</span>
+    <span>FahrSync · fahrsync.de</span>
     <span>Erstellt am ${heute}</span>
     <span>ADK-Stufen: ${ADK_STUFEN.map(st => st.wert + ' ' + st.lang).join(' · ')}</span>
   </div>
