@@ -33,7 +33,7 @@
   --surface2: #1c2640;
   --border:   #2a3655;
   --text:     #e8eef8;
-  --muted:    #6b7fa8;
+  --muted:    #8a9cc4;   /* vorher #6b7fa8: 3,7:1, zu blass */
   --accent:   #f0b429;
   --accent2:  #3fb950;
   --blue:     #4a9eff;
@@ -330,6 +330,8 @@ html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--tex
   color:var(--text); padding:13px; border-radius:12px;
   font-family:'Manrope',sans-serif; font-weight:600; font-size:0.9rem; cursor:pointer;
 }
+/* Sichtbarer Fokus fuer Tastatur-Bedienung (wie in der App) */
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, [onclick]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 </style>
 <link rel="manifest" href="./manifest-portal.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -403,9 +405,9 @@ html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--tex
     <div class="login-logo">
       <img src="./icon-192.png?v=3" alt="ADK" style="height:80px;width:80px;border-radius:50%;display:block;margin:0 auto 8px" onerror="this.style.display='none'">
       <div class="login-title">Schüler-Portal</div>
-      <div class="login-sub">ADK – Digitale Kartei</div>
+      <div class="login-sub">von FahrSync</div>
     </div>
-    <input class="code-input" id="inp-code" type="text" maxlength="12"
+    <input class="code-input" id="inp-code" aria-label="Zugangscode" type="text" maxlength="12"
       placeholder="CODE" autocomplete="off" autocorrect="off" spellcheck="false"
       oninput="this.value=this.value.toUpperCase()"
       onkeydown="if(event.key==='Enter')doLogin()">
