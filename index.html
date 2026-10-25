@@ -1059,6 +1059,52 @@ body:not([class*="style-"]) .abc-header { font-family:'Manrope',sans-serif; text
   background:var(--seg); border-color:var(--seg); color:#14140f;
 }
 
+/* Drei Skalen, die sich nicht nur in der Markierung, sondern in der FORM
+   unterscheiden (Kundenwunsch: die bisherigen vier sahen sich zu aehnlich).
+   Alle bleiben reine CSS-Varianten derselben fuenf Knoepfe - jede Stufe ist
+   weiter einzeln antippbar, Aufbau und Speicherung aendern sich nicht.
+   Die Selektoren tragen .adk-balken mit, damit sie gegen die Rasterkarte
+   (.adk-klassisch .adk-zeile .adk-seg::before) gewinnen.
+
+   Signal: Balken steigen an wie eine Empfangsanzeige - "wie stark sitzt es". */
+.skala-signal .adk-balken { gap:4px; }
+.skala-signal .adk-balken .adk-seg { align-items:flex-end; padding-bottom:4px; }
+.skala-signal .adk-balken .adk-seg::before { border-radius:3px 3px 1px 1px; }
+.skala-signal .adk-balken .adk-seg:nth-child(1)::before { height:6px; }
+.skala-signal .adk-balken .adk-seg:nth-child(2)::before { height:10px; }
+.skala-signal .adk-balken .adk-seg:nth-child(3)::before { height:14px; }
+.skala-signal .adk-balken .adk-seg:nth-child(4)::before { height:18px; }
+.skala-signal .adk-balken .adk-seg:nth-child(5)::before { height:22px; }
+
+/* Regler: eine durchgehende Spur, gefuellt bis zur erreichten Stufe, dort
+   ein runder Knopf - wie ein Schieberegler. Ohne :has() (aeltere Browser)
+   fehlt nur der Knopf, die gefuellte Spur zeigt den Stand trotzdem. */
+.skala-regler .adk-balken { gap:0; }
+.skala-regler .adk-balken .adk-seg { position:relative; }
+.skala-regler .adk-balken .adk-seg::before {
+  height:4px; border:none; border-radius:0; background:var(--border);
+}
+.skala-regler .adk-balken .adk-seg:first-child::before { border-radius:2px 0 0 2px; }
+.skala-regler .adk-balken .adk-seg:last-child::before  { border-radius:0 2px 2px 0; }
+.skala-regler .adk-balken .adk-seg.erreicht::before { background:var(--seg); }
+.skala-regler .adk-balken .adk-seg.erreicht:not(:has(+ .adk-seg.erreicht))::after {
+  content:''; position:absolute; right:-9px; top:50%; width:18px; height:18px; margin-top:-9px;
+  border-radius:50%; background:var(--seg); border:3px solid var(--surface);
+  box-shadow:0 0 0 1px var(--seg); z-index:1; pointer-events:none;
+}
+
+/* Leitlinie: offene Stufen gestrichelt wie die Mittellinie, erreichte
+   durchgezogen wie die Fahrstreifenbegrenzung. */
+.skala-leitlinie .adk-balken { gap:8px; }
+.skala-leitlinie .adk-balken .adk-seg::before {
+  height:4px; border:none; border-radius:2px;
+  background:repeating-linear-gradient(90deg, var(--muted) 0 7px, transparent 7px 12px);
+  opacity:0.7;
+}
+.skala-leitlinie .adk-balken .adk-seg.erreicht::before {
+  height:7px; background:var(--seg); opacity:1;
+}
+
 /* ── FORTSCHRITT-ANZEIGE: wie die Balken gefuellt werden ──────────────
    Wirkt auf alle Fortschrittsbalken (.bar-fill), also Themengruppen,
    Gesamtfortschritt und Schaltstunden gleichermassen - damit es im
@@ -12277,6 +12323,9 @@ const SKALA_ARTEN = [
   { id: 'skala-punkte',  name: 'Punkte',   beschreibung: 'Runde Punkte statt Flächen. Zurückhaltender, wirkt leichter.' },
   { id: 'skala-zahlen',  name: 'Zahlen',   beschreibung: 'Jedes Feld zeigt seine Stufennummer. Am eindeutigsten, wenn jemand die Stufen noch lernt.' },
   { id: 'skala-kreuze',  name: 'Kreuze',   beschreibung: 'Erledigte Felder bekommen ein Kreuz, offene bleiben leer – wie handschriftlich auf der Karte.' },
+  { id: 'skala-signal',  name: 'Signal',   beschreibung: 'Ansteigende Balken wie eine Empfangsanzeige. Man sieht sofort, wie gut ein Thema sitzt.' },
+  { id: 'skala-regler',  name: 'Regler',   beschreibung: 'Eine Linie mit Knopf an der erreichten Stufe – wie ein Schieberegler. Sehr ruhig.' },
+  { id: 'skala-leitlinie', name: 'Leitlinie', beschreibung: 'Offene Stufen gestrichelt wie die Mittellinie, erreichte durchgezogen wie die Fahrbahnbegrenzung.' },
 ];
 
 // ══ FORTSCHRITT-ANZEIGE: wie die Fortschrittsbalken gefuellt werden ════
