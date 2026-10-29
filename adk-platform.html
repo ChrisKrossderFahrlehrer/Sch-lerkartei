@@ -1070,6 +1070,14 @@ async function renderAnalytics() {
     // dadurch ueberall 0.
     const soloFahrlehrer = (alleFahrlehrer || []).filter(l => !l.fahrschuleName && l.status === 'aktiv');
 
+    // Zaehlt nur echte Eintraege: keine geplanten Stunden (typ 'planung', liegen
+    // oft in der Zukunft und sind noch nicht gefahren) und keine Eintraege von
+    // Schuelern, die geloescht wurden (die Eintraege bleiben sonst stehen).
+    const echteProtokolle = (protokollSnap, schuelerSnap) => {
+      const gueltig = new Set(schuelerSnap.docs.filter(d => d.data().archivGrund !== 'geloescht').map(d => d.id));
+      return protokollSnap.docs.map(d => d.data()).filter(p => p.typ !== 'planung' && gueltig.has(p.studentId));
+    };
+
     // Schüler-Zahlen pro Fahrschule (nur Anzahl, kein Name)
     const fsStats = await Promise.all(aktiveFahrschulen.map(async fs => {
       const [schuelerSnap, lehrerSnap, protokollSnap] = await Promise.all([
@@ -1079,6 +1087,7 @@ async function renderAnalytics() {
       ]);
       // Gelöschte Schüler liegen 90 Tage im Papierkorb der App - nicht mitzählen.
       const schueler = schuelerSnap.docs.map(d => d.data()).filter(s => s.archivGrund !== 'geloescht');
+      const protokolle = echteProtokolle(protokollSnap, schuelerSnap);
       return {
         id: fs.id,
         name: fs.name,
@@ -1088,17 +1097,15 @@ async function renderAnalytics() {
         anzahlAktiv:     schueler.filter(s => !s.archiviert).length,
         anzahlArchiviert:schueler.filter(s => s.archiviert).length,
         anzahlLehrer:    lehrerSnap.size,
-        anzahlProtokolle:protokollSnap.size,
+        letzteNutzung:   (window.__alleUsers || []).filter(u => u.fahrschuleId === fs.id).reduce((m,u) => Math.max(m, u.letzteNutzung || 0), 0),
+        anzahlProtokolle:protokolle.length,
         klassenVerteilung: {
           B:     schueler.filter(s => ['B','B-Auto','B197'].includes(s.klasse||'B')).length,
           BE:    schueler.filter(s => s.klasse === 'BE').length,
           A:     schueler.filter(s => s.klasse === 'A').length,
         },
         // Letzter Eintrag im Protokoll (Aktivität)
-        letzteAktivitaet: protokollSnap.docs.reduce((max, d) => {
-          const t = d.data().createdAt || 0;
-          return t > max ? t : max;
-        }, 0),
+        letzteAktivitaet: protokolle.reduce((max, p) => Math.max(max, p.createdAt || 0), 0),
       };
     }));
 
@@ -1111,6 +1118,7 @@ async function renderAnalytics() {
       ]);
       // Gelöschte Schüler liegen 90 Tage im Papierkorb der App - nicht mitzählen.
       const schueler = schuelerSnap.docs.map(d => d.data()).filter(s => s.archivGrund !== 'geloescht');
+      const protokolle = echteProtokolle(protokollSnap, schuelerSnap);
       return {
         id: l.id, name: l.name || 'Fahrlehrer', stadt: 'Eigenständig',
         registriert: l.createdAt,
@@ -1118,16 +1126,14 @@ async function renderAnalytics() {
         anzahlAktiv:     schueler.filter(s => !s.archiviert).length,
         anzahlArchiviert:schueler.filter(s => s.archiviert).length,
         anzahlLehrer:    1,
-        anzahlProtokolle:protokollSnap.size,
+        letzteNutzung:   l.letzteNutzung || 0,
+        anzahlProtokolle:protokolle.length,
         klassenVerteilung: {
           B:  schueler.filter(s => ['B','B-Auto','B197'].includes(s.klasse||'B')).length,
           BE: schueler.filter(s => s.klasse === 'BE').length,
           A:  schueler.filter(s => s.klasse === 'A').length,
         },
-        letzteAktivitaet: protokollSnap.docs.reduce((max, d) => {
-          const t = d.data().createdAt || 0;
-          return t > max ? t : max;
-        }, 0),
+        letzteAktivitaet: protokolle.reduce((max, p) => Math.max(max, p.createdAt || 0), 0),
       };
     }));
     const alleStats = [...fsStats, ...soloStats];
@@ -1168,17 +1174,14 @@ async function renderAnalytics() {
       <!-- Klassen-Verteilung gesamt -->
       <div class="section-hd">🎓 Klassen-Verteilung (Platform)</div>
       <div class="card" style="margin-bottom:16px">
-        ${['B/B197/B-Auto','BE','A'].map((label, i) => {
-          const keys = [['B','BE','A'][i]];
-          const val = i===0
-            ? fsStats.reduce((s,f)=>s+f.klassenVerteilung.B,0)
-            : i===1 ? fsStats.reduce((s,f)=>s+f.klassenVerteilung.BE,0)
-            : fsStats.reduce((s,f)=>s+f.klassenVerteilung.A,0);
+        ${['B/B197/B-Auto','BE','A','Andere'].map((label, i) => {
+          const summe = k => alleStats.reduce((s,f)=>s+f.klassenVerteilung[k],0);
+          const val = [summe('B'), summe('BE'), summe('A'), Math.max(0, gesamt.schueler - summe('B') - summe('BE') - summe('A'))][i];
           const pct = gesamt.schueler > 0 ? Math.round(val/gesamt.schueler*100) : 0;
-          const col = ['var(--accent)','var(--accent2)','var(--blue)'][i];
+          const col = ['var(--accent)','var(--accent2)','var(--blue)','var(--muted)'][i];
           return `<div style="margin-bottom:10px">
             <div style="display:flex;justify-content:space-between;font-size:0.8rem;margin-bottom:4px">
-              <span>${['🚗 Klasse B','🔗 BE','🏍️ Klasse A'][i]}</span>
+              <span>${['🚗 Klasse B','🔗 BE','🏍️ Klasse A','▫️ Andere'][i]}</span>
               <span style="color:${col};font-weight:700">${val} (${pct}%)</span>
             </div>
             <div style="background:var(--surface2);border-radius:4px;height:6px">
@@ -1191,11 +1194,11 @@ async function renderAnalytics() {
       <!-- Pro-Fahrschule Tabelle -->
       <div class="section-hd">🏫 Aktivität pro Fahrschule &amp; Solo-Fahrlehrer</div>
       <div style="margin:0 16px 8px;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden">
-        <div style="display:grid;grid-template-columns:1fr auto auto auto auto;gap:0;font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--border);background:var(--surface2)">
-          <span>Fahrschule</span><span style="text-align:center">Lehrer</span><span style="text-align:center">Schüler</span><span style="text-align:center">Protokolle</span><span style="text-align:center">Aktiv</span>
+        <div style="display:grid;grid-template-columns:1fr auto auto auto auto auto;gap:0;font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--border);background:var(--surface2)">
+          <span>Fahrschule</span><span style="text-align:center">Lehrer</span><span style="text-align:center" title="Aktive Schüler (ohne archivierte)">Schüler</span><span style="text-align:center" title="Gefahrene Stunden und Theorie, ohne Planung">Einträge</span><span style="text-align:center" title="Letzter Eintrag im Protokoll">Letzter</span><span style="text-align:center" title="Letzte App-Nutzung">In App</span>
         </div>
         ${alleStats.map(fs => `
-          <div style="display:grid;grid-template-columns:1fr auto auto auto auto;gap:0;padding:10px 12px;border-bottom:1px solid var(--border);font-size:0.82rem;align-items:center">
+          <div style="display:grid;grid-template-columns:1fr auto auto auto auto auto;gap:0;padding:10px 12px;border-bottom:1px solid var(--border);font-size:0.82rem;align-items:center">
             <div>
               <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px">${escHtml(fs.name)}</div>
               <div style="font-size:0.68rem;color:var(--muted)">${fs.stadt}</div>
@@ -1204,6 +1207,7 @@ async function renderAnalytics() {
             <span style="text-align:center;color:var(--accent2);font-weight:700">${fs.anzahlAktiv}</span>
             <span style="text-align:center;color:var(--purple);font-weight:700">${fs.anzahlProtokolle}</span>
             <span style="text-align:center;font-size:0.72rem">${aktivLabel(fs.letzteAktivitaet)}</span>
+            <span style="text-align:center;font-size:0.72rem">${aktivLabel(fs.letzteNutzung)}</span>
           </div>`).join('')}
       </div>
 
