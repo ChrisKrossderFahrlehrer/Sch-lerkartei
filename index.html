@@ -4899,6 +4899,25 @@ onAuthStateChanged(auth, async (user) => {
           }
         }
 
+        // Letzte Nutzung (nur ein Zeitstempel, keine Inhalte) fuer die SuperAdmin-
+        // Uebersicht. Hoechstens alle 10 Minuten geschrieben; SuperAdmin selbst nicht.
+        if (!(user.email === 'chriskoo@mail.de' || profil.rolle === 'superadmin')) {
+          const lebenszeichen = () => {
+            try {
+              if (!currentUser || !currentUser.uid || document.visibilityState === 'hidden') return;
+              const jetzt = Date.now();
+              if (jetzt - (window.__letzteNutzungT || 0) < 600000) return;
+              window.__letzteNutzungT = jetzt;
+              dbUpd(doc(db, 'users', currentUser.uid), { letzteNutzung: jetzt }).catch(() => {});
+            } catch(e) {}
+          };
+          lebenszeichen();
+          if (!window.__lebenszeichenAn) {
+            window.__lebenszeichenAn = true;
+            document.addEventListener('visibilitychange', lebenszeichen);
+          }
+        }
+
         currentUser._fahrschuleId = profil.fahrschuleId || null;
         currentUser._rolle        = profil.rolle || 'fahrlehrer';
         currentUser._fsName       = profil.fahrschuleName || '';

@@ -866,6 +866,9 @@ function renderAlleNutzer() {
     name: f.name || '?', gruppe: 0, typ: 'Fahrschule', typIcon: '🏫',
     zuordnung: f.fahrschulCode || '–', status: f.status || 'aktiv', datum: f.createdAt || 0,
     email: f.email || '–', schueler: null,  // Fahrschule selbst hat keine eigene Schülerzahl
+    // Zuletzt aktiv = neueste Nutzung irgendeines Kontos dieser Schule (Inhaber und Fahrlehrer)
+    zuletzt: (window.__alleUsers || []).filter(u => u.fahrschuleId === f.id)
+      .reduce((m, u) => Math.max(m, u.letzteNutzung || 0), 0),
   }));
   alleFahrlehrer.forEach(l => zeilen.push({
     name: l.name || '?',
@@ -874,6 +877,7 @@ function renderAlleNutzer() {
     zuordnung: l.fahrschuleName || 'Eigenständig', status: l.status || 'aktiv', datum: l.createdAt || 0,
     email: l.email || '–',
     schueler: (typeof l.studentCount === 'number') ? l.studentCount : null,  // null = noch nicht gemeldet
+    zuletzt: l.letzteNutzung || 0,
   }));
 
   // Sortierung
@@ -885,6 +889,7 @@ function renderAlleNutzer() {
     }
     let av, bv;
     if (alleSortKey === 'datum') { av = a.datum; bv = b.datum; }
+    else if (alleSortKey === 'zuletzt') { av = a.zuletzt || 0; bv = b.zuletzt || 0; }
     else if (alleSortKey === 'schueler') { av = (a.schueler ?? -1); bv = (b.schueler ?? -1); }  // numerisch, „?" ans Ende
     else { av = String(a[alleSortKey]||'').toLowerCase(); bv = String(b[alleSortKey]||'').toLowerCase(); }
     if (av < bv) return alleSortAsc ? -1 : 1;
@@ -900,6 +905,15 @@ function renderAlleNutzer() {
     if (st === 'zahlung_offen') return '<span style="display:inline-block;background:rgba(240,180,41,0.15);color:var(--accent);border-radius:6px;padding:2px 7px;font-size:0.68rem;font-weight:700">💳 Zahlung offen</span>';
     if (st === 'ausstehend') return '<span style="display:inline-block;background:rgba(240,180,41,0.15);color:var(--accent);border-radius:6px;padding:2px 7px;font-size:0.68rem;font-weight:700">Wartet</span>';
     return '<span style="color:var(--muted);font-size:0.68rem">–</span>';
+  };
+  // Zuletzt aktiv: 'Heute 14:05' / 'Gestern' / 'vor 12 Tagen' (rot ab 30 Tagen); 0 = noch nie erfasst
+  const zuletztZelle = t => {
+    if (!t) return '<span style="color:var(--muted)" title="Noch nicht erfasst - erscheint nach dem nächsten Öffnen der App">–</span>';
+    const tage = Math.floor((new Date().setHours(0,0,0,0) - new Date(t).setHours(0,0,0,0)) / 86400000);
+    const uhr = new Date(t).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+    const farbe = tage <= 7 ? 'var(--accent2)' : tage <= 30 ? 'var(--accent)' : 'var(--danger)';
+    const text = tage <= 0 ? 'Heute ' + uhr : tage === 1 ? 'Gestern ' + uhr : 'vor ' + tage + ' Tagen';
+    return '<span style="color:' + farbe + ';font-weight:700" title="' + new Date(t).toLocaleString('de-DE') + '">' + text + '</span>';
   };
   const th = (label, key) => '<th onclick="sortAlle(\'' + key + '\')" style="text-align:left;padding:10px 8px;font-size:0.7rem;font-weight:800;color:var(--muted);cursor:pointer;white-space:nowrap;border-bottom:2px solid var(--border);user-select:none;position:sticky;top:0;background:var(--bg)">' + label + pfeil(key) + '</th>';
 
@@ -920,6 +934,7 @@ function renderAlleNutzer() {
       + '<td style="padding:10px 8px;font-size:0.74rem;color:var(--muted);border-bottom:1px solid var(--border);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(z.email) + '</td>'
       + '<td style="padding:10px 8px;text-align:center;border-bottom:1px solid var(--border)">' + schuelerCell + '</td>'
       + '<td style="padding:10px 8px;border-bottom:1px solid var(--border);white-space:nowrap">' + statusPill(z.status) + '</td>'
+      + '<td style="padding:10px 8px;font-size:0.74rem;border-bottom:1px solid var(--border);white-space:nowrap">' + zuletztZelle(z.zuletzt) + '</td>'
       + '<td style="padding:10px 8px;font-size:0.74rem;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap">' + datumStr + '</td>'
       + '</tr>';
   }).join('');
@@ -939,9 +954,9 @@ function renderAlleNutzer() {
     + (gesamt === 0
         ? '<div style="padding:40px;text-align:center;color:var(--muted)">Noch niemand angemeldet.</div>'
         : '<div style="margin:8px 12px 8px;overflow-x:auto;-webkit-overflow-scrolling:touch">'
-          + '<table style="width:100%;border-collapse:collapse;min-width:640px">'
+          + '<table style="width:100%;border-collapse:collapse;min-width:760px">'
           + '<thead><tr>'
-          + th('Name', 'name') + th('Typ', 'typ') + th('Code / Zuordnung', 'zuordnung') + th('E-Mail', 'email') + th('Schüler', 'schueler') + th('Status', 'status') + th('Registriert', 'datum')
+          + th('Name', 'name') + th('Typ', 'typ') + th('Code / Zuordnung', 'zuordnung') + th('E-Mail', 'email') + th('Schüler', 'schueler') + th('Status', 'status') + th('Zuletzt aktiv', 'zuletzt') + th('Registriert', 'datum')
           + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
           + '<div style="text-align:center;font-size:0.7rem;color:var(--muted);margin:4px 0 12px">Spalten-Überschrift antippen zum Sortieren · <span onclick="sortAlle(\'gruppe\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Standard-Gruppierung</span></div>')
     // Diagnose-Bereich (einklappbar) — zeigt ob jemand fehlt
