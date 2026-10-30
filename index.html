@@ -377,11 +377,24 @@ input, textarea, select { font-size: max(16px, 0.88rem); }
    wirkten als auf kleineren Handys. Jetzt bekommt auch dieser Bereich eine
    sanfte, mittig zentrierte Obergrenze - kleine/normale Handys (<=414px)
    sind davon unberuehrt. */
-@media (min-width: 415px) and (max-width: 767px) {
-  body { max-width: 415px; margin: 0 auto; }
+@media (min-width: 415px) and (max-width: 599px) {
+  body { max-width: 480px; margin: 0 auto; }
+}
+/* FALT-HANDYS (z.B. Galaxy Z Fold innen) und TABLETS: vorher war die App hier
+   auf 415px bzw. 768px begrenzt und liess links und rechts viel Leerraum.
+   Jetzt nutzt sie die Breite: Schuelerliste zweispaltig, Akte mittig mit
+   lesbarer Zeilenlaenge. */
+@media (min-width: 600px) {
+  body { max-width: 1180px; margin: 0 auto; }
+  #student-list .abc-group { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 12px; align-items: start; }
+  #student-list .abc-group > :not(.student-card) { grid-column: 1 / -1; }
+  #start-check > .card { max-width: 760px; margin-left: auto !important; margin-right: auto !important; }
+  .detail-scroll > * { max-width: 820px; margin-left: auto; margin-right: auto; }
+}
+@media (min-width: 1100px) {
+  #student-list .abc-group { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (min-width: 768px) {
-  body { max-width: 768px; margin: 0 auto; }
   .header { padding: 16px 24px; }
   .detail-scroll, .scroll-body { padding-bottom: 32px; }
   .login-box { max-width: 480px; padding: 48px 40px; position: relative; z-index: 1; }
@@ -398,7 +411,6 @@ input, textarea, select { font-size: max(16px, 0.88rem); }
 
 /* ── GROSSES TABLET / iPad Pro (1024px+) ── */
 @media (min-width: 1024px) {
-  body { max-width: 900px; }
   .header-title { font-size: 1.3rem; }
 }
 
@@ -1947,6 +1959,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       <option value="progAsc">Fortschritt (niedrig → hoch)</option>
     </select>
   </div>
+  <div id="start-check" style="display:none"></div>
   <div id="abc-bar" class="abc-bar" style="display:none"></div>
   <div class="student-scroll" id="student-list">
     <div class="empty-state" id="initial-empty-state"><div class="ei">🚗</div><p>Noch keine Schüler angelegt.</p></div>
@@ -3031,6 +3044,21 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 </div>
 
 <!-- DESIGN-STIL AUSWAHL -->
+<div class="modal-overlay" id="fs-adresse-modal" onclick="closeModal(event)">
+  <div class="modal-sheet">
+    <div class="sheet-title">🏫 Adresse der Fahrschule</div>
+    <div style="font-size:0.8rem;color:var(--muted);line-height:1.5;margin:6px 0 14px">Steht auf deinen Rechnungen und auf dem Ausbildungsnachweis. Sichtbar nur für dich und den Anbieter.</div>
+    <label class="form-label" for="fsa-strasse">Straße und Hausnummer</label>
+    <input class="form-input" id="fsa-strasse" autocomplete="address-line1" placeholder="Musterstraße 1">
+    <div style="display:grid;grid-template-columns:110px 1fr;gap:8px">
+      <div><label class="form-label" for="fsa-plz">PLZ</label><input class="form-input" id="fsa-plz" inputmode="numeric" autocomplete="postal-code" placeholder="12345"></div>
+      <div><label class="form-label" for="fsa-ort">Ort</label><input class="form-input" id="fsa-ort" autocomplete="address-level2" placeholder="Musterstadt"></div>
+    </div>
+    <button class="btn-main" style="margin-top:14px" onclick="speichereFsAdresse()">Speichern</button>
+    <button class="btn-sheet-cancel" onclick="document.getElementById('fs-adresse-modal').classList.remove('open')">Abbrechen</button>
+  </div>
+</div>
+
 <div class="modal-overlay" id="stil-modal" onclick="closeModal(event)">
   <div class="modal-sheet" style="max-width:420px">
     <div class="sheet-title">🎨 Design-Stil wählen</div>
@@ -4313,6 +4341,7 @@ async function loadAboStatus(uid) {
       window.__billingScope  = null;
       window.__billingDocRef = null;
     }
+    try { ladeFsAdresseStatus(); } catch(e) {}
 
     let src = data;
     if (window.__billingScope === 'fahrschule') {
@@ -5194,6 +5223,7 @@ function listenStudents() {
     students.sort((a,b) => (a.nachname||'').localeCompare(b.nachname||''));
     renderList();
     if (activeId) renderDetail();
+    try { aktualisiereStartCheck(); } catch(e) {}
     ladeBroadcast(); // Nachricht vom SuperAdmin prüfen/anzeigen
 
     // Datenschutzfreundlich: nur die ANZAHL (nicht die Daten) ins eigene users-Doc
@@ -11435,6 +11465,82 @@ window.erstLoginAbschliessen = async () => {
 };
 
 
+
+// ══ GEFUEHRTER START ════════════════════════════════════════════════
+// Kleine Checkliste ueber der Schuelerliste, nur fuer Konto-Inhaber
+// (Fahrschule oder eigenstaendiger Fahrlehrer). Verschwindet, sobald alles
+// erledigt ist oder der Nutzer sie ausblendet (nur auf diesem Geraet).
+function lsGet(k){ try { return localStorage.getItem(k); } catch(e){ return null; } }
+function lsSet(k,v){ try { localStorage.setItem(k,v); } catch(e){} }
+window.__fsAdresseOk = null;  // null = noch nicht geladen
+async function ladeFsAdresseStatus() {
+  if (!window.__billingDocRef || window.__DEMO) return;
+  try {
+    const d = await getDoc(doc(db, window.__billingDocRef.coll, window.__billingDocRef.id));
+    const b = d.exists() ? d.data() : {};
+    window.__fsAdresse = { strasse: b.rechnungsStrasse || '', plz: b.rechnungsPlz || '', ort: b.rechnungsOrt || '' };
+    window.__fsAdresseOk = !!(b.rechnungsStrasse && b.rechnungsPlz && b.rechnungsOrt);
+  } catch(e) { window.__fsAdresseOk = null; }
+  aktualisiereStartCheck();
+}
+window.oeffneFsAdresse = () => {
+  const a = window.__fsAdresse || {};
+  document.getElementById('fsa-strasse').value = a.strasse || '';
+  document.getElementById('fsa-plz').value = a.plz || '';
+  document.getElementById('fsa-ort').value = a.ort || '';
+  document.getElementById('fs-adresse-modal').classList.add('open');
+};
+window.speichereFsAdresse = async () => {
+  const strasse = document.getElementById('fsa-strasse').value.trim();
+  const plz = document.getElementById('fsa-plz').value.trim();
+  const ort = document.getElementById('fsa-ort').value.trim();
+  if (!strasse || !plz || !ort) { toast('Bitte Straße, PLZ und Ort ausfüllen'); return; }
+  if (!window.__billingDocRef) { toast('Nur der Konto-Inhaber kann die Adresse ändern'); return; }
+  try {
+    await dbUpd(doc(db, window.__billingDocRef.coll, window.__billingDocRef.id),
+      { rechnungsStrasse: strasse, rechnungsPlz: plz, rechnungsOrt: ort });
+    window.__fsAdresse = { strasse, plz, ort }; window.__fsAdresseOk = true;
+    document.getElementById('fs-adresse-modal').classList.remove('open');
+    toast('Adresse gespeichert ✓');
+    aktualisiereStartCheck();
+  } catch(e) { console.warn('Adresse speichern:', e); toast('Speichern fehlgeschlagen. Bitte erneut versuchen.'); }
+};
+window.startCheckAusblenden = () => { lsSet('fs_startcheck_aus', '1'); aktualisiereStartCheck(); };
+window.startCheckSchritt = (k) => {
+  if (k === 'adresse') oeffneFsAdresse();
+  else if (k === 'schueler') openAddModal();
+  else if (k === 'einladen') { lsSet('fs_start_einladen', '1'); openInviteModal(); aktualisiereStartCheck(); }
+  else if (k === 'design') { lsSet('fs_start_design', '1'); openStilAuswahl(); aktualisiereStartCheck(); }
+};
+function aktualisiereStartCheck() {
+  const box = document.getElementById('start-check');
+  if (!box) return;
+  const inhaber = !!window.__billingDocRef && !window.__DEMO;
+  if (!inhaber || lsGet('fs_startcheck_aus') === '1' || window.__fsAdresseOk === null) { box.style.display = 'none'; return; }
+  const schritte = [
+    { k:'adresse',  t:'Adresse der Fahrschule eintragen', h:'Für Rechnungen und Ausbildungsnachweis', ok: window.__fsAdresseOk },
+    { k:'schueler', t:'Ersten Schüler anlegen', h:'Mit Name und Klasse geht es los', ok: (students || []).length > 0 },
+  ];
+  if (window.__billingScope === 'fahrschule')
+    schritte.push({ k:'einladen', t:'Fahrlehrer einladen', h:'Link per WhatsApp oder E-Mail teilen', ok: lsGet('fs_start_einladen') === '1' });
+  schritte.push({ k:'design', t:'Design aussuchen', h:'7 Looks, hell oder dunkel', ok: lsGet('fs_start_design') === '1' || !!lsGet('fs_stil') });
+  const fertig = schritte.filter(x => x.ok).length;
+  if (fertig === schritte.length) { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  box.innerHTML = '<div class="card" style="margin:10px 12px 4px;padding:14px">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">'
+    + '<div style="font-weight:800;font-size:0.92rem">🚀 Erste Schritte <span style="color:var(--muted);font-weight:700;font-size:0.78rem">' + fertig + ' von ' + schritte.length + '</span></div>'
+    + '<button type="button" onclick="startCheckAusblenden()" style="background:none;border:none;color:var(--muted);font-size:0.74rem;cursor:pointer;padding:6px">Ausblenden</button></div>'
+    + '<div style="height:6px;background:var(--surface2);border-radius:4px;margin-bottom:8px;overflow:hidden"><div style="height:100%;width:' + Math.round(fertig / schritte.length * 100) + '%;background:var(--accent2)"></div></div>'
+    + schritte.map(x => '<button type="button" ' + (x.ok ? 'disabled' : 'onclick="startCheckSchritt(\'' + x.k + '\')"')
+        + ' style="display:flex;width:100%;align-items:center;gap:10px;background:none;border:none;border-top:1px solid var(--border);padding:10px 2px;color:var(--text);text-align:left;cursor:' + (x.ok ? 'default' : 'pointer') + ';font:inherit">'
+        + '<span style="width:22px;height:22px;flex-shrink:0;border-radius:50%;display:grid;place-items:center;font-size:0.75rem;font-weight:800;'
+        + (x.ok ? 'background:var(--accent2);color:#fff">✓' : 'border:2px solid var(--border);color:var(--muted)">') + '</span>'
+        + '<span style="flex:1;min-width:0"><span style="display:block;font-weight:700;font-size:0.85rem;' + (x.ok ? 'text-decoration:line-through;color:var(--muted)' : '') + '">' + x.t + '</span>'
+        + '<span style="display:block;font-size:0.72rem;color:var(--muted)">' + x.h + '</span></span>'
+        + (x.ok ? '' : '<span style="color:var(--accent);font-weight:800">›</span>') + '</button>').join('')
+    + '</div>';
+}
 
 // ══ RECHNUNGSADRESSE + RECHNUNGEN ═══════════════════════════════════
 async function ladeRechnungsadresse() {

@@ -798,6 +798,19 @@ onAuthStateChanged(auth,async user=>{
     const lname=namensteile.slice(1).join(' ')||'';
     currentProfile=(snap&&snap.exists())?snap.data():{fname,lname,role:currentRole,schoolId:fahrschuleId};
     currentProfile.role=currentRole;
+    // Letzte Kalender-Nutzung (nur Zeitstempel) fuer die SuperAdmin-Uebersicht,
+    // hoechstens alle 10 Minuten.
+    const kalLebenszeichen=()=>{
+      try{
+        if(document.visibilityState==='hidden')return;
+        const jetzt=Date.now();
+        if(jetzt-(window.__kalNutzungT||0)<600000)return;
+        window.__kalNutzungT=jetzt;
+        updateDoc(doc(db,'users',user.uid),{letzteNutzungKalender:jetzt}).catch(()=>{});
+      }catch(e){}
+    };
+    kalLebenszeichen();
+    if(!window.__kalLebenszeichenAn){window.__kalLebenszeichenAn=true;document.addEventListener('visibilitychange',kalLebenszeichen);}
     currentProfile.schoolId=fahrschuleId;
 
     // kalenderUsers-Doc anlegen (best effort – blockiert den Zugang NICHT)

@@ -866,9 +866,10 @@ function renderAlleNutzer() {
     name: f.name || '?', gruppe: 0, typ: 'Fahrschule', typIcon: '🏫',
     zuordnung: f.fahrschulCode || '–', status: f.status || 'aktiv', datum: f.createdAt || 0,
     email: f.email || '–', schueler: null,  // Fahrschule selbst hat keine eigene Schülerzahl
+    abo: f.abo || 'free', aboExpiry: f.aboExpiry || 0,
     // Zuletzt aktiv = neueste Nutzung irgendeines Kontos dieser Schule (Inhaber und Fahrlehrer)
     zuletzt: (window.__alleUsers || []).filter(u => u.fahrschuleId === f.id)
-      .reduce((m, u) => Math.max(m, u.letzteNutzung || 0), 0),
+      .reduce((m, u) => Math.max(m, u.letzteNutzung || 0, u.letzteNutzungKalender || 0), 0),
   }));
   alleFahrlehrer.forEach(l => zeilen.push({
     name: l.name || '?',
@@ -877,7 +878,8 @@ function renderAlleNutzer() {
     zuordnung: l.fahrschuleName || 'Eigenständig', status: l.status || 'aktiv', datum: l.createdAt || 0,
     email: l.email || '–',
     schueler: (typeof l.studentCount === 'number') ? l.studentCount : null,  // null = noch nicht gemeldet
-    zuletzt: l.letzteNutzung || 0,
+    zuletzt: Math.max(l.letzteNutzung || 0, l.letzteNutzungKalender || 0),
+    zuletztWo: (l.letzteNutzungKalender || 0) > (l.letzteNutzung || 0) ? 'Kalender' : 'Kartei',
   }));
 
   // Sortierung
@@ -934,7 +936,7 @@ function renderAlleNutzer() {
       + '<td style="padding:10px 8px;font-size:0.74rem;color:var(--muted);border-bottom:1px solid var(--border);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(z.email) + '</td>'
       + '<td style="padding:10px 8px;text-align:center;border-bottom:1px solid var(--border)">' + schuelerCell + '</td>'
       + '<td style="padding:10px 8px;border-bottom:1px solid var(--border);white-space:nowrap">' + statusPill(z.status) + '</td>'
-      + '<td style="padding:10px 8px;font-size:0.74rem;border-bottom:1px solid var(--border);white-space:nowrap">' + zuletztZelle(z.zuletzt) + '</td>'
+      + '<td style="padding:10px 8px;font-size:0.74rem;border-bottom:1px solid var(--border);white-space:nowrap">' + zuletztZelle(z.zuletzt) + (z.zuletzt && z.zuletztWo ? '<div style="font-size:0.62rem;color:var(--muted)">' + z.zuletztWo + '</div>' : '') + '</td>'
       + '<td style="padding:10px 8px;font-size:0.74rem;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap">' + datumStr + '</td>'
       + '</tr>';
   }).join('');
@@ -945,12 +947,43 @@ function renderAlleNutzer() {
     '• <b>' + esc(u.name||'?') + '</b> — typ:' + (u.typ||'(kein)') + ' · rolle:' + (u.rolle||'(keine)') + ' · status:' + (u.status||'(kein)') + ' · email:' + esc(u.email||'?')
   ).join('<br>');
 
+  // ── Nachfassen: wer braucht Aufmerksamkeit? ──
+  // Nur freigeschaltete Konten; neu Registrierte (unter 7 Tagen) gelten noch
+  // nicht als inaktiv. Ablauf eines bezahlten Abos: 7 Tage vorher warnen.
+  const TAG = 86400000, jetztT = Date.now();
+  const warnungen = [];
+  zeilen.forEach(z => {
+    const gruende = [];
+    if (z.status === 'zahlung_offen') gruende.push(['💳 Zahlung offen', 'var(--danger)']);
+    if (z.aboExpiry && z.abo !== 'free') {
+      const rest = Math.ceil((z.aboExpiry - jetztT) / TAG);
+      if (rest < 0) gruende.push(['⌛ Abo seit ' + (-rest) + ' T. abgelaufen', 'var(--danger)']);
+      else if (rest <= 7) gruende.push(['⌛ Abo endet in ' + rest + ' T.', 'var(--accent)']);
+    }
+    if (z.status === 'aktiv' && z.datum && jetztT - z.datum > 7 * TAG) {
+      if (!z.zuletzt) gruende.push(['💤 Noch nie erfasst', 'var(--muted)']);
+      else if (jetztT - z.zuletzt > 14 * TAG) gruende.push(['💤 ' + Math.floor((jetztT - z.zuletzt) / TAG) + ' Tage inaktiv', 'var(--accent)']);
+    }
+    if (gruende.length) warnungen.push({ z, gruende });
+  });
+  const warnHTML = !warnungen.length ? ''
+    : '<div style="margin:8px 12px 12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden">'
+      + '<div style="padding:10px 12px;font-weight:800;font-size:0.82rem;border-bottom:1px solid var(--border);background:var(--surface2)">⚠️ Nachfassen (' + warnungen.length + ')</div>'
+      + warnungen.map(w => '<div style="padding:9px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">'
+          + '<div style="min-width:0"><div style="font-weight:700;font-size:0.82rem">' + w.z.typIcon + ' ' + esc(w.z.name) + '</div>'
+          + '<div style="font-size:0.7rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px">' + esc(w.z.email) + '</div></div>'
+          + '<div style="display:flex;gap:6px;flex-wrap:wrap">' + w.gruende.map(g => '<span style="font-size:0.68rem;font-weight:700;color:' + g[1] + ';border:1px solid var(--border);border-radius:6px;padding:2px 7px">' + g[0] + '</span>').join('') + '</div>'
+          + '</div>').join('')
+      + '<div style="padding:8px 12px;font-size:0.68rem;color:var(--muted)">Inaktiv = über 14 Tage weder Kartei noch Kalender geöffnet. „Noch nie erfasst" verschwindet, sobald das Konto die App einmal öffnet.</div>'
+      + '</div>';
+
   body.innerHTML =
     '<div class="kpi-row">'
     + '<div class="kpi"><div class="kpi-val" style="color:var(--accent)">' + gesamt + '</div><div class="kpi-lbl">Gesamt</div></div>'
     + '<div class="kpi"><div class="kpi-val" style="color:#f0b429">' + fahrschulen.length + '</div><div class="kpi-lbl">🏫 Fahrschulen</div></div>'
     + '<div class="kpi"><div class="kpi-val" style="color:#58a6ff">' + alleFahrlehrer.length + '</div><div class="kpi-lbl">👤 Fahrlehrer</div></div>'
     + '</div>'
+    + warnHTML
     + (gesamt === 0
         ? '<div style="padding:40px;text-align:center;color:var(--muted)">Noch niemand angemeldet.</div>'
         : '<div style="margin:8px 12px 8px;overflow-x:auto;-webkit-overflow-scrolling:touch">'
@@ -1097,7 +1130,7 @@ async function renderAnalytics() {
         anzahlAktiv:     schueler.filter(s => !s.archiviert).length,
         anzahlArchiviert:schueler.filter(s => s.archiviert).length,
         anzahlLehrer:    lehrerSnap.size,
-        letzteNutzung:   (window.__alleUsers || []).filter(u => u.fahrschuleId === fs.id).reduce((m,u) => Math.max(m, u.letzteNutzung || 0), 0),
+        letzteNutzung:   (window.__alleUsers || []).filter(u => u.fahrschuleId === fs.id).reduce((m,u) => Math.max(m, u.letzteNutzung || 0, u.letzteNutzungKalender || 0), 0),
         anzahlProtokolle:protokolle.length,
         klassenVerteilung: {
           B:     schueler.filter(s => ['B','B-Auto','B197'].includes(s.klasse||'B')).length,
@@ -1126,7 +1159,7 @@ async function renderAnalytics() {
         anzahlAktiv:     schueler.filter(s => !s.archiviert).length,
         anzahlArchiviert:schueler.filter(s => s.archiviert).length,
         anzahlLehrer:    1,
-        letzteNutzung:   l.letzteNutzung || 0,
+        letzteNutzung:   Math.max(l.letzteNutzung || 0, l.letzteNutzungKalender || 0),
         anzahlProtokolle:protokolle.length,
         klassenVerteilung: {
           B:  schueler.filter(s => ['B','B-Auto','B197'].includes(s.klasse||'B')).length,
