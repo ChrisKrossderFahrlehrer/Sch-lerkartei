@@ -73,8 +73,18 @@ async function schuelerEndgueltigLoeschen(db, studentId) {
     db.collection('accessCodes').where('studentId', '==', studentId));
   const protokoll = await loescheAlle(
     db.collection('protokoll').where('studentId', '==', studentId));
+  // Verknuepfte Kalender-Daten (Kalender-Schueler mit adkStudentId) samt
+  // Theorie-Eintraegen. Termine bleiben stehen; sie tragen nur die ID des
+  // Kalender-Schuelers, die danach ins Leere zeigt.
+  let kalender = 0;
+  const kalSnap = await db.collection('schueler').where('adkStudentId', '==', studentId).get();
+  for (const k of kalSnap.docs) {
+    kalender += await loescheAlle(db.collection('theorieStunden').where('schuelerId', '==', k.id));
+    await k.ref.delete();
+    kalender++;
+  }
   await db.collection('students').doc(studentId).delete();
-  return { codes, protokoll };
+  return { codes, protokoll, kalender };
 }
 
 // Reaktion auf eine Aenderung am Schueler-Dokument (Trigger in index.js).

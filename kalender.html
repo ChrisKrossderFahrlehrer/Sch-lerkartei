@@ -1091,6 +1091,14 @@ window.aktivierePush = async () => {
 // Kalender, Anschrift in der ADK) und macht die DSGVO-Loeschung
 // unvollstaendig.
 //
+// STAND: Statt die Sammlungen zusammenzulegen, werden Kalender-Schueler mit
+// ihrer Kartei-Akte VERKNUEPFT (Feld adkStudentId, siehe Ausbildungsnachweis).
+// Grund: Die Kalender-Schueler-ID steckt in laufenden Buchungen (slots.bookedBy),
+// in den verschickten Buchungslinks (?schueler=...), in bookingStudents und der
+// Warteliste. Ein Umzug in die Kartei-Sammlung haette neue IDs bedeutet - alle
+// verschickten Links waeren tot und gebuchte Termine verwaist. Die Verknuepfung
+// bringt Anschrift fuer den Nachweis und das Mitloeschen
+// (functions/papierkorb.js), ohne laufende Buchungen anzufassen.
 // Umstellung erfolgt in Etappen. Solange hier der alte Wert steht,
 // verhaelt sich alles exakt wie bisher. Nach erfolgreicher Datenuebernahme
 // wird hier auf die ADK-Sammlung umgestellt - EINE Zeile, jederzeit
@@ -2068,6 +2076,12 @@ pages['nachweis']=async function(el){
       <p class="text-muted" style="font-size:12px;margin:-4px 0 14px">Unterschriften sind optional. Leer gelassen, bleibt auf dem Ausdruck eine Linie zum Unterschreiben.</p>
       <button class="btn btn-primary" id="nw-btn" onclick="erstelleNachweis()">📄 Nachweis erstellen</button>
     </div>
+  </div>
+  <div class="card">
+    <div class="card-title">🔗 Mit der Kartei verknüpfen</div>
+    <p class="text-muted" style="font-size:13px;margin:0 0 12px">Kalender und Kartei führen ihre Schüler noch getrennt. Verknüpfte Schüler bekommen Anschrift und Geburtsdatum automatisch aus der Kartei, und beim endgültigen Löschen in der Kartei werden auch ihre Kalenderdaten entfernt. Es werden nur Schüler mit exakt gleichem Vor- und Nachnamen vorgeschlagen.</p>
+    <button class="btn btn-secondary" onclick="nwVerknuepfenVorschlag()">Vorschläge anzeigen</button>
+    <div id="nw-link-liste" style="margin-top:12px"></div>
   </div></div>`;
   ['lehrer','schueler'].forEach(nwSigInit);
   try{
@@ -2106,7 +2120,10 @@ window.nwSchuelerGewaehlt=async function(){
   if(s.klasse) document.getElementById('nw-klasse').value=s.klasse;
   // Vorschlag aus der Kartei (gleicher Vor- und Nachname, gleiche Fahrschule)
   let treffer=null;
-  try{
+  if(s.adkStudentId){
+    try{ const k=await getDoc(doc(db,'students',s.adkStudentId)); if(k.exists()&&k.data().archivGrund!=='geloescht') treffer=k.data(); }catch(e){ console.warn('Verknuepfte Kartei',e); }
+  }
+  if(!treffer) try{
     const ks=await getDocs(query(collection(db,'students'),where('fahrschuleId','==',currentSchoolId)));
     const n=t=>String(t||'').trim().toLowerCase();
     treffer=ks.docs.map(d=>d.data()).find(k=>n(k.vorname)===n(s.fname)&&n(k.nachname)===n(s.lname)&&k.archivGrund!=='geloescht')||null;
@@ -2121,6 +2138,38 @@ window.nwSchuelerGewaehlt=async function(){
   }else{
     document.getElementById('nw-quelle').textContent='Kein passender Eintrag in der Kartei gefunden. Bitte Angaben eintragen.';
   }
+};
+
+window.nwVerknuepfenVorschlag=async function(){
+  const box=document.getElementById('nw-link-liste');
+  box.innerHTML='<div class="spinner"></div>';
+  try{
+    const ks=await getDocs(query(collection(db,'students'),where('fahrschuleId','==',currentSchoolId)));
+    const n=t=>String(t||'').trim().toLowerCase();
+    const kartei=ks.docs.map(d=>({id:d.id,...d.data()})).filter(k=>k.archivGrund!=='geloescht');
+    const offen=Object.values(window.__nwSchueler||{}).filter(s=>!s.adkStudentId);
+    const verknuepft=Object.values(window.__nwSchueler||{}).length-offen.length;
+    const vorschlaege=[];
+    offen.forEach(s=>{
+      const passt=kartei.filter(k=>n(k.vorname)===n(s.fname)&&n(k.nachname)===n(s.lname));
+      if(passt.length===1) vorschlaege.push({s,k:passt[0]});
+    });
+    if(!vorschlaege.length){ box.innerHTML=`<p class="text-muted" style="font-size:13px">Keine neuen Vorschläge. Bereits verknüpft: ${verknuepft}.</p>`; return; }
+    window.__nwVorschlaege=vorschlaege;
+    box.innerHTML=`<p style="font-size:13px;margin:0 0 8px">${vorschlaege.length} Vorschläge · bereits verknüpft: ${verknuepft}</p>`
+      + vorschlaege.map((v,i)=>`<label style="display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--border);font-size:13px;cursor:pointer"><input type="checkbox" class="nw-link-check" value="${i}" checked> <span>${escHtml(v.s.fname)} ${escHtml(v.s.lname)} <span class="text-muted">↔ Kartei${v.k.klasse?' · Klasse '+escHtml(v.k.klasse):''}${v.k.geburt?' · geb. '+escHtml(v.k.geburt):''}</span></span></label>`).join('')
+      + '<button class="btn btn-primary" style="margin-top:10px" onclick="nwVerknuepfenSpeichern()">Ausgewählte verknüpfen</button>';
+  }catch(e){ console.warn('Verknuepfen',e); box.innerHTML='<p style="color:var(--danger);font-size:13px">Kartei konnte nicht gelesen werden.</p>'; }
+};
+window.nwVerknuepfenSpeichern=async function(){
+  const ids=[...document.querySelectorAll('.nw-link-check:checked')].map(c=>parseInt(c.value));
+  let ok=0,fehler=0;
+  for(const i of ids){
+    const v=window.__nwVorschlaege[i];
+    try{ await updateDoc(doc(db,SCHUELER_COLL,v.s.id),{adkStudentId:v.k.id}); v.s.adkStudentId=v.k.id; ok++; }catch(e){ console.warn('verknuepfen',e); fehler++; }
+  }
+  toast(`${ok} verknüpft${fehler?', '+fehler+' fehlgeschlagen':''}.`, fehler?'error':'success');
+  nwVerknuepfenVorschlag();
 };
 
 window.erstelleNachweis=async function(){

@@ -125,6 +125,11 @@ await db.doc('accessCodes/CODEALT').set({ studentId: 'alt', teacherUid: 'lehrerC
 await db.doc('protokoll/palt').set({ studentId: 'alt', uid: 'lehrerC', text: 'x' });
 await db.doc('students/frisch').set({ uid: 'lehrerB', vorname: 'Frisch', ...LOESCHEN(T0 - 89 * TAG) });
 await db.doc('students/ohneDatum').set({ uid: 'lehrerB', vorname: 'OhneDatum', archiviert: true, archivGrund: 'geloescht', archiviertAm: T0 - 100 * TAG });
+// Verknuepfte Kalender-Daten des alten Schuelers - und ein fremder Kalender-Schueler daneben
+await db.doc('schueler/kalAlt').set({ fname: 'Alt', schoolId: 'fsX', adkStudentId: 'alt' });
+await db.doc('theorieStunden/thAlt').set({ schuelerId: 'kalAlt', thema: '1' });
+await db.doc('schueler/kalAnders').set({ fname: 'Anders', schoolId: 'fsX', adkStudentId: 'frisch' });
+await db.doc('theorieStunden/thAnders').set({ schuelerId: 'kalAnders', thema: '2' });
 await db.doc('students/fertig').set({ uid: 'lehrerB', vorname: 'Fertig', archiviert: true, archiviertAm: T0 - 400 * TAG });
 await pruefe('Leeren: nur ueber 90 Tage Geloeschte', async () => {
   gleich(await papierkorbLeeren(db, T0), 2, 'Anzahl');
@@ -133,6 +138,12 @@ await pruefe('91 Tage -> weg, samt Code und Protokoll eines anderen Lehrers', as
   gleich(await gibts('students/alt'), false, 'Schueler');
   gleich(await gibts('accessCodes/CODEALT'), false, 'Code');
   gleich(await gibts('protokoll/palt'), false, 'Protokoll');
+});
+await pruefe('... und mit ihm der verknuepfte Kalender-Schueler samt Theorie', async () => {
+  gleich(await gibts('schueler/kalAlt'), false, 'Kalender-Schueler');
+  gleich(await gibts('theorieStunden/thAlt'), false, 'Theorie');
+  gleich(await gibts('schueler/kalAnders'), true, 'fremder Kalender-Schueler');
+  gleich(await gibts('theorieStunden/thAnders'), true, 'fremde Theorie');
 });
 await pruefe('Ohne geloeschtAm zaehlt archiviertAm (bleibt nicht ewig liegen)', async () => {
   gleich(await gibts('students/ohneDatum'), false, 'Schueler');
