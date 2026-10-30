@@ -859,6 +859,7 @@ function buildSidebar(){
     {id:'admin-lehrer',icon:'👨‍🏫',label:'Fahrlehrer'},
     {id:'admin-schueler',icon:'🧑‍🎓',label:'Fahrschüler'},
     {id:'admin-pruefungen',icon:'🎓',label:'Prüfungen'},
+    {id:'nachweis',icon:'📄',label:'Ausbildungsnachweis'},
     {id:'admin-fuhrpark',icon:'🚗',label:'Fuhrpark'},
     {id:'admin-urlaub',icon:'🏖️',label:'Urlaub'},
     {id:'admin-sperrtage',icon:'🚫',label:'Sperrtage'},
@@ -874,6 +875,7 @@ function buildSidebar(){
     {id:'lehrer-urlaub',icon:'🏖️',label:'Urlaub'},
     {id:'lehrer-warteliste',icon:'⏳',label:'Warteliste'},
     {id:'lehrer-theorie',icon:'📖',label:'Theorie'},
+    ...(istEinzelLehrer?[{id:'nachweis',icon:'📄',label:'Ausbildungsnachweis'}]:[]),
     {id:'lehrer-profil',icon:'⚙️',label:'Einstellungen'},
   ];
   const items=currentRole==='superadmin'?saNav:currentRole==='admin'?adminNav:lehrerNav;
@@ -2028,6 +2030,216 @@ const AN_KATEGORIEN = [
   { code: 'NF',  label: 'Fahrstunden bei Dunkelheit' },
   { code: 'SN',  label: 'Schaltnachweis (§5a FahrschAusbO)' },
 ];
+
+// ══ AUSBILDUNGSNACHWEIS (Anlage 3 zu § 6 Abs. 1 FahrschAusbO) ══════
+// Nur fuer Inhaber der Fahrschule und eigenstaendige Fahrlehrer: Der
+// Nachweis wird von der Fahrschule ausgestellt, angestellte Fahrlehrer
+// sehen den Menuepunkt nicht. Gefahrene Stunden kommen aus den Terminen
+// (vergangen, nicht als Fehlstunde markiert), Theorie aus theorieStunden.
+// Anschrift und Geburtsdatum werden aus der Kartei (ADK) vorgeschlagen,
+// wenn der Name uebereinstimmt, und koennen vor dem Erstellen korrigiert
+// werden. Ausgabe als Druckansicht - "Als PDF sichern" im Druckdialog.
+const AN_TYP_FALLBACK = { ueberlandfahrt:'UL', autobahnfahrt:'AB', nachtfahrt:'NF', normal:'Üst' };
+const AN_PFLICHT = { UL:5, AB:4, NF:3 }; // Mindestanzahl je 45 Min. (Klassen A, A1, A2, B)
+function darfNachweis(){ return currentRole==='admin' || (currentRole==='lehrer' && istEinzelLehrer); }
+window.__nwSig = { lehrer:null, schueler:null };
+
+pages['nachweis']=async function(el){
+  if(!darfNachweis()){ el.innerHTML='<div class="page active"><h2 class="page-title">Ausbildungsnachweis</h2><div class="card"><p class="text-muted">Den Ausbildungsnachweis stellt die Fahrschule aus. Bitte wende dich an den Inhaber.</p></div></div>'; return; }
+  el.innerHTML=`<div class="page active"><h2 class="page-title">📄 Ausbildungsnachweis</h2>
+  <p class="text-muted" style="margin:-8px 0 16px">Nach Anlage 3 zu § 6 Abs. 1 FahrschAusbO. Wähle den Schüler, prüfe die Angaben und erstelle den Nachweis zum Drucken oder als PDF.</p>
+  <div class="card">
+    <div class="field"><label for="nw-schueler">Fahrschüler</label><select id="nw-schueler" onchange="nwSchuelerGewaehlt()"><option value="">— bitte wählen —</option></select></div>
+    <div id="nw-form" style="display:none">
+      <div class="grid-2">
+        <div class="field"><label for="nw-klasse">Klasse</label><select id="nw-klasse"><option>B</option><option>B197</option><option>BE</option><option>A</option><option>A2</option><option>A1</option><option>AM</option></select></div>
+        <div class="field"><label for="nw-geb">Geburtsdatum</label><input id="nw-geb" type="date"></div>
+      </div>
+      <div class="field"><label for="nw-strasse">Straße und Hausnummer</label><input id="nw-strasse" autocomplete="off"></div>
+      <div class="grid-2">
+        <div class="field"><label for="nw-plz">PLZ</label><input id="nw-plz" inputmode="numeric" autocomplete="off"></div>
+        <div class="field"><label for="nw-ort">Ort</label><input id="nw-ort" autocomplete="off"></div>
+      </div>
+      <div id="nw-quelle" class="text-muted" style="font-size:12px;margin:-6px 0 14px"></div>
+      <div class="grid-2">
+        <div class="field"><label>Unterschrift Fahrlehrer/in</label><canvas id="nw-sig-lehrer" width="600" height="200" style="width:100%;height:110px;background:#fff;border:1px solid var(--border);border-radius:8px;touch-action:none"></canvas><button type="button" class="btn btn-secondary btn-sm" style="margin-top:6px" onclick="nwSigLeeren('lehrer')">Löschen</button></div>
+        <div class="field"><label>Unterschrift Fahrschüler/in</label><canvas id="nw-sig-schueler" width="600" height="200" style="width:100%;height:110px;background:#fff;border:1px solid var(--border);border-radius:8px;touch-action:none"></canvas><button type="button" class="btn btn-secondary btn-sm" style="margin-top:6px" onclick="nwSigLeeren('schueler')">Löschen</button></div>
+      </div>
+      <p class="text-muted" style="font-size:12px;margin:-4px 0 14px">Unterschriften sind optional. Leer gelassen, bleibt auf dem Ausdruck eine Linie zum Unterschreiben.</p>
+      <button class="btn btn-primary" id="nw-btn" onclick="erstelleNachweis()">📄 Nachweis erstellen</button>
+    </div>
+  </div></div>`;
+  ['lehrer','schueler'].forEach(nwSigInit);
+  try{
+    const q = currentRole==='admin'
+      ? query(collection(db,SCHUELER_COLL),where('schoolId','==',currentSchoolId))
+      : query(collection(db,SCHUELER_COLL),where('lehrerUid','==',currentUser.uid));
+    const snap=await getDocs(q);
+    window.__nwSchueler={};
+    const sel=document.getElementById('nw-schueler');
+    snap.docs.map(d=>({id:d.id,...d.data()}))
+      .sort((a,b)=>(a.lname||'').localeCompare(b.lname||''))
+      .forEach(s=>{ window.__nwSchueler[s.id]=s; sel.insertAdjacentHTML('beforeend',`<option value="${s.id}">${escHtml(s.lname||'')}, ${escHtml(s.fname||'')}</option>`); });
+    if(snap.empty) sel.insertAdjacentHTML('afterend','<p class="text-muted" style="margin-top:8px">Noch keine Schüler im Kalender.</p>');
+  }catch(e){ console.warn('nachweis schueler',e); toast('Schüler konnten nicht geladen werden.','error'); }
+};
+
+function nwSigInit(wer){
+  const c=document.getElementById('nw-sig-'+wer); if(!c)return;
+  const ctx=c.getContext('2d'); ctx.lineWidth=3; ctx.lineCap='round'; ctx.strokeStyle='#111';
+  let zeichnet=false;
+  const pos=e=>{const r=c.getBoundingClientRect();return [(e.clientX-r.left)*c.width/r.width,(e.clientY-r.top)*c.height/r.height];};
+  c.addEventListener('pointerdown',e=>{zeichnet=true;c.setPointerCapture(e.pointerId);const [x,y]=pos(e);ctx.beginPath();ctx.moveTo(x,y);});
+  c.addEventListener('pointermove',e=>{if(!zeichnet)return;const [x,y]=pos(e);ctx.lineTo(x,y);ctx.stroke();window.__nwSig[wer]=true;});
+  ['pointerup','pointercancel','pointerleave'].forEach(t=>c.addEventListener(t,()=>{zeichnet=false;}));
+  window.__nwSig[wer]=null;
+}
+window.nwSigLeeren=function(wer){const c=document.getElementById('nw-sig-'+wer);if(!c)return;c.getContext('2d').clearRect(0,0,c.width,c.height);window.__nwSig[wer]=null;};
+
+window.nwSchuelerGewaehlt=async function(){
+  const id=document.getElementById('nw-schueler').value;
+  document.getElementById('nw-form').style.display=id?'block':'none';
+  if(!id)return;
+  const s=window.__nwSchueler[id]||{};
+  ['nw-geb','nw-strasse','nw-plz','nw-ort'].forEach(f=>document.getElementById(f).value='');
+  document.getElementById('nw-quelle').textContent='Suche Angaben in der Kartei…';
+  if(s.klasse) document.getElementById('nw-klasse').value=s.klasse;
+  // Vorschlag aus der Kartei (gleicher Vor- und Nachname, gleiche Fahrschule)
+  let treffer=null;
+  try{
+    const ks=await getDocs(query(collection(db,'students'),where('fahrschuleId','==',currentSchoolId)));
+    const n=t=>String(t||'').trim().toLowerCase();
+    treffer=ks.docs.map(d=>d.data()).find(k=>n(k.vorname)===n(s.fname)&&n(k.nachname)===n(s.lname)&&k.archivGrund!=='geloescht')||null;
+  }catch(e){ console.warn('Kartei-Abgleich',e); }
+  if(treffer){
+    document.getElementById('nw-geb').value=treffer.geburt||'';
+    document.getElementById('nw-strasse').value=treffer.strasse||'';
+    document.getElementById('nw-plz').value=treffer.plz||'';
+    document.getElementById('nw-ort').value=treffer.ort||'';
+    if(treffer.klasse) document.getElementById('nw-klasse').value=treffer.klasse;
+    document.getElementById('nw-quelle').textContent='✓ Angaben aus der Kartei übernommen. Bitte prüfen.';
+  }else{
+    document.getElementById('nw-quelle').textContent='Kein passender Eintrag in der Kartei gefunden. Bitte Angaben eintragen.';
+  }
+};
+
+window.erstelleNachweis=async function(){
+  const id=document.getElementById('nw-schueler').value; if(!id)return;
+  const s=window.__nwSchueler[id]||{};
+  const btn=document.getElementById('nw-btn'); btn.disabled=true; btn.textContent='Wird erstellt…';
+  // Fenster sofort oeffnen (sonst blockiert der Browser das Popup nach dem Laden)
+  const w=window.open('','_blank');
+  if(!w){ btn.disabled=false; btn.textContent='📄 Nachweis erstellen'; return toast('Bitte Pop-ups für diese Seite erlauben.','error'); }
+  w.document.write('<p style="font-family:sans-serif;padding:20px">Nachweis wird erstellt…</p>');
+  try{
+    const jetzt=Date.now();
+    const slotQ = currentRole==='admin'
+      ? query(collection(db,'slots'),where('schoolId','==',currentSchoolId),where('bookedBy','==',id))
+      : query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid),where('bookedBy','==',id));
+    const thQ = currentRole==='admin'
+      ? query(collection(db,'theorieStunden'),where('schoolId','==',currentSchoolId),where('schuelerId','==',id))
+      : query(collection(db,'theorieStunden'),where('lehrerUid','==',currentUser.uid),where('schuelerId','==',id));
+    const [slotSnap,thSnap]=await Promise.all([getDocs(slotQ),getDocs(thQ)]);
+    const ms=t=>t&&t.toDate?t.toDate().getTime():(t?new Date(t).getTime():0);
+    const fahrten=slotSnap.docs.map(d=>d.data())
+      .filter(x=>x.status!=='nichtErschienen' && ms(x.endTime) && ms(x.endTime)<=jetzt)
+      .sort((a,b)=>ms(a.startTime)-ms(b.startTime))
+      .map(x=>({ start:ms(x.startTime), ende:ms(x.endTime), min:Math.round((ms(x.endTime)-ms(x.startTime))/60000),
+                 kat:x.anKategorie||AN_TYP_FALLBACK[x.type]||'Üst', lehrer:x.lehrerUid }));
+    const theorie=thSnap.docs.map(d=>d.data()).sort((a,b)=>String(a.datum).localeCompare(String(b.datum)));
+    // Fahrlehrer-Namen
+    const lehrerNamen={};
+    for(const uid of [...new Set(fahrten.map(f=>f.lehrer).concat(theorie.map(t=>t.lehrerUid)).filter(Boolean))]){
+      try{ const u=await getDoc(doc(db,'kalenderUsers',uid)); if(u.exists()) lehrerNamen[uid]=`${u.data().fname||''} ${u.data().lname||''}`.trim(); }catch(e){}
+      if(!lehrerNamen[uid] && uid===currentUser.uid) lehrerNamen[uid]=`${currentProfile.fname||''} ${currentProfile.lname||''}`.trim();
+    }
+    // Fahrschule: Name und Anschrift (dieselbe Adresse wie auf den Rechnungen)
+    let fs={ name:(currentSchool&&currentSchool.name)||'', strasse:'', plz:'', ort:'' };
+    try{
+      const ref = istEinzelLehrer ? doc(db,'users',currentUser.uid) : doc(db,'fahrschulen',currentSchoolId);
+      const d=await getDoc(ref);
+      if(d.exists()){ const b=d.data(); fs={ name: b.fahrschuleName||b.name||fs.name, strasse:b.rechnungsStrasse||'', plz:b.rechnungsPlz||'', ort:b.rechnungsOrt||'' }; }
+    }catch(e){ console.warn('Fahrschul-Adresse',e); }
+    const sigImg=wer=>window.__nwSig[wer]?document.getElementById('nw-sig-'+wer).toDataURL('image/png'):null;
+    const daten={
+      fs, klasse:document.getElementById('nw-klasse').value,
+      schueler:{ name:`${s.lname||''}, ${s.fname||''}`, geb:document.getElementById('nw-geb').value,
+        strasse:document.getElementById('nw-strasse').value.trim(), plz:document.getElementById('nw-plz').value.trim(), ort:document.getElementById('nw-ort').value.trim() },
+      fahrten, theorie, lehrerNamen, sigLehrer:sigImg('lehrer'), sigSchueler:sigImg('schueler')
+    };
+    w.document.open(); w.document.write(nachweisHtml(daten)); w.document.close();
+  }catch(e){
+    console.warn('erstelleNachweis',e);
+    try{ w.close(); }catch(_){}
+    toast('Nachweis konnte nicht erstellt werden ('+(e.code||e.message||'Fehler')+').','error');
+  }
+  btn.disabled=false; btn.textContent='📄 Nachweis erstellen';
+};
+
+function nachweisHtml(d){
+  const e=escHtml;
+  const datum=t=>t?new Date(t).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
+  const uhr=t=>new Date(t).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+  const isoDatum=s=>{ if(!s)return ''; const [y,m,t]=String(s).split('-'); return t?`${t}.${m}.${y}`:e(s); };
+  const katLabel=c=>{ const k=AN_KATEGORIEN.find(x=>x.code===c); return k?k.label:c; };
+  const zusatzKey=/^A/.test(d.klasse)?'A':'B';
+  const zusatz=(THEORIE_ZUSATZ[zusatzKey]||[]);
+  const theorieZeile=t=>{
+    const eintr=d.theorie.filter(x=>String(x.thema)===t.nr);
+    return `<tr><td class="c">${e(t.nr)}</td><td>${e(t.titel)}</td><td>${eintr.map(x=>isoDatum(x.datum)).join(', ')||'&nbsp;'}</td><td class="c">${eintr.reduce((s,x)=>s+(x.minuten||0),0)||''}</td></tr>`;
+  };
+  const summe={}; d.fahrten.forEach(f=>{summe[f.kat]=(summe[f.kat]||0)+f.min;});
+  const gesamtMin=d.fahrten.reduce((s,f)=>s+f.min,0);
+  const pflichtTxt=Object.entries(AN_PFLICHT).map(([k,n])=>{
+    const ist=Math.floor((summe[k]||0)/45);
+    return `<tr><td>${e(katLabel(k))} (${k})</td><td class="c">${n} × 45 Min.</td><td class="c">${summe[k]||0} Min. (${ist} × 45)</td><td class="c">${ist>=n?'✓':'offen'}</td></tr>`;
+  }).join('');
+  const linie=(img,label)=>`<div class="sig">${img?`<img src="${img}" alt="">`:'<div style="height:52px"></div>'}<div class="sl">${label}</div></div>`;
+  return `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Ausbildungsnachweis ${e(d.schueler.name)}</title>
+<style>
+@page{size:A4;margin:14mm 13mm}
+*{box-sizing:border-box}body{font:10pt/1.35 Arial,Helvetica,sans-serif;color:#111;margin:0;padding:16px}
+h1{font-size:15pt;margin:0 0 2px}h2{font-size:11pt;margin:16px 0 6px;border-bottom:1.5px solid #111;padding-bottom:2px}
+.sub{font-size:8.5pt;color:#444;margin-bottom:12px}
+.kopf{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.box{border:1px solid #111;padding:7px 9px;min-height:74px}.box b{display:block;font-size:8pt;text-transform:uppercase;letter-spacing:.04em;color:#444;margin-bottom:3px}
+table{width:100%;border-collapse:collapse;font-size:9pt}th,td{border:1px solid #111;padding:3px 5px;text-align:left;vertical-align:top}th{background:#eee;font-size:8.5pt}
+.c{text-align:center;white-space:nowrap}tr{page-break-inside:avoid}
+.sigs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-top:22px;page-break-inside:avoid}
+.sig img{height:52px;max-width:100%;display:block}.sl{border-top:1px solid #111;font-size:8.5pt;padding-top:3px}
+.leiste{position:sticky;top:0;background:#fff;padding:8px 0 12px;display:flex;gap:8px}
+.leiste button{font:600 11pt Arial;padding:9px 16px;border-radius:8px;border:1px solid #111;background:#ffd454;cursor:pointer}
+@media print{.leiste{display:none}body{padding:0}}
+</style></head><body>
+<div class="leiste"><button onclick="window.print()">🖨️ Drucken / Als PDF sichern</button><button onclick="window.close()" style="background:#fff">Schließen</button></div>
+<h1>Ausbildungsnachweis</h1>
+<div class="sub">nach Anlage 3 zu § 6 Abs. 1 der Fahrschüler-Ausbildungsordnung (FahrschAusbO) · Klasse ${e(d.klasse)} · erstellt am ${datum(Date.now())}</div>
+<div class="kopf">
+  <div class="box"><b>Fahrschule</b>${e(d.fs.name)}<br>${e(d.fs.strasse)}<br>${e(d.fs.plz)} ${e(d.fs.ort)}</div>
+  <div class="box"><b>Fahrschüler/in</b>${e(d.schueler.name)}<br>geb. ${isoDatum(d.schueler.geb)||'__________'}<br>${e(d.schueler.strasse)}<br>${e(d.schueler.plz)} ${e(d.schueler.ort)}</div>
+</div>
+<h2>1. Theoretischer Unterricht – Grundstoff</h2>
+<table><thead><tr><th class="c">Nr.</th><th>Thema</th><th>Datum</th><th class="c">Min.</th></tr></thead><tbody>${THEORIE_GRUNDSTOFF.map(theorieZeile).join('')}</tbody></table>
+<h2>2. Theoretischer Unterricht – klassenspezifischer Zusatzstoff</h2>
+<table><thead><tr><th class="c">Nr.</th><th>Thema</th><th>Datum</th><th class="c">Min.</th></tr></thead><tbody>${zusatz.map(theorieZeile).join('')}</tbody></table>
+<h2>3. Praktischer Unterricht</h2>
+<table><thead><tr><th class="c">Nr.</th><th>Datum</th><th class="c">Uhrzeit</th><th class="c">Min.</th><th>Ausbildungsinhalt</th><th>Fahrlehrer/in</th></tr></thead><tbody>
+${d.fahrten.length?d.fahrten.map((f,i)=>`<tr><td class="c">${i+1}</td><td>${datum(f.start)}</td><td class="c">${uhr(f.start)}–${uhr(f.ende)}</td><td class="c">${f.min}</td><td>${e(f.kat)} – ${e(katLabel(f.kat))}</td><td>${e(d.lehrerNamen[f.lehrer]||'')}</td></tr>`).join(''):'<tr><td colspan="6" class="c">Noch keine gefahrenen Stunden erfasst.</td></tr>'}
+</tbody></table>
+<h2>4. Zusammenfassung</h2>
+<table><thead><tr><th>Ausbildungsinhalt</th><th class="c">Minuten</th></tr></thead><tbody>
+${Object.keys(summe).map(k=>`<tr><td>${e(k)} – ${e(katLabel(k))}</td><td class="c">${summe[k]}</td></tr>`).join('')}
+<tr><th>Gesamt praktischer Unterricht</th><th class="c">${gesamtMin} Min. (${(gesamtMin/45).toFixed(1).replace('.',',')} × 45)</th></tr></tbody></table>
+${/^(B|A)/.test(d.klasse)&&d.klasse!=='BE'?`<h2>5. Besondere Ausbildungsfahrten (Mindestumfang)</h2>
+<table><thead><tr><th>Art</th><th class="c">Mindestens</th><th class="c">Absolviert</th><th class="c">Status</th></tr></thead><tbody>${pflichtTxt}</tbody></table>`:''}
+<p style="font-size:8.5pt;margin-top:14px">Die Richtigkeit der Angaben wird bestätigt.</p>
+<div class="sigs">
+  ${linie(null,'Ort, Datum')}
+  ${linie(d.sigLehrer,'Unterschrift Fahrlehrer/in')}
+  ${linie(d.sigSchueler,'Unterschrift Fahrschüler/in')}
+</div>
+</body></html>`;
+}
 
 window.setSlotKategorie = async function(slotId, kategorie, year, month, day) {
   try {
