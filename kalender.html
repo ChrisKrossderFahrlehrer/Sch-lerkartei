@@ -2279,7 +2279,7 @@ ${d.fahrten.length?d.fahrten.map((f,i)=>`<tr><td class="c">${i+1}</td><td>${datu
 <table><thead><tr><th>Ausbildungsinhalt</th><th class="c">Minuten</th></tr></thead><tbody>
 ${Object.keys(summe).map(k=>`<tr><td>${e(k)} – ${e(katLabel(k))}</td><td class="c">${summe[k]}</td></tr>`).join('')}
 <tr><th>Gesamt praktischer Unterricht</th><th class="c">${gesamtMin} Min. (${(gesamtMin/45).toFixed(1).replace('.',',')} × 45)</th></tr></tbody></table>
-${/^(B|A)/.test(d.klasse)&&d.klasse!=='BE'?`<h2>5. Besondere Ausbildungsfahrten (Mindestumfang)</h2>
+${['B','B197','A','A1','A2'].includes(d.klasse)?`<h2>5. Besondere Ausbildungsfahrten (Mindestumfang)</h2>
 <table><thead><tr><th>Art</th><th class="c">Mindestens</th><th class="c">Absolviert</th><th class="c">Status</th></tr></thead><tbody>${pflichtTxt}</tbody></table>`:''}
 <p style="font-size:8.5pt;margin-top:14px">Die Richtigkeit der Angaben wird bestätigt.</p>
 <div class="sigs">
