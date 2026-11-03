@@ -5418,6 +5418,7 @@ window.zeigeAmpelDetail = (studentId) => {
   } else {
     msg = `${icon} ${ampel.text}\n\nNoch offen:\n• ${ampel.offen.join('\n• ')}`;
   }
+  if (ampel.hinweise && ampel.hinweise.length) msg += `\n\nAus den letzten Stunden:\n• ${ampel.hinweise.join('\n• ')}`;
   alert(msg);
 };
 
@@ -5605,7 +5606,9 @@ function pruefungsAmpel(s) {
   const offen = [];
 
   // 1. Pflichtfahrten (Sonderfahrten) vollständig?
-  const sonderFehlt = SONDER.filter(f => (s.sonderfahrten||{})[f.key] < f.min);
+  // FIX: ohne "|| 0" ergab ein noch nie gezaehlter Eintrag (undefined < 5)
+  // false - eine fehlende Sonderfahrt galt dadurch als erledigt.
+  const sonderFehlt = SONDER.filter(f => (((s.sonderfahrten||{})[f.key]) || 0) < f.min);
   sonderFehlt.forEach(f => {
     const ist = (s.sonderfahrten||{})[f.key] || 0;
     offen.push(`${f.name}: ${ist}/${f.min} Fahrten`);
@@ -5622,11 +5625,36 @@ function pruefungsAmpel(s) {
     if (!s.testfahrtBestanden) offen.push('Testfahrt (B197) noch offen');
   }
 
-  // 4. ADK-Themen-Stand (mind. 80% im Schnitt für "bereit")
+  // 4. Theorieprüfung (BE hat keine eigene Theorieprüfung)
+  const theorieNoetig = !isBE;
+  if (theorieNoetig && !s.theorieBestanden) offen.push('Theorieprüfung noch nicht bestanden');
+
+  // 5. ADK-Themen-Stand (mind. 80% im Schnitt für "bereit")
   const pct = Math.min(overallProgress(s), 100);
 
+  // 6. Hinweise aus den letzten Fahrstunden. Nur wenn das Protokoll dieses
+  // Schuelers geladen ist (offene Akte) - die Farbe aendert sich dadurch
+  // NICHT, damit Liste und Akte dieselbe Ampel zeigen.
+  const hinweise = [];
+  const letzte = (protokollEintraege || [])
+    .filter(e => e.studentId === s.id && e.typ !== 'planung')
+    .sort((a, b) => String(b.datum).localeCompare(String(a.datum)))
+    .slice(0, 3);
+  if (letzte.length >= 2) {
+    const bewertet = letzte.filter(e => e.sterne > 0);
+    if (bewertet.length) {
+      const schnitt = bewertet.reduce((a, e) => a + e.sterne, 0) / bewertet.length;
+      if (schnitt < 3.5) hinweise.push(`Letzte Stunden im Schnitt ${schnitt.toFixed(1).replace('.', ',')} Sterne`);
+    }
+    const zaehl = {};
+    letzte.forEach(e => (e.maengel || []).forEach(m => { zaehl[m] = (zaehl[m] || 0) + 1; }));
+    Object.entries(zaehl).filter(([, n]) => n >= 2)
+      .forEach(([m, n]) => hinweise.push(`${m}: in ${n} der letzten ${letzte.length} Stunden notiert`));
+  }
+  if (pct < 90) hinweise.push(`ADK-Themen: ${pct}% (für Prüfungsbereit 90%)`);
+
   // Ampel-Logik
-  const pflichtOk = sonderFehlt.length === 0 && fs >= ziel;
+  const pflichtOk = sonderFehlt.length === 0 && fs >= ziel && (!theorieNoetig || !!s.theorieBestanden);
   let farbe, text;
   if (pflichtOk && pct >= 90) {
     farbe = 'gruen'; text = 'Prüfungsbereit';
@@ -5635,7 +5663,7 @@ function pruefungsAmpel(s) {
   } else {
     farbe = 'rot'; text = 'Noch nicht bereit';
   }
-  return { farbe, text, offen, pct };
+  return { farbe, text, offen, pct, hinweise };
 }
 
 function overallProgress(s) {

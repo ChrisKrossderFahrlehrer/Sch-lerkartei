@@ -1114,6 +1114,16 @@ exports.papierkorbSchueler = onDocumentUpdated('students/{studentId}', async (ev
 // ── Taeglicher Aufraeum-Job ─────────────────────────────────────────
 // Setzt sowohl die 30-Tage-Frist als auch alle uebrigen Aufbewahrungs-
 // grenzen durch. Laeuft nachts, wenn niemand arbeitet.
+// Erinnerung an Fahrschueler etwa zwei Stunden vor einer geplanten Stunde
+// (siehe functions/erinnerung.js). Laeuft alle 30 Minuten.
+const { erinnerungenSenden } = require('./erinnerung');
+exports.fahrstundenErinnerung = onSchedule(
+  { schedule: 'every 30 minutes', timeZone: 'Europe/Berlin', timeoutSeconds: 300, memory: '256MiB' },
+  async () => {
+    const n = await erinnerungenSenden(getFirestore(), pushToSchueler);
+    if (n) console.log('Fahrstunden-Erinnerungen gesendet:', n);
+  });
+
 exports.taeglichesAufraeumen = onSchedule(
   { schedule: 'every day 03:15', timeZone: 'Europe/Berlin', timeoutSeconds: 540, memory: '512MiB' },
   async () => {

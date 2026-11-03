@@ -437,7 +437,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
       <div class="portal-header-sub" id="header-klasse"></div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
-      <button onclick="portalPushAktivieren()" id="btn-portal-push" aria-label="Benachrichtigungen aktivieren" title="Benachrichtigungen aktivieren" style="background:none;border:1px solid var(--border);color:var(--muted);width:30px;height:30px;border-radius:8px;font-size:0.9rem;cursor:pointer">🔔</button>
+      <button onclick="portalPushAktivieren()" id="btn-portal-push" aria-label="Benachrichtigungen aktivieren" title="Benachrichtigungen aktivieren (Chat und Erinnerung vor Fahrstunden)" style="background:none;border:1px solid var(--border);color:var(--muted);width:30px;height:30px;border-radius:8px;font-size:0.9rem;cursor:pointer">🔔</button>
       <button onclick="portalHelp()" aria-label="Hilfe" style="background:none;border:1px solid var(--border);color:var(--muted);width:30px;height:30px;border-radius:8px;font-size:0.9rem;cursor:pointer">❓</button>
       <button onclick="doLogout()" style="background:none;border:1px solid var(--border);color:var(--muted);padding:5px 10px;border-radius:8px;font-size:0.72rem;cursor:pointer">Abmelden</button>
     </div>
@@ -923,6 +923,8 @@ function renderDashboard() {
       ${chatHintHTML}
       ${nextLessonHTML}
 
+      ${tippsKarteHTML()}
+
       <!-- Fortschritt -->
       <div class="card">
         <div class="card-title">📊 Dein Ausbildungsstand</div>
@@ -1209,6 +1211,67 @@ window.respondLesson = async (lessonId, status) => {
   }
 };
 
+// ── PERSOENLICHE TIPPS ──────────────────────────────────────────
+// Zu jedem Mangel, den der Fahrlehrer im Protokoll ankreuzen kann, ein
+// kurzer Tipp in eigenen Worten. Schluessel = Text ohne Emoji, klein,
+// damit "👁️ Schulterblick" und "Schulterblick" (alte Eintraege) passen.
+// Neue Maengel in index.html (mangel-chip) hier ergaenzen.
+const MANGEL_TIPPS = {
+  'anfahren/anhalten': 'Kupplung langsam kommen lassen, bis das Auto leicht zieht, erst dann Gas geben. Beim Anhalten früh vom Gas, gleichmäßig bremsen und kurz vor dem Stillstand kuppeln.',
+  'spurwechsel': 'Immer in dieser Reihenfolge: Innenspiegel, Außenspiegel, Blinker, Schulterblick, dann erst wechseln. Den Blinker so lange anlassen, bis du ganz drüben bist.',
+  'abbiegen': 'Früh blinken, früh einordnen, Tempo vorher abbauen. Beim Rechtsabbiegen an Radfahrer und Fußgänger denken, beim Linksabbiegen an den Gegenverkehr.',
+  'vorfahrt': 'Schon vor der Kreuzung klären: Welches Schild gilt? Gibt es keins, gilt rechts vor links. Im Zweifel langsam ran und bremsbereit sein.',
+  'abstand halten': 'Außerorts gilt „halber Tacho" in Metern. Einfacher Trick: Zwei Sekunden zählen, wenn das Auto vor dir an einem Pfosten vorbeifährt. Bei Nässe doppelt so viel.',
+  'geschwindigkeit': 'Nach jedem Schild und jedem Ortseingang kurz auf den Tacho schauen. In der 30-Zone im kleineren Gang fahren, dann bleibst du leichter unter dem Limit.',
+  'nachtfahrt': 'Blick an den rechten Fahrbahnrand, wenn dich Gegenverkehr blendet. Fernlicht rechtzeitig abblenden. Nachts lieber etwas langsamer, du siehst weniger weit.',
+  'autobahn': 'Auf dem Beschleunigungsstreifen wirklich beschleunigen, dann Spiegel, Blinker, Schulterblick und einfädeln. Rechts fahren, links nur zum Überholen.',
+  'überland': 'Kurven langsam anfahren, in der Kurve gleichmäßig Gas. Auf Landstraßen mit Wild, Traktoren und Radfahrern rechnen, nur überholen, wenn du die ganze Strecke frei siehst.',
+  'kreisverkehr': 'Beim Einfahren nicht blinken, beim Ausfahren rechts blinken. Wer schon im Kreis ist, hat Vorfahrt. Beim Ausfahren auf Fußgänger und Radfahrer achten.',
+  'ampelverhalten': 'Gelb heißt: anhalten, wenn es noch sicher geht. Grünpfeil-Schild: erst anhalten, dann vorsichtig abbiegen. Grüner Leuchtpfeil: geschützt abbiegen.',
+  'schulterblick': 'Der Spiegel hat einen toten Winkel. Vor jedem Anfahren, Spurwechsel und Abbiegen kurz über die Schulter schauen. Sag es dir am Anfang laut vor: Spiegel, Blinker, Schulter.',
+  'bremstechnik': 'Früh und gefühlvoll bremsen statt spät und hart. Den Druck zum Schluss etwas lösen, dann hält das Auto ohne Ruck.',
+  'schalten': 'Kupplung ganz durchtreten, Gang ohne Kraft einlegen, Kupplung zügig, aber gefühlvoll kommen lassen. Hör auf den Motor: Brummt er tief, runterschalten. Heult er, hochschalten.',
+  'lenken & spurhalten': 'Weit vorausschauen, nicht auf die Motorhaube. Die Hände bleiben auf „Viertel vor drei". Wo du hinschaust, fährst du hin.',
+  'fußgänger beachten': 'Am Zebrastreifen und beim Abbiegen haben Fußgänger Vorrang. Blickkontakt suchen, besonders bei Kindern und älteren Menschen bremsbereit sein.',
+  'licht & signale': 'Rechtzeitig blinken, bevor du bremst. Bei Dämmerung früh Licht an. Warnblinker beim Stauende oder wenn du liegen bleibst.',
+};
+function mangelSchluessel(m) {
+  return String(m || '').replace(/^[^A-Za-zÄÖÜäöüß]+/, '').trim().toLowerCase();
+}
+// Haeufigste Maengel der letzten 5 Fahrstunden, mit Tipp
+function persoenlicheTipps() {
+  const fahrten = (codeData.protokollSnapshot || [])
+    .filter(e => e.typ !== 'planung')
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+    .slice(0, 5);
+  const zaehler = {};
+  fahrten.forEach(e => (e.maengel || []).forEach(m => {
+    const k = mangelSchluessel(m);
+    if (!MANGEL_TIPPS[k]) return;
+    if (!zaehler[k]) zaehler[k] = { name: String(m).trim(), anzahl: 0, zuletzt: e.datum };
+    zaehler[k].anzahl++;
+  }));
+  return Object.entries(zaehler)
+    .sort((a, b) => b[1].anzahl - a[1].anzahl)
+    .slice(0, 3)
+    .map(([k, v]) => ({ ...v, tipp: MANGEL_TIPPS[k] }));
+}
+function tippsKarteHTML() {
+  const t = persoenlicheTipps();
+  if (!t.length) return '';
+  return `<div class="card" style="margin-bottom:16px">
+    <div class="card-title">🎯 Deine Tipps für die nächste Stunde</div>
+    <div style="font-size:0.75rem;color:var(--muted);margin:-4px 0 10px">Aus den Punkten, die dein Fahrlehrer zuletzt notiert hat.</div>
+    ${t.map(x => `<div style="border-top:1px solid var(--border);padding:10px 0">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline">
+        <b style="font-size:0.9rem">${escHtml(x.name)}</b>
+        <span style="font-size:0.7rem;color:var(--muted);white-space:nowrap">${x.anzahl}× in den letzten Stunden</span>
+      </div>
+      <div style="font-size:0.85rem;line-height:1.5;margin-top:4px">${escHtml(x.tipp)}</div>
+    </div>`).join('')}
+  </div>`;
+}
+
 // ── Protokoll ──────────────────────────────────────────────────
 function renderProtokoll() {
   const proto = (codeData.protokollSnapshot || [])
@@ -1326,7 +1389,7 @@ function renderFortschritt() {
       <div style="font-size:1.8rem">📖</div>
       <div>
         <div style="font-weight:700">Theorie-Wissen zum Nachschlagen</div>
-        <div style="font-size:0.78rem;color:var(--muted);margin-top:2px">Bremsformeln, Vorfahrt, Bußgeld & mehr</div>
+        <div style="font-size:0.78rem;color:var(--muted);margin-top:2px">Prüfung, Einparken, Verkehrszeichen & mehr</div>
       </div>
     </button>
     <div class="card" style="margin-bottom:16px">
@@ -1455,7 +1518,7 @@ window.portalPushAktivieren = async () => {
       ua:        navigator.userAgent.slice(0, 120),
       createdAt: Date.now()
     });
-    portalToast('🔔 Benachrichtigungen aktiviert!');
+    portalToast('🔔 Aktiviert: Nachrichten und eine Erinnerung vor deinen Fahrstunden.');
   } catch (e) {
     console.warn('portalPushAktivieren:', e);
     portalToast('Aktivierung fehlgeschlagen (' + (e.code || e.message || 'Fehler') + ').');
@@ -1706,6 +1769,79 @@ const THEORIE_WISSEN = [
       <p><b>Geschwindigkeit innerorts</b> ab 21 km/h zu schnell: 80 € + 1 Punkt</p>
       <p style="color:var(--muted);font-size:0.85rem">Ein Fahrverbot droht i.d.R. ab 21 km/h innerorts bzw. 41 km/h außerorts zu schnell.</p>
       <p style="color:var(--muted);font-size:0.72rem">Werte nach Bußgeldkatalog-Verordnung (BKatV) 2026, ohne Gewähr – bei Rechtsfragen bitte deinen Fahrlehrer fragen.</p>`
+  },
+  {
+    icon: '🎯', titel: 'Praktische Prüfung',
+    html: `
+      <p><b>Mitbringen:</b> Personalausweis oder Reisepass. Wenn du eine Brille oder Kontaktlinsen brauchst (Eintrag im Antrag), unbedingt tragen.</p>
+      <p><b>Ablauf:</b> Der Prüfer begrüßt dich, prüft deinen Ausweis und stellt Fragen zur Technik (Abfahrtkontrolle). Dann fährst du innerorts, außerorts und meist auch auf der Autobahn. Dazwischen kommen Grundfahraufgaben, zum Beispiel Einparken.</p>
+      <p><b>Ansagen:</b> Der Prüfer sagt dir rechtzeitig, wohin es geht. Fährst du falsch, ist das allein kein Fehler. Bleib ruhig und fahr sicher weiter.</p>
+      <p><b>Häufige Gründe zum Durchfallen:</b></p>
+      <ul style="margin:0 0 10px 18px;padding:0">
+        <li>Vorfahrt missachtet</li>
+        <li>Schulterblick vergessen beim Abbiegen oder Spurwechsel</li>
+        <li>Zu schnell, vor allem nach einem Ortsschild oder in der 30-Zone</li>
+        <li>Fußgänger am Überweg oder beim Abbiegen nicht durchgelassen</li>
+        <li>Der Fahrlehrer musste eingreifen</li>
+      </ul>
+      <p style="color:var(--muted);font-size:0.85rem">Tipp: Am Abend vorher nichts Neues mehr lernen, gut schlafen, vorher etwas essen. Nervosität ist normal, der Prüfer weiß das.</p>`
+  },
+  {
+    icon: '🅿️', titel: 'Grundfahraufgaben',
+    html: `
+      <p><b>Rückwärts einparken (längs):</b> Neben das vordere Auto stellen, etwa einen halben bis einen Meter Abstand. Schulterblick, langsam zurück. Wenn dein Heck auf Höhe von dessen Stoßstange ist, voll einschlagen. Bei etwa 45 Grad gerade stellen, zurückrollen, dann voll gegenlenken.</p>
+      <p><b>Quer einparken:</b> Weit genug ausholen, damit du gerade in die Lücke kommst. Langsam fahren und beide Seiten im Blick behalten, lieber einmal korrigieren als anstoßen.</p>
+      <p><b>Umkehren:</b> Nur wo es erlaubt und übersichtlich ist. Vorher in alle Richtungen schauen, auch nach Fußgängern und Radfahrern.</p>
+      <p><b>Gefahrbremsung:</b> Kräftig und voll bremsen und gleichzeitig kuppeln. Das ABS pulsiert spürbar im Pedal, das ist richtig. Fuß bis zum Stillstand drauf lassen.</p>
+      <p style="color:var(--muted);font-size:0.85rem">Jede Fahrschule zeigt eigene Merkpunkte am Auto. Richte dich nach dem, was dein Fahrlehrer dir zeigt.</p>`
+  },
+  {
+    icon: '🔧', titel: 'Abfahrtkontrolle',
+    html: `
+      <p><b>Reifen:</b> Gesetzlich mindestens 1,6 mm Profil. Den richtigen Luftdruck findest du meist im Tankdeckel oder an der Fahrertür.</p>
+      <p><b>Licht:</b> Abblendlicht, Fernlicht, Blinker, Bremslicht, Rückfahrlicht, Nebelschlussleuchte, Warnblinker.</p>
+      <p><b>Unter der Motorhaube:</b> Motoröl (Messstab zwischen Min und Max), Kühlmittel, Bremsflüssigkeit, Scheibenwaschwasser.</p>
+      <p><b>Im Auto:</b> Warndreieck, Verbandkasten und Warnweste müssen dabei sein.</p>
+      <p><b>Außerdem:</b> Hupe, Scheibenwischer, Spiegel und Sitz richtig eingestellt, Gurt angelegt.</p>`
+  },
+  {
+    icon: '🔰', titel: 'Probezeit',
+    html: `
+      <p>Die Probezeit dauert <b>2 Jahre</b> ab dem ersten Führerschein.</p>
+      <p><b>A-Verstöße</b> (schwer), zum Beispiel: Rotlicht, ab 21 km/h zu schnell, Alkohol (0,0 ‰), Handy am Steuer, Vorfahrt missachtet, zu dichtes Auffahren.</p>
+      <p><b>B-Verstöße</b> (weniger schwer), zum Beispiel: abgefahrene Reifen, Fahren ohne gültige Hauptuntersuchung.</p>
+      <p><b>Was passiert:</b></p>
+      <ul style="margin:0 0 10px 18px;padding:0">
+        <li>1 A- oder 2 B-Verstöße: Aufbauseminar, Probezeit verlängert sich auf 4 Jahre</li>
+        <li>Danach noch einmal: schriftliche Verwarnung, Empfehlung zur verkehrspsychologischen Beratung</li>
+        <li>Danach noch einmal: Der Führerschein wird entzogen</li>
+      </ul>
+      <p style="color:var(--muted);font-size:0.72rem">Vereinfachte Übersicht ohne Gewähr. Bei Fragen hilft dir dein Fahrlehrer.</p>`
+  },
+  {
+    icon: '🚫', titel: 'Halten und Parken',
+    html: `
+      <p><b>Halten</b> heißt: bis 3 Minuten oder zum Ein- und Aussteigen oder Be- und Entladen. Alles darüber ist <b>Parken</b>.</p>
+      <p><b>Halten verboten</b> u.a.: an engen oder unübersichtlichen Stellen, in scharfen Kurven, auf Bahnübergängen, auf Fußgängerüberwegen und bis 5 m davor, vor Feuerwehrzufahrten.</p>
+      <p><b>Parken verboten</b> u.a.: bis 5 m vor und hinter Kreuzungen und Einmündungen, vor Grundstücksein- und -ausfahrten, bis 15 m vor und hinter Bushaltestellen-Schildern.</p>
+      <p style="color:var(--muted);font-size:0.85rem">Verkehrszeichen gehen immer vor. Im Zweifel: lieber ein paar Meter weiter.</p>`
+  },
+  {
+    icon: '🛣️', titel: 'Autobahn und Überholen',
+    html: `
+      <p><b>Richtgeschwindigkeit:</b> 130 km/h, wenn nichts anderes angezeigt ist. Auf die Autobahn dürfen nur Fahrzeuge, die schneller als 60 km/h fahren können.</p>
+      <p><b>Rechtsfahrgebot:</b> Grundsätzlich rechts fahren, links nur zum Überholen.</p>
+      <p><b>Rettungsgasse:</b> Sobald der Verkehr stockt, nicht erst wenn das Blaulicht kommt. Ganz links fahrende nach links, alle anderen nach rechts.</p>
+      <p><b>Reißverschluss:</b> Erst direkt vor der Engstelle abwechselnd einfädeln, nicht schon weit vorher.</p>
+      <p><b>Radfahrer überholen:</b> Innerorts mindestens 1,5 m Abstand, außerorts mindestens 2 m.</p>
+      <p style="color:var(--muted);font-size:0.85rem">Auf der Autobahn sind Wenden und Rückwärtsfahren verboten, auch wenn du die Ausfahrt verpasst.</p>`
+  },
+  {
+    icon: '🚂', titel: 'Bahnübergang, Licht und Winter',
+    html: `
+      <p><b>Bahnübergang:</b> Züge haben immer Vorrang. Die Baken mit drei, zwei und einem Streifen kündigen ihn an. Ab den Baken nicht mehr überholen. Blinkt rotes Licht oder senkt sich die Schranke: vor dem Andreaskreuz anhalten.</p>
+      <p><b>Licht:</b> Bei Dämmerung, Dunkelheit und schlechter Sicht Abblendlicht. Die Nebelschlussleuchte nur bei Sicht unter 50 m, dann höchstens 50 km/h.</p>
+      <p><b>Winter:</b> Bei Glätte, Schnee oder Eis sind Winterreifen Pflicht (Alpine-Symbol). Alle Scheiben frei kratzen, nicht nur ein Guckloch. Abstand deutlich vergrößern, sanft bremsen und lenken.</p>`
   },
   {
     // katalog:true statt festem html - dieser Eintrag baut die Übersicht auf.
