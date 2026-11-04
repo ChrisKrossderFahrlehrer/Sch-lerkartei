@@ -1609,7 +1609,54 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 <div id="auth-resolving-overlay" style="position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px">
   <img src="./icon-192.png?v=3" alt="FahrSync" style="width:64px;height:64px;object-fit:contain;border-radius:16px">
   <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.3rem;color:var(--accent);opacity:0.85">FahrSync</div>
+  <div id="auth-hilfe" style="display:none;max-width:320px;text-align:center;padding:0 20px;font-size:0.82rem;line-height:1.5;color:var(--muted)">
+    <p style="margin:0 0 12px">Das Laden dauert ungewöhnlich lange.</p>
+    <button type="button" onclick="location.reload()" style="width:100%;padding:12px;border-radius:12px;border:none;background:var(--accent);color:#0d1117;font-weight:800;font-size:0.9rem;margin-bottom:8px;cursor:pointer">Neu laden</button>
+    <button type="button" onclick="__appZuruecksetzen()" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--text);font-weight:700;font-size:0.85rem;cursor:pointer">App-Zwischenspeicher leeren und neu laden</button>
+    <p style="margin:10px 0 0;font-size:0.72rem">Deine Daten bleiben erhalten, nur die gespeicherte App-Version wird erneuert.</p>
+    <pre id="auth-fehler" style="display:none;margin:12px 0 0;text-align:left;white-space:pre-wrap;word-break:break-word;font-size:0.68rem;background:var(--surface2);border-radius:8px;padding:8px;color:var(--danger)"></pre>
+  </div>
 </div>
+<script>
+  // Sicherheitsnetz fuer den Lade-Schirm: Er verschwindet erst, wenn die
+  // Anmeldung geklaert ist. Haengt dabei etwas (alte App-Version im
+  // Zwischenspeicher, Netz, ein Skriptfehler), sah man bisher nur das Logo -
+  // ohne jeden Ausweg. Nach 8 Sekunden gibt es jetzt Knoepfe, und ein
+  // Skriptfehler wird mit angezeigt (hilft bei der Fehlersuche am Handy).
+  (function () {
+    var fehler = [];
+    function zeige() {
+      var h = document.getElementById('auth-hilfe');
+      if (!document.getElementById('auth-resolving-overlay') || !h) return;
+      h.style.display = 'block';
+      if (fehler.length) {
+        var f = document.getElementById('auth-fehler');
+        f.textContent = fehler.slice(0, 3).join('\n');
+        f.style.display = 'block';
+      }
+    }
+    window.addEventListener('error', function (e) {
+      fehler.push((e.message || 'Fehler') + (e.filename ? ' (' + String(e.filename).split('/').pop() + ':' + e.lineno + ')' : ''));
+      if (document.getElementById('auth-hilfe').style.display === 'block') zeige();
+    });
+    window.addEventListener('unhandledrejection', function (e) {
+      var r = e.reason; fehler.push('Promise: ' + ((r && (r.code || r.message)) || r));
+    });
+    setTimeout(zeige, 8000);
+    window.__appZuruecksetzen = function () {
+      var fertig = function () { location.reload(); };
+      try {
+        var schritte = [];
+        if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations)
+          schritte.push(navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.unregister(); })); }));
+        if (window.caches && caches.keys)
+          schritte.push(caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }));
+        Promise.all(schritte).then(fertig, fertig);
+        setTimeout(fertig, 3000);
+      } catch (e) { fertig(); }
+    };
+  })();
+</script>
 
 <!-- ══ E-MAIL BESTAETIGEN (nur neu registrierte Konten) ══ -->
 <div class="screen" id="screen-email-verify">
