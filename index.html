@@ -4335,6 +4335,8 @@ window.doLogout = async () => {
   if (unsubProtokoll){ unsubProtokoll();unsubProtokoll= null; }
   aboStatus = 'free';
   hideBanner();
+  // Selbst abgemeldet: beim naechsten Start nicht auf eine Anmeldung warten
+  try { localStorage.removeItem('fs_zuletzt_angemeldet'); } catch(e) {}
   try { await signOut(auth); } catch(e) { console.error('doLogout:', e); }
 };
 // ABO-SYSTEM
@@ -4932,6 +4934,31 @@ onAuthStateChanged(auth, async (user) => {
   if (urlParams.get('code') && !user) { checkUrlCode(); return; }
   if (urlParams.get('invite') && !user) { checkInviteParam(urlParams.get('invite')); }
 
+  // iPhone-Startbildschirm: Die App startet dort bei jedem Oeffnen komplett
+  // neu, und die Anmeldung meldet oft ZUERST "niemand angemeldet" und erst
+  // Sekunden spaeter den gespeicherten Nutzer. Bisher erschien in dieser Zeit
+  // der Login - es sah aus, als muesse man sich laufend neu anmelden. Wer
+  // zuletzt angemeldet war (und sich nicht selbst abgemeldet hat), sieht jetzt
+  // bis zu 5 Sekunden weiter den Ladebildschirm; kommt der Nutzer in der Zeit,
+  // geht es direkt in die Kartei, sonst erscheint der Login.
+  if (user) {
+    window.__authNutzerGesehen = true;
+    window.__overlayHalten = false;
+    try { localStorage.setItem('fs_zuletzt_angemeldet', '1'); } catch(e) {}
+  } else if (!window.__authNutzerGesehen && !window.__nullAbgewartet && (() => {
+      try { return localStorage.getItem('fs_zuletzt_angemeldet') === '1'; } catch(e) { return false; } })()) {
+    window.__nullAbgewartet = true;
+    window.__overlayHalten = true;
+    setTimeout(() => {
+      if (window.__authNutzerGesehen) return;
+      window.__overlayHalten = false;
+      zeigeAbgemeldetAnsicht();
+      const ov = document.getElementById('auth-resolving-overlay');
+      if (ov) ov.remove();
+    }, 5000);
+    return;
+  }
+
   if (user) {
     currentUser = user;
     if (urlParams.get('invite')) { try { toast('ℹ️ Einladungslink erkannt – bitte zuerst abmelden, um ihn einzulösen.'); } catch(e){} }
@@ -5178,6 +5205,17 @@ onAuthStateChanged(auth, async (user) => {
     // innerhalb der Rueckgaengig-Frist geschlossen).
     setTimeout(() => holeOffeneLoeschungenNach().catch(e => console.warn('Nachholen:', e)), 3000);
   } else {
+    zeigeAbgemeldetAnsicht();
+  }
+ } finally {
+  const __authOverlay = document.getElementById('auth-resolving-overlay');
+  if (__authOverlay && !window.__weiterleitung && !window.__overlayHalten) __authOverlay.remove();
+ }
+});
+
+// Abgemeldeter Zustand: alle Ansichten aus, Login an. Eigene Funktion, weil
+// sie auch zeitversetzt laeuft (siehe Warten auf die zweite Meldung oben).
+function zeigeAbgemeldetAnsicht() {
     currentUser = null;
     students = [];
     activeId = null;
@@ -5209,11 +5247,6 @@ onAuthStateChanged(auth, async (user) => {
     else if (einstieg === 'demo') { switchTab('login'); setTimeout(() => { try { startDemo(); } catch(e) {} }, 0); }
     else switchTab('login');
   }
- } finally {
-  const __authOverlay = document.getElementById('auth-resolving-overlay');
-  if (__authOverlay && !window.__weiterleitung) __authOverlay.remove();
- }
-});
 
 // ─────────────────────────────────────────
 // FIRESTORE
