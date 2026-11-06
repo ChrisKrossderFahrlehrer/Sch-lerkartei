@@ -5032,6 +5032,9 @@ onAuthStateChanged(auth, async (user) => {
           const params = new URLSearchParams(window.location.search);
           const willNormalAnsicht = params.get('normal') === '1';
           if (!willNormalAnsicht) {
+            // Ladebildschirm stehen lassen: Sonst blitzte bis zum Laden der
+            // Admin-Seite der Login-Bildschirm auf, obwohl man angemeldet ist.
+            window.__weiterleitung = true;
             window.location.replace('adk-platform.html');
             return;
           }
@@ -5208,7 +5211,7 @@ onAuthStateChanged(auth, async (user) => {
   }
  } finally {
   const __authOverlay = document.getElementById('auth-resolving-overlay');
-  if (__authOverlay) __authOverlay.remove();
+  if (__authOverlay && !window.__weiterleitung) __authOverlay.remove();
  }
 });
 
