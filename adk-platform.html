@@ -572,6 +572,10 @@ enableIndexedDbPersistence(db).catch(() => {});
 
 // ⚡ LOADING-SCREEN SICHERHEITS-TIMEOUT (falls Firebase Auth nicht antwortet,
 // z.B. Safari/iPhone mit blockiertem IndexedDB) — sonst hängt die Seite ewig.
+// FIX: Vorher nach 3 Sekunden. Am Handy dauert das Pruefen der gespeicherten
+// Anmeldung oft laenger - dann erschien kurz der Login-Bildschirm, obwohl man
+// angemeldet war, und erst danach die Admin-Ansicht. Jetzt nur noch als
+// Notloesung, wenn die Anmeldung wirklich nicht antwortet.
 setTimeout(() => {
   const l = document.getElementById('loading');
   if (l && l.style.display !== 'none') {
@@ -582,7 +586,7 @@ setTimeout(() => {
       if (login) login.classList.add('active');
     }
   }
-}, 3000);
+}, 12000);
 
 // ── SUPERADMIN UID (nur dieser User ist Super-Admin) ─────────
 const SUPERADMIN_UID = 'DEINE_SUPERADMIN_UID'; // Optional: nach erstem Login mit deiner UID ersetzen
