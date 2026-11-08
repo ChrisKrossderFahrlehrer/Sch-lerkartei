@@ -4352,6 +4352,7 @@ window.doLogout = async () => {
   hideBanner();
   // Selbst abgemeldet: beim naechsten Start nicht auf eine Anmeldung warten
   try { localStorage.removeItem('fs_zuletzt_angemeldet'); } catch(e) {}
+  window.__selbstAbgemeldet = true;
   try { await signOut(auth); } catch(e) { console.error('doLogout:', e); }
 };
 // ABO-SYSTEM
@@ -4935,6 +4936,7 @@ async function migrateOldAccessCodes() {
 }
 
 onAuthStateChanged(auth, async (user) => {
+ let __halten = false;
  try {
   if (window.__DEMO) return;
   // FIX: Anonyme Schüler-Sessions (Kalender-Sync/Push-Grundlage) dürfen NICHT
@@ -4949,30 +4951,37 @@ onAuthStateChanged(auth, async (user) => {
   if (urlParams.get('code') && !user) { checkUrlCode(); return; }
   if (urlParams.get('invite') && !user) { checkInviteParam(urlParams.get('invite')); }
 
-  // iPhone-Startbildschirm: Die App startet dort bei jedem Oeffnen komplett
-  // neu, und die Anmeldung meldet oft ZUERST "niemand angemeldet" und erst
-  // Sekunden spaeter den gespeicherten Nutzer. Bisher erschien in dieser Zeit
-  // der Login - es sah aus, als muesse man sich laufend neu anmelden. Wer
-  // zuletzt angemeldet war (und sich nicht selbst abgemeldet hat), sieht jetzt
-  // bis zu 20 Sekunden weiter den Ladebildschirm (5 Sekunden reichten auf dem
-  // iPhone nicht: Login erschien, danach lud die Kartei trotzdem); kommt der Nutzer in der Zeit,
-  // geht es direkt in die Kartei, sonst erscheint der Login.
+  // iPhone-Startbildschirm: Die Anmeldung meldet dort beim Start oft
+  // "niemand angemeldet" (zuerst oder auch zwischendurch) und erst Sekunden
+  // spaeter den gespeicherten Nutzer. Bisher erschien dann der Login und kurz
+  // danach lud die Kartei doch. Jetzt gilt: Eine Meldung "niemand angemeldet"
+  // fuehrt nur sofort zum Login, wenn man sich selbst abgemeldet hat oder
+  // gar keine gespeicherte Anmeldung existiert. Sonst bleibt bis zu 20
+  // Sekunden der Ladebildschirm (bzw. die Kartei) stehen; kommt der Nutzer
+  // in der Zeit, geht es normal weiter.
   if (user) {
     window.__authNutzerGesehen = true;
-    window.__overlayHalten = false;
+    window.__selbstAbgemeldet = false;
+    if (window.__nullTimer) { clearTimeout(window.__nullTimer); window.__nullTimer = null; }
     try { localStorage.setItem('fs_zuletzt_angemeldet', '1'); } catch(e) {}
-  } else if (!window.__authNutzerGesehen && !window.__nullAbgewartet && (() => {
-      try { return localStorage.getItem('fs_zuletzt_angemeldet') === '1'; } catch(e) { return false; } })()) {
-    window.__nullAbgewartet = true;
-    window.__overlayHalten = true;
-    setTimeout(() => {
-      if (window.__authNutzerGesehen) return;
-      window.__overlayHalten = false;
-      zeigeAbgemeldetAnsicht();
-      const ov = document.getElementById('auth-resolving-overlay');
-      if (ov) ov.remove();
-    }, 20000);
-    return;
+  } else if (!window.__selbstAbgemeldet && !urlParams.get('code') && !urlParams.get('invite')) {
+    let zuletzt = false;
+    try { zuletzt = localStorage.getItem('fs_zuletzt_angemeldet') === '1'; } catch(e) {}
+    const gespeichert = zuletzt || await gespeicherteAnmeldungVorhanden();
+    if (auth.currentUser) { __halten = true; return; }   // Nutzer kam waehrenddessen
+    if (gespeichert) {
+      __halten = true;
+      if (!window.__nullTimer) {
+        window.__nullTimer = setTimeout(() => {
+          window.__nullTimer = null;
+          if (auth.currentUser) return;
+          zeigeAbgemeldetAnsicht();
+          const ov = document.getElementById('auth-resolving-overlay');
+          if (ov) ov.remove();
+        }, 20000);
+      }
+      return;
+    }
   }
 
   if (user) {
@@ -5171,6 +5180,7 @@ onAuthStateChanged(auth, async (user) => {
           window.__abmeldeGrund = '💳 Deine Zahlung steht noch aus. Bitte begleiche die offene Rechnung, um die App weiter zu nutzen.<br><span style="font-size:0.8rem;color:var(--muted)">Bei Fragen wende dich an den Support.</span>';
           document.getElementById('auth-error').innerHTML = window.__abmeldeGrund;
           try { localStorage.removeItem('fs_zuletzt_angemeldet'); } catch(e) {}
+          window.__selbstAbgemeldet = true;
           await signOut(auth);
           return;
         }
@@ -5180,6 +5190,7 @@ onAuthStateChanged(auth, async (user) => {
           window.__abmeldeGrund = '🚫 Dein Konto wurde gesperrt. Bitte Kontakt aufnehmen.';
           document.getElementById('auth-error').innerHTML = window.__abmeldeGrund;
           try { localStorage.removeItem('fs_zuletzt_angemeldet'); } catch(e) {}
+          window.__selbstAbgemeldet = true;
           await signOut(auth);
           return;
         }
@@ -5237,9 +5248,44 @@ onAuthStateChanged(auth, async (user) => {
   }
  } finally {
   const __authOverlay = document.getElementById('auth-resolving-overlay');
-  if (__authOverlay && !window.__weiterleitung && !window.__overlayHalten) __authOverlay.remove();
+  if (__authOverlay && !window.__weiterleitung && !__halten) __authOverlay.remove();
  }
 });
+
+// Liegt im Browser eine gespeicherte Firebase-Anmeldung? Schaut direkt in
+// den Speicher des SDK (IndexedDB 'firebaseLocalStorageDb', Ersatz
+// localStorage), ohne etwas anzulegen. Im Zweifel true (lieber warten).
+async function gespeicherteAnmeldungVorhanden() {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('firebase:authUser:')) return true;
+    }
+  } catch(e) {}
+  try {
+    if (!window.indexedDB || !indexedDB.databases) return false;
+    const dbs = await Promise.race([indexedDB.databases(), new Promise(r => setTimeout(() => r(null), 1500))]);
+    if (!dbs) return true;
+    if (!dbs.some(x => x && x.name === 'firebaseLocalStorageDb')) return false;
+    return await new Promise(res => {
+      const t = setTimeout(() => res(true), 1500);
+      const fertig = (w) => { clearTimeout(t); res(w); };
+      const req = indexedDB.open('firebaseLocalStorageDb');
+      // Nie selbst anlegen: Das wuerde den Speicher des SDK beschaedigen
+      req.onupgradeneeded = () => { try { req.transaction.abort(); } catch(e) {} };
+      req.onerror = () => fertig(true);
+      req.onsuccess = () => {
+        const db = req.result;
+        try {
+          if (!db.objectStoreNames.contains('firebaseLocalStorage')) { db.close(); return fertig(false); }
+          const g = db.transaction('firebaseLocalStorage', 'readonly').objectStore('firebaseLocalStorage').getAllKeys();
+          g.onsuccess = () => { db.close(); fertig((g.result || []).some(k => String(k).startsWith('firebase:authUser:'))); };
+          g.onerror = () => { db.close(); fertig(true); };
+        } catch(e) { try { db.close(); } catch(_) {} fertig(true); }
+      };
+    });
+  } catch(e) { return true; }
+}
 
 // Abgemeldeter Zustand: alle Ansichten aus, Login an. Eigene Funktion, weil
 // sie auch zeitversetzt laeuft (siehe Warten auf die zweite Meldung oben).

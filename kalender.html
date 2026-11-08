@@ -742,14 +742,18 @@ onAuthStateChanged(auth,async user=>{
   // dem Ladebildschirm statt den Login zu sehen (wie in index.html).
   if(!user){
     let zuletzt=false; try{ zuletzt=localStorage.getItem('fs_zuletzt_angemeldet')==='1'; }catch(e){}
-    if(zuletzt && !window.__kalNutzerGesehen && !window.__kalNullAbgewartet){
-      window.__kalNullAbgewartet=true;
-      setTimeout(()=>{ if(!window.__kalNutzerGesehen && !auth.currentUser) show('auth'); },20000);
+    // Auch nach einer ersten Nutzer-Meldung (iPhone: Nutzer -> niemand ->
+    // Nutzer). Nur das eigene Abmelden loescht die Marke -> sofort Login.
+    if(zuletzt){
+      if(!window.__kalNullTimer){
+        window.__kalNullTimer=setTimeout(()=>{ window.__kalNullTimer=null; if(!auth.currentUser) show('auth'); },20000);
+      }
       return;
     }
     show('auth');return;
   }
   window.__kalNutzerGesehen=true;
+  if(window.__kalNullTimer){ clearTimeout(window.__kalNullTimer); window.__kalNullTimer=null; }
   try{ localStorage.setItem('fs_zuletzt_angemeldet','1'); }catch(e){}
   currentUser=user;istEinzelLehrer=false;
 

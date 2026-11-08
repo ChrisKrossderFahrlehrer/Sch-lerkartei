@@ -1524,13 +1524,18 @@ onAuthStateChanged(auth, async (user) => {
   if (!user) {
     let zuletzt = false;
     try { zuletzt = localStorage.getItem('fs_zuletzt_angemeldet') === '1'; } catch(e) {}
-    if (zuletzt && !__nutzerGesehen && !__nullAbgewartet) {
-      __nullAbgewartet = true;
-      setTimeout(() => {
-        if (__nutzerGesehen || auth.currentUser) return;
-        ladenAus();
-        showScreen('screen-login');
-      }, 20000);
+    // Auch wenn vorher schon ein Nutzer gemeldet war: Das iPhone meldet beim
+    // Start manchmal Nutzer -> niemand -> Nutzer. Nur das eigene Abmelden
+    // (loescht die Marke) fuehrt sofort zum Login.
+    if (zuletzt) {
+      if (!__nullAbgewartet) {
+        __nullAbgewartet = setTimeout(() => {
+          __nullAbgewartet = false;
+          if (auth.currentUser) return;
+          ladenAus();
+          showScreen('screen-login');
+        }, 20000);
+      }
       return;
     }
     ladenAus();
@@ -1538,6 +1543,7 @@ onAuthStateChanged(auth, async (user) => {
     return;
   }
   __nutzerGesehen = true;
+  if (__nullAbgewartet) { clearTimeout(__nullAbgewartet); __nullAbgewartet = false; }
   try { localStorage.setItem('fs_zuletzt_angemeldet', '1'); } catch(e) {}
 
   currentUser = user;
