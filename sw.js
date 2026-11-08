@@ -2,7 +2,7 @@
 // HTML kommt IMMER frisch vom Server → kein Cache-Löschen mehr nötig!
 // Cache dient nur als Offline-Fallback.
 
-const CACHE_NAME = 'adk-v210';
+const CACHE_NAME = 'adk-v211';
 
 // ── FCM Push: Hintergrund-Benachrichtigungen (data-only → wir zeigen selbst an) ──
 try {
@@ -91,7 +91,11 @@ self.addEventListener('fetch', event => {
     url.hostname.includes('firebaseio') ||
     url.hostname.includes('firestore')  ||
     url.hostname.includes('jsdelivr')   ||
-    url.hostname.includes('paypal')
+    url.hostname.includes('paypal')     ||
+    // apis.google.com, accounts.google.com usw.: nie ueber den Service Worker
+    // (vorher mit no-store bei jedem Start neu geladen)
+    url.hostname === 'google.com'       ||
+    url.hostname.endsWith('.google.com')
   ) return;
 
   // Nur GET cachen

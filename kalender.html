@@ -415,7 +415,7 @@ tr:last-child td{border-bottom:none;}
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getAuth, initializeAuth, indexedDBLocalPersistence, browserSessionPersistence, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, collection, query, where, orderBy, serverTimestamp, Timestamp, onSnapshot, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
@@ -432,7 +432,15 @@ const firebaseConfig = {
 const SUPER_ADMIN_EMAIL = "chriskoo@mail.de"; // ← Deine Super-Admin E-Mail
 
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+// Anmeldung OHNE Popup-/Redirect-Helfer starten. getAuth() haengt im Browser
+// automatisch einen Helfer fuer Google-Popup-Anmeldungen an, den die App gar
+// nicht nutzt. Auf iPhone, iPad, Android und in Safari laedt das SDK dafuer
+// VOR der ersten Anmelde-Rueckmeldung ein Skript von apis.google.com samt
+// unsichtbarem iframe. Antwortet apis.google.com langsam oder gar nicht,
+// bleibt die App beim Logo stehen bzw. zeigt den Login, obwohl man
+// angemeldet ist. Gleiche Speicher-Reihenfolge wie bisher (IndexedDB, dann
+// localStorage, dann Sitzung) - bestehende Anmeldungen bleiben erhalten.
+const auth = initializeAuth(app, { persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence] });
 const db = getFirestore(app);
 
 // Globales Sicherheitsnetz + DIAGNOSE: fängt nicht abgefangene Firestore-
@@ -601,8 +609,8 @@ function injectTypeBadgeStyles() {
 }
 function typeLabel(id){const t=fahrstundenarten.find(a=>a.id===id);return t?t.label:id;}
 function typeColor(id){const t=fahrstundenarten.find(a=>a.id===id);return t?t.color:'#888';}
-function typeBadgeHtml(id){const l=typeLabel(id),c=typeColor(id),r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16);
-  return `<span class="badge" style="background:rgba(${r},${g},${b},0.18);color:${c};filter:brightness(1.4)">${l}</span>`;}
+function typeBadgeHtml(id){const l=typeLabel(id);let c=typeColor(id);if(!/^#[0-9a-fA-F]{6}$/.test(String(c)))c='#888888';const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16);
+  return `<span class="badge" style="background:rgba(${r},${g},${b},0.18);color:${c};filter:brightness(1.4)">${escHtml(l)}</span>`;}
 
 // ── UTILS ──
 function toast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className='show '+type;setTimeout(()=>t.className='',3000);}
@@ -664,7 +672,8 @@ window.doLogin=async function(){
   const eingabe=document.getElementById('login-email').value.trim();
   const pw=document.getElementById('login-pw').value;
   if(!eingabe||!pw){toast('Bitte Benutzername/E-Mail und Passwort eingeben.','error');return;}
-  try{await setPersistence(auth,browserLocalPersistence);}catch(e){}
+  // Kein setPersistence() mehr (SDK #9319): Er hat die Anmeldung in einem
+  // zweiten offenen Tab (Kartei) geloescht. IndexedDB ist beim Start eingestellt.
   // FIX: Gleiche Benutzername-Anmeldung wie die Haupt-App - der Kalender
   // akzeptierte bisher NUR echte E-Mails, die ADK aber auch Benutzernamen
   // (z.B. "Chris"). Jetzt: bei einer Eingabe ohne '@' erst die echte E-Mail
@@ -704,6 +713,9 @@ window.doRegisterAdmin=async function(){
 window.doLogout=async function(){
   currentUser=null;currentRole=null;currentProfile=null;currentSchoolId=null;currentSchool=null;
   calDate=new Date();calView='month';weekStart=null;
+  // Selbst abgemeldet: Kartei wartet beim naechsten Start nicht auf eine Anmeldung
+  try{localStorage.removeItem('fs_zuletzt_angemeldet');}catch(e){}
+  window.__kalNutzungT=0;
   await signOut(auth);
 };
 
@@ -806,7 +818,8 @@ onAuthStateChanged(auth,async user=>{
         const jetzt=Date.now();
         if(jetzt-(window.__kalNutzungT||0)<600000)return;
         window.__kalNutzungT=jetzt;
-        updateDoc(doc(db,'users',user.uid),{letzteNutzungKalender:jetzt}).catch(()=>{});
+        const u=auth.currentUser; if(!u||u.isAnonymous)return;
+        updateDoc(doc(db,'users',u.uid),{letzteNutzungKalender:jetzt}).catch(()=>{});
       }catch(e){}
     };
     kalLebenszeichen();
@@ -1099,10 +1112,8 @@ window.aktivierePush = async () => {
 // verschickten Links waeren tot und gebuchte Termine verwaist. Die Verknuepfung
 // bringt Anschrift fuer den Nachweis und das Mitloeschen
 // (functions/papierkorb.js), ohne laufende Buchungen anzufassen.
-// Umstellung erfolgt in Etappen. Solange hier der alte Wert steht,
-// verhaelt sich alles exakt wie bisher. Nach erfolgreicher Datenuebernahme
-// wird hier auf die ADK-Sammlung umgestellt - EINE Zeile, jederzeit
-// zurueckstellbar. Die alte Sammlung bleibt als Sicherung bestehen.
+// Ein einfaches Umstellen dieser Konstante auf 'students' geht NICHT:
+// Feldnamen (fname/vorname, schoolId/fahrschuleId) und Regeln passen nicht.
 
 // ══ AMTLICHE THEORIE-THEMEN (Rahmenplan) ══════════════════════════
 // Auf dem Ausbildungsnachweis wird das Thema per amtlicher Nummer
@@ -1110,29 +1121,34 @@ window.aktivierePush = async () => {
 // Klassen; der Zusatzstoff ist klassenspezifisch (B: 2 Themen,
 // A/A1/A2: 4 Themen, AM: 2 aus den A-Themen).
 const THEORIE_GRUNDSTOFF = [
+  // Amtliche Titel nach Anlage 1 FahrschAusbO (Grundstoff)
   { nr: '1',  titel: 'Persönliche Voraussetzungen' },
   { nr: '2',  titel: 'Risikofaktor Mensch' },
   { nr: '3',  titel: 'Rechtliche Rahmenbedingungen' },
   { nr: '4',  titel: 'Straßenverkehrssystem und seine Nutzung' },
-  { nr: '5',  titel: 'Vorfahrt und Verkehrsregelung' },
-  { nr: '6',  titel: 'Verkehrszeichen, Verkehrseinrichtungen, Bahnübergänge' },
+  { nr: '5',  titel: 'Vorfahrt und Verkehrsregelungen' },
+  { nr: '6',  titel: 'Verkehrszeichen und Verkehrseinrichtungen sowie Bahnübergänge' },
   { nr: '7',  titel: 'Andere Teilnehmer im Straßenverkehr' },
-  { nr: '8',  titel: 'Geschwindigkeit, Abstand, umweltschonende Fahrweise' },
+  { nr: '8',  titel: 'Geschwindigkeit, Abstand und umweltschonende Fahrweise' },
   { nr: '9',  titel: 'Verkehrsverhalten bei Fahrmanövern, Verkehrsbeobachtung' },
   { nr: '10', titel: 'Ruhender Verkehr' },
-  { nr: '11', titel: 'Besondere Verkehrssituationen, Folgen von Fehlverhalten' },
+  { nr: '11', titel: 'Verhalten in besonderen Situationen, Folgen von Verstößen gegen Verkehrsvorschriften' },
   { nr: '12', titel: 'Lebenslanges Lernen' },
 ];
+// Klassenspezifischer Zusatzstoff, amtliche Titel und Reihenfolge:
+// Klasse B nach Anlage 2.2, Klassen A/A2/A1/AM nach Anlage 2.1 FahrschAusbO.
+// ACHTUNG: Bis 11/2026 standen A2 und A4 vertauscht drin. Alte Eintraege
+// ordnet der Ausbildungsnachweis am gespeicherten Titel um (nwThemaNr).
 const THEORIE_ZUSATZ = {
   B: [
-    { nr: 'B1', titel: 'Technik, Personen- und Güterbeförderung' },
-    { nr: 'B2', titel: 'Fahren mit Solokraftfahrzeugen und Zügen, Umweltschutz' },
+    { nr: 'B1', titel: 'Technische Bedingungen, Personen- und Güterbeförderung – umweltbewusster Umgang mit Kraftfahrzeugen' },
+    { nr: 'B2', titel: 'Fahren mit Solokraftfahrzeugen und Zügen' },
   ],
   A: [
-    { nr: 'A1', titel: 'Fahrer/Fahrzeug – Persönliche Voraussetzungen' },
-    { nr: 'A2', titel: 'Fahrtechnik – Fahrphysik' },
-    { nr: 'A3', titel: 'Besondere Schwierigkeiten und Gefahren beim Motorradfahren' },
-    { nr: 'A4', titel: 'Besonderes Verhalten beim Motorradfahren' },
+    { nr: 'A1', titel: 'Fahrer/Beifahrer, Fahrzeug' },
+    { nr: 'A2', titel: 'Besonderes Verhalten beim Motorradfahren' },
+    { nr: 'A3', titel: 'Besondere Schwierigkeiten und Gefahren' },
+    { nr: 'A4', titel: 'Fahrtechnik und Fahrphysik' },
   ],
 };
 
@@ -1140,7 +1156,7 @@ const SCHUELER_COLL = 'schueler';
 
 const pages={};
 
-// ══ THEORIE-UNTERRICHT (Gruppen-Sitzung, Anlage 3 zu §6 Abs.1 FahrschAusbO) ══
+// ══ THEORIE-UNTERRICHT (Gruppen-Sitzung, Anlage 3 zu § 6 Abs. 1 DV-FahrlG) ══
 // Anders als praktische Fahrstunden (ein Termin = ein Schueler) laeuft
 // Theorie meist als Gruppenunterricht - daher eigene Seite mit
 // Mehrfachauswahl statt Anbindung an einen einzelnen Kalendertermin.
@@ -1182,7 +1198,7 @@ pages['lehrer-theorie']=async function(el){
   const schueler = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (a.lname||'').localeCompare(b.lname||''));
   listEl.innerHTML = schueler.map(s => `
     <label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer">
-      <input type="checkbox" class="th-schueler-check" value="${s.id}" style="width:18px;height:18px;flex-shrink:0">
+      <input type="checkbox" class="th-schueler-check" value="${escHtml(s.id)}" style="width:18px;height:18px;flex-shrink:0">
       <span>${escHtml(s.fname||'')} ${escHtml(s.lname||'')}</span>
     </label>`).join('');
 };
@@ -1212,6 +1228,10 @@ window.speichereTheorieStunde = async function(){
   const gewaehlte = Array.from(document.querySelectorAll('.th-schueler-check:checked')).map(c => c.value);
   if (!datum || !thema || !minuten) { statusEl.style.color='var(--danger)'; statusEl.textContent='Bitte Datum, Thema und Dauer ausfüllen.'; return; }
   if (gewaehlte.length === 0) { statusEl.style.color='var(--danger)'; statusEl.textContent='Bitte mindestens einen Schüler auswählen.'; return; }
+  // Doppeltipp-Schutz: Sonst entstanden zwei Eintraege und der Nachweis
+  // zeigte doppelte Minuten.
+  if (window.__thSpeichert) return;
+  window.__thSpeichert = true;
   statusEl.style.color='var(--text-muted)'; statusEl.textContent='Wird gespeichert…';
   try {
     for (const schuelerId of gewaehlte) {
@@ -1226,6 +1246,8 @@ window.speichereTheorieStunde = async function(){
   } catch(e) {
     console.warn('speichereTheorieStunde', e);
     statusEl.style.color='var(--danger)'; statusEl.textContent='Fehler beim Speichern: ' + (e.code||e.message||'unbekannt');
+  } finally {
+    window.__thSpeichert = false;
   }
 };
 
@@ -1406,7 +1428,7 @@ window.setLehrerBlockDauer=async function(uid,min){
 window.viewLehrerSchueler=async function(lehrerUid,lehrerName){
   const snap=await getDocs(query(collection(db,SCHUELER_COLL),where('lehrerUid','==',lehrerUid),where('schoolId','==',currentSchoolId)));
   const rows=snap.docs.map(d=>{const s=d.data();return`<tr><td>${escHtml(s.fname)} ${escHtml(s.lname)}</td><td>${escHtml(s.email||'—')}</td><td><button class="btn btn-danger btn-sm" onclick="unassignSchueler('${d.id}')">Entfernen</button></td></tr>`;}).join('');
-  openModal(`<h2 class="modal-title">Schüler: ${lehrerName}</h2>${rows?`<table><thead><tr><th>Name</th><th>E-Mail</th><th></th></tr></thead><tbody>${rows}</tbody></table>`:'<p class="text-muted">Keine Schüler.</p>'}`);
+  openModal(`<h2 class="modal-title">Schüler: ${escHtml(lehrerName)}</h2>${rows?`<table><thead><tr><th>Name</th><th>E-Mail</th><th></th></tr></thead><tbody>${rows}</tbody></table>`:'<p class="text-muted">Keine Schüler.</p>'}`);
 };
 window.unassignSchueler=async function(id){await updateDoc(doc(db,SCHUELER_COLL,id),{lehrerUid:null});toast('Entfernt.','success');closeModal();};
 
@@ -1442,7 +1464,7 @@ async function loadSchuelerList(lehrerDocs){
     snap.docs.map(d=>{
       const s=d.data();
       const link=`${location.origin}${location.pathname}?schueler=${d.id}&lehrer=${s.lehrerUid||''}`;
-      const k=s.maxFahrstunden>0?`${s.bookedCount||0}/${s.maxFahrstunden}`:`${s.bookedCount||0}/∞`;
+      const k=s.maxFahrstunden>0?`${Number(s.bookedCount)||0}/${Number(s.maxFahrstunden)||0}`:`${Number(s.bookedCount)||0}/∞`;
       const w=s.maxFahrstunden>0&&(s.bookedCount||0)>=s.maxFahrstunden;
       const autoStr=s.autoId&&am[s.autoId]?`<span class="auto-kennzeichen" style="font-size:10px">${escHtml(am[s.autoId].kennzeichen)}</span>`:'—';
       return`<tr><td>${escHtml(s.fname)} ${escHtml(s.lname)}</td><td>${s.lehrerUid?(lm[s.lehrerUid]||'?'):'—'}</td>
@@ -1473,13 +1495,13 @@ window.editSchueler=async function(id){
     <div class="field"><label>Vorname</label><input id="es-fname" value="${escHtml(s.fname)}"></div>
     <div class="field"><label>Nachname</label><input id="es-lname" value="${escHtml(s.lname)}"></div>
     <div class="field"><label>E-Mail</label><input id="es-email" value="${escHtml(s.email||'')}"></div>
-    <div class="field"><label>Telefon</label><input id="es-tel" value="${s.tel||''}"></div>
+    <div class="field"><label>Telefon</label><input id="es-tel" value="${escHtml(s.tel||'')}"></div>
     <div class="field"><label>Fahrlehrer</label><select id="es-lehrer"><option value="">— Keiner —</option>${opts}</select></div>
     <div class="grid-2">
       <div class="field"><label>Max. Fahrstunden</label><input id="es-max" type="number" min="0" value="${s.maxFahrstunden||0}"></div>
       <div class="field"><label>Max. akt. Termine</label><input id="es-maxaktiv" type="number" min="0" value="${s.maxAktiveTermine||0}"></div>
     </div>
-    <p class="text-muted" style="margin-bottom:12px">Bereits gebucht: <strong>${s.bookedCount||0}</strong></p>
+    <p class="text-muted" style="margin-bottom:12px">Bereits gebucht: <strong>${Number(s.bookedCount)||0}</strong></p>
     <button class="btn btn-primary" onclick="saveSchueler('${id}')">Speichern</button>`);
 };
 window.saveSchueler=async function(id){
@@ -2026,8 +2048,8 @@ window.manuellBuchen = async function(slotId, schuelerId, year, month, day) {
   }
 };
 // ══ TERMIN-DETAIL: Schueler-Zugriff, Fehlstunde, Stornieren, Fahrstunden-Historie ══
-// Amtliche Kategorien fuer besondere Ausbildungsfahrten (Anlage 3 zu §6 Abs.1
-// FahrschAusbO). Gemeinsame Liste, damit Dropdown und spaetere PDF-Erzeugung
+// Amtliche Kategorien fuer besondere Ausbildungsfahrten (Anlage 3 zu § 6 Abs. 1
+// DV-FahrlG). Gemeinsame Liste, damit Dropdown und spaetere PDF-Erzeugung
 // konsistent dieselben Codes/Bezeichnungen verwenden.
 const AN_KATEGORIEN = [
   { code: 'Üst', label: 'Übungsstunden i.g.O./a.g.O.' },
@@ -2039,30 +2061,68 @@ const AN_KATEGORIEN = [
   { code: 'SN',  label: 'Schaltnachweis (§5a FahrschAusbO)' },
 ];
 
-// ══ AUSBILDUNGSNACHWEIS (Anlage 3 zu § 6 Abs. 1 FahrschAusbO) ══════
+// ══ AUSBILDUNGSNACHWEIS (§ 31 Abs. 1 FahrlG, § 6 Abs. 2 FahrschAusbO) ══
+// Amtliches Muster: Anlage 3 zu § 6 Abs. 1 der Durchfuehrungsverordnung zum
+// Fahrlehrergesetz (DV-FahrlG). (Nicht die Anlage 3 der FahrschAusbO - das
+// ist der Ausbildungsplan fuer die Praxis.) Abweichungen vom Muster sind bei
+// maschineller Erstellung zulaessig, die Inhalte muessen aber drin sein:
+// Fahrschule, Fahrschueler mit Anschrift und Geburtsdatum, beantragte
+// Klasse(n), Vorbesitz, Theorie je Termin (Datum, Thema, Minuten, Fahrlehrer),
+// Praxis je Termin (Datum, Art und Inhalt, Beginn, Minuten, Fahrlehrer),
+// ggf. Kooperation, Unterschrift Inhaber/verantwortliche Leitung und
+// Fahrschueler.
 // Nur fuer Inhaber der Fahrschule und eigenstaendige Fahrlehrer: Der
 // Nachweis wird von der Fahrschule ausgestellt, angestellte Fahrlehrer
 // sehen den Menuepunkt nicht. Gefahrene Stunden kommen aus den Terminen
 // (vergangen, nicht als Fehlstunde markiert), Theorie aus theorieStunden.
-// Anschrift und Geburtsdatum werden aus der Kartei (ADK) vorgeschlagen,
-// wenn der Name uebereinstimmt, und koennen vor dem Erstellen korrigiert
-// werden. Ausgabe als Druckansicht - "Als PDF sichern" im Druckdialog.
+// Anschrift und Geburtsdatum kommen aus der verknuepften Kartei-Akte bzw.
+// bei eindeutigem Namen aus der Kartei und koennen korrigiert werden.
+// Ausgabe als Druckansicht - "Als PDF sichern" im Druckdialog.
 const AN_TYP_FALLBACK = { ueberlandfahrt:'UL', autobahnfahrt:'AB', nachtfahrt:'NF', normal:'Üst' };
-const AN_PFLICHT = { UL:5, AB:4, NF:3 }; // Mindestanzahl je 45 Min. (Klassen A, A1, A2, B)
+// Mindestumfang besondere Ausbildungsfahrten je 45 Min. (Anlage 4 FahrschAusbO):
+// Ueberland / Autobahn / Dunkelheit. AM hat keine.
+const AN_PFLICHT = {
+  B:{UL:5,AB:4,NF:3}, B197:{UL:5,AB:4,NF:3},
+  A:{UL:5,AB:4,NF:3}, A2:{UL:5,AB:4,NF:3}, A1:{UL:5,AB:4,NF:3},
+  BE:{UL:3,AB:1,NF:1},
+};
+// Erweiterung A1 -> A2 bzw. A2 -> A vor Ablauf von 2 Jahren: 3 / 2 / 1
+const AN_PFLICHT_AUFSTIEG = {UL:3,AB:2,NF:1};
+// Zusatzstoff-Liste je Klasse (Anlage 2.1 fuer A/A2/A1/AM, 2.2 fuer B)
+function nwZusatzThemen(klasse){
+  if (/^(A|AM)/.test(klasse)) return THEORIE_ZUSATZ.A;
+  if (klasse==='B' || klasse==='B197') return THEORIE_ZUSATZ.B;
+  return [];
+}
+// Vor der Korrektur der Motorrad-Themen (11/2026) waren A2 und A4
+// vertauscht gespeichert. Alte Eintraege werden am gespeicherten Titel
+// erkannt und der amtlichen Nummer zugeordnet.
+function nwThemaNr(t){
+  const titel=String(t.themaTitel||'');
+  if (t.thema==='A2' && /Fahrtechnik/.test(titel)) return 'A4';
+  if (t.thema==='A4' && /Besonderes Verhalten/.test(titel)) return 'A2';
+  return String(t.thema||'');
+}
 function darfNachweis(){ return currentRole==='admin' || (currentRole==='lehrer' && istEinzelLehrer); }
 window.__nwSig = { lehrer:null, schueler:null };
 
 pages['nachweis']=async function(el){
   if(!darfNachweis()){ el.innerHTML='<div class="page active"><h2 class="page-title">Ausbildungsnachweis</h2><div class="card"><p class="text-muted">Den Ausbildungsnachweis stellt die Fahrschule aus. Bitte wende dich an den Inhaber.</p></div></div>'; return; }
   el.innerHTML=`<div class="page active"><h2 class="page-title">📄 Ausbildungsnachweis</h2>
-  <p class="text-muted" style="margin:-8px 0 16px">Nach Anlage 3 zu § 6 Abs. 1 FahrschAusbO. Wähle den Schüler, prüfe die Angaben und erstelle den Nachweis zum Drucken oder als PDF.</p>
+  <p class="text-muted" style="margin:-8px 0 16px">Nach dem Muster in Anlage 3 DV-FahrlG (§ 31 Abs. 1 FahrlG, § 6 Abs. 2 FahrschAusbO). Wähle den Schüler, prüfe die Angaben und erstelle den Nachweis zum Drucken oder als PDF.</p>
   <div class="card">
     <div class="field"><label for="nw-schueler">Fahrschüler</label><select id="nw-schueler" onchange="nwSchuelerGewaehlt()"><option value="">— bitte wählen —</option></select></div>
     <div id="nw-form" style="display:none">
       <div class="grid-2">
-        <div class="field"><label for="nw-klasse">Klasse</label><select id="nw-klasse"><option>B</option><option>B197</option><option>BE</option><option>A</option><option>A2</option><option>A1</option><option>AM</option></select></div>
+        <div class="field"><label for="nw-klasse">Ausbildung für Klasse</label><select id="nw-klasse" onchange="nwKlasseGeaendert()"><option>B</option><option>B197</option><option>BE</option><option>A</option><option>A2</option><option>A1</option><option>AM</option></select></div>
         <div class="field"><label for="nw-geb">Geburtsdatum</label><input id="nw-geb" type="date"></div>
       </div>
+      <div class="grid-2">
+        <div class="field"><label for="nw-beantragt">Beantragte Klasse(n)</label><input id="nw-beantragt" autocomplete="off" placeholder="z. B. B"></div>
+        <div class="field"><label for="nw-vorbesitz">Vorbesitz der Klasse(n)</label><input id="nw-vorbesitz" autocomplete="off" placeholder="z. B. AM oder leer"></div>
+      </div>
+      <div class="field" id="nw-aufstieg-feld" style="display:none"><label for="nw-aufstieg">Erweiterung bei Vorbesitz</label>
+        <select id="nw-aufstieg"><option value="">Keine Erweiterung (Ersterwerb)</option><option value="unter2">A1 → A2 oder A2 → A, Vorbesitz unter 2 Jahre (3/2/1 Pflichtfahrten)</option><option value="ab2">A1 → A2 oder A2 → A, Vorbesitz ab 2 Jahre (keine Pflichtfahrten)</option></select></div>
       <div class="field"><label for="nw-strasse">Straße und Hausnummer</label><input id="nw-strasse" autocomplete="off"></div>
       <div class="grid-2">
         <div class="field"><label for="nw-plz">PLZ</label><input id="nw-plz" inputmode="numeric" autocomplete="off"></div>
@@ -2070,7 +2130,13 @@ pages['nachweis']=async function(el){
       </div>
       <div id="nw-quelle" class="text-muted" style="font-size:12px;margin:-6px 0 14px"></div>
       <div class="grid-2">
-        <div class="field"><label>Unterschrift Fahrlehrer/in</label><canvas id="nw-sig-lehrer" width="600" height="200" style="width:100%;height:110px;background:#fff;border:1px solid var(--border);border-radius:8px;touch-action:none"></canvas><button type="button" class="btn btn-secondary btn-sm" style="margin-top:6px" onclick="nwSigLeeren('lehrer')">Löschen</button></div>
+        <div class="field"><label for="nw-flnr">Fahrlehrer-Nr. (optional)</label><input id="nw-flnr" autocomplete="off"></div>
+        <div class="field"><label for="nw-koop">Kooperation (falls zutreffend)</label>
+          <select id="nw-koop"><option value="">Keine Kooperation</option><option value="gebend">Wir sind Auftrag gebende Fahrschule</option><option value="nehmend">Wir sind Auftrag nehmende Fahrschule</option></select></div>
+      </div>
+      <div class="field" id="nw-koop-name-feld" style="display:none"><label for="nw-koop-name">Name der Partner-Fahrschule</label><input id="nw-koop-name" autocomplete="off"></div>
+      <div class="grid-2">
+        <div class="field"><label>Unterschrift Inhaber/in bzw. verantwortliche Leitung</label><canvas id="nw-sig-lehrer" width="600" height="200" style="width:100%;height:110px;background:#fff;border:1px solid var(--border);border-radius:8px;touch-action:none"></canvas><button type="button" class="btn btn-secondary btn-sm" style="margin-top:6px" onclick="nwSigLeeren('lehrer')">Löschen</button></div>
         <div class="field"><label>Unterschrift Fahrschüler/in</label><canvas id="nw-sig-schueler" width="600" height="200" style="width:100%;height:110px;background:#fff;border:1px solid var(--border);border-radius:8px;touch-action:none"></canvas><button type="button" class="btn btn-secondary btn-sm" style="margin-top:6px" onclick="nwSigLeeren('schueler')">Löschen</button></div>
       </div>
       <p class="text-muted" style="font-size:12px;margin:-4px 0 14px">Unterschriften sind optional. Leer gelassen, bleibt auf dem Ausdruck eine Linie zum Unterschreiben.</p>
@@ -2084,6 +2150,9 @@ pages['nachweis']=async function(el){
     <div id="nw-link-liste" style="margin-top:12px"></div>
   </div></div>`;
   ['lehrer','schueler'].forEach(nwSigInit);
+  document.getElementById('nw-koop').addEventListener('change',()=>{
+    document.getElementById('nw-koop-name-feld').style.display=document.getElementById('nw-koop').value?'block':'none';
+  });
   try{
     const q = currentRole==='admin'
       ? query(collection(db,SCHUELER_COLL),where('schoolId','==',currentSchoolId))
@@ -2093,7 +2162,7 @@ pages['nachweis']=async function(el){
     const sel=document.getElementById('nw-schueler');
     snap.docs.map(d=>({id:d.id,...d.data()}))
       .sort((a,b)=>(a.lname||'').localeCompare(b.lname||''))
-      .forEach(s=>{ window.__nwSchueler[s.id]=s; sel.insertAdjacentHTML('beforeend',`<option value="${s.id}">${escHtml(s.lname||'')}, ${escHtml(s.fname||'')}</option>`); });
+      .forEach(s=>{ window.__nwSchueler[s.id]=s; sel.insertAdjacentHTML('beforeend',`<option value="${escHtml(s.id)}">${escHtml(s.lname||'')}, ${escHtml(s.fname||'')}</option>`); });
     if(snap.empty) sel.insertAdjacentHTML('afterend','<p class="text-muted" style="margin-top:8px">Noch keine Schüler im Kalender.</p>');
   }catch(e){ console.warn('nachweis schueler',e); toast('Schüler konnten nicht geladen werden.','error'); }
 };
@@ -2110,33 +2179,56 @@ function nwSigInit(wer){
 }
 window.nwSigLeeren=function(wer){const c=document.getElementById('nw-sig-'+wer);if(!c)return;c.getContext('2d').clearRect(0,0,c.width,c.height);window.__nwSig[wer]=null;};
 
+// Kartei-Klasse -> Klasse im Nachweis ('B-Auto' ist Klasse B mit Automatik)
+function nwKlasse(k){ return k==='B-Auto' ? 'B' : k; }
+window.nwKlasseGeaendert=function(){
+  const k=document.getElementById('nw-klasse').value;
+  document.getElementById('nw-aufstieg-feld').style.display=(k==='A'||k==='A2')?'block':'none';
+  if(!(k==='A'||k==='A2')) document.getElementById('nw-aufstieg').value='';
+};
+
 window.nwSchuelerGewaehlt=async function(){
-  const id=document.getElementById('nw-schueler').value;
+  const sel=document.getElementById('nw-schueler');
+  const id=sel.value;
   document.getElementById('nw-form').style.display=id?'block':'none';
   if(!id)return;
+  // Alles vom vorher gewaehlten Schueler zuruecksetzen - auch die
+  // Unterschriften: Sonst stand die Unterschrift von Schueler A auf dem
+  // Nachweis von Schueler B.
+  nwSigLeeren('lehrer'); nwSigLeeren('schueler');
   const s=window.__nwSchueler[id]||{};
-  ['nw-geb','nw-strasse','nw-plz','nw-ort'].forEach(f=>document.getElementById(f).value='');
+  ['nw-geb','nw-strasse','nw-plz','nw-ort','nw-vorbesitz','nw-beantragt'].forEach(f=>document.getElementById(f).value='');
+  document.getElementById('nw-aufstieg').value='';
+  document.getElementById('nw-klasse').value=nwKlasse(s.klasse)||'B';
+  if(!document.getElementById('nw-klasse').value) document.getElementById('nw-klasse').value='B';
+  nwKlasseGeaendert();
+  document.getElementById('nw-beantragt').value=document.getElementById('nw-klasse').value;
   document.getElementById('nw-quelle').textContent='Suche Angaben in der Kartei…';
-  if(s.klasse) document.getElementById('nw-klasse').value=s.klasse;
-  // Vorschlag aus der Kartei (gleicher Vor- und Nachname, gleiche Fahrschule)
-  let treffer=null;
+  // Vorschlag aus der Kartei: zuerst die verknuepfte Akte, sonst ein
+  // EINDEUTIGER Treffer mit gleichem Vor- und Nachnamen
+  let treffer=null, mehrdeutig=false;
   if(s.adkStudentId){
     try{ const k=await getDoc(doc(db,'students',s.adkStudentId)); if(k.exists()&&k.data().archivGrund!=='geloescht') treffer=k.data(); }catch(e){ console.warn('Verknuepfte Kartei',e); }
   }
+  if(sel.value!==id) return;   // inzwischen anderer Schueler gewaehlt
   if(!treffer) try{
     const ks=await getDocs(query(collection(db,'students'),where('fahrschuleId','==',currentSchoolId)));
     const n=t=>String(t||'').trim().toLowerCase();
-    treffer=ks.docs.map(d=>d.data()).find(k=>n(k.vorname)===n(s.fname)&&n(k.nachname)===n(s.lname)&&k.archivGrund!=='geloescht')||null;
+    const passt=ks.docs.map(d=>d.data()).filter(k=>n(k.vorname)===n(s.fname)&&n(k.nachname)===n(s.lname)&&k.archivGrund!=='geloescht');
+    if(passt.length===1) treffer=passt[0]; else if(passt.length>1) mehrdeutig=true;
   }catch(e){ console.warn('Kartei-Abgleich',e); }
+  if(sel.value!==id) return;
   if(treffer){
     document.getElementById('nw-geb').value=treffer.geburt||'';
     document.getElementById('nw-strasse').value=treffer.strasse||'';
     document.getElementById('nw-plz').value=treffer.plz||'';
     document.getElementById('nw-ort').value=treffer.ort||'';
-    if(treffer.klasse) document.getElementById('nw-klasse').value=treffer.klasse;
+    if(treffer.klasse){ document.getElementById('nw-klasse').value=nwKlasse(treffer.klasse)||document.getElementById('nw-klasse').value; nwKlasseGeaendert(); document.getElementById('nw-beantragt').value=document.getElementById('nw-klasse').value; }
     document.getElementById('nw-quelle').textContent='✓ Angaben aus der Kartei übernommen. Bitte prüfen.';
   }else{
-    document.getElementById('nw-quelle').textContent='Kein passender Eintrag in der Kartei gefunden. Bitte Angaben eintragen.';
+    document.getElementById('nw-quelle').textContent=mehrdeutig
+      ? 'Mehrere Schüler mit diesem Namen in der Kartei – bitte verknüpfen (unten) oder Angaben eintragen.'
+      : 'Kein passender Eintrag in der Kartei gefunden. Bitte Angaben eintragen.';
   }
 };
 
@@ -2194,12 +2286,14 @@ window.erstelleNachweis=async function(){
       .filter(x=>x.status!=='nichtErschienen' && ms(x.endTime) && ms(x.endTime)<=jetzt)
       .sort((a,b)=>ms(a.startTime)-ms(b.startTime))
       .map(x=>({ start:ms(x.startTime), ende:ms(x.endTime), min:Math.round((ms(x.endTime)-ms(x.startTime))/60000),
-                 kat:x.anKategorie||AN_TYP_FALLBACK[x.type]||'Üst', lehrer:x.lehrerUid }));
+                 kat:x.anKategorie||AN_TYP_FALLBACK[x.type]||'?', lehrer:x.lehrerUid }));
     const theorie=thSnap.docs.map(d=>d.data()).sort((a,b)=>String(a.datum).localeCompare(String(b.datum)));
-    // Fahrlehrer-Namen
+    // Fahrlehrer-Namen: Kalender-Profil, sonst Kartei-Profil (z. B. Termine,
+    // die in der Kartei geplant wurden, ohne Kalender-Profil)
     const lehrerNamen={};
     for(const uid of [...new Set(fahrten.map(f=>f.lehrer).concat(theorie.map(t=>t.lehrerUid)).filter(Boolean))]){
       try{ const u=await getDoc(doc(db,'kalenderUsers',uid)); if(u.exists()) lehrerNamen[uid]=`${u.data().fname||''} ${u.data().lname||''}`.trim(); }catch(e){}
+      if(!lehrerNamen[uid]) try{ const u=await getDoc(doc(db,'users',uid)); if(u.exists()) lehrerNamen[uid]=String(u.data().name||'').trim(); }catch(e){}
       if(!lehrerNamen[uid] && uid===currentUser.uid) lehrerNamen[uid]=`${currentProfile.fname||''} ${currentProfile.lname||''}`.trim();
     }
     // Fahrschule: Name und Anschrift (dieselbe Adresse wie auf den Rechnungen)
@@ -2210,10 +2304,13 @@ window.erstelleNachweis=async function(){
       if(d.exists()){ const b=d.data(); fs={ name: b.fahrschuleName||b.name||fs.name, strasse:b.rechnungsStrasse||'', plz:b.rechnungsPlz||'', ort:b.rechnungsOrt||'' }; }
     }catch(e){ console.warn('Fahrschul-Adresse',e); }
     const sigImg=wer=>window.__nwSig[wer]?document.getElementById('nw-sig-'+wer).toDataURL('image/png'):null;
+    const wert=idf=>document.getElementById(idf).value.trim();
     const daten={
       fs, klasse:document.getElementById('nw-klasse').value,
-      schueler:{ name:`${s.lname||''}, ${s.fname||''}`, geb:document.getElementById('nw-geb').value,
-        strasse:document.getElementById('nw-strasse').value.trim(), plz:document.getElementById('nw-plz').value.trim(), ort:document.getElementById('nw-ort').value.trim() },
+      beantragt:wert('nw-beantragt'), vorbesitz:wert('nw-vorbesitz'), aufstieg:document.getElementById('nw-aufstieg').value,
+      flnr:wert('nw-flnr'), koop:document.getElementById('nw-koop').value, koopName:wert('nw-koop-name'),
+      schueler:{ nachname:s.lname||'', vorname:s.fname||'', geb:document.getElementById('nw-geb').value,
+        strasse:wert('nw-strasse'), plz:wert('nw-plz'), ort:wert('nw-ort') },
       fahrten, theorie, lehrerNamen, sigLehrer:sigImg('lehrer'), sigSchueler:sigImg('schueler')
     };
     w.document.open(); w.document.write(nachweisHtml(daten)); w.document.close();
@@ -2227,24 +2324,40 @@ window.erstelleNachweis=async function(){
 
 function nachweisHtml(d){
   const e=escHtml;
-  const datum=t=>t?new Date(t).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
-  const uhr=t=>new Date(t).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
-  const isoDatum=s=>{ if(!s)return ''; const [y,m,t]=String(s).split('-'); return t?`${t}.${m}.${y}`:e(s); };
-  const katLabel=c=>{ const k=AN_KATEGORIEN.find(x=>x.code===c); return k?k.label:c; };
-  const zusatzKey=/^A/.test(d.klasse)?'A':'B';
-  const zusatz=(THEORIE_ZUSATZ[zusatzKey]||[]);
-  const theorieZeile=t=>{
-    const eintr=d.theorie.filter(x=>String(x.thema)===t.nr);
-    return `<tr><td class="c">${e(t.nr)}</td><td>${e(t.titel)}</td><td>${eintr.map(x=>isoDatum(x.datum)).join(', ')||'&nbsp;'}</td><td class="c">${eintr.reduce((s,x)=>s+(x.minuten||0),0)||''}</td></tr>`;
-  };
+  const TZ={timeZone:'Europe/Berlin'};
+  const datum=t=>t?new Date(t).toLocaleDateString('de-DE',{...TZ,day:'2-digit',month:'2-digit',year:'numeric'}):'';
+  const uhr=t=>new Date(t).toLocaleTimeString('de-DE',{...TZ,hour:'2-digit',minute:'2-digit'});
+  // Theorie-Datum ist ein Text 'JJJJ-MM-TT' - alles escapen, auch Unerwartetes
+  const isoDatum=s=>{ if(!s)return ''; const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s)); return e(m?`${m[3]}.${m[2]}.${m[1]}`:s); };
+  const zahl=x=>{ const n=Number(x); return Number.isFinite(n)&&n>0?Math.round(n):0; };
+  const katLabel=c=>{ if(c==='?')return 'Kategorie fehlt – bitte im Termin wählen'; const k=AN_KATEGORIEN.find(x=>x.code===c); return k?k.label:c; };
+  const lehrer=uid=>e(d.lehrerNamen[uid]||'');
+  // Theorie: eine Zeile je Termin; Themen ohne Termin bleiben als leere Zeile
+  // stehen, damit sofort sichtbar ist, was noch fehlt.
+  const theorieMitNr=d.theorie.map(t=>({...t,_nr:nwThemaNr(t)}));
+  const themenTabelle=liste=>liste.map(t=>{
+    const eintr=theorieMitNr.filter(x=>x._nr===t.nr);
+    if(!eintr.length) return `<tr><td class="c">${e(t.nr)}</td><td>${e(t.titel)}</td><td></td><td class="c"></td><td></td></tr>`;
+    return eintr.map(x=>`<tr><td class="c">${e(t.nr)}</td><td>${e(t.titel)}</td><td class="c">${isoDatum(x.datum)}</td><td class="c">${zahl(x.minuten)||''}</td><td>${lehrer(x.lehrerUid)}</td></tr>`).join('');
+  }).join('');
+  const zusatz=nwZusatzThemen(d.klasse);
+  const bekannt=new Set([...THEORIE_GRUNDSTOFF,...zusatz].map(t=>t.nr));
+  const weitere=theorieMitNr.filter(x=>!bekannt.has(x._nr));
   const summe={}; d.fahrten.forEach(f=>{summe[f.kat]=(summe[f.kat]||0)+f.min;});
   const gesamtMin=d.fahrten.reduce((s,f)=>s+f.min,0);
-  const pflichtTxt=Object.entries(AN_PFLICHT).map(([k,n])=>{
+  const pflicht = d.aufstieg==='ab2' ? null : (d.aufstieg==='unter2' ? AN_PFLICHT_AUFSTIEG : AN_PFLICHT[d.klasse]);
+  const pflichtTxt=pflicht?Object.entries(pflicht).map(([k,n])=>{
     const ist=Math.floor((summe[k]||0)/45);
     return `<tr><td>${e(katLabel(k))} (${k})</td><td class="c">${n} × 45 Min.</td><td class="c">${summe[k]||0} Min. (${ist} × 45)</td><td class="c">${ist>=n?'✓':'offen'}</td></tr>`;
-  }).join('');
-  const linie=(img,label)=>`<div class="sig">${img?`<img src="${img}" alt="">`:'<div style="height:52px"></div>'}<div class="sl">${label}</div></div>`;
-  return `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Ausbildungsnachweis ${e(d.schueler.name)}</title>
+  }).join(''):'';
+  // Ueberland: davon mindestens eine Fahrt mit 2 x 45 Min. am Stueck
+  const langeUL=d.fahrten.some(f=>f.kat==='UL'&&f.min>=90);
+  const ulZeile=pflicht&&pflicht.UL?`<tr><td colspan="2">davon eine Überlandfahrt mit mind. 2 × 45 Min. am Stück</td><td class="c">${langeUL?'vorhanden':'nicht erfasst'}</td><td class="c">${langeUL?'✓':'offen'}</td></tr>`:'';
+  const b197Zeile=d.klasse==='B197'?`<tr><td>${e(katLabel('SN'))} (SN, § 5a FahrschAusbO)</td><td class="c">10 × 45 Min.</td><td class="c">${summe.SN||0} Min.</td><td class="c">${(summe.SN||0)>=450?'✓':'offen'}</td></tr>`:'';
+  const linie=(img,label,text)=>`<div class="sig">${img?`<img src="${img}" alt="">`:(text?`<div class="sigtxt">${text}</div>`:'<div style="height:52px"></div>')}<div class="sl">${label}</div></div>`;
+  const ortDatum=(d.fs.ort?e(d.fs.ort)+', ':'')+datum(Date.now());
+  const koopTxt=d.koop?`<div class="box" style="min-height:0;margin-top:10px"><b>Kooperation</b>${d.koop==='gebend'?'Auftrag gebende':'Auftrag nehmende'} Fahrschule${d.koopName?' · Partner: '+e(d.koopName):''}</div>`:'';
+  return `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Ausbildungsnachweis ${e(d.schueler.nachname)}, ${e(d.schueler.vorname)}</title>
 <style>
 @page{size:A4;margin:14mm 13mm}
 *{box-sizing:border-box}body{font:10pt/1.35 Arial,Helvetica,sans-serif;color:#111;margin:0;padding:16px}
@@ -2252,40 +2365,53 @@ h1{font-size:15pt;margin:0 0 2px}h2{font-size:11pt;margin:16px 0 6px;border-bott
 .sub{font-size:8.5pt;color:#444;margin-bottom:12px}
 .kopf{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .box{border:1px solid #111;padding:7px 9px;min-height:74px}.box b{display:block;font-size:8pt;text-transform:uppercase;letter-spacing:.04em;color:#444;margin-bottom:3px}
+.zeile{font-size:9pt;margin-top:4px}
 table{width:100%;border-collapse:collapse;font-size:9pt}th,td{border:1px solid #111;padding:3px 5px;text-align:left;vertical-align:top}th{background:#eee;font-size:8.5pt}
-.c{text-align:center;white-space:nowrap}tr{page-break-inside:avoid}
-.sigs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-top:22px;page-break-inside:avoid}
-.sig img{height:52px;max-width:100%;display:block}.sl{border-top:1px solid #111;font-size:8.5pt;padding-top:3px}
+thead{display:table-header-group}
+.c{text-align:center;white-space:nowrap}tr{page-break-inside:avoid;break-inside:avoid}
+.schluss{break-inside:avoid;page-break-inside:avoid}
+.sigs{display:grid;grid-template-columns:1fr 1.3fr 1.3fr;gap:18px;margin-top:22px}
+.sig img{height:52px;max-width:100%;display:block}.sigtxt{height:52px;display:flex;align-items:flex-end;padding-bottom:3px}.sl{border-top:1px solid #111;font-size:8.5pt;padding-top:3px}
+.fuss{font-size:7.5pt;color:#555;margin-top:14px}
 .leiste{position:sticky;top:0;background:#fff;padding:8px 0 12px;display:flex;gap:8px}
 .leiste button{font:600 11pt Arial;padding:9px 16px;border-radius:8px;border:1px solid #111;background:#ffd454;cursor:pointer}
 @media print{.leiste{display:none}body{padding:0}}
 </style></head><body>
 <div class="leiste"><button onclick="window.print()">🖨️ Drucken / Als PDF sichern</button><button onclick="window.close()" style="background:#fff">Schließen</button></div>
-<h1>Ausbildungsnachweis</h1>
-<div class="sub">nach Anlage 3 zu § 6 Abs. 1 der Fahrschüler-Ausbildungsordnung (FahrschAusbO) · Klasse ${e(d.klasse)} · erstellt am ${datum(Date.now())}</div>
+<h1>Ausbildungsnachweis für Klasse ${e(d.klasse)}</h1>
+<div class="sub">gemäß § 31 Absatz 1 Fahrlehrergesetz und § 6 Absatz 2 Fahrschüler-Ausbildungsordnung · Muster nach Anlage 3 zu § 6 Absatz 1 DV-FahrlG · erstellt am ${datum(Date.now())}</div>
 <div class="kopf">
-  <div class="box"><b>Fahrschule</b>${e(d.fs.name)}<br>${e(d.fs.strasse)}<br>${e(d.fs.plz)} ${e(d.fs.ort)}</div>
-  <div class="box"><b>Fahrschüler/in</b>${e(d.schueler.name)}<br>geb. ${isoDatum(d.schueler.geb)||'__________'}<br>${e(d.schueler.strasse)}<br>${e(d.schueler.plz)} ${e(d.schueler.ort)}</div>
+  <div class="box"><b>Fahrschule</b>${e(d.fs.name)}<br>${e(d.fs.strasse)}<br>${e(d.fs.plz)} ${e(d.fs.ort)}${d.flnr?`<div class="zeile">Fahrlehrer-Nr.: ${e(d.flnr)}</div>`:''}</div>
+  <div class="box"><b>Fahrschüler/in</b>${e(d.schueler.nachname)}, ${e(d.schueler.vorname)}<br>geb. ${isoDatum(d.schueler.geb)||'__________'}<br>${e(d.schueler.strasse)}<br>${e(d.schueler.plz)} ${e(d.schueler.ort)}</div>
 </div>
-<h2>1. Theoretischer Unterricht – Grundstoff</h2>
-<table><thead><tr><th class="c">Nr.</th><th>Thema</th><th>Datum</th><th class="c">Min.</th></tr></thead><tbody>${THEORIE_GRUNDSTOFF.map(theorieZeile).join('')}</tbody></table>
-<h2>2. Theoretischer Unterricht – klassenspezifischer Zusatzstoff</h2>
-<table><thead><tr><th class="c">Nr.</th><th>Thema</th><th>Datum</th><th class="c">Min.</th></tr></thead><tbody>${zusatz.map(theorieZeile).join('')}</tbody></table>
-<h2>3. Praktischer Unterricht</h2>
-<table><thead><tr><th class="c">Nr.</th><th>Datum</th><th class="c">Uhrzeit</th><th class="c">Min.</th><th>Ausbildungsinhalt</th><th>Fahrlehrer/in</th></tr></thead><tbody>
-${d.fahrten.length?d.fahrten.map((f,i)=>`<tr><td class="c">${i+1}</td><td>${datum(f.start)}</td><td class="c">${uhr(f.start)}–${uhr(f.ende)}</td><td class="c">${f.min}</td><td>${e(f.kat)} – ${e(katLabel(f.kat))}</td><td>${e(d.lehrerNamen[f.lehrer]||'')}</td></tr>`).join(''):'<tr><td colspan="6" class="c">Noch keine gefahrenen Stunden erfasst.</td></tr>'}
+<div class="kopf" style="margin-top:10px">
+  <div class="box" style="min-height:0"><b>Beantragte Klasse(n)</b>${e(d.beantragt||d.klasse)}</div>
+  <div class="box" style="min-height:0"><b>Vorbesitz der Klasse(n)</b>${e(d.vorbesitz)||'—'}</div>
+</div>
+${koopTxt}
+<h2>1. Theoretischer Grundunterricht</h2>
+<table><thead><tr><th class="c">Nr.</th><th>Thema</th><th class="c">Datum</th><th class="c">Minuten</th><th>Fahrlehrer/in</th></tr></thead><tbody>${themenTabelle(THEORIE_GRUNDSTOFF)}</tbody></table>
+<h2>2. Klassenspezifischer Unterricht</h2>
+<table><thead><tr><th class="c">Nr.</th><th>Thema</th><th class="c">Datum</th><th class="c">Minuten</th><th>Fahrlehrer/in</th></tr></thead><tbody>${themenTabelle(zusatz)}${weitere.map(x=>`<tr><td class="c">${e(x._nr)}</td><td>${e(x.themaTitel||'')}</td><td class="c">${isoDatum(x.datum)}</td><td class="c">${zahl(x.minuten)||''}</td><td>${lehrer(x.lehrerUid)}</td></tr>`).join('')}${(!zusatz.length&&!weitere.length)?'<tr><td colspan="5" class="c">Keine Einträge.</td></tr>':''}</tbody></table>
+<h2>3. Praktische Ausbildung</h2>
+<table><thead><tr><th class="c">Nr.</th><th class="c">Datum</th><th>Art und Inhalt</th><th class="c">Beginn</th><th class="c">Minuten</th><th>Fahrlehrer/in</th></tr></thead><tbody>
+${d.fahrten.length?d.fahrten.map((f,i)=>`<tr><td class="c">${i+1}</td><td class="c">${datum(f.start)}</td><td>${e(f.kat)} – ${e(katLabel(f.kat))}</td><td class="c">${uhr(f.start)}</td><td class="c">${f.min}</td><td>${lehrer(f.lehrer)}</td></tr>`).join(''):'<tr><td colspan="6" class="c">Noch keine gefahrenen Stunden erfasst.</td></tr>'}
 </tbody></table>
+<div style="font-size:7.5pt;color:#555;margin-top:3px">Gf = Grundfahraufgaben · Uw = Unterweisung am Ausbildungsfahrzeug · SN = Schaltnachweis (§ 5a FahrschAusbO) · Üst = Übungsstunden i.g.O./a.g.O. · UL = Überlandfahrt · AB = Autobahn · NF = Dunkelheit</div>
 <h2>4. Zusammenfassung</h2>
 <table><thead><tr><th>Ausbildungsinhalt</th><th class="c">Minuten</th></tr></thead><tbody>
 ${Object.keys(summe).map(k=>`<tr><td>${e(k)} – ${e(katLabel(k))}</td><td class="c">${summe[k]}</td></tr>`).join('')}
-<tr><th>Gesamt praktischer Unterricht</th><th class="c">${gesamtMin} Min. (${(gesamtMin/45).toFixed(1).replace('.',',')} × 45)</th></tr></tbody></table>
-${['B','B197','A','A1','A2'].includes(d.klasse)?`<h2>5. Besondere Ausbildungsfahrten (Mindestumfang)</h2>
-<table><thead><tr><th>Art</th><th class="c">Mindestens</th><th class="c">Absolviert</th><th class="c">Status</th></tr></thead><tbody>${pflichtTxt}</tbody></table>`:''}
+<tr><th>Gesamt praktische Ausbildung</th><th class="c">${gesamtMin} Min. (${(gesamtMin/45).toFixed(1).replace('.',',')} × 45)</th></tr></tbody></table>
+${(pflicht||b197Zeile)?`<h2>5. Besondere Ausbildungsfahrten (Mindestumfang nach Anlage 4 FahrschAusbO)</h2>
+<table><thead><tr><th>Art</th><th class="c">Mindestens</th><th class="c">Absolviert</th><th class="c">Status</th></tr></thead><tbody>${pflichtTxt}${ulZeile}${b197Zeile}</tbody></table>`:(d.aufstieg==='ab2'?'<p style="font-size:8.5pt;margin-top:10px">Erweiterung bei Vorbesitz ab 2 Jahren: keine Pflichtfahrten.</p>':'')}
+<div class="schluss">
 <p style="font-size:8.5pt;margin-top:14px">Die Richtigkeit der Angaben wird bestätigt.</p>
 <div class="sigs">
-  ${linie(null,'Ort, Datum')}
-  ${linie(d.sigLehrer,'Unterschrift Fahrlehrer/in')}
+  ${linie(null,'Ort, Datum',ortDatum)}
+  ${linie(d.sigLehrer,'Unterschrift Fahrschulinhaber/in bzw. verantwortliche Leitung')}
   ${linie(d.sigSchueler,'Unterschrift Fahrschüler/in')}
+</div>
+<div class="fuss">${e(d.schueler.nachname)}, ${e(d.schueler.vorname)} · Klasse ${e(d.klasse)} · maschinell erstellt mit FahrSync</div>
 </div>
 </body></html>`;
 }
@@ -2541,7 +2667,7 @@ async function renderWarteliste(){
   box.innerHTML='<table><tbody>'+list.map(w=>{
     const seit=(w.createdAt&&w.createdAt.toDate)?w.createdAt.toDate().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}):'';
     const notiz=w.notiz?'<div class="text-muted" style="font-size:12px;margin-top:3px">„'+escHtml(w.notiz)+'“</div>':'';
-    return '<tr><td>'+escHtml(w.vorname||'Schüler')+(seit?' <span class="text-muted" style="font-size:11px">seit '+seit+'</span>':'')+notiz+'</td><td style="text-align:right"><button class="btn btn-secondary btn-sm" onclick="wartelisteEntfernen(\''+w.id+'\')">Entfernen</button></td></tr>';
+    return '<tr><td>'+escHtml(w.vorname||'Schüler')+(seit?' <span class="text-muted" style="font-size:11px">seit '+seit+'</span>':'')+notiz+'</td><td style="text-align:right"><button class="btn btn-secondary btn-sm" onclick="wartelisteEntfernen(\''+attrJs(w.id)+'\')">Entfernen</button></td></tr>';
   }).join('')+'</tbody></table>';
 }
 window.wartelisteEntfernen=async function(id){if(!window.confirm('Diesen Eintrag von der Warteliste entfernen?'))return;try{await deleteDoc(doc(db,'bookingWaitlist',id));toast('Entfernt.','success');renderWarteliste();}catch(e){toast('Fehlgeschlagen.','error');}};
@@ -2554,7 +2680,7 @@ async function renderNachrichten(){
   box.innerHTML=list.map(m=>{
     const wann=(m.createdAt&&m.createdAt.toDate)?m.createdAt.toDate().toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
     const neu=m.status==='neu';
-    return '<div class="slot-row" style="'+(neu?'border-left:3px solid var(--accent);padding-left:8px':'')+'"><div class="slot-info"><strong>'+escHtml(m.vorname||'Schüler')+'</strong> <span class="text-muted" style="font-size:11px">'+wann+'</span>'+(neu?' <span style="color:var(--accent);font-size:11px">• neu</span>':'')+'<div style="margin-top:3px;white-space:pre-wrap;font-size:13px">'+escHtml(m.text||'')+'</div></div><div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">'+(neu?'<button class="btn btn-secondary btn-sm" onclick="nachrichtGelesen(\''+m.id+'\')">Gelesen</button>':'')+'<button class="btn btn-secondary btn-sm" onclick="nachrichtLoeschen(\''+m.id+'\')">Löschen</button></div></div>';
+    return '<div class="slot-row" style="'+(neu?'border-left:3px solid var(--accent);padding-left:8px':'')+'"><div class="slot-info"><strong>'+escHtml(m.vorname||'Schüler')+'</strong> <span class="text-muted" style="font-size:11px">'+wann+'</span>'+(neu?' <span style="color:var(--accent);font-size:11px">• neu</span>':'')+'<div style="margin-top:3px;white-space:pre-wrap;font-size:13px">'+escHtml(m.text||'')+'</div></div><div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">'+(neu?'<button class="btn btn-secondary btn-sm" onclick="nachrichtGelesen(\''+attrJs(m.id)+'\')">Gelesen</button>':'')+'<button class="btn btn-secondary btn-sm" onclick="nachrichtLoeschen(\''+attrJs(m.id)+'\')">Löschen</button></div></div>';
   }).join('');
 }
 window.nachrichtGelesen=async function(id){try{await updateDoc(doc(db,'bookingMessages',id),{status:'gelesen'});renderNachrichten();}catch(e){toast('Fehlgeschlagen.','error');}};
@@ -2584,8 +2710,8 @@ async function renderBookingRequests(){
       const datum=d?d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}):'?';
       const zeit=d&&e?p(d.getHours())+':'+p(d.getMinutes())+'–'+p(e.getHours())+':'+p(e.getMinutes()):'?';
       return`<tr><td>${escHtml(r.vorname||'')||'Schüler'}</td><td>${datum}</td><td>${zeit}</td><td>${typeBadgeHtml(r.type)}${r.tausch?' <span style="font-size:10px;color:var(--accent);white-space:nowrap">🔄 Tausch</span>':''}</td>
-        <td style="white-space:nowrap;text-align:right"><button class="btn btn-success btn-sm" onclick="bestaetigeBuchung('${r.id}')">✓</button>
-        <button class="btn btn-danger btn-sm" onclick="lehneBuchungAb('${r.id}')">✕</button></td></tr>`;}).join('')+'</tbody></table>';
+        <td style="white-space:nowrap;text-align:right"><button class="btn btn-success btn-sm" onclick="bestaetigeBuchung('${attrJs(r.id)}')">✓</button>
+        <button class="btn btn-danger btn-sm" onclick="lehneBuchungAb('${attrJs(r.id)}')">✕</button></td></tr>`;}).join('')+'</tbody></table>';
 }
 window.bestaetigeBuchung=async function(reqId){
   try{
@@ -2699,7 +2825,7 @@ pages['lehrer-schueler']=async function(el){
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:14px">
         <div>
           <div style="font-family:var(--font-display);font-size:18px">${escHtml(s.fname)} ${escHtml(s.lname)}</div>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:3px">${escHtml(s.email||'')} ${s.tel?'· '+s.tel:''}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:3px">${escHtml(s.email||'')} ${s.tel?'· '+escHtml(s.tel):''}</div>
           <div style="margin-top:5px;display:flex;gap:7px;align-items:center;flex-wrap:wrap">
             <span style="color:${warn?'var(--danger)':'var(--text-muted)'};font-size:12px">🎓 ${kontingent}${warn?' ⚠️':''}</span>
             ${autoHtml?`<span>${autoHtml}</span>`:''}
@@ -2756,7 +2882,7 @@ window.viewLehrerKalender=async function(lehrerUid,lehrerName){
   main.innerHTML=`<div class="page active">
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
       <button class="btn btn-secondary btn-sm" onclick="navigate('admin-lehrer')">← Zurück</button>
-      <h2 class="page-title" style="margin-bottom:0">📅 ${lehrerName}</h2>
+      <h2 class="page-title" style="margin-bottom:0">📅 ${escHtml(lehrerName)}</h2>
     </div>
     <div class="card">
       <div class="cal-header">
@@ -2810,7 +2936,7 @@ window.adminOpenDayDetail=async function(year,month,day){
   const sHtml=daySlots.length?daySlots.map(d=>{const s=d.data();const pend=!s.bookedBy&&window.__pendingReq&&window.__pendingReq.bySlot[d.id];const sn=s.bookedBy?(scm[s.bookedBy]||'?'):(pend?('⏳ Anfrage: '+pend):null);
     return`<div class="slot-row"><div class="slot-time">${fmtTime(s.startTime)}–${fmtTime(s.endTime)}</div>
     <div class="slot-info">${typeBadgeHtml(s.type)}${sn?`<div class="slot-student">👤 ${sn}</div>`:'<div class="slot-student" style="color:var(--success)">Frei</div>'}</div></div>`;}).join(''):'<p class="text-muted">Keine Slots.</p>';
-  openModal(`<h2 class="modal-title">${dateStr}</h2><div class="card-title">Slots – ${window._adminCalLehrerName}</div>${sHtml}<hr class="divider"><div class="card-title">Sperren / Abwesenheit</div>${blockListHtml(bSnap.docs.map(d=>({id:d.id,...d.data()})))}${blockFormHtml(year,month,day,lUid)}`);
+  openModal(`<h2 class="modal-title">${dateStr}</h2><div class="card-title">Slots – ${escHtml(window._adminCalLehrerName)}</div>${sHtml}<hr class="divider"><div class="card-title">Sperren / Abwesenheit</div>${blockListHtml(bSnap.docs.map(d=>({id:d.id,...d.data()})))}${blockFormHtml(year,month,day,lUid)}`);
 };
 
 // ════════════════════════════════
@@ -2831,7 +2957,7 @@ function pruefungFormHtml(sid,p=null){
   const isEdit=!!p;
   const opts=[{v:'ausstehend',l:'Ausstehend'},{v:'bestanden',l:'Bestanden'},{v:'nicht_bestanden',l:'Nicht bestanden'}].map(o=>`<option value="${o.v}" ${(p?.status||'ausstehend')===o.v?'selected':''}>${o.l}</option>`).join('');
   return`<h2 class="modal-title">${isEdit?'Prüfung bearbeiten':'Prüfung eintragen'}</h2>
-    <div class="grid-2"><div class="field"><label>Datum</label><input id="pf-d" type="date" value="${p?.datum||''}"></div><div class="field"><label>Versuch</label><input id="pf-v" type="number" min="1" value="${p?.versuch||1}"></div></div>
+    <div class="grid-2"><div class="field"><label>Datum</label><input id="pf-d" type="date" value="${escHtml(p?.datum||'')}"></div><div class="field"><label>Versuch</label><input id="pf-v" type="number" min="1" value="${p?.versuch||1}"></div></div>
     <div class="field"><label>Prüfungsort</label><input id="pf-o" placeholder="TÜV München" value="${escHtml(p?.ort||'')}"></div>
     <div class="field"><label>Status</label><select id="pf-s">${opts}</select></div>
     <div class="field"><label>Notiz</label><input id="pf-n" placeholder="Rückwärtsfahren…" value="${escHtml(p?.notiz||'')}"></div>

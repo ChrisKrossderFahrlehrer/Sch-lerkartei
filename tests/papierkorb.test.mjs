@@ -130,9 +130,19 @@ await db.doc('schueler/kalAlt').set({ fname: 'Alt', schoolId: 'fsX', adkStudentI
 await db.doc('theorieStunden/thAlt').set({ schuelerId: 'kalAlt', thema: '1' });
 await db.doc('schueler/kalAnders').set({ fname: 'Anders', schoolId: 'fsX', adkStudentId: 'frisch' });
 await db.doc('theorieStunden/thAnders').set({ schuelerId: 'kalAnders', thema: '2' });
+// ... dazu oeffentliche Buchungsdaten und Notizen am Kalender-Schueler
+await db.doc('bookingStudents/kalAlt').set({ vorname: 'Alt', lehrerUid: 'lehrerB' });
+await db.doc('bookingWaitlist/kalAlt').set({ vorname: 'Alt', lehrerUid: 'lehrerB', schuelerId: 'kalAlt', status: 'wartend' });
+await db.doc('notizen/nAlt').set({ schuelerId: 'kalAlt', text: 'privat' });
+await db.doc('bookingMessages/mAlt').set({ schuelerId: 'kalAlt', text: 'Hallo' });
+// Akte MIT Fahrschul-Kennung: ein Kalender-Schueler einer FREMDEN Schule mit
+// derselben adkStudentId darf nie mitgeloescht werden
+await db.doc('students/altFs').set({ uid: 'lehrerB', fahrschuleId: 'fsX', vorname: 'AltFs', ...LOESCHEN(T0 - 95 * TAG) });
+await db.doc('schueler/kalAltFs').set({ fname: 'AltFs', schoolId: 'fsX', adkStudentId: 'altFs' });
+await db.doc('schueler/kalFremd').set({ fname: 'Fremd', schoolId: 'fsY', adkStudentId: 'altFs' });
 await db.doc('students/fertig').set({ uid: 'lehrerB', vorname: 'Fertig', archiviert: true, archiviertAm: T0 - 400 * TAG });
 await pruefe('Leeren: nur ueber 90 Tage Geloeschte', async () => {
-  gleich(await papierkorbLeeren(db, T0), 2, 'Anzahl');
+  gleich(await papierkorbLeeren(db, T0), 3, 'Anzahl');
 });
 await pruefe('91 Tage -> weg, samt Code und Protokoll eines anderen Lehrers', async () => {
   gleich(await gibts('students/alt'), false, 'Schueler');
@@ -144,6 +154,16 @@ await pruefe('... und mit ihm der verknuepfte Kalender-Schueler samt Theorie', a
   gleich(await gibts('theorieStunden/thAlt'), false, 'Theorie');
   gleich(await gibts('schueler/kalAnders'), true, 'fremder Kalender-Schueler');
   gleich(await gibts('theorieStunden/thAnders'), true, 'fremde Theorie');
+});
+await pruefe('... samt oeffentlicher Buchungsdaten, Warteliste, Notizen und Nachrichten', async () => {
+  gleich(await gibts('bookingStudents/kalAlt'), false, 'Buchungslink-Daten');
+  gleich(await gibts('bookingWaitlist/kalAlt'), false, 'Warteliste');
+  gleich(await gibts('notizen/nAlt'), false, 'Notiz');
+  gleich(await gibts('bookingMessages/mAlt'), false, 'Nachricht');
+});
+await pruefe('Kalender-Schueler einer fremden Schule mit derselben Verknuepfung bleibt', async () => {
+  gleich(await gibts('schueler/kalAltFs'), false, 'eigener Kalender-Schueler');
+  gleich(await gibts('schueler/kalFremd'), true, 'fremder Kalender-Schueler');
 });
 await pruefe('Ohne geloeschtAm zaehlt archiviertAm (bleibt nicht ewig liegen)', async () => {
   gleich(await gibts('students/ohneDatum'), false, 'Schueler');

@@ -394,6 +394,138 @@ await pruefe('Betreiber listet alle Kalender-Schulprofile', async () => {
   await assertSucceeds(getDocs(collection(superAdmin(), 'schools')));
 });
 
+// ─────────────────────────────────────────────────────────────────────────
+// Unabhaengige Pruefung 11/2026: Anlegen im Kalender war erlaubt, wenn
+// ENTWEDER die Schule passte (dann mit beliebiger lehrerUid) ODER die
+// lehrerUid die eigene war (dann mit beliebiger Schule). Jetzt muss beides
+// passen. Dazu: Kennungen mit HTML darin, Altkonten nach dem Austritt,
+// Eintraege ohne Login.
+console.log('\nKETTE 5 — Kalender: fremde Schulen und fremde Lehrer beschreiben');
+const EX = 'lehrer-ex';                 // hat die Schule verlassen
+const OHNE_KAL = 'lehrer-ohne-kalender'; // Mitglied, nutzt nur die Kartei
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  const db = ctx.firestore();
+  const s = (p, d) => setDoc(doc(db, p), d);
+  await s(`users/${EX}`,       { uid: EX,       rolle: 'fahrlehrer', status: 'aktiv', fahrschuleId: EX });
+  await s(`kalenderUsers/${EX}`, { uid: EX, schoolId: SCHULE });   // altes Profil, nie nachgezogen
+  await s(`users/${OHNE_KAL}`, { uid: OHNE_KAL, rolle: 'fahrlehrer', status: 'aktiv', fahrschuleId: SCHULE });
+  await s('slots/slot-lehrer', { schoolId: SCHULE, lehrerUid: LEHRER });
+  await s('slots/slot-ex',     { schoolId: SCHULE, lehrerUid: EX });
+  await s('bookingLinks/' + LEHRER, { aktiv: true });
+  await s('bookingStudents/bs1', { lehrerUid: LEHRER, vorname: 'Lena' });
+  await s('bookingStudents/bs-fremd', { lehrerUid: SCHULE, vorname: 'Fremd' });
+  await s('accessCodes/CODE-OK', { schuelerName: 'Lena', expiresAt: Date.now() + 86400000 });
+});
+await pruefe('Angreifer legt eigenes Kalenderprofil an (eigene Schule) darf', async () => {
+  await assertSucceeds(setDoc(doc(als(ANGREIFER), 'kalenderUsers', ANGREIFER), { uid: ANGREIFER, schoolId: ANGREIFER }));
+});
+await pruefe('...Kalender-Schueler in der FREMDEN Schule anlegen darf NICHT', async () => {
+  await assertFails(setDoc(doc(als(ANGREIFER), 'schueler', 'kAngriff1'), { schoolId: SCHULE, lehrerUid: ANGREIFER, fname: 'X' }));
+});
+await pruefe('...Termin in den Kalender eines FREMDEN Lehrers schieben darf NICHT', async () => {
+  await assertFails(setDoc(doc(als(ANGREIFER), 'slots', 'slotAngriff1'), { schoolId: ANGREIFER, lehrerUid: LEHRER }));
+});
+await pruefe('...Theorie-Eintrag in der fremden Schule anlegen darf NICHT', async () => {
+  await assertFails(setDoc(doc(als(ANGREIFER), 'theorieStunden', 'thAngriff1'), { schoolId: SCHULE, lehrerUid: ANGREIFER, schuelerId: 'x' }));
+});
+await pruefe('...Notiz an einen Schueler der fremden Schule haengen darf NICHT', async () => {
+  await assertFails(setDoc(doc(als(ANGREIFER), 'notizen', 'nAngriff1'), { schoolId: SCHULE, lehrerUid: ANGREIFER, schuelerId: 'x', text: 'hallo' }));
+});
+await pruefe('...Pruefung in der fremden Schule eintragen darf NICHT', async () => {
+  await assertFails(setDoc(doc(als(ANGREIFER), 'pruefungen', 'pAngriff1'), { schoolId: SCHULE, eingetragenVon: ANGREIFER, schuelerId: 'x' }));
+});
+await pruefe('Dokument-Kennung mit HTML darin darf NICHT (landet in onclick)', async () => {
+  await assertFails(setDoc(doc(als(LEHRER), 'slots', '<img src=x onerror=alert(1)>'), { schoolId: SCHULE, lehrerUid: LEHRER }));
+});
+await pruefe('Eigenen Termin in eine FREMDE Schule umziehen darf NICHT', async () => {
+  await assertFails(updateDoc(doc(als(LEHRER), 'slots', 'slot-lehrer'), { schoolId: 'andere-schule' }));
+});
+await pruefe('Termin der Schule einem schulfremden Lehrer zuschieben darf NICHT', async () => {
+  await assertFails(updateDoc(doc(als(LEHRER), 'slots', 'slot-lehrer'), { lehrerUid: ANGREIFER }));
+});
+await pruefe('Ausgetretener Lehrer liest die Termine der Schule NICHT mehr', async () => {
+  await assertFails(getDoc(doc(als(EX), 'slots', 'slot-schule')));
+});
+await pruefe('...und listet die Kalenderprofile der Schule NICHT mehr', async () => {
+  await assertFails(getDocs(query(collection(als(EX), 'kalenderUsers'), where('schoolId', '==', SCHULE))));
+});
+
+console.log('\nGEGENPROBE — so schreiben kalender.html und index.html wirklich');
+await pruefe('Lehrer legt eigenen Termin in seiner Schule an', async () => {
+  await assertSucceeds(setDoc(doc(als(LEHRER), 'slots', 'Ab3dEf6hIj9kLm2nOp5q'), { schoolId: SCHULE, lehrerUid: LEHRER, type: 'normal' }));
+});
+await pruefe('Lehrer aendert eigenen Termin (gleiche Schule)', async () => {
+  await assertSucceeds(updateDoc(doc(als(LEHRER), 'slots', 'slot-lehrer'), { bookedBy: 'k1' }));
+});
+await pruefe('Inhaber legt einen Termin fuer einen Kollegen an', async () => {
+  await assertSucceeds(setDoc(doc(als(SCHULE), 'slots', 'slotFuerKollegen1'), { schoolId: SCHULE, lehrerUid: LEHRER }));
+});
+await pruefe('Inhaber uebertraegt einen Kalender-Schueler an einen Kollegen', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'schueler', 'kUebertrag'), { schoolId: SCHULE, lehrerUid: SCHULE, fname: 'Tom' });
+  });
+  await assertSucceeds(updateDoc(doc(als(SCHULE), 'schueler', 'kUebertrag'), { lehrerUid: LEHRER }));
+});
+await pruefe('Mitglied OHNE Kalenderprofil (nur Kartei) legt Schueler-Zwilling und Termin an', async () => {
+  await assertSucceeds(setDoc(doc(als(OHNE_KAL), 'schueler', 'kZwilling1'), { schoolId: SCHULE, lehrerUid: OHNE_KAL, fname: 'Lena', adkStudentId: 's-schule' }));
+  await assertSucceeds(setDoc(doc(als(OHNE_KAL), 'slots', 'slotKartei1'), { schoolId: SCHULE, lehrerUid: OHNE_KAL, bookedBy: 'kZwilling1' }));
+});
+await pruefe('Solo-Lehrer legt Termin unter eigener Kennung an', async () => {
+  await assertSucceeds(setDoc(doc(als(SOLO), 'slots', 'slotSolo1'), { schoolId: SOLO, lehrerUid: SOLO }));
+});
+await pruefe('Pruefung eintragen (ohne lehrerUid, mit eingetragenVon) darf', async () => {
+  await assertSucceeds(setDoc(doc(als(LEHRER), 'pruefungen', 'pruefung1'), { schoolId: SCHULE, eingetragenVon: LEHRER, schuelerId: 'k1', status: 'ausstehend' }));
+});
+await pruefe('Ausgetretener Lehrer behaelt seine EIGENEN Termine', async () => {
+  await assertSucceeds(getDoc(doc(als(EX), 'slots', 'slot-ex')));
+});
+
+console.log('\nOHNE LOGIN — Passwort-Hilfe, Buchungsseite, Schueler-Portal');
+const resetDaten = { username: 'max.muster', kontakt: '0170 1234567', status: 'offen', createdAt: Date.now() };
+await pruefe('Passwort-Hilfe mit automatisch vergebener Kennung darf', async () => {
+  await assertSucceeds(setDoc(doc(ohneAnmeldung(), 'passwordResets', 'Ab3dEf6hIj9kLm2nOp5q'), resetDaten));
+});
+await pruefe('...mit frei gewaehlter Kennung (HTML darin) darf NICHT', async () => {
+  await assertFails(setDoc(doc(ohneAnmeldung(), 'passwordResets', '<img src=x onerror=alert(1)>'), resetDaten));
+});
+const wl = (id, lehrerUid = LEHRER) => ({ lehrerUid, schuelerId: id, vorname: 'Lena', notiz: '', status: 'wartend', createdAt: Date.now() });
+await pruefe('Warteliste mit echtem Buchungslink darf', async () => {
+  await assertSucceeds(setDoc(doc(ohneAnmeldung(), 'bookingWaitlist', 'bs1'), wl('bs1')));
+});
+await pruefe('...mit erfundener Schueler-Kennung darf NICHT', async () => {
+  await assertFails(setDoc(doc(ohneAnmeldung(), 'bookingWaitlist', 'erfunden'), wl('erfunden')));
+});
+await pruefe('...mit dem Schueler eines ANDEREN Lehrers darf NICHT', async () => {
+  await assertFails(setDoc(doc(ohneAnmeldung(), 'bookingWaitlist', 'bs-fremd'), wl('bs-fremd')));
+});
+const anfrage = { lehrerUid: LEHRER, schuelerId: 'bs1', vorname: 'Lena', slotId: 's1', start: '2026-12-01T10:00', ende: '2026-12-01T10:45', status: 'angefragt', createdAt: Date.now() };
+await pruefe('Buchungsanfrage mit automatisch vergebener Kennung darf', async () => {
+  await assertSucceeds(setDoc(doc(ohneAnmeldung(), 'bookingRequests', 'Zz9yXx8wVv7uTt6sRr5q'), anfrage));
+});
+await pruefe('...mit frei gewaehlter Kennung darf NICHT', async () => {
+  await assertFails(setDoc(doc(ohneAnmeldung(), 'bookingRequests', "x');alert(1);('"), anfrage));
+});
+const nachricht = { lehrerUid: LEHRER, schuelerId: 'bs1', vorname: 'Lena', text: 'Hallo', status: 'neu', createdAt: Date.now() };
+await pruefe('Nachricht mit automatisch vergebener Kennung darf', async () => {
+  await assertSucceeds(setDoc(doc(ohneAnmeldung(), 'bookingMessages', 'Mm1nNo2pPq3rRs4tTu5v'), nachricht));
+});
+await pruefe('...mit frei gewaehlter Kennung darf NICHT', async () => {
+  await assertFails(setDoc(doc(ohneAnmeldung(), 'bookingMessages', 'kurz'), nachricht));
+});
+const token = (uid, extra) => ({ uid, rolle: 'schueler', ua: 'Test', createdAt: Date.now(), ...extra });
+await pruefe('Portal (anonym) meldet Push mit echtem Zugangscode an', async () => {
+  await assertSucceeds(setDoc(doc(anonym('portal-1'), 'fcmTokens', 'tok-portal-1'), token('portal-1', { codeId: 'CODE-OK' })));
+});
+await pruefe('...mit erfundenem Zugangscode darf NICHT', async () => {
+  await assertFails(setDoc(doc(anonym('portal-2'), 'fcmTokens', 'tok-portal-2'), token('portal-2', { codeId: 'GIBT-ES-NICHT' })));
+});
+await pruefe('...ganz ohne Zugangscode darf NICHT', async () => {
+  await assertFails(setDoc(doc(anonym('portal-3'), 'fcmTokens', 'tok-portal-3'), token('portal-3')));
+});
+await pruefe('Fahrlehrer (echtes Konto) meldet Push ohne Zugangscode an', async () => {
+  await assertSucceeds(setDoc(doc(als(LEHRER), 'fcmTokens', 'tok-lehrer-1'), { uid: LEHRER, ua: 'Test', createdAt: Date.now() }));
+});
+
 await testEnv.cleanup();
 console.log(`\n${bestanden} bestanden, ${fehlgeschlagen} fehlgeschlagen\n`);
 process.exit(fehlgeschlagen > 0 ? 1 : 0);

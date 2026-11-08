@@ -23,6 +23,10 @@ concurrency:
   group: webhooks-einrichten
   cancel-in-progress: false
 
+# Nur lesen - wie beim Deployen.
+permissions:
+  contents: read
+
 jobs:
   webhooks:
     # Nur vom Stand auf main - wie beim Deployen.

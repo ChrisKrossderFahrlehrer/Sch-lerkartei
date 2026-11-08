@@ -316,8 +316,13 @@ exports.syncSlotToGoogleCalendar = onDocumentUpdated({ document: 'slots/{slotId}
         // nicht vorname/nachname (das ist nur in der ADK-Kartei so) -
         // dadurch blieb der Name im Google-Kalender-Titel bisher leer.
         const scSnap = await getFirestore().collection('schueler').doc(after.bookedBy).get();
-        if (scSnap.exists) {
-          const name = `${(scSnap.data().fname || '')} ${(scSnap.data().lname || '')}`.trim();
+        // Nur Schueler derselben Fahrschule bzw. desselben Fahrlehrers: Sonst
+        // liesse sich mit einer fremden Schueler-ID dessen Name in den eigenen
+        // Google-Kalender holen.
+        const sc = scSnap.exists ? scSnap.data() : null;
+        const passt = sc && ((sc.schoolId && sc.schoolId === after.schoolId) || (sc.lehrerUid && sc.lehrerUid === after.lehrerUid));
+        if (passt) {
+          const name = `${(sc.fname || '')} ${(sc.lname || '')}`.trim();
           if (name) titel = `Fahrstunde – ${name}`;
         }
       } catch (e) { /* Titel-Fallback reicht */ }
@@ -1251,7 +1256,16 @@ exports.syncBookedCount = onDocumentUpdated('slots/{slotId}', async (event) => {
         const ref = db.doc(`schueler/${schuelerId}`);
         const snap = await tx.get(ref);
         if (!snap.exists) return null;
-        const wert = Math.max(0, (snap.data().bookedCount || 0) + delta);
+        // Nur Schueler, die zum Termin passen (gleiche Schule oder gleicher
+        // Fahrlehrer). Sonst konnte ein beliebiger Termin mit einer fremden
+        // Schueler-ID deren Fahrstunden-Zaehler veraendern.
+        const sc = snap.data();
+        const slot = delta < 0 ? vorher : nachher;
+        const passt = (!sc.schoolId && !sc.lehrerUid)
+          || (sc.schoolId && sc.schoolId === slot.schoolId)
+          || (sc.lehrerUid && sc.lehrerUid === slot.lehrerUid);
+        if (!passt) return null;
+        const wert = Math.max(0, (Number(sc.bookedCount) || 0) + delta);
         tx.update(ref, { bookedCount: wert });
         return wert;
       });
