@@ -552,7 +552,8 @@ html { overscroll-behavior-y: contain; }
 <script type="module">
 import { initializeApp }                                         from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-         signOut, onAuthStateChanged, updateProfile }            from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+         signOut, onAuthStateChanged, updateProfile,
+         initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, enableIndexedDbPersistence,
          collection, doc, addDoc, updateDoc, deleteDoc,
          getDoc, getDocs, setDoc,
@@ -570,7 +571,15 @@ const firebaseConfig = {
 };
 
 const app  = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+// Anmeldung OHNE Popup-/Redirect-Helfer starten. getAuth() haengt im Browser
+// automatisch einen Helfer fuer Google-Popup-Anmeldungen an, den die App gar
+// nicht nutzt. Auf iPhone, iPad, Android und in Safari laedt das SDK dafuer
+// VOR der ersten Anmelde-Rueckmeldung ein Skript von apis.google.com samt
+// unsichtbarem iframe. Antwortet apis.google.com langsam oder gar nicht,
+// bleibt die App beim Logo stehen bzw. zeigt den Login, obwohl man
+// angemeldet ist. Gleiche Speicher-Reihenfolge wie bisher (IndexedDB, dann
+// localStorage, dann Sitzung) - bestehende Anmeldungen bleiben erhalten.
+const auth = initializeAuth(app, { persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence] });
 const db   = getFirestore(app);
 
 window.__adkLoaded = true; // Signal an HTML-Notbremse: Firebase-Modul läuft
@@ -830,6 +839,9 @@ window.doLogout = async () => {
   if (unsubAlleLehrer)  { unsubAlleLehrer();  unsubAlleLehrer = null; }
   if (unsubLehrer)      { unsubLehrer();      unsubLehrer = null; }
   currentUser = null; currentProfil = null;
+  // Selbst abgemeldet: Die Kartei soll beim naechsten Start nicht auf eine
+  // gespeicherte Anmeldung warten (siehe index.html, fs_zuletzt_angemeldet).
+  try { localStorage.removeItem('fs_zuletzt_angemeldet'); } catch(e) {}
   try { await signOut(auth); } catch(e) { console.error('doLogout:', e); }
 };
 
@@ -952,7 +964,7 @@ function renderAlleNutzer() {
   // Diagnose-Rohdaten (alle users) — einklappbar
   const rohUsers = window.__alleUsers || [];
   const rohListe = rohUsers.map(u =>
-    '• <b>' + esc(u.name||'?') + '</b> — typ:' + (u.typ||'(kein)') + ' · rolle:' + (u.rolle||'(keine)') + ' · status:' + (u.status||'(kein)') + ' · email:' + esc(u.email||'?')
+    '• <b>' + esc(u.name||'?') + '</b> — typ:' + esc(u.typ||'(kein)') + ' · rolle:' + esc(u.rolle||'(keine)') + ' · status:' + esc(u.status||'(kein)') + ' · email:' + esc(u.email||'?')
   ).join('<br>');
 
   // ── Nachfassen: wer braucht Aufmerksamkeit? ──
@@ -1050,7 +1062,7 @@ function renderLehrer() {
       + '<div style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:3px;left:'+(l.werbefrei ? '23px' : '3px')+';transition:left .15s"></div></div>'
       + '</div>';
     const loeschBtn = '<div style="margin-top:8px">'
-      + '<button id="btn-del-lehrer-'+l.id+'" data-armed="0" onclick="deleteLehrerComplete(\''+l.id+'\',\''+(name||'Fahrlehrer').replace(/'/g,'')+'\')" style="width:100%;background:transparent;border:1px solid var(--danger);color:var(--danger);border-radius:8px;padding:7px;font-size:0.74rem;font-weight:700;cursor:pointer">🗑️ Löschen</button>'
+      + '<button id="btn-del-lehrer-'+l.id+'" data-armed="0" onclick="deleteLehrerComplete(\''+attrJs(l.id)+'\',\''+attrJs(l.name||'Fahrlehrer')+'\')" style="width:100%;background:transparent;border:1px solid var(--danger);color:var(--danger);border-radius:8px;padding:7px;font-size:0.74rem;font-weight:700;cursor:pointer">🗑️ Löschen</button>'
       + '</div>';
     return '<div class="list-item" style="'+(l.status==='ausstehend'?'border:1px solid rgba(240,180,41,0.3);background:rgba(240,180,41,0.04)':'')+'">'
       + '<div class="list-avatar" style="background:#58a6ff20;color:#58a6ff">'+initial+'</div>'
@@ -1242,7 +1254,7 @@ async function renderAnalytics() {
           <div style="display:grid;grid-template-columns:1fr auto auto auto auto auto;gap:0;padding:10px 12px;border-bottom:1px solid var(--border);font-size:0.82rem;align-items:center">
             <div>
               <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px">${escHtml(fs.name)}</div>
-              <div style="font-size:0.68rem;color:var(--muted)">${fs.stadt}</div>
+              <div style="font-size:0.68rem;color:var(--muted)">${escHtml(fs.stadt)}</div>
             </div>
             <span style="text-align:center;color:var(--blue);font-weight:700">${fs.anzahlLehrer}</span>
             <span style="text-align:center;color:var(--accent2);font-weight:700">${fs.anzahlAktiv}</span>
@@ -1314,7 +1326,7 @@ async function renderAbos() {
       const abo     = fs.abo || 'free';
       const expiry  = fs.aboExpiry ? new Date(fs.aboExpiry).toLocaleDateString('de-DE') : '–';
       const created = fs.createdAt ? new Date(fs.createdAt).toLocaleDateString('de-DE') : '–';
-      const ppId    = fs.aboPaypalId ? `<span style="font-size:0.6rem;color:var(--muted)">${fs.aboPaypalId.substring(0,16)}…</span>` : '';
+      const ppId    = fs.aboPaypalId ? `<span style="font-size:0.6rem;color:var(--muted)">${escHtml(fs.aboPaypalId.substring(0,16))}…</span>` : '';
       return `
         <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px">
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
@@ -1990,7 +2002,7 @@ function renderSuperadmin() {
             + '<div style="font-weight:700;font-size:0.85rem">👤 ' + un + '</div>'
             + '<div style="font-size:0.75rem;color:var(--muted);margin-top:2px">📞 ' + ko + ' · ' + datum + '</div>'
             + '</div>'
-            + '<button onclick="resolvePwReset(\'' + r.id + '\')" style="background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.4);color:var(--accent2);border-radius:8px;padding:6px 10px;font-size:0.7rem;font-weight:700;cursor:pointer;white-space:nowrap">✓ Erledigt</button>'
+            + '<button onclick="resolvePwReset(\'' + attrJs(r.id) + '\')" style="background:rgba(63,185,80,0.15);border:1px solid rgba(63,185,80,0.4);color:var(--accent2);border-radius:8px;padding:6px 10px;font-size:0.7rem;font-weight:700;cursor:pointer;white-space:nowrap">✓ Erledigt</button>'
             + '</div>';
         }).join('')
       + '<a href="https://console.firebase.google.com/project/fahrschule-ebc65/authentication/users" target="_blank" rel="noopener noreferrer" '
@@ -2012,9 +2024,9 @@ function renderSuperadmin() {
           : fs.status==='gesperrt'
           ? '<span class="badge badge-red">🚫 Gesperrt</span>'
           : '<span class="badge badge-yellow">⏳ Ausstehend</span>';
-        var initial = (fs.name||'?')[0].toUpperCase();
+        var initial = escHtml((fs.name||'?')[0].toUpperCase());
         var colors  = ['#f0b429','#3fb950','#58a6ff','#bc8cff'];
-        var color   = colors[fs.name.charCodeAt(0) % colors.length];
+        var color   = colors[(fs.name||'?').charCodeAt(0) % colors.length];
         var created = fs.createdAt ? new Date(fs.createdAt).toLocaleDateString('de-DE') : '';
         var actionBtns = fs.status==='ausstehend'
           ? '<div style="display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'
@@ -2026,9 +2038,9 @@ function renderSuperadmin() {
         return '<div class="list-item" onclick="openFsDetail(\''+fs.id+'\')" style="'+borderStyle+'">'
           +'<div class="list-avatar" style="background:'+color+'20;color:'+color+'">'+initial+'</div>'
           +'<div class="list-info" style="flex:1">'
-          +'<div class="list-name">'+fs.name+'</div>'
-          +'<div class="list-sub">'+(fs.inhaber||'')+' · '+(fs.stadt||'')+' · '+created+'</div>'
-          +'<div class="list-sub" style="color:var(--muted)">'+(fs.email||'')+'</div>'
+          +'<div class="list-name">'+escHtml(fs.name)+'</div>'
+          +'<div class="list-sub">'+escHtml(fs.inhaber)+' · '+escHtml(fs.stadt)+' · '+created+'</div>'
+          +'<div class="list-sub" style="color:var(--muted)">'+escHtml(fs.email)+'</div>'
           +'<div class="list-sub" style="color:var(--blue)">👥 '+alleFahrlehrer.filter(function(l){return l.fahrschuleId===fs.id;}).length+' Lehrer</div>'
           +actionBtns
           +'</div>'
@@ -2051,9 +2063,9 @@ window.openFsDetail = (fsId) => {
     <div style="text-align:center;margin-bottom:12px">${logoHTML}</div>
     <div style="margin-bottom:16px">
       <div style="display:flex;flex-direction:column;gap:8px;font-size:0.88rem">
-        <div><span style="color:var(--muted)">Inhaber:</span> <strong>${fs.inhaber}</strong></div>
+        <div><span style="color:var(--muted)">Inhaber:</span> <strong>${escHtml(fs.inhaber)}</strong></div>
         <div><span style="color:var(--muted)">E-Mail:</span> ${escHtml(fs.email)}</div>
-        <div><span style="color:var(--muted)">Stadt:</span> ${fs.stadt}</div>
+        <div><span style="color:var(--muted)">Stadt:</span> ${escHtml(fs.stadt)}</div>
         <div><span style="color:var(--muted)">Registriert:</span> ${new Date(fs.createdAt).toLocaleDateString('de-DE')}</div>
         <div><span style="color:var(--muted)">Status:</span> <strong style="color:${fs.status==='aktiv'?'var(--accent2)':fs.status==='gesperrt'?'var(--danger)':'var(--accent)'}">${fs.status}</strong></div>
       </div>
@@ -2256,7 +2268,7 @@ function zeigeUndoBalken(text, backup, nachAblaufCallback) {
   bar.style.cssText = 'position:fixed;left:50%;bottom:24px;z-index:99999;'
     + 'background:#1c2128;border:1px solid var(--border);border-radius:12px;padding:12px 16px;'
     + 'display:flex;align-items:center;gap:14px;box-shadow:0 8px 28px rgba(0,0,0,0.5);max-width:90vw';
-  bar.innerHTML = `<span style="font-size:0.85rem;color:var(--text)">${text}</span>`
+  bar.innerHTML = `<span style="font-size:0.85rem;color:var(--text)">${escHtml(text)}</span>`
     + `<button id="undo-btn" style="background:var(--accent);color:#0d1117;border:none;border-radius:8px;padding:7px 14px;font-size:0.82rem;font-weight:700;cursor:pointer;white-space:nowrap">↩️ Rückgängig</button>`;
   document.body.appendChild(bar);
 
@@ -2379,8 +2391,8 @@ async function renderFsAdmin() {
       <div class="card">
         <div style="display:flex;flex-direction:column;gap:10px;font-size:0.88rem">
           <div><span style="color:var(--muted)">Name:</span> <strong>${escHtml(fs.name)}</strong></div>
-          <div><span style="color:var(--muted)">Inhaber:</span> ${fs.inhaber}</div>
-          <div><span style="color:var(--muted)">Stadt:</span> ${fs.stadt}</div>
+          <div><span style="color:var(--muted)">Inhaber:</span> ${escHtml(fs.inhaber)}</div>
+          <div><span style="color:var(--muted)">Stadt:</span> ${escHtml(fs.stadt)}</div>
           <div><span style="color:var(--muted)">Status:</span> <span class="badge badge-green">✅ Aktiv</span></div>
         </div>
       </div>

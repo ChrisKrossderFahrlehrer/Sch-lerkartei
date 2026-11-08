@@ -35,6 +35,12 @@ concurrency:
   group: deploy-${{ github.ref }}
   cancel-in-progress: false
 
+# Der Ablauf liest das Repo nur. Ohne diese Zeile bekaeme er die
+# Standardrechte (je nach Einstellung auch Schreibrechte am Repo) - ein
+# kompromittiertes Testpaket koennte damit Code auf main schieben.
+permissions:
+  contents: read
+
 jobs:
   pruefen-und-deployen:
     runs-on: ubuntu-latest
@@ -43,6 +49,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          # Kein git push in diesem Ablauf - der Zugangsschluessel muss nach
+          # dem Auschecken nicht auf der Platte liegen bleiben.
+          persist-credentials: false
           # Volle Historie. Mit einer flachen Kopie (fetch-depth: 2) fehlt bei
           # einem Push mit mehreren Commits der Vergleichspunkt - der
           # Vergleich unten schlüge fehl und es würde sicherheitshalber ALLES

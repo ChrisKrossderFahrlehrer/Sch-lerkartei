@@ -502,10 +502,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 
 <script type="module">
 import { initializeApp }    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getAuth, initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getMessaging, getToken, isSupported } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
-import { getFirestore, doc, getDoc, onSnapshot, updateDoc }
+// FIX: setDoc/deleteDoc fehlten im Import - das Speichern des Push-Geraets
+// scheiterte mit "setDoc is not defined", kein Schueler bekam je eine
+// Benachrichtigung (Chat, Fahrstunden-Erinnerung).
+import { getFirestore, doc, getDoc, onSnapshot, updateDoc, setDoc, deleteDoc }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js';
 
@@ -519,6 +522,15 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+// Anmeldung OHNE Popup-/Redirect-Helfer starten. getAuth() haengt im Browser
+// automatisch einen Helfer fuer Google-Popup-Anmeldungen an, den die App gar
+// nicht nutzt. Auf iPhone, iPad, Android und in Safari laedt das SDK dafuer
+// VOR der ersten Anmelde-Rueckmeldung ein Skript von apis.google.com samt
+// unsichtbarem iframe. Antwortet apis.google.com langsam oder gar nicht,
+// bleibt die App beim Logo stehen bzw. zeigt den Login, obwohl man
+// angemeldet ist. Gleiche Speicher-Reihenfolge wie bisher (IndexedDB, dann
+// localStorage, dann Sitzung) - bestehende Anmeldungen bleiben erhalten.
+initializeAuth(app, { persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence] });
 const db  = getFirestore(app);
 const fns = getFunctions(app, 'europe-west3');
 
@@ -746,6 +758,16 @@ window.portalHelp = () => { document.getElementById('portal-help-overlay').style
 
 window.doLogout = () => {
   if (unsubLive) { unsubLive(); unsubLive = null; }
+  // Push-Registrierung dieses Geraets entfernen: Sonst kaemen auf einem
+  // geteilten Geraet (Familien-Tablet) nach dem Abmelden weiter Chat-
+  // Hinweise und Fahrstunden-Erinnerungen des abgemeldeten Schuelers an.
+  try {
+    const tok = localStorage.getItem('portal_fcm_tok');
+    if (tok) {
+      deleteDoc(doc(db, 'fcmTokens', tok)).catch(e => console.warn('Push-Abmeldung:', e));
+      localStorage.removeItem('portal_fcm_tok');
+    }
+  } catch(e) {}
   sessionStorage.removeItem('adk_portal_code_doc');
   try { localStorage.removeItem('adk_portal_code_doc'); } catch(e) {}
   codeDocId = null; codeData = null;
@@ -1234,6 +1256,9 @@ const MANGEL_TIPPS = {
   'lenken & spurhalten': 'Weit vorausschauen, nicht auf die Motorhaube. Die Hände bleiben auf „Viertel vor drei". Wo du hinschaust, fährst du hin.',
   'fußgänger beachten': 'Am Zebrastreifen und beim Abbiegen haben Fußgänger Vorrang. Blickkontakt suchen, besonders bei Kindern und älteren Menschen bremsbereit sein.',
   'licht & signale': 'Rechtzeitig blinken, bevor du bremst. Bei Dämmerung früh Licht an. Warnblinker beim Stauende oder wenn du liegen bleibst.',
+  'einparken': 'Ganz langsam fahren, Kupplung schleifen lassen. Erst schauen, dann lenken: Schulterblick und Spiegel, bevor du losrollst. Lieber einmal korrigieren als anstoßen.',
+  'umkehren': 'Nur wo es erlaubt und gut zu überblicken ist. Vorher in alle Richtungen schauen, auch nach Fußgängern und Radfahrern, und langsam bleiben.',
+  'rückwärtsfahren': 'Schrittgeschwindigkeit, Kupplung schleifen lassen. Zum Zurückschauen über die Schulter drehen und immer wieder in beide Außenspiegel sehen. Kleine Lenkbewegungen reichen.',
 };
 function mangelSchluessel(m) {
   return String(m || '').replace(/^[^A-Za-zÄÖÜäöüß]+/, '').trim().toLowerCase();
@@ -1518,6 +1543,8 @@ window.portalPushAktivieren = async () => {
       ua:        navigator.userAgent.slice(0, 120),
       createdAt: Date.now()
     });
+    // Merken, damit das Abmelden dieses Geraet wieder austragen kann
+    try { localStorage.setItem('portal_fcm_tok', tok); } catch(e) {}
     portalToast('🔔 Aktiviert: Nachrichten und eine Erinnerung vor deinen Fahrstunden.');
   } catch (e) {
     console.warn('portalPushAktivieren:', e);
@@ -1578,12 +1605,14 @@ window.sendeSchuelerBild = async (datei) => {
 
 // ══ THEORIE-WISSEN: kompaktes Nachschlagewerk (Kundenwunsch) ══════
 // Inhalte sorgfaeltig recherchiert und mehrfach quellenmaessig
-// gegengeprueft (Bremsformeln nach ADAC-Faustformel, Buhgeldbetraege
-// nach BKatV 2026, Promillegrenzen nach §24c StVG). Bewusst kompakt und
+// gegengeprueft (Bremsformeln nach ADAC-Faustformel, Bussgeldbetraege
+// nach BKatV Tabelle 1c, Alkohol/Cannabis nach §§ 24a, 24c StVG,
+// Grundfahraufgaben nach Anlage 7 FeV, Fristen nach § 18 FeV; zuletzt
+// unabhaengig nachgeprueft 11/2026). Bewusst kompakt und
 // in einfacher Sprache - kein Ersatz fuer den eigentlichen Theorieunterricht,
 // sondern eine schnelle Gedaechtnisstuetze.
 // ── VERKEHRSZEICHEN-KATALOG ────────────────────────────────────
-// Alle amtlichen Zeichen zum Nachschlagen - BEWUSST unabhaengig vom
+// Wichtige amtliche Zeichen zum Nachschlagen - BEWUSST unabhaengig vom
 // Lernstand. Vorher verwies der Theorie-Bereich auf "deinen
 // Ausbildungsstand": Dort sieht der Schueler aber nur die Zeichen, die sein
 // Fahrlehrer schon bewertet hat. Wer ein Zeichen nachschlagen will, das noch
@@ -1619,20 +1648,20 @@ const ZEICHEN_KATALOG = {
     '117-10':['Seitenwind','gefahr'],
     '120':['Verengte Fahrbahn','gefahr'],
     '121-10':['Einseitig verengte Fahrbahn','gefahr'],
-    '123':['Baustelle','gefahr'],
+    '123':['Arbeitsstelle (Baustelle)','gefahr'],
     '124':['Stau','gefahr'],
-    '131':['Ampel','gefahr'],
+    '131':['Lichtzeichenanlage (Ampel)','gefahr'],
     '133-10':['Fußgänger','gefahr'],
     '136-10':['Kinder','gefahr'],
     '138-10':['Radverkehr','gefahr'],
     '142-10':['Wildwechsel','gefahr'],
     '151':['Bahnübergang','gefahr'],
-    '209-10':['Vorgeschriebene Fahrtrichtung rechts','gebot'],
-    '211-10':['Hier rechts','gebot'],
-    '214-10':['Geradeaus oder rechts','gebot'],
+    '209-10':['Vorgeschriebene Fahrtrichtung links','gebot'],
+    '211-10':['Hier links','gebot'],
+    '214-10':['Geradeaus oder links','gebot'],
     '215':['Kreisverkehr','gebot'],
     '220-10':['Einbahnstraße','gebot'],
-    '222-10':['Vorbeifahrt rechts','gebot'],
+    '222-10':['Vorbeifahrt links','gebot'],
     '237':['Radweg','gebot'],
     '239':['Gehweg','gebot'],
     '240':['Gemeinsamer Geh- und Radweg','gebot'],
@@ -1650,7 +1679,7 @@ const ZEICHEN_KATALOG = {
     '265':['Höchsthöhe','verbot'],
     '266':['Höchstlänge','verbot'],
     '267':['Verbot der Einfahrt','verbot'],
-    '268':['Schneeketten vorgeschrieben','verbot'],
+    '268':['Schneeketten vorgeschrieben','gebot'],
     '272':['Wendeverbot','verbot'],
     '274-50':['Zulässige Höchstgeschwindigkeit','verbot'],
     '274_1':['Beginn Tempo-30-Zone','verbot'],
@@ -1662,7 +1691,7 @@ const ZEICHEN_KATALOG = {
     '282':['Ende sämtlicher Streckenverbote','verbot'],
     '283':['Absolutes Haltverbot','verbot'],
     '286':['Eingeschränktes Haltverbot','verbot'],
-    '290_1':['Beginn Haltverbotszone','verbot'],
+    '290_1':['Beginn eingeschränktes Haltverbot (Zone)','verbot'],
     '301':['Einmalige Vorfahrt','richt'],
     '306':['Vorfahrtstraße','richt'],
     '307':['Ende der Vorfahrtstraße','richt'],
@@ -1679,21 +1708,21 @@ const ZEICHEN_KATALOG = {
     '331_2':['Ende der Kraftfahrstraße','richt'],
     '350-10':['Fußgängerüberweg','richt'],
     '354':['Wasserschutzgebiet','richt'],
-    '405':['Autobahn-Knotenpunkt','wegweiser'],
-    '406-50':['Knotenpunktstafel Autobahn','wegweiser'],
-    '410':['Wegweiser zur Autobahn','wegweiser'],
-    '415-10':['Vorwegweiser Bundesstraße','wegweiser'],
-    '418-10':['Vorwegweiser außerorts','wegweiser'],
-    '430-10':['Vorwegweiser zur Autobahn','wegweiser'],
-    '434-50':['Wegweisertafel Landstraße','wegweiser'],
-    '437':['Straßennamensschild','wegweiser'],
-    '438':['Vorwegweiser Landstraße','wegweiser'],
-    '439':['Wegweiser Landstraße','wegweiser'],
-    '440':['Vorwegweiser Autobahn','wegweiser'],
-    '441':['Wegweiser Autobahn','wegweiser'],
+    '405':['Autobahnnummer','wegweiser'],
+    '406-50':['Knotenpunktnummer (Autobahn)','wegweiser'],
+    '410':['Europastraße','wegweiser'],
+    '415-10':['Pfeilwegweiser auf Bundesstraßen','wegweiser'],
+    '418-10':['Pfeilwegweiser auf sonstigen Straßen','wegweiser'],
+    '430-10':['Pfeilwegweiser zur Autobahn','wegweiser'],
+    '434-50':['Tabellenwegweiser','wegweiser'],
+    '437':['Straßennamenschild','wegweiser'],
+    '438':['Vorwegweiser','wegweiser'],
+    '439':['Gegliederter Vorwegweiser','wegweiser'],
+    '440':['Vorwegweiser zur Autobahn','wegweiser'],
+    '441':['Gegliederter Vorwegweiser zur Autobahn','wegweiser'],
     '442-10':['Vorwegweiser für bestimmte Verkehrsarten','wegweiser'],
-    '448':['Ausfahrttafel Autobahn','wegweiser'],
-    '449':['Ankündigungstafel Autobahn','wegweiser'],
+    '448':['Ankündigungstafel (Autobahn)','wegweiser'],
+    '449':['Vorwegweiser auf Autobahnen','wegweiser'],
     '453':['Entfernungstafel Autobahn','wegweiser'],
     '454-10':['Umleitungswegweiser','wegweiser'],
     // Zusatzzeichen - selbst gezeichnet (werkzeug/zusatzzeichen-zeichnen.py),
@@ -1738,12 +1767,12 @@ const THEORIE_WISSEN = [
       <p style="color:var(--muted);font-size:0.85rem">Bei einer <b>Gefahrenbremsung</b> (Vollbremsung) wird der Bremsweg nur halb so lang gerechnet: <code>(km/h ÷ 10)² ÷ 2</code>.</p>`
   },
   {
-    icon: '🍺', titel: 'Promillegrenzen',
+    icon: '🍺', titel: 'Alkohol und Cannabis',
     html: `
-      <p><b>0,0 ‰</b> – für Fahranfänger in der Probezeit und alle unter 21 Jahren. Absolutes Alkoholverbot, egal wie wenig.</p>
-      <p><b>0,5 ‰</b> – für alle anderen Fahrer die allgemeine Grenze.</p>
-      <p style="color:var(--muted);font-size:0.85rem">Verstößt du als Fahranfänger gegen die 0,0-‰-Grenze: 250 € Bußgeld, 1 Punkt, Probezeit verlängert sich auf 4 Jahre, zusätzlich ein Aufbauseminar.</p>
-      <p style="color:var(--muted);font-size:0.85rem">Ab 1,1 ‰ gilt es als Straftat, nicht mehr nur als Ordnungswidrigkeit.</p>`
+      <p><b>0,0 ‰ und kein Cannabis</b> – solange du in der Probezeit oder unter 21 bist. Auch Reste vom Vorabend zählen.</p>
+      <p><b>Für alle anderen:</b> ab 0,5 ‰ oder ab 3,5 ng/ml THC im Blut gibt es 500 € Bußgeld, 2 Punkte und 1 Monat Fahrverbot.</p>
+      <p style="color:var(--muted);font-size:0.85rem">Verstößt du als Fahranfänger gegen das Verbot: 250 € Bußgeld, 1 Punkt, ein Aufbauseminar, und die Probezeit verlängert sich auf 4 Jahre.</p>
+      <p style="color:var(--muted);font-size:0.85rem">Fährst du schon ab 0,3 ‰ unsicher oder baust einen Unfall, ist das eine Straftat. Ab 1,1 ‰ ist es immer eine.</p>`
   },
   {
     icon: '📏', titel: 'Sicherheitsabstand',
@@ -1756,9 +1785,9 @@ const THEORIE_WISSEN = [
     icon: '🔀', titel: 'Vorfahrt & Kreisverkehr',
     html: `
       <p><b>Rechts vor links</b> gilt nur, wenn kein Schild, keine Ampel und keine Polizei die Vorfahrt regeln.</p>
-      <p><b>Keine Rechts-vor-links-Regel</b> gilt u.a.: bei Ein-/Ausfahrt aus einem verkehrsberuhigten Bereich, aus einem Feld-/Waldweg, oder wenn Schilder/Ampeln die Vorfahrt schon regeln.</p>
+      <p><b>Kein Rechts vor links</b>, wenn du aus einem verkehrsberuhigten Bereich, aus einer Fußgängerzone, von einem Parkplatz, aus einer Einfahrt oder über einen abgesenkten Bordstein auf die Straße fährst. Dann lässt du alle durch. Wer aus einem Feld- oder Waldweg kommt, muss ebenfalls warten.</p>
       <p><b>Im Kreisverkehr</b> (mit Schild „Kreisverkehr"): Wer schon im Kreis fährt, hat Vorfahrt. Einfahrende müssen warten, egal ob von rechts oder nicht.</p>
-      <p style="color:var(--muted);font-size:0.85rem">Blinken beim Einfahren in den Kreisverkehr ist nicht Pflicht – beim Ausfahren aber schon.</p>`
+      <p style="color:var(--muted);font-size:0.85rem"><b>Blinken:</b> Beim Einfahren in den Kreisverkehr darfst du nicht blinken. Beim Ausfahren musst du rechts blinken.</p>`
   },
   {
     icon: '💶', titel: 'Bußgeldkatalog (Auswahl)',
@@ -1766,15 +1795,17 @@ const THEORIE_WISSEN = [
       <p><b>Handy am Steuer:</b> 100 € + 1 Punkt</p>
       <p><b>Rotlichtverstoß einfach:</b> 90 € + 1 Punkt</p>
       <p><b>Rotlichtverstoß qualifiziert</b> (länger als 1 Sek. rot): 200 € + 2 Punkte + 1 Monat Fahrverbot</p>
-      <p><b>Geschwindigkeit innerorts</b> ab 21 km/h zu schnell: 80 € + 1 Punkt</p>
-      <p style="color:var(--muted);font-size:0.85rem">Ein Fahrverbot droht i.d.R. ab 21 km/h innerorts bzw. 41 km/h außerorts zu schnell.</p>
-      <p style="color:var(--muted);font-size:0.72rem">Werte nach Bußgeldkatalog-Verordnung (BKatV) 2026, ohne Gewähr – bei Rechtsfragen bitte deinen Fahrlehrer fragen.</p>`
+      <p><b>Innerorts 21–25 km/h zu schnell:</b> 115 € + 1 Punkt</p>
+      <p style="color:var(--muted);font-size:0.85rem">Fahrverbot gibt es meist ab 31 km/h zu viel innerorts und ab 41 km/h außerorts – oder wenn du in einem Jahr zweimal 26 km/h oder mehr zu schnell warst.</p>
+      <p style="color:var(--muted);font-size:0.72rem">Werte für Pkw nach Bußgeldkatalog-Verordnung (BKatV), Stand November 2026, ohne Gewähr – bei Rechtsfragen bitte deinen Fahrlehrer fragen.</p>`
   },
   {
     icon: '🎯', titel: 'Praktische Prüfung',
     html: `
       <p><b>Mitbringen:</b> Personalausweis oder Reisepass. Wenn du eine Brille oder Kontaktlinsen brauchst (Eintrag im Antrag), unbedingt tragen.</p>
-      <p><b>Ablauf:</b> Der Prüfer begrüßt dich, prüft deinen Ausweis und stellt Fragen zur Technik (Abfahrtkontrolle). Dann fährst du innerorts, außerorts und meist auch auf der Autobahn. Dazwischen kommen Grundfahraufgaben, zum Beispiel Einparken.</p>
+      <p><b>Ablauf:</b> Der Prüfer begrüßt dich, prüft deinen Ausweis und lässt dich ein paar Dinge am Auto prüfen, zum Beispiel Licht oder Reifen. Dann fährst du innerorts, außerorts und meist auch auf der Autobahn. Dazwischen kommen Grundfahraufgaben, zum Beispiel Einparken.</p>
+      <p><b>Dauer:</b> Klasse B mindestens 55 Minuten, davon mindestens 30 Minuten reine Fahrzeit.</p>
+      <p><b>Fristen:</b> Die praktische Prüfung muss innerhalb von 12 Monaten nach der bestandenen Theorieprüfung sein. Nicht bestanden? Wiederholen kannst du in der Regel frühestens nach 2 Wochen.</p>
       <p><b>Ansagen:</b> Der Prüfer sagt dir rechtzeitig, wohin es geht. Fährst du falsch, ist das allein kein Fehler. Bleib ruhig und fahr sicher weiter.</p>
       <p><b>Häufige Gründe zum Durchfallen:</b></p>
       <ul style="margin:0 0 10px 18px;padding:0">
@@ -1789,6 +1820,8 @@ const THEORIE_WISSEN = [
   {
     icon: '🅿️', titel: 'Grundfahraufgaben',
     html: `
+      <p>In der Prüfung (Klasse B) fährst du <b>3 Aufgaben</b>: rückwärts längs einparken <b>oder</b> rückwärts nach rechts um eine Ecke. Dazu kommen 2 aus: Umkehren, quer oder schräg einparken, Gefahrbremsung.</p>
+      <p><b>Rückwärts um die Ecke:</b> Nah am rechten Rand zurückrollen. An der Ecke langsam einlenken und viel nach hinten rechts schauen. Am Ende stehst du gerade und nah am Rand.</p>
       <p><b>Rückwärts einparken (längs):</b> Neben das vordere Auto stellen, etwa einen halben bis einen Meter Abstand. Schulterblick, langsam zurück. Wenn dein Heck auf Höhe von dessen Stoßstange ist, voll einschlagen. Bei etwa 45 Grad gerade stellen, zurückrollen, dann voll gegenlenken.</p>
       <p><b>Quer einparken:</b> Weit genug ausholen, damit du gerade in die Lücke kommst. Langsam fahren und beide Seiten im Blick behalten, lieber einmal korrigieren als anstoßen.</p>
       <p><b>Umkehren:</b> Nur wo es erlaubt und übersichtlich ist. Vorher in alle Richtungen schauen, auch nach Fußgängern und Radfahrern.</p>
@@ -1796,8 +1829,9 @@ const THEORIE_WISSEN = [
       <p style="color:var(--muted);font-size:0.85rem">Jede Fahrschule zeigt eigene Merkpunkte am Auto. Richte dich nach dem, was dein Fahrlehrer dir zeigt.</p>`
   },
   {
-    icon: '🔧', titel: 'Abfahrtkontrolle',
+    icon: '🔧', titel: 'Auto-Check vor der Fahrt',
     html: `
+      <p style="color:var(--muted);font-size:0.85rem">In der Prüfung (Klasse B) heißt das Sicherheitskontrolle: Der Prüfer lässt dich ein paar dieser Punkte prüfen.</p>
       <p><b>Reifen:</b> Gesetzlich mindestens 1,6 mm Profil. Den richtigen Luftdruck findest du meist im Tankdeckel oder an der Fahrertür.</p>
       <p><b>Licht:</b> Abblendlicht, Fernlicht, Blinker, Bremslicht, Rückfahrlicht, Nebelschlussleuchte, Warnblinker.</p>
       <p><b>Unter der Motorhaube:</b> Motoröl (Messstab zwischen Min und Max), Kühlmittel, Bremsflüssigkeit, Scheibenwaschwasser.</p>
@@ -1808,22 +1842,24 @@ const THEORIE_WISSEN = [
     icon: '🔰', titel: 'Probezeit',
     html: `
       <p>Die Probezeit dauert <b>2 Jahre</b> ab dem ersten Führerschein.</p>
-      <p><b>A-Verstöße</b> (schwer), zum Beispiel: Rotlicht, ab 21 km/h zu schnell, Alkohol (0,0 ‰), Handy am Steuer, Vorfahrt missachtet, zu dichtes Auffahren.</p>
-      <p><b>B-Verstöße</b> (weniger schwer), zum Beispiel: abgefahrene Reifen, Fahren ohne gültige Hauptuntersuchung.</p>
+      <p><b>A-Verstöße</b> (schwer), zum Beispiel: Rotlicht, ab 21 km/h zu schnell, Alkohol oder Cannabis, Handy am Steuer, Vorfahrt missachtet, zu dichtes Auffahren.</p>
+      <p><b>B-Verstöße</b> (weniger schwer), zum Beispiel: abgefahrene Reifen oder ohne Winterreifen bei Glätte.</p>
       <p><b>Was passiert:</b></p>
       <ul style="margin:0 0 10px 18px;padding:0">
         <li>1 A- oder 2 B-Verstöße: Aufbauseminar, Probezeit verlängert sich auf 4 Jahre</li>
         <li>Danach noch einmal: schriftliche Verwarnung, Empfehlung zur verkehrspsychologischen Beratung</li>
         <li>Danach noch einmal: Der Führerschein wird entzogen</li>
       </ul>
+      <p><b>Aufbauseminar verpasst?</b> Wer es nicht in der gesetzten Frist macht, verliert den Führerschein.</p>
+      <p><b>Begleitetes Fahren ab 17:</b> Fährst du ohne eingetragene Begleitperson, gibt es Bußgeld und einen Punkt, und die Fahrerlaubnis wird widerrufen.</p>
       <p style="color:var(--muted);font-size:0.72rem">Vereinfachte Übersicht ohne Gewähr. Bei Fragen hilft dir dein Fahrlehrer.</p>`
   },
   {
     icon: '🚫', titel: 'Halten und Parken',
     html: `
-      <p><b>Halten</b> heißt: bis 3 Minuten oder zum Ein- und Aussteigen oder Be- und Entladen. Alles darüber ist <b>Parken</b>.</p>
+      <p><b>Parken</b> heißt: Du hältst länger als 3 Minuten, oder du verlässt das Auto, auch nur kurz. Zügiges Ein- und Aussteigen oder Be- und Entladen zählt als <b>Halten</b>.</p>
       <p><b>Halten verboten</b> u.a.: an engen oder unübersichtlichen Stellen, in scharfen Kurven, auf Bahnübergängen, auf Fußgängerüberwegen und bis 5 m davor, vor Feuerwehrzufahrten.</p>
-      <p><b>Parken verboten</b> u.a.: bis 5 m vor und hinter Kreuzungen und Einmündungen, vor Grundstücksein- und -ausfahrten, bis 15 m vor und hinter Bushaltestellen-Schildern.</p>
+      <p><b>Parken verboten</b> u.a.: bis 5 m vor und hinter Kreuzungen und Einmündungen (vor der Kreuzung 8 m, wenn rechts ein abgetrennter Radweg ist), vor Grundstücksein- und -ausfahrten, vor abgesenkten Bordsteinen, bis 15 m vor und hinter Bushaltestellen-Schildern.</p>
       <p style="color:var(--muted);font-size:0.85rem">Verkehrszeichen gehen immer vor. Im Zweifel: lieber ein paar Meter weiter.</p>`
   },
   {
@@ -1839,8 +1875,8 @@ const THEORIE_WISSEN = [
   {
     icon: '🚂', titel: 'Bahnübergang, Licht und Winter',
     html: `
-      <p><b>Bahnübergang:</b> Züge haben immer Vorrang. Die Baken mit drei, zwei und einem Streifen kündigen ihn an. Ab den Baken nicht mehr überholen. Blinkt rotes Licht oder senkt sich die Schranke: vor dem Andreaskreuz anhalten.</p>
-      <p><b>Licht:</b> Bei Dämmerung, Dunkelheit und schlechter Sicht Abblendlicht. Die Nebelschlussleuchte nur bei Sicht unter 50 m, dann höchstens 50 km/h.</p>
+      <p><b>Bahnübergang:</b> Züge haben Vorrang. Die Baken mit drei, zwei und einem Streifen kündigen den Übergang an. Fahr langsam heran und überhol nicht mehr. Vor dem Andreaskreuz wartest du, wenn ein Zug kommt, gelbes oder rotes Licht leuchtet, die Schranke runtergeht, ein Pfiff ertönt oder ein Bahnmitarbeiter Halt zeigt. Ohne Schranke schaust du nach links und rechts.</p>
+      <p><b>Licht:</b> Bei Dämmerung, Dunkelheit und schlechter Sicht Abblendlicht. Tagfahrlicht reicht dann nicht, weil hinten nichts leuchtet. Die Nebelschlussleuchte schaltest du nur bei <b>Nebel</b> mit Sicht unter 50 m ein, nicht bei Regen. Siehst du weniger als 50 m weit, fährst du höchstens 50 km/h.</p>
       <p><b>Winter:</b> Bei Glätte, Schnee oder Eis sind Winterreifen Pflicht (Alpine-Symbol). Alle Scheiben frei kratzen, nicht nur ein Guckloch. Abstand deutlich vergrößern, sanft bremsen und lenken.</p>`
   },
   {
@@ -1893,7 +1929,7 @@ function vzKatalogHTML() {
     <button onclick="oeffneTheorieWissen()" style="background:none;border:none;color:var(--accent);cursor:pointer;padding:0;margin-bottom:12px;font-size:0.85rem">← Zurück</button>
     <div style="font-size:1.1rem;font-weight:700;margin-bottom:4px">🚦 Verkehrszeichen</div>
     <div style="font-size:0.75rem;color:var(--muted);margin-bottom:12px;line-height:1.5">
-      Alle ${Object.keys(ZEICHEN_KATALOG).length} amtlichen Zeichen zum Nachschlagen – unabhängig davon,
+      ${Object.keys(ZEICHEN_KATALOG).length} wichtige Zeichen zum Nachschlagen – unabhängig davon,
       was im Unterricht schon dran war.
     </div>
     <input id="vz-suche" value="${escHtml(vzSuche)}" oninput="vzSucheEingabe(this.value)"
@@ -1910,7 +1946,7 @@ function vzKatalogHTML() {
     <!-- Dieselbe Quellenangabe wie im Katalog der Fahrlehrer-App. Die Bilder
          sind dieselben; gesehen werden sie hier von deutlich mehr Leuten. -->
     <div style="font-size:0.62rem;color:var(--muted);margin-top:14px;line-height:1.5">
-      Amtliche Verkehrszeichen (Quelle: Bundesanstalt für Straßenwesen), gemeinfrei nach § 5 UrhG.
+      Amtliche Verkehrszeichen (Quelle: Bundesanstalt für Straßenwesen), gemeinfrei nach § 5 UrhG. Die Zusatzzeichen sind nach amtlichem Vorbild selbst gezeichnet.
       Einteilung nach StVO: Gefahrzeichen (Anlage 1), Vorschriftzeichen (Anlage 2), Richtzeichen und Wegweisung (Anlage 3).
     </div>`;
 }

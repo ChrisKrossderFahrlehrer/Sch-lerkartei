@@ -67,19 +67,34 @@ async function portalFreigebenAlt(db, studentId, geloeschtAm, jetzt = Date.now()
 }
 
 // Schueler samt Begleitdaten endgueltig entfernen: Zugangscodes (Chat,
-// Name, Planung) mit Chat-Fotos, Protokoll, zuletzt das Schueler-Dokument.
+// Name, Planung) mit Chat-Fotos, Protokoll, verknuepfte Kalender-Daten,
+// zuletzt das Schueler-Dokument.
 async function schuelerEndgueltigLoeschen(db, studentId) {
+  const stud = await db.collection('students').doc(studentId).get();
+  // Nur die echte Fahrschul-Kennung; aeltere Akten ohne fahrschuleId pruefen nicht.
+  const fsId = stud.exists ? (stud.get('fahrschuleId') || null) : null;
   const codes = await loescheZugangscodesMitBildern(
     db.collection('accessCodes').where('studentId', '==', studentId));
   const protokoll = await loescheAlle(
     db.collection('protokoll').where('studentId', '==', studentId));
-  // Verknuepfte Kalender-Daten (Kalender-Schueler mit adkStudentId) samt
-  // Theorie-Eintraegen. Termine bleiben stehen; sie tragen nur die ID des
-  // Kalender-Schuelers, die danach ins Leere zeigt.
+  // Verknuepfte Kalender-Schueler (adkStudentId) mit allem, was an ihrer
+  // Kalender-ID haengt. Nur Kalender-Schueler DERSELBEN Fahrschule: Die
+  // Verknuepfung setzt der Kalender selbst - ein fremder Eintrag mit
+  // derselben ID darf hier nie mitgeloescht werden.
+  // Termine (slots) bleiben stehen; sie tragen nur die Kalender-ID, die
+  // danach ins Leere zeigt, und gehoeren zur Buchhaltung der Schule.
   let kalender = 0;
   const kalSnap = await db.collection('schueler').where('adkStudentId', '==', studentId).get();
   for (const k of kalSnap.docs) {
-    kalender += await loescheAlle(db.collection('theorieStunden').where('schuelerId', '==', k.id));
+    const kSchule = k.get('schoolId') || null;
+    if (fsId && kSchule && kSchule !== fsId) continue;
+    for (const c of ['theorieStunden', 'notizen', 'pruefungen', 'warteliste', 'bookingRequests', 'bookingMessages']) {
+      kalender += await loescheAlle(db.collection(c).where('schuelerId', '==', k.id));
+    }
+    // Oeffentlich per ID lesbare Buchungs-Daten (Vorname, Termine) entfernen -
+    // der verschickte Buchungslink funktioniert danach nicht mehr.
+    await db.collection('bookingStudents').doc(k.id).delete();
+    await db.collection('bookingWaitlist').doc(k.id).delete();
     await k.ref.delete();
     kalender++;
   }

@@ -1637,7 +1637,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     }
     window.addEventListener('error', function (e) {
       fehler.push((e.message || 'Fehler') + (e.filename ? ' (' + String(e.filename).split('/').pop() + ':' + e.lineno + ')' : ''));
-      if (document.getElementById('auth-hilfe').style.display === 'block') zeige();
+      var hh = document.getElementById('auth-hilfe');
+      if (hh && hh.style.display === 'block') zeige();
     });
     window.addEventListener('unhandledrejection', function (e) {
       var r = e.reason; fehler.push('Promise: ' + ((r && (r.code || r.message)) || r));
@@ -1879,7 +1880,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       • Konto-Daten: E-Mail-Adresse, Name, Passwort (verschlüsselt)<br>
       • Vertrags- und Rechnungsdaten der Kunden: Name der Fahrschule bzw. des Fahrlehrers, Rechnungsanschrift, gebuchter Tarif, Abo-Status, Rechnungen<br>
       • Schüler-Daten: Name, Geburtsdatum, Anschrift (Straße, PLZ, Ort), Ausbildungsfortschritt, Fahrstunden, Protokolle einschließlich der Unterschrift des Fahrschülers, Angaben zu Prüfungsversuchen sowie Notizen des Fahrlehrers (z. B. „Fürs nächste Mal")<br>
-      • Ausbildungsnachweis: Art und Inhalt der praktischen Fahrstunden (Kategorien nach Anlage 3 zu § 6 Abs. 1 FahrschAusbO), besuchter theoretischer Unterricht (Themennummer, Datum, Dauer) – erforderlich zur gesetzlich vorgeschriebenen Ausbildungsdokumentation<br>
+      • Ausbildungsnachweis: Art und Inhalt der praktischen Fahrstunden (Kategorien nach Anlage 3 zu § 6 Abs. 1 DV-FahrlG), besuchter theoretischer Unterricht (Themennummer, Datum, Dauer) – erforderlich zur gesetzlich vorgeschriebenen Ausbildungsdokumentation<br>
       • Chat-Nachrichten und optional übermittelte Bilder zwischen Fahrlehrer und Fahrschüler, einschließlich des Zeitpunkts der letzten Kenntnisnahme (Lesestatus)<br>
       • Nutzungsdaten: Anmeldezeitpunkte, technische Verbindungsdaten<br>
       • Push-Benachrichtigungen: Geräte-Token zur Zustellung von Benachrichtigungen (z.B. bei neuen Chat-Nachrichten); wird gelöscht, sobald Benachrichtigungen deaktiviert oder das Gerät abgemeldet wird<br>
@@ -2171,7 +2172,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       <!-- Klassen-Hinweise -->
       <div id="klasse-hint-b"     style="display:block;font-size:0.7rem;color:var(--muted);margin-top:6px;padding:6px 10px;background:var(--surface2);border-radius:8px">🚗 Standard PKW mit Schaltgetriebe · 30 Fahrstunden</div>
       <div id="klasse-hint-bauto" style="display:none;font-size:0.7rem;color:var(--muted);margin-top:6px;padding:6px 10px;background:var(--surface2);border-radius:8px">🤖 Nur Automatikfahrzeug · keine Schaltberechtigung · 30 Fahrstunden</div>
-      <div id="klasse-hint-b197"  style="display:none;font-size:0.7rem;color:#bc8cff;margin-top:6px;line-height:1.4;background:rgba(160,100,255,0.08);border:1px solid rgba(160,100,255,0.25);border-radius:8px;padding:8px 10px">⚙️ <strong>Automatik-Prüfung</strong> · min. 10 Schaltstunden (à 45 Min.) · 15-min. Testfahrt (½ innerorts, ½ außerorts)</div>
+      <div id="klasse-hint-b197"  style="display:none;font-size:0.7rem;color:#bc8cff;margin-top:6px;line-height:1.4;background:rgba(160,100,255,0.08);border:1px solid rgba(160,100,255,0.25);border-radius:8px;padding:8px 10px">⚙️ <strong>Automatik-Prüfung</strong> · min. 10 Schaltstunden (à 45 Min.) · Testfahrt mind. 15 Min., inner- und außerorts</div>
       <div id="klasse-hint-be"    style="display:none;font-size:0.7rem;color:var(--accent2);margin-top:6px;padding:6px 10px;background:rgba(63,185,80,0.08);border:1px solid rgba(63,185,80,0.25);border-radius:8px">🔗 Anhänger · Voraussetzung: Klasse B vorhanden · keine Theorieprüfung · 3× Überland, 1× Autobahn, 1× Nacht</div>
       <div id="klasse-hint-a"     style="display:none;font-size:0.7rem;color:var(--blue);margin-top:6px;padding:6px 10px;background:rgba(88,166,255,0.08);border:1px solid rgba(88,166,255,0.25);border-radius:8px">🏍️ Motorrad unbeschränkt · 20 Fahrstunden · Sonderfahrten: 5× Überland, 4× Autobahn, 3× Nacht</div>
       <div id="b197-hint" style="display:none"></div>
@@ -3027,7 +3028,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
           style="flex:1;height:40px;text-align:center;font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);-moz-appearance:textfield">
         <button onclick="document.getElementById('inp-b197-ziel').value=Math.min(99,parseInt(document.getElementById('inp-b197-ziel').value||10)+1)" style="width:40px;height:40px;border-radius:10px;border:1.5px solid var(--accent);background:var(--accent);color:#0d1117;cursor:pointer;font-size:1.2rem">+</button>
       </div>
-      <div style="font-size:0.72rem;color:var(--muted);margin-top:8px;text-align:center">Schaltstunden können in die Sonderfahrten integriert werden (§5a FahrschAusbO)</div>
+      <div style="font-size:0.72rem;color:var(--muted);margin-top:8px;text-align:center">Mind. 10 Stunden à 45 Min. auf einem Schaltwagen, dazu eine Testfahrt von mind. 15 Min. inner- und außerorts (§ 5a FahrschAusbO)</div>
     </div>
     <div class="sheet-actions">
       <button class="btn-sheet-cancel" onclick="document.getElementById('b197-settings-modal').classList.remove('open')">Abbrechen</button>
@@ -3094,7 +3095,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 <div class="modal-overlay" id="fs-adresse-modal" onclick="closeModal(event)">
   <div class="modal-sheet">
     <div class="sheet-title">🏫 Adresse der Fahrschule</div>
-    <div style="font-size:0.8rem;color:var(--muted);line-height:1.5;margin:6px 0 14px">Steht auf deinen Rechnungen und auf dem Ausbildungsnachweis. Sichtbar nur für dich und den Anbieter.</div>
+    <div style="font-size:0.8rem;color:var(--muted);line-height:1.5;margin:6px 0 14px">Steht auf deinen Rechnungen und auf dem Ausbildungsnachweis. Sichtbar für dich, die Fahrlehrer deiner Fahrschule und den Anbieter.</div>
     <label class="form-label" for="fsa-strasse">Straße und Hausnummer</label>
     <input class="form-input" id="fsa-strasse" autocomplete="address-line1" placeholder="Musterstraße 1">
     <div style="display:grid;grid-template-columns:110px 1fr;gap:8px">
@@ -3218,7 +3219,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       </button>
       <button onclick="saveKlasseAendern('B197')" class="klasse-choice-btn">
         <div style="font-weight:700">⚙️ B197</div>
-        <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">Automatik-Prüfung + min. 10 Schaltstunden (45 Min.) + 15-min. Testfahrt</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">Automatik-Prüfung + min. 10 Schaltstunden (45 Min.) + Testfahrt (mind. 15 Min.)</div>
       </button>
       <button onclick="saveKlasseAendern('BE')" class="klasse-choice-btn">
         <div style="font-weight:700">🔗 Klasse BE</div>
@@ -3236,7 +3237,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
-import { signInAnonymously, getAuth, setPersistence, browserLocalPersistence, indexedDBLocalPersistence, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider, verifyBeforeUpdateEmail, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { signInAnonymously, getAuth, initializeAuth, browserSessionPersistence, setPersistence, browserLocalPersistence, indexedDBLocalPersistence, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider, verifyBeforeUpdateEmail, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, enableIndexedDbPersistence, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, getDocs, getDoc, serverTimestamp, Timestamp, deleteField } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
 import { getStorage, ref, uploadBytes, getDownloadURL, listAll, deleteObject } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
@@ -3251,7 +3252,15 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+// Anmeldung OHNE Popup-/Redirect-Helfer starten. getAuth() haengt im Browser
+// automatisch einen Helfer fuer Google-Popup-Anmeldungen an, den die App gar
+// nicht nutzt. Auf iPhone, iPad, Android und in Safari laedt das SDK dafuer
+// VOR der ersten Anmelde-Rueckmeldung ein Skript von apis.google.com samt
+// unsichtbarem iframe. Antwortet apis.google.com langsam oder gar nicht,
+// bleibt die App beim Logo stehen bzw. zeigt den Login, obwohl man
+// angemeldet ist. Gleiche Speicher-Reihenfolge wie bisher (IndexedDB, dann
+// localStorage, dann Sitzung) - bestehende Anmeldungen bleiben erhalten.
+const auth = initializeAuth(app, { persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence] });
 const db = getFirestore(app);
 const fns = getFunctions(app, 'europe-west3');
 // WICHTIG: Hier wird BEWUSST kein setPersistence() mehr aufgerufen.
@@ -3773,7 +3782,11 @@ window.switchTab = (tab) => {
   });
   document.getElementById('auth-error').textContent = '';
   if (tab==='register') {
-    if (typeof setRegRole === 'function') setRegRole('fahrschule'); // Default-Rolle setzen
+    // FIX: Mit Einladungslink IMMER als Fahrlehrer registrieren. Vorher setzte
+    // jeder Wechsel auf "Registrieren" die Rolle auf "Fahrschule" zurueck -
+    // wer eingeladen war, legte versehentlich eine eigene Fahrschule an.
+    if (typeof setRegRole === 'function') setRegRole(window.__inviteData ? 'fahrlehrer' : 'fahrschule');
+    if (window.__inviteData) { const fw = document.getElementById('reg-fscode-wrap'); if (fw) fw.style.display = 'none'; }
     // Einwilligung zurücksetzen (sauberer Startzustand)
     regConsentGegeben = false;
     const cbox = document.getElementById('reg-consent-box');
@@ -3824,14 +3837,9 @@ window.doLogin = async () => {
   const btn = document.getElementById('btn-login');
   if (!eingabe || !pw) { setAuthError('Bitte Benutzername/E-Mail und Passwort eingeben.'); return; }
   btn.disabled = true; btn.textContent = '…';
-  // IndexedDB bevorzugen: haltbarer als localStorage, das auf iOS als eines
-  // der ersten Dinge geleert wird. Hier unproblematisch, weil direkt danach
-  // ohnehin eine neue Anmeldung erfolgt (anders als beim App-Start).
-  try {
-    await setPersistence(auth, indexedDBLocalPersistence);
-  } catch(e) {
-    try { await setPersistence(auth, browserLocalPersistence); } catch(e2) { /* best effort */ }
-  }
+  // Kein setPersistence() mehr: IndexedDB ist schon beim Start als erste
+  // Wahl eingestellt (initializeAuth oben). Der Aufruf hier hat bei einem
+  // zweiten offenen Tab (Kalender) dessen Anmeldung geloescht (SDK #9319).
 
   // Mögliche E-Mail-Adressen sammeln, die wir nacheinander probieren
   const versuche = [];
@@ -4181,6 +4189,7 @@ window.createInvite = async () => {
     const link = 'https://fahrsync.de/?invite=' + token;
     document.getElementById('inv-link').value = link;
     document.getElementById('inv-result').style.display = 'block';
+    try { localStorage.setItem('fs_start_einladen', '1'); aktualisiereStartCheck(); } catch(e) {}
     renderInviteList();
   } catch(e) {
     console.error('createInvite', e);
@@ -4240,10 +4249,13 @@ window.deleteInvite = async (id) => {
 window.checkInviteParam = async (token) => {
   try {
     const snap = await getDoc(doc(db, 'invites', token));
-    if (!snap.exists()) { setAuthError('⚠️ Diese Einladung ist ungültig.'); return; }
+    // Meldungen zusaetzlich merken: Die Abgemeldet-Ansicht kann (z.B. nach der
+    // Wartezeit beim Start) das Fehlerfeld spaeter noch einmal leeren.
+    const einladungFehler = (m) => { window.__abmeldeGrund = escHtml(m); setAuthError(m); };
+    if (!snap.exists()) { einladungFehler('⚠️ Diese Einladung ist ungültig.'); return; }
     const inv = snap.data();
-    if (inv.used) { setAuthError('⚠️ Diese Einladung wurde bereits verwendet.'); return; }
-    if (inv.expiresAt && Date.now() > inv.expiresAt) { setAuthError('⚠️ Diese Einladung ist abgelaufen. Bitte eine neue anfordern.'); return; }
+    if (inv.used) { einladungFehler('⚠️ Diese Einladung wurde bereits verwendet.'); return; }
+    if (inv.expiresAt && Date.now() > inv.expiresAt) { einladungFehler('⚠️ Diese Einladung ist abgelaufen. Bitte eine neue anfordern.'); return; }
     window.__inviteData = { token, fahrschuleId: inv.fahrschuleId, fsName: inv.fsName || '', fahrschulCode: inv.fahrschulCode || null };
     try { if (typeof setRegRole === 'function') setRegRole('fahrlehrer'); } catch(e) {}
     try {
@@ -4260,6 +4272,9 @@ window.checkInviteParam = async (token) => {
       }
       const em = document.getElementById('reg-email'); if (em && !em.value && inv.email) em.value = inv.email;
       if (ne && !ne.value && inv.name) ne.value = inv.name;
+      // Direkt das Registrieren-Formular zeigen (vorher stand man auf
+      // "Anmelden" und der Einladungs-Hinweis war unsichtbar)
+      switchTab('register');
       (document.getElementById('btn-register') || ne).scrollIntoView({ behavior: 'smooth', block: 'center' });
     } catch(uiErr) { console.warn('invite ui', uiErr); }
   } catch(e) {
@@ -4963,9 +4978,17 @@ onAuthStateChanged(auth, async (user) => {
     currentUser = user;
     if (urlParams.get('invite')) { try { toast('ℹ️ Einladungslink erkannt – bitte zuerst abmelden, um ihn einzulösen.'); } catch(e){} }
 
-    // Profil + Fahrschul-Status laden
+    // Profil + Fahrschul-Status laden.
+    // Schneller Start: Jede Leseanfrage hier wird nacheinander abgewartet,
+    // bevor der Ladebildschirm verschwindet. Deshalb wird das Fahrschul-
+    // Dokument nur EINMAL gelesen und das Profil fuer den Erst-Login-Check
+    // weiterverwendet (vorher 5 Anfragen hintereinander, jetzt 2).
+    let __profilDaten = null;
+    const __fsLesen = {};
+    const holeFahrschule = (id) => (__fsLesen[id] = __fsLesen[id] || getDoc(doc(db, 'fahrschulen', id)));
     try {
       const profDoc = await getDoc(doc(db, 'users', user.uid));
+      __profilDaten = profDoc.exists() ? profDoc.data() : null;
       if (!profDoc.exists()) {
         // SELBSTHEILUNG: Konto ohne users-Dokument (z.B. Alt-Konto oder
         // abgebrochene Registrierung) → jetzt nachträglich anlegen,
@@ -5039,7 +5062,7 @@ onAuthStateChanged(auth, async (user) => {
           } else if (profil.kalenderAktiv === true) {
             currentUser._kalenderAktiv = true;
           } else if (profil.fahrschuleId) {
-            const fsSnap = await getDoc(doc(db, 'fahrschulen', profil.fahrschuleId));
+            const fsSnap = await holeFahrschule(profil.fahrschuleId);
             if (fsSnap.exists() && fsSnap.data().kalenderAktiv === true) {
               currentUser._kalenderAktiv = true;
             }
@@ -5079,7 +5102,7 @@ onAuthStateChanged(auth, async (user) => {
         if (fsId && fsId !== user.uid) {
           // Fahrlehrer gehört zu fremder Fahrschule → deren Status zählt zusätzlich
           try {
-            const fsDoc = await getDoc(doc(db, 'fahrschulen', fsId));
+            const fsDoc = await holeFahrschule(fsId);
             if (fsDoc.exists()) {
               // FIX Freigabe-Lücke: Der Fahrschul-Status kann den Fahrlehrer nur
               // SPERREN (gesperrt/ausstehend), aber nie freischalten – jeder
@@ -5092,7 +5115,7 @@ onAuthStateChanged(auth, async (user) => {
         } else if (fsId === user.uid) {
           // Fahrschule (Inhaber): eigener fahrschulen-Doc-Status
           try {
-            const fsDoc = await getDoc(doc(db, 'fahrschulen', fsId));
+            const fsDoc = await holeFahrschule(fsId);
             if (fsDoc.exists()) {
               if (fsDoc.data().status) effektiverStatus = fsDoc.data().status;
               aboData = fsDoc.data();
@@ -5135,16 +5158,20 @@ onAuthStateChanged(auth, async (user) => {
         if (!istSuperadmin && effektiverStatus === 'zahlung_offen') {
           document.querySelectorAll('.screen').forEach(s => { s.classList.remove('active'); s.style.display=''; });
           document.getElementById('screen-login').classList.add('active');
-          document.getElementById('auth-error').innerHTML =
-            '💳 Deine Zahlung steht noch aus. Bitte begleiche die offene Rechnung, um die App weiter zu nutzen.<br><span style="font-size:0.8rem;color:var(--muted)">Bei Fragen wende dich an den Support.</span>';
+          // FIX: Meldung merken - nach signOut leert die Abgemeldet-Ansicht das
+          // Fehlerfeld, man sah nur einen leeren Login ("meldet mich staendig ab").
+          window.__abmeldeGrund = '💳 Deine Zahlung steht noch aus. Bitte begleiche die offene Rechnung, um die App weiter zu nutzen.<br><span style="font-size:0.8rem;color:var(--muted)">Bei Fragen wende dich an den Support.</span>';
+          document.getElementById('auth-error').innerHTML = window.__abmeldeGrund;
+          try { localStorage.removeItem('fs_zuletzt_angemeldet'); } catch(e) {}
           await signOut(auth);
           return;
         }
         if (!istSuperadmin && effektiverStatus === 'gesperrt') {
           document.querySelectorAll('.screen').forEach(s => { s.classList.remove('active'); s.style.display=''; });
           document.getElementById('screen-login').classList.add('active');
-          document.getElementById('auth-error').textContent =
-            '🚫 Dein Konto wurde gesperrt. Bitte Kontakt aufnehmen.';
+          window.__abmeldeGrund = '🚫 Dein Konto wurde gesperrt. Bitte Kontakt aufnehmen.';
+          document.getElementById('auth-error').innerHTML = window.__abmeldeGrund;
+          try { localStorage.removeItem('fs_zuletzt_angemeldet'); } catch(e) {}
           await signOut(auth);
           return;
         }
@@ -5157,29 +5184,22 @@ onAuthStateChanged(auth, async (user) => {
         // nur aus der E-Mail geraten (z.B. "info") und wuerde sonst einen
         // Namen belegen, den sich nie jemand ausgesucht hat.
         if (profil.username && !istSuperadmin && !profil.nacherstellt) {
-          try {
-            const unRef = doc(db, 'usernames', String(profil.username).toLowerCase());
-            const unSnap = await getDoc(unRef);
-            if (!unSnap.exists()) {
-              await dbSet(unRef, {
-                username: String(profil.username).toLowerCase(),
-                email: (user.email || profil.email || '').toLowerCase(),
-                uid: user.uid, createdAt: Date.now(), nachgetragen: true
-              });
-            }
-          } catch(e) { /* nicht kritisch - Anmeldung per E-Mail geht immer */ }
+          // Im Hintergrund - der Start wartet nicht darauf
+          const unRef = doc(db, 'usernames', String(profil.username).toLowerCase());
+          getDoc(unRef).then(unSnap => unSnap.exists() ? null : dbSet(unRef, {
+            username: String(profil.username).toLowerCase(),
+            email: (user.email || profil.email || '').toLowerCase(),
+            uid: user.uid, createdAt: Date.now(), nachgetragen: true
+          })).catch(() => { /* nicht kritisch - Anmeldung per E-Mail geht immer */ });
         }
       }
     } catch(e) { /* offline – weiter */ }
 
     // ── ERST-LOGIN: vom SuperAdmin angelegte Konten muessen zuerst ein
     // eigenes Passwort setzen (temporaeres verfaellt), optional E-Mail.
-    try {
-      const pDoc = await getDoc(doc(db, 'users', user.uid));
-      if (pDoc.exists() && pDoc.data().erstLoginAusstehend === true) {
-        document.getElementById('erstlogin-modal').style.display = 'flex';
-      }
-    } catch(e) { /* offline - Dialog kommt beim naechsten Login */ }
+    if (__profilDaten && __profilDaten.erstLoginAusstehend === true) {
+      document.getElementById('erstlogin-modal').style.display = 'flex';
+    }
 
     document.getElementById('screen-login').classList.remove('active');
     document.getElementById('screen-warte').classList.remove('active');
@@ -5245,7 +5265,10 @@ function zeigeAbgemeldetAnsicht() {
     window.__einstiegGenutzt = true;
     if (einstieg === 'registrieren') switchTab('register');
     else if (einstieg === 'demo') { switchTab('login'); setTimeout(() => { try { startDemo(); } catch(e) {} }, 0); }
-    else switchTab('login');
+    else switchTab(window.__inviteData ? 'register' : 'login');
+    // Grund der Abmeldung (Sperre, offene Zahlung, ungueltige Einladung)
+    // wieder anzeigen - switchTab und die Zeilen oben leeren das Feld.
+    if (window.__abmeldeGrund && authErr) { authErr.innerHTML = window.__abmeldeGrund; window.__abmeldeGrund = null; }
   }
 
 // ─────────────────────────────────────────
@@ -5501,7 +5524,7 @@ window.zeigeAmpelDetail = (studentId) => {
   } else {
     msg = `${icon} ${ampel.text}\n\nNoch offen:\n• ${ampel.offen.join('\n• ')}`;
   }
-  if (ampel.hinweise && ampel.hinweise.length) msg += `\n\nAus den letzten Stunden:\n• ${ampel.hinweise.join('\n• ')}`;
+  if (ampel.hinweise && ampel.hinweise.length) msg += `\n\nHinweise:\n• ${ampel.hinweise.join('\n• ')}`;
   alert(msg);
 };
 
@@ -5889,7 +5912,7 @@ window.renderList = () => {
     case 'klasseA':  filtered = filtered.filter(s => s.klasse === 'A'); break;
     case 'klasseB':  filtered = filtered.filter(s => ['B','B-Auto','B197'].includes(s.klasse||'B')); break;
     case 'klasseBE': filtered = filtered.filter(s => s.klasse === 'BE'); break;
-    case 'theorie':  filtered = filtered.filter(s => !s.theorieBestanden); break;
+    case 'theorie':  filtered = filtered.filter(s => s.klasse !== 'BE' && !s.theorieBestanden); break;
     case 'sonder':   filtered = filtered.filter(s => {
       const SONDER = s.klasse==='A' ? [{key:'ueber',min:5},{key:'autobahn',min:4},{key:'nacht',min:3}]
         : s.klasse==='BE' ? SONDERFAHRTEN_BE : SONDERFAHRTEN;
@@ -6098,8 +6121,8 @@ let aktivKlasseTab = {};
 function buildPruefungsCheckliste(s, klasse, ADK, SONDER) {
   const items = [];
 
-  // Theorie
-  items.push({
+  // Theorie (BE hat keine eigene Theoriepruefung - wie in der Pruefungsampel)
+  if (klasse !== 'BE') items.push({
     done: !!s.theorieBestanden,
     label: s.theorieBestanden ? 'Theorie bestanden' : 'Theorieprüfung noch offen',
     icon: '📋'
@@ -8035,18 +8058,28 @@ async function legeKalenderTerminAn(datum, uhrzeit) {
   const schoolId = currentUser._fahrschuleId || currentUser.uid;
   const norm = (x) => String(x || '').trim().toLowerCase();
 
-  // Kalender führt Schüler in einem EIGENEN Namensraum ('schueler') ohne
-  // Verknüpfungsfeld zur ADK-Kartei - Zuordnung daher über den Namen,
-  // wie auch im Heute-Widget. Fehlt der Schüler dort noch (Altbestand vor
-  // der automatischen Weitergabe), wird er hier angelegt.
+  // Kalender führt Schüler in einem EIGENEN Namensraum ('schueler').
+  // Zuerst über die Verknüpfung (adkStudentId) suchen, sonst über den
+  // Namen wie im Heute-Widget. Ein eindeutiger Namenstreffer wird dabei
+  // gleich verknüpft (Ausbildungsnachweis, Löschen im Papierkorb). Fehlt
+  // der Schüler dort noch (Altbestand vor der automatischen Weitergabe),
+  // wird er hier angelegt - gleich mit Verknüpfung.
   let kalId = null;
   try {
     const kSnap = await getDocs(query(collection(db,'schueler'), where('lehrerUid','==',currentUser.uid)));
-    const treffer = kSnap.docs.find(d => {
-      const k = d.data();
-      return norm(k.fname) === norm(s.vorname) && norm(k.lname) === norm(s.nachname);
-    });
-    if (treffer) kalId = treffer.id;
+    const verknuepft = kSnap.docs.find(d => d.data().adkStudentId === s.id);
+    if (verknuepft) kalId = verknuepft.id;
+    else {
+      const treffer = kSnap.docs.filter(d => {
+        const k = d.data();
+        return !k.adkStudentId && norm(k.fname) === norm(s.vorname) && norm(k.lname) === norm(s.nachname);
+      });
+      if (treffer.length) kalId = treffer[0].id;
+      if (treffer.length === 1) {
+        dbUpd(doc(db,'schueler',kalId), { adkStudentId: s.id })
+          .catch(e => console.warn('Kalender-Schüler verknüpfen:', e));
+      }
+    }
   } catch(e) { console.warn('Kalender-Schüler suchen:', e); }
 
   if (!kalId) {
@@ -8055,6 +8088,7 @@ async function legeKalenderTerminAn(datum, uhrzeit) {
       email: '', tel: '',
       lehrerUid: currentUser.uid,
       maxFahrstunden: 0, maxAktiveTermine: 0, bookedCount: 0,
+      adkStudentId: s.id,
       schoolId, createdAt: serverTimestamp()
     });
     kalId = neu && neu.id ? neu.id : null;
@@ -8377,7 +8411,7 @@ window.addStudent = async () => {
     // Nächste fortlaufende Schüler-Nummer ermitteln (höchste vorhandene + 1)
     const maxNr = students.reduce((max, st) => Math.max(max, st.schuelerNr || 0), 0);
     const neueNr = maxNr + 1;
-    await dbAdd(collection(db,'students'),{
+    const neuRef = await dbAdd(collection(db,'students'),{
       uid: currentUser.uid,
       fahrschuleId: currentUser._fahrschuleId || currentUser.uid,
       schuelerNr: neueNr,
@@ -8407,12 +8441,16 @@ window.addStudent = async () => {
     // Eigener try/catch: scheitert der Kalender-Eintrag (z.B. Modul nicht
     // gebucht), bleibt das ADK-Anlegen davon unberuehrt.
     // maxFahrstunden/maxAktiveTermine 0 = unbegrenzt (Kalender-Konvention).
+    // adkStudentId verknuepft den Zwilling mit der Kartei-Akte: Der
+    // Ausbildungsnachweis findet so die richtigen Stammdaten, und das
+    // endgueltige Loeschen im Papierkorb nimmt den Zwilling mit.
     try {
       await dbAdd(collection(db,'schueler'),{
         fname: vn, lname: nn,
         email: '', tel: '',
         lehrerUid: currentUser.uid,
         maxFahrstunden: 0, maxAktiveTermine: 0, bookedCount: 0,
+        ...(neuRef && neuRef.id ? { adkStudentId: neuRef.id } : {}),
         schoolId: currentUser._fahrschuleId || currentUser.uid,
         createdAt: serverTimestamp()
       });
@@ -10581,7 +10619,7 @@ window.openImpressum = async () => {
           <strong style="color:var(--text)">§ 8 Datenverantwortung</strong><br>
           Der Nutzer ist Verantwortlicher i.S.d. Art. 4 Nr. 7 DSGVO für alle eingegebenen Schülerdaten und stellt sicher, dass eine Rechtsgrundlage für deren Verarbeitung vorliegt.<br><br>
           <strong style="color:var(--text)">§ 8a Ausbildungsnachweis und gesetzliche Dokumentationspflichten</strong><br>
-          Die Software unterstützt bei der Erfassung und Aufbereitung von Ausbildungsdaten. Die gesetzliche Pflicht zur ordnungsgemäßen Führung, inhaltlichen Richtigkeit, Unterzeichnung und Aufbewahrung des Ausbildungsnachweises (§ 31 FahrlG, § 6 FahrschAusbO nebst Anlagen) verbleibt ausschließlich beim Nutzer bzw. der Fahrschule. Der Nutzer prüft vor Ausstellung eigenverantwortlich, ob die erfassten Angaben vollständig und zutreffend sind. Der Betreiber übernimmt keine Gewähr für die rechtliche Anerkennung erzeugter Dokumente durch Behörden oder Prüforganisationen.<br><br>
+          Die Software unterstützt bei der Erfassung und Aufbereitung von Ausbildungsdaten. Die gesetzliche Pflicht zur ordnungsgemäßen Führung, inhaltlichen Richtigkeit, Unterzeichnung und Aufbewahrung des Ausbildungsnachweises (§ 31 FahrlG, § 6 DV-FahrlG mit Anlage 3, § 6 FahrschAusbO) verbleibt ausschließlich beim Nutzer bzw. der Fahrschule. Der Nutzer prüft vor Ausstellung eigenverantwortlich, ob die erfassten Angaben vollständig und zutreffend sind. Der Betreiber übernimmt keine Gewähr für die rechtliche Anerkennung erzeugter Dokumente durch Behörden oder Prüforganisationen.<br><br>
           <strong style="color:var(--text)">§ 8b Vom Nutzer übermittelte Inhalte</strong><br>
           Der Nutzer und seine Fahrschüler können über die Chat-Funktion Bilder übermitteln. Der Nutzer stellt sicher, dass hierbei keine rechtswidrigen Inhalte übertragen werden und dass er zur Übermittlung berechtigt ist. Der Betreiber sichtet übermittelte Inhalte nicht anlasslos, ist jedoch berechtigt, bei konkreten Hinweisen auf rechtswidrige Inhalte diese zu entfernen.<br><br>
           <strong style="color:var(--text)">§ 9 Verfügbarkeit</strong><br>
@@ -11418,11 +11456,26 @@ if ('serviceWorker' in navigator) {
       })
       .catch(err => console.log('Service Worker Fehler:', err));
 
-    let swReloaded = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (swReloaded) return;
+    // Neue App-Version uebernommen -> neu laden, aber NICHT
+    //  - beim allerersten Besuch (die Seite ist dann ohnehin aktuell) und
+    //  - nicht mitten in einem offenen Dialog (neuer Schueler, Protokoll mit
+    //    Unterschrift): Eingaben gingen sonst verloren. Dann wird beim
+    //    naechsten Wechsel in den Hintergrund neu geladen.
+    let swReloaded = false, swUpdateWartet = false;
+    const swHatteController = !!navigator.serviceWorker.controller;
+    const swDialogOffen = () => !!document.querySelector('.modal-overlay.open');
+    const swNeuLaden = () => {
+      if (swReloaded || swDialogOffen()) return false;
       swReloaded = true;
       window.location.reload();
+      return true;
+    };
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!swHatteController) return;
+      if (!swNeuLaden()) swUpdateWartet = true;
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (swUpdateWartet && document.visibilityState === 'hidden') swNeuLaden();
     });
   });
 
@@ -11620,8 +11673,10 @@ window.startCheckAusblenden = () => { lsSet('fs_startcheck_aus', '1'); aktualisi
 window.startCheckSchritt = (k) => {
   if (k === 'adresse') oeffneFsAdresse();
   else if (k === 'schueler') openAddModal();
-  else if (k === 'einladen') { lsSet('fs_start_einladen', '1'); openInviteModal(); aktualisiereStartCheck(); }
-  else if (k === 'design') { lsSet('fs_start_design', '1'); openStilAuswahl(); aktualisiereStartCheck(); }
+  // Abgehakt wird erst, wenn wirklich eine Einladung erstellt bzw. ein
+  // Design gewaehlt wurde (createInvite / waehleStil), nicht beim Oeffnen.
+  else if (k === 'einladen') { openInviteModal(); }
+  else if (k === 'design') { openStilAuswahl(); }
 };
 function aktualisiereStartCheck() {
   const box = document.getElementById('start-check');
@@ -11982,20 +12037,20 @@ const ZEICHEN_KATALOG = {
     '117-10':['Seitenwind','gefahr'],
     '120':['Verengte Fahrbahn','gefahr'],
     '121-10':['Einseitig verengte Fahrbahn','gefahr'],
-    '123':['Baustelle','gefahr'],
+    '123':['Arbeitsstelle (Baustelle)','gefahr'],
     '124':['Stau','gefahr'],
-    '131':['Ampel','gefahr'],
+    '131':['Lichtzeichenanlage (Ampel)','gefahr'],
     '133-10':['Fußgänger','gefahr'],
     '136-10':['Kinder','gefahr'],
     '138-10':['Radverkehr','gefahr'],
     '142-10':['Wildwechsel','gefahr'],
     '151':['Bahnübergang','gefahr'],
-    '209-10':['Vorgeschriebene Fahrtrichtung rechts','gebot'],
-    '211-10':['Hier rechts','gebot'],
-    '214-10':['Geradeaus oder rechts','gebot'],
+    '209-10':['Vorgeschriebene Fahrtrichtung links','gebot'],
+    '211-10':['Hier links','gebot'],
+    '214-10':['Geradeaus oder links','gebot'],
     '215':['Kreisverkehr','gebot'],
     '220-10':['Einbahnstraße','gebot'],
-    '222-10':['Vorbeifahrt rechts','gebot'],
+    '222-10':['Vorbeifahrt links','gebot'],
     '237':['Radweg','gebot'],
     '239':['Gehweg','gebot'],
     '240':['Gemeinsamer Geh- und Radweg','gebot'],
@@ -12013,7 +12068,7 @@ const ZEICHEN_KATALOG = {
     '265':['Höchsthöhe','verbot'],
     '266':['Höchstlänge','verbot'],
     '267':['Verbot der Einfahrt','verbot'],
-    '268':['Schneeketten vorgeschrieben','verbot'],
+    '268':['Schneeketten vorgeschrieben','gebot'],
     '272':['Wendeverbot','verbot'],
     '274-50':['Zulässige Höchstgeschwindigkeit','verbot'],
     '274_1':['Beginn Tempo-30-Zone','verbot'],
@@ -12025,7 +12080,7 @@ const ZEICHEN_KATALOG = {
     '282':['Ende sämtlicher Streckenverbote','verbot'],
     '283':['Absolutes Haltverbot','verbot'],
     '286':['Eingeschränktes Haltverbot','verbot'],
-    '290_1':['Beginn Haltverbotszone','verbot'],
+    '290_1':['Beginn eingeschränktes Haltverbot (Zone)','verbot'],
     '301':['Einmalige Vorfahrt','richt'],
     '306':['Vorfahrtstraße','richt'],
     '307':['Ende der Vorfahrtstraße','richt'],
@@ -12042,21 +12097,21 @@ const ZEICHEN_KATALOG = {
     '331_2':['Ende der Kraftfahrstraße','richt'],
     '350-10':['Fußgängerüberweg','richt'],
     '354':['Wasserschutzgebiet','richt'],
-    '405':['Autobahn-Knotenpunkt','wegweiser'],
-    '406-50':['Knotenpunktstafel Autobahn','wegweiser'],
-    '410':['Wegweiser zur Autobahn','wegweiser'],
-    '415-10':['Vorwegweiser Bundesstraße','wegweiser'],
-    '418-10':['Vorwegweiser außerorts','wegweiser'],
-    '430-10':['Vorwegweiser zur Autobahn','wegweiser'],
-    '434-50':['Wegweisertafel Landstraße','wegweiser'],
-    '437':['Straßennamensschild','wegweiser'],
-    '438':['Vorwegweiser Landstraße','wegweiser'],
-    '439':['Wegweiser Landstraße','wegweiser'],
-    '440':['Vorwegweiser Autobahn','wegweiser'],
-    '441':['Wegweiser Autobahn','wegweiser'],
+    '405':['Autobahnnummer','wegweiser'],
+    '406-50':['Knotenpunktnummer (Autobahn)','wegweiser'],
+    '410':['Europastraße','wegweiser'],
+    '415-10':['Pfeilwegweiser auf Bundesstraßen','wegweiser'],
+    '418-10':['Pfeilwegweiser auf sonstigen Straßen','wegweiser'],
+    '430-10':['Pfeilwegweiser zur Autobahn','wegweiser'],
+    '434-50':['Tabellenwegweiser','wegweiser'],
+    '437':['Straßennamenschild','wegweiser'],
+    '438':['Vorwegweiser','wegweiser'],
+    '439':['Gegliederter Vorwegweiser','wegweiser'],
+    '440':['Vorwegweiser zur Autobahn','wegweiser'],
+    '441':['Gegliederter Vorwegweiser zur Autobahn','wegweiser'],
     '442-10':['Vorwegweiser für bestimmte Verkehrsarten','wegweiser'],
-    '448':['Ausfahrttafel Autobahn','wegweiser'],
-    '449':['Ankündigungstafel Autobahn','wegweiser'],
+    '448':['Ankündigungstafel (Autobahn)','wegweiser'],
+    '449':['Vorwegweiser auf Autobahnen','wegweiser'],
     '453':['Entfernungstafel Autobahn','wegweiser'],
     '454-10':['Umleitungswegweiser','wegweiser'],
     // Zusatzzeichen - selbst gezeichnet (werkzeug/zusatzzeichen-zeichnen.py),
@@ -12313,6 +12368,7 @@ window.waehleStil = (id) => {
   STILE.forEach(s => { if (s.id) document.body.classList.remove(s.id); });
   if (id) document.body.classList.add(id);
   localStorage.setItem('fs_stil', id);
+  try { localStorage.setItem('fs_start_design', '1'); aktualisiereStartCheck(); } catch(e) {}
   document.getElementById('stil-liste').innerHTML = STILE.map(previewKachel).join('');
   toast('Design aktualisiert ✓');
 };
@@ -13118,7 +13174,7 @@ window.leseSicherung = async (datei) => {
     <div id="kat-reiter" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
     <div id="kat-liste" style="max-height:46vh;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px"></div>
     <div style="font-size:0.66rem;color:var(--muted);margin-top:10px;line-height:1.5">
-      Amtliche Verkehrszeichen (Quelle: Bundesanstalt für Straßenwesen), gemeinfrei nach § 5 UrhG.
+      Amtliche Verkehrszeichen (Quelle: Bundesanstalt für Straßenwesen), gemeinfrei nach § 5 UrhG. Die Zusatzzeichen sind nach amtlichem Vorbild selbst gezeichnet.
       Einteilung nach StVO: Gefahrzeichen (Anlage 1), Vorschriftzeichen (Anlage 2 – Warte-/Haltgebote, Gebote, Verbote), Richtzeichen und Wegweisung (Anlage 3).
     </div>
     <button class="btn-sheet-cancel" onclick="document.getElementById('zeichen-katalog-modal').classList.remove('open')" style="margin-top:10px">Fertig</button>
