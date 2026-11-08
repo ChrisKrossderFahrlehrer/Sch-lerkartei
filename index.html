@@ -262,6 +262,15 @@ body.light {
   --shadow-sm: var(--glas-licht), 0 10px 30px rgba(0,0,0,0.30);
   --shadow-md: var(--glas-licht), 0 16px 40px rgba(0,0,0,0.40);
 }
+/* Lade-Schirm beim Start immer DECKEND. Er nutzte var(--bg) - im Design
+   "Glas" ist das zu 65 % durchsichtig, man sah das Login-Formular dahinter
+   ("Eingabe-Fenster beim Start", obwohl man angemeldet ist). */
+#auth-resolving-overlay { background: #0d1117 !important; }
+body.light #auth-resolving-overlay { background: #f4f6f9 !important; }
+body.style-glas #auth-resolving-overlay { background: #06080c !important; }
+body.style-glas.light #auth-resolving-overlay { background: #eef1f7 !important; }
+/* Solange der Lade-Schirm da ist, den Login gar nicht zeichnen */
+body:has(#auth-resolving-overlay) #screen-login { visibility: hidden; }
 body.style-glas {
   background:
     radial-gradient(60% 42% at 12% 8%, rgba(240,180,41,0.38), transparent 62%),
@@ -1606,7 +1615,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
      Login-Formular auf, bevor JS die echte Anmeldung erkennt - wirkt wie ein
      ungewolltes Ausloggen, obwohl keines stattfindet. Wird direkt in
      onAuthStateChanged entfernt, sobald die erste echte Antwort da ist. -->
-<div id="auth-resolving-overlay" style="position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px">
+<div id="auth-resolving-overlay" style="position:fixed;inset:0;z-index:9999;background:#0d1117;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px">
   <img src="./icon-192.png?v=3" alt="FahrSync" style="width:64px;height:64px;object-fit:contain;border-radius:16px">
   <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.3rem;color:var(--accent);opacity:0.85">FahrSync</div>
   <div id="auth-hilfe" style="display:none;max-width:320px;text-align:center;padding:0 20px;font-size:0.82rem;line-height:1.5;color:var(--muted)">
