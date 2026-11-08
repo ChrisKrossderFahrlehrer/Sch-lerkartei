@@ -4976,6 +4976,13 @@ onAuthStateChanged(auth, async (user) => {
 
   if (user) {
     currentUser = user;
+    // Superadmin sofort zur Admin-Seite - nicht erst Profil, Fahrschule und
+    // Status laden (das kostete beim Start vom Home-Bildschirm Sekunden).
+    if (user.email === 'chriskoo@mail.de' && urlParams.get('normal') !== '1' && !urlParams.get('invite')) {
+      window.__weiterleitung = true;
+      window.location.replace('adk-platform.html');
+      return;
+    }
     if (urlParams.get('invite')) { try { toast('ℹ️ Einladungslink erkannt – bitte zuerst abmelden, um ihn einzulösen.'); } catch(e){} }
 
     // Profil + Fahrschul-Status laden.
