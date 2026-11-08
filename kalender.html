@@ -738,13 +738,13 @@ onAuthStateChanged(auth,async user=>{
   const params=new URLSearchParams(window.location.search);
   if(params.get('schueler')&&params.get('lehrer')){showBookingPage(params.get('schueler'),params.get('lehrer'));return;}
   // iPhone-Startbildschirm: erst "niemand angemeldet", Sekunden spaeter der
-  // gespeicherte Nutzer. Wer zuletzt angemeldet war, wartet bis zu 5 s auf
+  // gespeicherte Nutzer. Wer zuletzt angemeldet war, wartet bis zu 20 s auf
   // dem Ladebildschirm statt den Login zu sehen (wie in index.html).
   if(!user){
     let zuletzt=false; try{ zuletzt=localStorage.getItem('fs_zuletzt_angemeldet')==='1'; }catch(e){}
     if(zuletzt && !window.__kalNutzerGesehen && !window.__kalNullAbgewartet){
       window.__kalNullAbgewartet=true;
-      setTimeout(()=>{ if(!window.__kalNutzerGesehen && !auth.currentUser) show('auth'); },5000);
+      setTimeout(()=>{ if(!window.__kalNutzerGesehen && !auth.currentUser) show('auth'); },20000);
       return;
     }
     show('auth');return;

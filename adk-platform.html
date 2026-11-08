@@ -1513,7 +1513,7 @@ window.setZahlungStatus = async (fsId, status) => {
 };
 // iPhone-Startbildschirm: Die Anmeldung meldet dort oft ZUERST "niemand
 // angemeldet" und erst Sekunden spaeter den gespeicherten Nutzer. Wer zuletzt
-// angemeldet war, sieht deshalb bis zu 5 Sekunden weiter den Ladebildschirm
+// angemeldet war, sieht deshalb bis zu 20 Sekunden weiter den Ladebildschirm
 // statt den Login (wie in index.html).
 let __nutzerGesehen = false, __nullAbgewartet = false;
 onAuthStateChanged(auth, async (user) => {
@@ -1530,7 +1530,7 @@ onAuthStateChanged(auth, async (user) => {
         if (__nutzerGesehen || auth.currentUser) return;
         ladenAus();
         showScreen('screen-login');
-      }, 5000);
+      }, 20000);
       return;
     }
     ladenAus();

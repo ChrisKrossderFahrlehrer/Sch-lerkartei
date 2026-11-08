@@ -1621,7 +1621,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
   // Sicherheitsnetz fuer den Lade-Schirm: Er verschwindet erst, wenn die
   // Anmeldung geklaert ist. Haengt dabei etwas (alte App-Version im
   // Zwischenspeicher, Netz, ein Skriptfehler), sah man bisher nur das Logo -
-  // ohne jeden Ausweg. Nach 8 Sekunden gibt es jetzt Knoepfe, und ein
+  // ohne jeden Ausweg. Nach 12 Sekunden gibt es jetzt Knoepfe, und ein
   // Skriptfehler wird mit angezeigt (hilft bei der Fehlersuche am Handy).
   (function () {
     var fehler = [];
@@ -1643,7 +1643,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     window.addEventListener('unhandledrejection', function (e) {
       var r = e.reason; fehler.push('Promise: ' + ((r && (r.code || r.message)) || r));
     });
-    setTimeout(zeige, 8000);
+    setTimeout(zeige, 12000);
     window.__appZuruecksetzen = function () {
       var fertig = function () { location.reload(); };
       try {
@@ -4954,7 +4954,8 @@ onAuthStateChanged(auth, async (user) => {
   // Sekunden spaeter den gespeicherten Nutzer. Bisher erschien in dieser Zeit
   // der Login - es sah aus, als muesse man sich laufend neu anmelden. Wer
   // zuletzt angemeldet war (und sich nicht selbst abgemeldet hat), sieht jetzt
-  // bis zu 5 Sekunden weiter den Ladebildschirm; kommt der Nutzer in der Zeit,
+  // bis zu 20 Sekunden weiter den Ladebildschirm (5 Sekunden reichten auf dem
+  // iPhone nicht: Login erschien, danach lud die Kartei trotzdem); kommt der Nutzer in der Zeit,
   // geht es direkt in die Kartei, sonst erscheint der Login.
   if (user) {
     window.__authNutzerGesehen = true;
@@ -4970,7 +4971,7 @@ onAuthStateChanged(auth, async (user) => {
       zeigeAbgemeldetAnsicht();
       const ov = document.getElementById('auth-resolving-overlay');
       if (ov) ov.remove();
-    }, 5000);
+    }, 20000);
     return;
   }
 
