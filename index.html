@@ -1904,7 +1904,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
       <strong style="color:var(--text)">2. Welche Daten werden verarbeitet?</strong><br>
       • Konto-Daten: E-Mail-Adresse, Name, Passwort (verschlüsselt)<br>
       • Vertrags- und Rechnungsdaten der Kunden: Name der Fahrschule bzw. des Fahrlehrers, Rechnungsanschrift, gebuchter Tarif, Abo-Status, Rechnungen<br>
-      • Schüler-Daten: Name, Geburtsdatum, Anschrift (Straße, PLZ, Ort), Ausbildungsfortschritt, Fahrstunden, Protokolle einschließlich der Unterschrift des Fahrschülers, Angaben zu Prüfungsversuchen sowie Notizen des Fahrlehrers (z. B. „Fürs nächste Mal")<br>
+      • Schüler-Daten: Name, Geburtsdatum, optional ein Foto (nur mit Einwilligung, nicht im Schüler-Portal sichtbar), Anschrift (Straße, PLZ, Ort), Ausbildungsfortschritt, Fahrstunden, Protokolle einschließlich der Unterschrift des Fahrschülers, Angaben zu Prüfungsversuchen sowie Notizen des Fahrlehrers (z. B. „Fürs nächste Mal")<br>
       • Ausbildungsnachweis: Art und Inhalt der praktischen Fahrstunden (Kategorien nach Anlage 3 zu § 6 Abs. 1 DV-FahrlG), besuchter theoretischer Unterricht (Themennummer, Datum, Dauer) – erforderlich zur gesetzlich vorgeschriebenen Ausbildungsdokumentation<br>
       • Chat-Nachrichten und optional übermittelte Bilder zwischen Fahrlehrer und Fahrschüler, einschließlich des Zeitpunkts der letzten Kenntnisnahme (Lesestatus)<br>
       • Nutzungsdaten: Anmeldezeitpunkte, technische Verbindungsdaten<br>
@@ -3203,6 +3203,28 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     </div>
     <div id="adresse-status" style="font-size:0.82rem;min-height:20px;margin-bottom:8px;text-align:center;padding:8px;border-radius:8px"></div>
     <button class="btn-main" onclick="speichereAdresse()">💾 Speichern</button>
+  </div>
+</div>
+
+<!-- FOTO UND GEBURTSTAG JE SCHÜLER -->
+<div class="modal-overlay" id="foto-geb-modal" onclick="closeModal(event)">
+  <div class="modal-sheet" style="max-width:420px">
+    <div class="sheet-title">📷 Foto und Geburtstag</div>
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px">
+      <div id="fg-vorschau" style="flex-shrink:0"></div>
+      <div style="display:flex;flex-direction:column;gap:8px;flex:1">
+        <label class="btn-sheet-cancel" style="margin:0;text-align:center;cursor:pointer;background:var(--surface2)">📷 Foto aufnehmen oder wählen
+          <input type="file" id="fg-datei" accept="image/*" style="display:none" onchange="fotoGewaehlt(this)">
+        </label>
+        <button type="button" id="fg-entfernen" class="btn-sheet-cancel" style="margin:0" onclick="fotoEntfernen()">Foto entfernen</button>
+      </div>
+    </div>
+    <p style="font-size:0.72rem;color:var(--muted);margin:0 0 14px;line-height:1.5">Nur mit Einverständnis des Schülers, bei Minderjährigen der Eltern. Das Foto sehen nur du und deine Fahrschule, nicht das Schüler-Portal.</p>
+    <div class="form-group"><label class="form-label" for="fg-geb">Geburtsdatum</label><input class="form-input" id="fg-geb" type="date"></div>
+    <p style="font-size:0.72rem;color:var(--muted);margin:-4px 0 12px;line-height:1.5">3 Tage vorher erscheint neben dem Namen ein Countdown, am Geburtstag eine Torte 🎂.</p>
+    <div id="fg-status" style="font-size:0.82rem;min-height:20px;margin-bottom:8px;text-align:center;padding:8px;border-radius:8px"></div>
+    <button class="btn-main" onclick="speichereFotoGeburtstag()">💾 Speichern</button>
+    <button class="btn-sheet-cancel" onclick="document.getElementById('foto-geb-modal').classList.remove('open')">Abbrechen</button>
   </div>
 </div>
 
@@ -5705,6 +5727,36 @@ function getSchuelerNr(s) {
 }
 function getColor(s) { const i = students.indexOf(s); return COLORS[(i<0?0:i)%COLORS.length]; }
 function initials(s) { return ((s.vorname||'?')[0] + (s.nachname||'?')[0]).toUpperCase(); }
+// Schuelerfoto: klein (192 px, JPEG) direkt in der Schuelerakte - gleiche
+// Zugriffsregeln wie die Akte, wird mit ihr geloescht, nie ans Portal
+// gegeben (buildPortalSnapshot nennt seine Felder einzeln). Nur echte
+// JPEG-Daten-URLs werden angezeigt, nie ein beliebiger Text im src.
+function fotoOk(f) { return typeof f === 'string' && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(f) && f.length < 200000; }
+function avatarHtml(s, c, stil) {
+  const st = stil || '';
+  if (fotoOk(s.foto)) return `<div class="avatar" style="background:${c};${st};padding:0;overflow:hidden"><img src="${s.foto}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block"></div>`;
+  return `<div class="avatar" style="background:${c};${st}">${initials(s)}</div>`;
+}
+// Tage bis zum naechsten Geburtstag in Ortszeit (0 = heute), sonst null.
+// 29.02. wird in Nicht-Schaltjahren am 28.02. gefeiert.
+function tageBisGeburtstag(s) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s.geburt || ''));
+  if (!m) return null;
+  const mon = +m[2] - 1, tag = +m[3];
+  const heute = new Date(); heute.setHours(0, 0, 0, 0);
+  const am = (j) => { const d = new Date(j, mon, tag); return d.getMonth() === mon ? d : new Date(j, mon + 1, 0); };
+  let g = am(heute.getFullYear());
+  if (g < heute) g = am(heute.getFullYear() + 1);
+  return Math.round((g - heute) / 86400000);
+}
+// Ab 3 Tagen vorher ein Countdown neben dem Namen, am Tag selbst eine Torte
+function geburtstagTag(s) {
+  if (s.archiviert) return '';
+  const n = tageBisGeburtstag(s);
+  if (n === null || n > 3) return '';
+  if (n === 0) return '<span title="Hat heute Geburtstag" style="font-size:1rem;margin-left:4px">🎂</span>';
+  return `<span title="Geburtstag ${n === 1 ? 'morgen' : 'in ' + n + ' Tagen'}" style="display:inline-block;margin-left:6px;background:rgba(240,180,41,0.15);color:var(--accent);border:1px solid rgba(240,180,41,0.4);border-radius:999px;font-size:0.62rem;font-weight:800;padding:1px 7px;white-space:nowrap;vertical-align:middle">🎈 ${n === 1 ? 'morgen' : 'in ' + n + ' Tagen'}</span>`;
+}
 function formatDate(d) { if (!d) return ''; const [y,m,day]=d.split('-'); return `${day}.${m}.${y}`; }
 // Datum als YYYY-MM-DD in ORTSZEIT. toISOString() rechnet nach UTC um und
 // liefert in deutscher Sommerzeit zwischen 00:00 und 02:00 den VORTAG.
@@ -6128,8 +6180,8 @@ function renderStudentCard(s) {
   const _anim = window.__cardAnim ? ' card-in' : '';
   const _delay = window.__cardAnim ? ('animation-delay:' + Math.min((window.__cardIdx++) * 0.028, 0.45) + 's;') : '';
   return `<div class="student-card${_anim}" onclick="openDetail('${s.id}')" style="${_delay}${(unread||expiryAbgelaufen)?'border-color:rgba(248,81,73,0.4)':''}">
-    <div class="avatar" style="background:${c}">${initials(s)}</div>
-    <div style="flex:1;min-width:0"><div class="sc-name">${ampelDot}${s.pinned?'📌 ':''}${escapeHtmlEigen(s.vorname)} ${escapeHtmlEigen(s.nachname)} ${bf17Tag}</div><div class="sc-meta">${meta}</div>${notifHTML}</div>
+    ${avatarHtml(s, c)}
+    <div style="flex:1;min-width:0"><div class="sc-name">${ampelDot}${s.pinned?'📌 ':''}${escapeHtmlEigen(s.vorname)} ${escapeHtmlEigen(s.nachname)}${geburtstagTag(s)} ${bf17Tag}</div><div class="sc-meta">${meta}</div>${notifHTML}</div>
     <div class="sc-right">
       <button onclick="event.stopPropagation();togglePin('${s.id}')" title="${s.pinned?'Lösen':'Anpinnen'}" style="background:none;border:none;cursor:pointer;font-size:1rem;padding:4px;min-width:40px;min-height:40px;display:inline-flex;align-items:center;justify-content:center;opacity:${s.pinned?'1':'0.35'};line-height:1">📌</button>
       <div class="progress-ring-wrap">
@@ -6340,13 +6392,16 @@ function renderDetail() {
   const ampelTag = `<span onclick="zeigeAmpelDetail('${s.id}')" style="background:${af.bg};color:${af.color};border:1px solid ${af.border};border-radius:6px;padding:2px 8px;font-size:0.72rem;font-weight:700;cursor:pointer" title="Prüfungsreife – tippen für Details">${af.icon} ${ampel.text}</span>`;
 
   document.getElementById('profile-strip').innerHTML=`
-    <div class="avatar" style="background:${c};width:50px;height:50px;font-size:1.1rem">${initials(s)}</div>
+    <div onclick="openFotoGeburtstag('${s.id}')" title="Foto und Geburtstag" style="position:relative;cursor:pointer;flex-shrink:0">
+      ${avatarHtml(s, c, 'width:50px;height:50px;font-size:1.1rem')}
+      <span style="position:absolute;right:-3px;bottom:-3px;background:var(--surface);border:1px solid var(--border);border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:0.65rem">📷</span>
+    </div>
     <div class="profile-info">
-      <div class="profile-name">${escapeHtmlEigen(s.vorname)} ${escapeHtmlEigen(s.nachname)}</div>
+      <div class="profile-name">${escapeHtmlEigen(s.vorname)} ${escapeHtmlEigen(s.nachname)}${geburtstagTag(s)}</div>
       <div class="profile-meta" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
         ${kennzeichenBadge(getSchuelerNr(s))}
         <span style="background:${badge.color};color:${badge.text};border:1px solid ${badge.border};border-radius:6px;padding:2px 8px;font-size:0.72rem;font-weight:700">${badge.label}</span>
-        ${a?'<span style="font-size:0.72rem;color:var(--muted)">'+a+' Jahre</span>':''}
+        <span onclick="openFotoGeburtstag('${s.id}')" style="cursor:pointer;font-size:0.72rem;color:var(--muted);text-decoration:underline;text-decoration-style:dotted">${a!==null&&a!==undefined&&!isNaN(a) ? a+' Jahre' : '🎂 Geburtstag eintragen'}</span>
         ${bf17DetailTag}
         ${ampelTag}
         <span onclick="openAdresseBearbeiten('${s.id}')" style="cursor:pointer;font-size:0.72rem;color:${s.strasse ? 'var(--muted)' : 'var(--danger)'};text-decoration:underline;text-decoration-style:dotted">
@@ -8667,7 +8722,7 @@ function renderDashboard() {
     const c = getColor(s);
     const warnung = pct >= 80 && !SONDERFAHRTEN.every(f => (s.sonderfahrten||{})[f.key] >= f.min);
     return `<div class="dash-student-row">
-      <div class="avatar" style="background:${c};width:38px;height:38px;font-size:0.85rem;flex-shrink:0">${initials(s)}</div>
+      ${avatarHtml(s, c, 'width:38px;height:38px;font-size:0.85rem;flex-shrink:0')}
       <div class="dash-bar-wrap">
         <div class="dash-name">
           <span>${escHtml(s.vorname)} ${escHtml(s.nachname)} ${warnung?'<span style="color:var(--danger);font-size:0.7rem">⚠️ Pflichtf. fehlen</span>':''}</span>
@@ -13002,6 +13057,81 @@ window.speichereAdresse = async () => {
 };
 
 
+// ── Foto und Geburtstag je Schueler ──
+window.openFotoGeburtstag = (schuelerId) => {
+  const s = getStudent(schuelerId);
+  if (!s) return;
+  window.__fgId = schuelerId;
+  window.__fgFoto = fotoOk(s.foto) ? s.foto : null;
+  document.getElementById('fg-geb').value = s.geburt || '';
+  document.getElementById('fg-status').textContent = '';
+  document.getElementById('fg-datei').value = '';
+  fotoVorschau();
+  document.getElementById('foto-geb-modal').classList.add('open');
+};
+function fotoVorschau() {
+  const s = getStudent(window.__fgId) || {};
+  document.getElementById('fg-vorschau').innerHTML =
+    avatarHtml({ ...s, foto: window.__fgFoto }, getColor(s), 'width:84px;height:84px;font-size:1.6rem');
+  document.getElementById('fg-entfernen').style.display = window.__fgFoto ? '' : 'none';
+}
+// Bild verkleinern: quadratischer Ausschnitt aus der Mitte, 192 px, JPEG
+function fotoVerkleinern(datei) {
+  return new Promise((ok, fehler) => {
+    const url = URL.createObjectURL(datei);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const seite = Math.min(img.naturalWidth, img.naturalHeight);
+        const sx = (img.naturalWidth - seite) / 2, sy = (img.naturalHeight - seite) / 2;
+        const cv = document.createElement('canvas'); cv.width = cv.height = 192;
+        cv.getContext('2d').drawImage(img, sx, sy, seite, seite, 0, 0, 192, 192);
+        let q = 0.82, daten = cv.toDataURL('image/jpeg', q);
+        while (daten.length > 60000 && q > 0.4) { q -= 0.1; daten = cv.toDataURL('image/jpeg', q); }
+        URL.revokeObjectURL(url); ok(daten);
+      } catch(e) { URL.revokeObjectURL(url); fehler(e); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); fehler(new Error('Bild nicht lesbar')); };
+    img.src = url;
+  });
+}
+window.fotoGewaehlt = async (input) => {
+  const datei = input.files && input.files[0];
+  if (!datei) return;
+  const st = document.getElementById('fg-status');
+  st.style.color = 'var(--muted)'; st.textContent = 'Bild wird vorbereitet…';
+  try {
+    const daten = await fotoVerkleinern(datei);
+    if (!fotoOk(daten)) throw new Error('Format');
+    window.__fgFoto = daten; fotoVorschau();
+    st.textContent = '';
+  } catch(e) {
+    console.warn('Foto', e);
+    st.style.color = 'var(--danger)'; st.textContent = 'Dieses Bild konnte nicht gelesen werden.';
+  }
+};
+window.fotoEntfernen = () => { window.__fgFoto = null; fotoVorschau(); };
+window.speichereFotoGeburtstag = async () => {
+  const id = window.__fgId; const s = getStudent(id);
+  if (!id || !s) return;
+  const geburt = document.getElementById('fg-geb').value || '';
+  const st = document.getElementById('fg-status');
+  if (geburt && (geburt > heuteLokal() || geburt < '1920-01-01')) {
+    st.style.color = 'var(--danger)'; st.textContent = 'Bitte ein gültiges Geburtsdatum eintragen.'; return;
+  }
+  const upd = { geburt };
+  upd.foto = window.__fgFoto ? window.__fgFoto : deleteField();
+  st.style.color = 'var(--muted)'; st.textContent = 'Wird gespeichert…';
+  try {
+    await dbUpd(doc(db, 'students', id), upd);
+    s.geburt = geburt; if (window.__fgFoto) s.foto = window.__fgFoto; else delete s.foto;
+    st.style.color = 'var(--accent2)'; st.textContent = '✓ Gespeichert';
+    setTimeout(() => { document.getElementById('foto-geb-modal').classList.remove('open'); openDetail(id); try { renderList(); } catch(e) {} }, 400);
+  } catch(e) {
+    console.warn('speichereFotoGeburtstag', e);
+    st.style.color = 'var(--danger)'; st.textContent = 'Fehler beim Speichern.';
+  }
+};
 
 // ══ KOMPLETTSICHERUNG ═════════════════════════════════════════════
 // Zweck (Kundenwunsch): Der Fahrlehrer bzw. die Fahrschule soll die
