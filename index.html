@@ -2723,15 +2723,15 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
   <!-- Highlight box -->
   <div id="tutorial-highlight" style="position:absolute;border:2.5px solid var(--accent);border-radius:12px;box-shadow:0 0 0 4000px rgba(0,0,0,0.65);transition:all 0.35s cubic-bezier(.4,0,.2,1);pointer-events:none;z-index:9001"></div>
   <!-- Tooltip card -->
-  <div id="tutorial-card" style="position:absolute;background:var(--surface);border:1.5px solid var(--accent);border-radius:16px;padding:18px 20px;max-width:290px;width:calc(100vw - 40px);box-shadow:0 8px 32px rgba(0,0,0,0.5);z-index:9002;pointer-events:all;transition:all 0.3s ease">
+  <div id="tutorial-card" style="position:absolute;background:var(--surface);border:1.5px solid var(--accent);border-radius:16px;padding:18px 18px;max-width:310px;width:calc(100vw - 30px);box-shadow:0 8px 32px rgba(0,0,0,0.5);z-index:9002;pointer-events:all;transition:all 0.3s ease">
     <div style="font-size:1.5rem;margin-bottom:6px" id="tut-emoji">👋</div>
     <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1rem;margin-bottom:6px" id="tut-title">Willkommen!</div>
     <div style="font-size:0.84rem;color:var(--muted);line-height:1.5" id="tut-text">Lass uns kurz die wichtigsten Funktionen zeigen.</div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px">
       <button onclick="skipTutorial()" style="background:none;border:none;color:var(--muted);font-size:0.78rem;cursor:pointer;padding:0;font-family:'Manrope',sans-serif">Überspringen</button>
       <div style="display:flex;align-items:center;gap:10px">
-        <div id="tut-dots" style="display:flex;gap:5px"></div>
-        <button onclick="tutNext()" id="tut-next-btn" style="background:var(--accent);border:none;color:#0d1117;padding:8px 18px;border-radius:10px;font-weight:700;font-size:0.85rem;cursor:pointer;font-family:'Syne',sans-serif">Weiter →</button>
+        <div id="tut-dots" style="display:flex;gap:4px"></div>
+        <button onclick="tutNext()" id="tut-next-btn" style="white-space:nowrap;background:var(--accent);border:none;color:#0d1117;padding:8px 14px;border-radius:10px;font-weight:700;font-size:0.85rem;cursor:pointer;font-family:'Syne',sans-serif">Weiter →</button>
       </div>
     </div>
   </div>
@@ -11313,39 +11313,45 @@ const TUTORIAL_STEPS = [
     target: null,
   },
   {
+    emoji: '✅',
+    title: 'Erste Schritte',
+    text: 'Oben in der Liste stehen deine ersten Schritte: Schüler anlegen, Adresse der Fahrschule eintragen, Kollegen einladen, Design wählen. Erledigtes wird abgehakt.',
+    target: null,
+  },
+  {
     emoji: '➕',
     title: 'Schüler anlegen',
-    text: 'Mit diesem Button legst du einen neuen Schüler an – Klasse B, B197, BE oder A.',
+    text: 'Mit diesem Button legst du einen neuen Schüler an – Klasse B, B197, BE oder A. Er steht dann auch gleich im Kalender.',
     target: 'fab-add',
   },
   {
     emoji: '📇',
     title: 'Schüler-Kartei',
-    text: 'Tippe auf einen Schüler: Fahrstunden zählen, Protokoll führen (geplante Stunden = blau), Themen bewerten, PDF exportieren.',
+    text: 'Tippe auf einen Schüler: Fahrstunden zählen, Protokoll mit Unterschrift führen (geplante Stunden = blau), Themen bewerten, PDF exportieren.',
+    target: null,
+  },
+  {
+    emoji: '🚦',
+    title: 'Prüfungsampel',
+    text: 'Die Ampel zeigt dir, wie weit ein Schüler für die Prüfung ist – Sonderfahrten, Theorie, Themen. Antippen zeigt, was noch fehlt. Oben suchst du nach Namen und filterst z. B. nach Prüfungsreife.',
     target: null,
   },
   {
     emoji: '🔑',
     title: 'Schüler-Portal',
-    text: 'In der Kartei einen Zugangscode erzeugen – dein Schüler sieht damit Fortschritt, Protokoll, Termine und kann mit dir chatten.',
+    text: 'In der Kartei einen Zugangscode erzeugen. Dein Schüler sieht Fortschritt, Protokoll und Termine, chattet mit dir, lernt Theorie und Verkehrszeichen und bekommt eine Erinnerung vor der Fahrstunde.',
     target: null,
-  },
-  {
-    emoji: '🔍',
-    title: 'Suchen & Filtern',
-    text: 'Oben nach Namen suchen. Die Chips filtern nach Klasse, Fortschritt oder Archiv.',
-    target: 'search',
   },
   {
     emoji: '📅',
-    title: 'Planer & Abo',
-    text: 'Mit dem Planer-Modul buchen Schüler ihre Fahrstunden online – du bestätigst nur noch. Alles 14 Tage kostenlos testbar über den ⭐-Button.',
+    title: 'Kalender',
+    text: 'Im Kalender buchen Schüler ihre Fahrstunden online – du bestätigst nur noch. Als Inhaber oder eigenständiger Fahrlehrer erstellst du dort auch den Ausbildungsnachweis. 14 Tage kostenlos testen über den ⭐-Button.',
     target: null,
   },
   {
-    emoji: '✅',
+    emoji: '🚀',
     title: 'Los geht\'s!',
-    text: 'Das war\'s! Die ausführliche Hilfe (inkl. Abo, Einladungen & Push) findest du jederzeit unter ⚙️ → ❓ Hilfe.',
+    text: 'Design und Einstellungen findest du unter ⚙️, die ausführliche Hilfe unter ⚙️ → ❓ Hilfe.',
     target: null,
   },
 ];
@@ -11389,7 +11395,7 @@ function renderTutStep() {
   // Dots
   const dotsEl = document.getElementById('tut-dots');
   dotsEl.innerHTML = Array.from({length: total}, (_,i) =>
-    `<div style="width:${i===tutStep?16:6}px;height:6px;border-radius:3px;background:${i===tutStep?'var(--accent)':'var(--border)'};transition:all 0.3s"></div>`
+    `<div style="width:${i===tutStep?14:5}px;height:5px;border-radius:3px;background:${i===tutStep?'var(--accent)':'var(--border)'};transition:all 0.3s"></div>`
   ).join('');
 
   // Highlight target element
@@ -11408,13 +11414,13 @@ function renderTutStep() {
       highlight.style.height = (r.height + pad*2) + 'px';
 
       // Position card: below target if space, else above
-      const cardH = 180;
+      const cardH = card.offsetHeight || 200;  // echte Hoehe, Texte sind unterschiedlich lang
       const spaceBelow = window.innerHeight - r.bottom - 20;
       const cardTop = spaceBelow > cardH
         ? r.bottom + 14
         : r.top - cardH - 14;
       card.style.top  = Math.max(10, cardTop) + 'px';
-      card.style.left = Math.min(Math.max(10, r.left - 10), window.innerWidth - 310) + 'px';
+      card.style.left = Math.min(Math.max(10, r.left - 10), window.innerWidth - 325) + 'px';
     }
   } else {
     // Centered card, no highlight
