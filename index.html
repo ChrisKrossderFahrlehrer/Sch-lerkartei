@@ -6615,7 +6615,7 @@ function renderDetail() {
       </div>
     </div>
 
-    <div class="section-block" onclick="toggleTheorie()" style="cursor:pointer">
+    ${isBE ? '' : `<div class="section-block" onclick="toggleTheorie()" style="cursor:pointer">
       <div class="section-body" style="display:flex;align-items:center;gap:14px;padding:16px">
         <div style="width:36px;height:36px;border-radius:10px;border:2px solid ${s.theorieBestanden?'var(--accent2)':'var(--border)'};background:${s.theorieBestanden?'var(--accent2)':'var(--surface2)'};display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;transition:all 0.2s">
           ${s.theorieBestanden?'✓':''}
@@ -6627,7 +6627,7 @@ function renderDetail() {
           </div>
         </div>
       </div>
-    </div>
+    </div>`}
     <div class="section-block">
       <div class="section-header"><div class="section-title">Pflichtfahrten Klasse ${klasse}</div><span style="font-size:0.65rem;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:1px 5px">Gesetzlich vorgeschrieben</span></div>
       <div class="section-body"><div class="sonder-grid">${sonderHTML}</div></div>
@@ -9137,7 +9137,7 @@ window.openSettings = async () => {
   if (emErr) emErr.textContent = '';
   if (emOk)  emOk.textContent = '';
   const emDisp = document.getElementById('email-current-display');
-  if (emDisp && currentUser) emDisp.innerHTML = 'Aktuelle E-Mail: <b>' + (currentUser.email || '–') + '</b>';
+  if (emDisp && currentUser) emDisp.innerHTML = 'Aktuelle E-Mail: <b>' + escHtml(currentUser.email || '–') + '</b>';
   const disp = document.getElementById('settings-username-display');
   if (disp && currentUser) disp.textContent = '👤 Angemeldet als: ' + (currentUser.displayName || '');
   // Prüforganisation: Liste füllen und aktuellen Stand anzeigen
@@ -9612,7 +9612,13 @@ function buildPortalSnapshot(s, code, expiresAt) {
     schaltstunden:     s.schaltstunden || 0,
     zielSchaltstunden: s.zielSchaltstunden || 10,
     testfahrtBestanden:s.testfahrtBestanden || false,
-    // KEIN pruefKommentar (interner Fahrlehrer-Kommentar)
+    // FIX: Der "Kommentar zur Pruefungsreife" ist in der Akte ausdruecklich
+    // als "Fuer Schueler sichtbar" gekennzeichnet und wird im Portal
+    // angezeigt. Er fehlte hier - jedes weitere Speichern (eine Fahrstunde
+    // mehr, ein Thema bewertet) schrieb den Schnappschuss neu und der
+    // Kommentar verschwand beim Schueler wieder. Interne Notizen
+    // (notes, notizHistorie) bleiben weiterhin draussen.
+    pruefKommentar:    s.pruefKommentar || '',
     code:              code,
     expiresAt:         expiresAt,
   };
@@ -11227,10 +11233,20 @@ async function loadChatMessages() {
     window.__chatMessages = (codeDoc && Array.isArray(codeDoc.messages)) ? codeDoc.messages : [];
     const msgs = (codeDoc && Array.isArray(codeDoc.messages) ? codeDoc.messages : [])
       .slice()
-      .sort((a,b) => (a.timestamp||0) - (b.timestamp||0))
+      .sort((a,b) => (a.timestamp||a.createdAt||0) - (b.timestamp||b.createdAt||0))
+      // FIX: Hier wurden nur text/createdAt/senderUid uebernommen - imagePath
+      // und imageUrl gingen verloren. Bilder (vom Schueler wie vom
+      // Fahrlehrer) erschienen deshalb in diesem Chat nur als leere
+      // Sprechblase, und aeltere Bildnachrichten ohne 'timestamp' hatten
+      // keine Uhrzeit.
       .map(m => ({
         text: m.text,
-        createdAt: m.timestamp,
+        imagePath: m.imagePath || null,
+        // Nur Adressen des eigenen Bildspeichers: Das Feld kann auch der
+        // Schueler schreiben - sonst liesse sich dem Fahrlehrer ein fremdes
+        // Bild (Zaehlpixel) unterschieben.
+        imageUrl: /^https:\/\/firebasestorage\.googleapis\.com\//.test(String(m.imageUrl || '')) ? m.imageUrl : null,
+        createdAt: m.timestamp || m.createdAt,
         senderUid: m.sender === 'fahrlehrer' ? currentUser.uid : null
       }));
 
@@ -11281,7 +11297,7 @@ async function loadChatMessages() {
       return `${trenner}
         <div style="display:flex;flex-direction:column;align-items:${vonFahrlehrer?'flex-end':'flex-start'};gap:2px">
           <div class="chat-bubble" style="
-            padding:${msg.imageUrl?'6px':'10px 14px'};border-radius:${vonFahrlehrer?'16px 16px 4px 16px':'16px 16px 16px 4px'};
+            padding:${bildQuelle?'6px':'10px 14px'};border-radius:${vonFahrlehrer?'16px 16px 4px 16px':'16px 16px 16px 4px'};
             background:${vonFahrlehrer?'var(--accent)':'var(--surface2)'};
             color:${vonFahrlehrer?'#0d1117':'var(--text)'}">
             ${inhalt}

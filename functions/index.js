@@ -277,7 +277,10 @@ exports.trennKalenderVerbindung = onCall({ region: 'europe-west3' }, async (reqC
 // wechsel eine Rechnung - spaetere automatische Verlaengerungen ueber
 // PayPal loesen aktuell KEINE neue Rechnung aus. Fuer laufende monatliche
 // Rechnungen braeuchte es zusaetzlich einen PayPal-Webhook.
-const { rechnungAnlegen, RECHNUNG_PLANS, abrechnungsZiel, rechnungsBeschreibung } = require('./rechnung');
+// PAYPAL_PLAN_IDS fehlte hier: bestaetigePaypalAbo brach deshalb bei JEDEM
+// Aufruf mit "PAYPAL_PLAN_IDS is not defined" ab - ein per PayPal bezahltes
+// Abo wurde ueber diesen Weg nie freigeschaltet.
+const { rechnungAnlegen, RECHNUNG_PLANS, PAYPAL_PLAN_IDS, abrechnungsZiel, rechnungsBeschreibung } = require('./rechnung');
 // Gekuendigte Abos: 14 Tage Nachlauf, dann 'free' - siehe functions/abo.js.
 const { kuendigungVormerken, kuendigungAufheben, abgelaufeneAbosBeenden,
         KUENDIGUNG_ENTFERNEN } = require('./abo');
@@ -1274,8 +1277,12 @@ exports.syncBookedCount = onDocumentUpdated('slots/{slotId}', async (event) => {
       // Trigger aber unter Umstaenden noch gar nicht gelaufen, der Schueler
       // saehe also den alten Stand. Deshalb hier nachziehen.
       if (neuerStand !== null) {
+        // update statt set(merge): Gibt es das Dokument noch nicht, darf es
+        // hier NICHT entstehen. Ein Dokument nur mit dem Zaehler (ohne
+        // lehrerUid) konnte der Fahrlehrer danach nie mehr beschreiben - der
+        // Buchungslink fuer diesen Schueler liess sich nicht mehr erstellen.
         await db.doc(`bookingStudents/${schuelerId}`)
-          .set({ bookedCount: neuerStand }, { merge: true })
+          .update({ bookedCount: neuerStand })
           .catch(() => {});
       }
     } catch (e) {

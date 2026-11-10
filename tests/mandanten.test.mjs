@@ -526,6 +526,143 @@ await pruefe('Fahrlehrer (echtes Konto) meldet Push ohne Zugangscode an', async 
   await assertSucceeds(setDoc(doc(als(LEHRER), 'fcmTokens', 'tok-lehrer-1'), { uid: LEHRER, ua: 'Test', createdAt: Date.now() }));
 });
 
+// ─────────────────────────────────────────────────────────────────────────
+// ZWEITE PRUEFUNG 11/2026
+console.log('\nKETTE 6 — ueber ein geloeschtes Profil in den Kalender einer fremden Schule');
+// So ging es: als Fahrschule registrieren, mit dem Fahrschul-Code "beitreten"
+// (wartend), Kalenderprofil mit der fremden Schule anlegen, wieder austreten,
+// eigenes Profil loeschen. Fuer Konten OHNE Profil galt im Kalender eine
+// Ausnahme von der Freigabe - damit stand der Kalender der Schule offen.
+const DIEB = 'dieb';
+await pruefe('Schritt 1: als Fahrschule registrieren darf', async () => {
+  await assertSucceeds(setDoc(doc(als(DIEB), 'users', DIEB), {
+    uid: DIEB, rolle: 'fahrschul-admin', typ: 'fahrschule', status: 'ausstehend', fahrschuleId: DIEB,
+  }));
+});
+await pruefe('Schritt 2: mit dem Code beitreten (wartend) darf', async () => {
+  await assertSucceeds(updateDoc(doc(als(DIEB), 'users', DIEB), {
+    fahrschuleId: SCHULE, beitrittCode: CODE, status: 'ausstehend',
+  }));
+});
+await pruefe('Schritt 3: Kalenderprofil anlegen darf (bringt allein nichts)', async () => {
+  await assertSucceeds(setDoc(doc(als(DIEB), 'kalenderUsers', DIEB), { uid: DIEB, schoolId: SCHULE }));
+  await assertFails(getDoc(doc(als(DIEB), 'slots', 'slot-schule')));
+});
+await pruefe('Schritt 4: wieder austreten darf', async () => {
+  await assertSucceeds(updateDoc(doc(als(DIEB), 'users', DIEB), { fahrschuleId: DIEB, fahrschuleName: null }));
+});
+await pruefe('Schritt 5: eigenes Profil loeschen darf NICHT', async () => {
+  await assertFails(deleteDoc(doc(als(DIEB), 'users', DIEB)));
+});
+// Und falls es so ein Konto schon gibt (Profil weg, Kalenderprofil zeigt auf
+// die fremde Schule):
+const OHNE_PROFIL = 'ohne-profil';
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  const db = ctx.firestore();
+  await setDoc(doc(db, 'kalenderUsers', OHNE_PROFIL), { uid: OHNE_PROFIL, schoolId: SCHULE });
+  await setDoc(doc(db, 'schools', SCHULE), { name: 'Schule', adminUid: SCHULE });
+  await setDoc(doc(db, 'users', 'mitglied-weg'), { uid: 'mitglied-weg', rolle: 'fahrlehrer', status: 'aktiv', fahrschuleId: SCHULE });
+  await setDoc(doc(db, 'schueler', 'kAdopt'),  { schoolId: SCHULE, lehrerUid: LEHRER, fname: 'Tom' });
+  await setDoc(doc(db, 'schueler', 'kAdopt2'), { schoolId: SCHULE, lehrerUid: LEHRER, fname: 'Pia' });
+  await setDoc(doc(db, 'bookingStudents', 'kAdopt'),  { bookedCount: 3 });
+  await setDoc(doc(db, 'bookingStudents', 'kAdopt2'), { bookedCount: 1 });
+  await setDoc(doc(db, 'bookingStudents', 'bs2'), { lehrerUid: LEHRER, vorname: 'Mia' });
+});
+await pruefe('Konto OHNE Profil liest die Termine der Schule NICHT', async () => {
+  await assertFails(getDoc(doc(als(OHNE_PROFIL), 'slots', 'slot-schule')));
+});
+await pruefe('...listet die Termine der Schule NICHT', async () => {
+  await assertFails(getDocs(query(collection(als(OHNE_PROFIL), 'slots'), where('schoolId', '==', SCHULE))));
+});
+await pruefe('...listet die Kalenderprofile der Schule NICHT', async () => {
+  await assertFails(getDocs(query(collection(als(OHNE_PROFIL), 'kalenderUsers'), where('schoolId', '==', SCHULE))));
+});
+await pruefe('...liest das Schulprofil NICHT', async () => {
+  await assertFails(getDoc(doc(als(OHNE_PROFIL), 'schools', SCHULE)));
+});
+await pruefe('...schiebt der Schule KEINEN Termin unter', async () => {
+  await assertFails(setDoc(doc(als(OHNE_PROFIL), 'slots', 'slotOhneProfil1'), { schoolId: SCHULE, lehrerUid: OHNE_PROFIL }));
+});
+await pruefe('Konto OHNE Profil legt KEIN Kalenderprofil an (fremde Schule)', async () => {
+  await assertFails(setDoc(doc(als('ohne-profil-2'), 'kalenderUsers', 'ohne-profil-2'), { uid: 'ohne-profil-2', schoolId: SCHULE }));
+});
+await pruefe('...auch nicht mit leerer Schule', async () => {
+  await assertFails(setDoc(doc(als('ohne-profil-2'), 'kalenderUsers', 'ohne-profil-2'), { uid: 'ohne-profil-2', schoolId: null }));
+});
+await pruefe('Inhaber weist einem AUSGETRETENEN Lehrer nichts mehr zu', async () => {
+  await assertFails(updateDoc(doc(als(SCHULE), 'schueler', 'kUebertrag'), { lehrerUid: EX }));
+});
+await pruefe('Inhaber weist einem WARTENDEN Mitglied nichts zu', async () => {
+  await assertFails(updateDoc(doc(als(SCHULE), 'schueler', 'kUebertrag'), { lehrerUid: WARTET }));
+});
+await pruefe('Kollege aendert das Kalenderprofil eines anderen NICHT', async () => {
+  await assertFails(updateDoc(doc(als(ALT), 'kalenderUsers', LEHRER), { blockDauer: 45 }));
+});
+await pruefe('Inhaber aendert am fremden Kalenderprofil NUR die Blockdauer', async () => {
+  await assertFails(updateDoc(doc(als(SCHULE), 'kalenderUsers', LEHRER), { approved: false }));
+  await assertFails(updateDoc(doc(als(SCHULE), 'kalenderUsers', LEHRER), { schoolId: 'andere-schule' }));
+});
+await pruefe('Mitglied aendert das Schulprofil NICHT (nur der Inhaber)', async () => {
+  await assertFails(updateDoc(doc(als(LEHRER), 'schools', SCHULE), { name: 'Umbenannt' }));
+});
+await pruefe('Fremder uebernimmt KEIN Buchungsdokument ohne Lehrer', async () => {
+  await assertFails(setDoc(doc(als(ANGREIFER), 'bookingStudents', 'kAdopt2'), { lehrerUid: ANGREIFER, vorname: 'X' }, { merge: true }));
+});
+
+console.log('\nGEGENPROBE — was der Kalender dafuer wirklich braucht');
+await pruefe('Inhaber setzt die Blockdauer eines Fahrlehrers', async () => {
+  await assertSucceeds(updateDoc(doc(als(SCHULE), 'kalenderUsers', LEHRER), { blockDauer: 90 }));
+});
+await pruefe('Inhaber aendert sein Schulprofil (Name, Fahrstundenarten)', async () => {
+  await assertSucceeds(updateDoc(doc(als(SCHULE), 'schools', SCHULE), {
+    name: 'Fahrschule Muster', bundesland: 'BB', fahrstundenarten: [{ id: 'fahrstunde', label: 'Fahrstunde', color: '#4a90d9' }],
+  }));
+});
+await pruefe('Inhaber legt das Schulprofil an, wenn es noch keines gibt', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => { await deleteDoc(doc(ctx.firestore(), 'schools', SCHULE)); });
+  await assertSucceeds(getDoc(doc(als(SCHULE), 'schools', SCHULE)));
+  await assertSucceeds(setDoc(doc(als(SCHULE), 'schools', SCHULE), { name: 'Schule', lehrerDarfSchuelerAnlegen: true, adminUid: SCHULE, createdAt: Date.now() }));
+});
+await pruefe('Mitglied liest das Schulprofil (Bundesland, Fahrstundenarten)', async () => {
+  await assertSucceeds(getDoc(doc(als(LEHRER), 'schools', SCHULE)));
+});
+await pruefe('Inhaber loescht das Profil eines Mitglieds seiner Schule', async () => {
+  await assertSucceeds(deleteDoc(doc(als(SCHULE), 'users', 'mitglied-weg')));
+});
+await pruefe('Inhaber aendert einen Termin eines AUSGETRETENEN Lehrers (Lehrer bleibt)', async () => {
+  await assertSucceeds(updateDoc(doc(als(SCHULE), 'slots', 'slot-ex'), { bookedBy: null, type: 'fahrstunde' }));
+});
+await pruefe('...und gibt ihn an einen aktiven Kollegen weiter', async () => {
+  await assertSucceeds(updateDoc(doc(als(SCHULE), 'slots', 'slot-ex'), { lehrerUid: LEHRER }));
+});
+await pruefe('Fahrlehrer uebernimmt das Buchungsdokument SEINES Schuelers (nur Zaehler vorhanden)', async () => {
+  await assertSucceeds(setDoc(doc(als(LEHRER), 'bookingStudents', 'kAdopt'), { vorname: 'Tom', lehrerUid: LEHRER, aktiv: true }, { merge: true }));
+});
+
+console.log('\nOHNE LOGIN — Buchungsseite: nur bekannte Felder, kurze Texte');
+await pruefe('Buchungsanfrage mit ueberlangem Vornamen darf NICHT', async () => {
+  await assertFails(setDoc(doc(ohneAnmeldung(), 'bookingRequests', 'Aa1bBb2cCc3dDd4eEe5f'), { ...anfrage, vorname: 'x'.repeat(61) }));
+});
+await pruefe('...mit zusaetzlichem Feld darf NICHT', async () => {
+  await assertFails(setDoc(doc(ohneAnmeldung(), 'bookingRequests', 'Aa1bBb2cCc3dDd4eEe5g'), { ...anfrage, extra: '<img src=x onerror=alert(1)>' }));
+});
+await pruefe('...mit Sonderzeichen in der Termin-Kennung darf NICHT', async () => {
+  await assertFails(setDoc(doc(ohneAnmeldung(), 'bookingRequests', 'Aa1bBb2cCc3dDd4eEe5h'), { ...anfrage, slotId: "a');alert(1);('" }));
+});
+await pruefe('...Tauschanfrage, wie die Buchungsseite sie schickt, darf', async () => {
+  await assertSucceeds(setDoc(doc(ohneAnmeldung(), 'bookingRequests', 'Aa1bBb2cCc3dDd4eEe5i'),
+    { ...anfrage, swapSlotId: 'Ab3dEf6hIj9kLm2nOp5q', type: 'fahrstunde', tausch: true }));
+});
+await pruefe('Nachricht mit zusaetzlichem Feld darf NICHT', async () => {
+  await assertFails(setDoc(doc(ohneAnmeldung(), 'bookingMessages', 'Mm1nNo2pPq3rRs4tTu5w'), { ...nachricht, html: '<b>x</b>' }));
+});
+await pruefe('Warteliste mit ueberlanger Notiz darf NICHT', async () => {
+  await assertFails(setDoc(doc(ohneAnmeldung(), 'bookingWaitlist', 'bs2'), { ...wl('bs2'), notiz: 'x'.repeat(501) }));
+});
+await pruefe('...mit 500 Zeichen darf', async () => {
+  await assertSucceeds(setDoc(doc(ohneAnmeldung(), 'bookingWaitlist', 'bs2'), { ...wl('bs2'), notiz: 'x'.repeat(500) }));
+});
+
 await testEnv.cleanup();
 console.log(`\n${bestanden} bestanden, ${fehlgeschlagen} fehlgeschlagen\n`);
 process.exit(fehlgeschlagen > 0 ? 1 : 0);

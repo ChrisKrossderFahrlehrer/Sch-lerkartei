@@ -252,6 +252,9 @@ tr:last-child td{border-bottom:none;}
 .sa-school-meta{font-size:12px;color:var(--text-muted);margin-top:3px;}
 
 /* ── Mobile ── */
+/* Das aufklappbare Menue gibt es nur auf dem Handy. Ohne diese Grundregel
+   stand am Rechner ein ungestalteter Knopf "☰ Menü" ueber der Seitenleiste. */
+.mobile-nav-bar,.sidebar-backdrop{display:none;}
 @media(max-width:768px){
   #toast{bottom:80px;right:10px;left:10px;max-width:100%;text-align:center;}
   #auth-screen{padding:16px;align-items:flex-start;padding-top:32px;min-height:100dvh;overflow-y:auto;}
@@ -580,11 +583,11 @@ window.blockTime=async function(year,month,day,lehrerUid){
     await addDoc(collection(db,'blocked'),{lehrerUid,schoolId:currentSchoolId||null,year,month,day,grund,label,ganztags,vonMin,bisMin,notiz,createdAt:serverTimestamp()});
     if(lehrerUid===currentUser.uid){try{await publishMyBookingLink();}catch(e){}}
     toast('Zeit gesperrt.','success');closeModal();
-    if(lehrerUid===currentUser.uid)renderCal();else renderAdminCal();
+    if(document.getElementById('admin-cal-grid'))renderAdminCal();else renderCal();
   }catch(e){console.warn('block',e);toast('Sperren fehlgeschlagen.','error');}
 };
 window.unblockTime=async function(id,isOwn){
-  try{await deleteDoc(doc(db,'blocked',id));if(isOwn){try{await publishMyBookingLink();}catch(e){}}toast('Aufgehoben.','success');closeModal();if(isOwn)renderCal();else renderAdminCal();}
+  try{await deleteDoc(doc(db,'blocked',id));if(isOwn){try{await publishMyBookingLink();}catch(e){}}toast('Aufgehoben.','success');closeModal();if(document.getElementById('admin-cal-grid'))renderAdminCal();else renderCal();}
   catch(e){toast('Fehlgeschlagen.','error');}
 };
 
@@ -592,23 +595,37 @@ async function loadTypes() {
   try {
     if (istEinzelLehrer) {
       fahrstundenarten = (currentProfile && currentProfile.fahrstundenarten && currentProfile.fahrstundenarten.length) ? currentProfile.fahrstundenarten : DEFAULT_ARTEN;
+    } else if (currentSchool && Array.isArray(currentSchool.fahrstundenarten) && currentSchool.fahrstundenarten.length) {
+      // Eigene Arten der Fahrschule (schools/{id}.fahrstundenarten)
+      fahrstundenarten = currentSchool.fahrstundenarten;
     } else {
+      // Altbestand: eine gemeinsame Liste fuer alle (settings/fahrstundenarten).
+      // Schreiben darf dort nur der Betreiber - Fahrschulen speichern ihre
+      // Arten jetzt bei sich (siehe saveArten).
       const snap = await getDoc(doc(db,'settings','fahrstundenarten'));
       fahrstundenarten = (snap.exists()&&snap.data().arten?.length) ? snap.data().arten : DEFAULT_ARTEN;
     }
   } catch(e) { fahrstundenarten = DEFAULT_ARTEN; }
+  if (!Array.isArray(fahrstundenarten) || !fahrstundenarten.length) fahrstundenarten = DEFAULT_ARTEN;
+  // Eigene Kopie: Aendern/Loeschen darf die Standardliste nicht anfassen
+  fahrstundenarten = fahrstundenarten.filter(a=>a&&a.id).map(a=>({id:String(a.id),label:String(a.label==null?a.id:a.label),color:artFarbe(a.color)}));
+  if (!fahrstundenarten.length) fahrstundenarten = DEFAULT_ARTEN.map(a=>({...a}));
   injectTypeBadgeStyles();
 }
 function injectTypeBadgeStyles() {
   let old=document.getElementById('dts'); if(old)old.remove();
   const s=document.createElement('style'); s.id='dts';
-  s.textContent=fahrstundenarten.map(t=>{const h=t.color,r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);
-    return `.slot-${t.id}{background:rgba(${r},${g},${b},0.22);color:${h};filter:brightness(1.4);}.badge-${t.id}{background:rgba(${r},${g},${b},0.18);color:${h};filter:brightness(1.4);}`;
+  s.textContent=fahrstundenarten.map(t=>{const h=artFarbe(t.color),r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);
+    return `.slot-${artKlasse(t.id)}{background:rgba(${r},${g},${b},0.22);color:${h};filter:brightness(1.4);}.badge-${artKlasse(t.id)}{background:rgba(${r},${g},${b},0.18);color:${h};filter:brightness(1.4);}`;
   }).join('');
   document.head.appendChild(s);
 }
+// Art-Kennung und Farbe kommen aus gespeicherten Einstellungen - nie ungeprueft
+// in class="..." oder style="..." einsetzen.
+function artKlasse(id){return String(id==null?'':id).replace(/[^A-Za-z0-9_-]/g,'_');}
+function artFarbe(c){return /^#[0-9a-fA-F]{6}$/.test(String(c))?String(c):'#888888';}
 function typeLabel(id){const t=fahrstundenarten.find(a=>a.id===id);return t?t.label:id;}
-function typeColor(id){const t=fahrstundenarten.find(a=>a.id===id);return t?t.color:'#888';}
+function typeColor(id){const t=fahrstundenarten.find(a=>a.id===id);return t?artFarbe(t.color):'#888888';}
 function typeBadgeHtml(id){const l=typeLabel(id);let c=typeColor(id);if(!/^#[0-9a-fA-F]{6}$/.test(String(c)))c='#888888';const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16);
   return `<span class="badge" style="background:rgba(${r},${g},${b},0.18);color:${c};filter:brightness(1.4)">${escHtml(l)}</span>`;}
 
@@ -737,6 +754,12 @@ onAuthStateChanged(auth,async user=>{
   __authResolved=true;
   const params=new URLSearchParams(window.location.search);
   if(params.get('schueler')&&params.get('lehrer')){showBookingPage(params.get('schueler'),params.get('lehrer'));return;}
+  // Anonyme Sitzung aus dem Schueler-Portal (gleicher Browser, gleiche
+  // Anmeldung): kein Konto fuer den Kalender. Wie "niemand angemeldet"
+  // behandeln - ohne die Marke "zuletzt angemeldet" zu setzen, sonst wartete
+  // die Kartei beim naechsten Start 20 Sekunden auf eine Anmeldung, die es
+  // nie gab, und hier stand "Kein ADK-Konto gefunden".
+  if(user&&user.isAnonymous){show('auth');return;}
   // iPhone-Startbildschirm: erst "niemand angemeldet", Sekunden spaeter der
   // gespeicherte Nutzer. Wer zuletzt angemeldet war, wartet bis zu 20 s auf
   // dem Ladebildschirm statt den Login zu sehen (wie in index.html).
@@ -818,7 +841,12 @@ onAuthStateChanged(auth,async user=>{
     }
 
     // Freigeschaltet → ADK-Rolle in Kalender-Rolle übersetzen
-    const istInhaber = adkUser.rolle==='fahrschul-admin' || adkUser.rolle==='fs_admin';
+    // Inhaber ist nur, wessen Fahrschule die EIGENE ist (wie in den Regeln).
+    // Die Rolle allein genuegt nicht: Wer als Inhaber einer anderen Schule
+    // beitritt, behaelt die Rolle, ist dort aber normales Mitglied - er sah
+    // sonst die Admin-Seiten, auf denen ihm die Regeln jedes Speichern
+    // verweigern.
+    const istInhaber = (adkUser.rolle==='fahrschul-admin' || adkUser.rolle==='fs_admin') && fahrschuleId===user.uid;
     currentRole = istInhaber ? 'admin' : 'lehrer';
     currentSchoolId = fahrschuleId;
     istEinzelLehrer = (currentRole==='lehrer') && (!adkUser.fahrschuleId || adkUser.fahrschuleId === user.uid);
@@ -1293,7 +1321,7 @@ pages['sa-dashboard']=async function(el){
       <div style="font-size:28px">🏫</div>
       <div style="flex:1">
         <div class="sa-school-name">${escHtml(s.name)}</div>
-        <div class="sa-school-meta">${BUNDESLAENDER[s.bundesland]||s.bundesland} · ${lehrerInSchool} Fahrlehrer</div>
+        <div class="sa-school-meta">${escHtml(BUNDESLAENDER[s.bundesland]||s.bundesland||'')} · ${lehrerInSchool} Fahrlehrer</div>
       </div>
       <button class="btn btn-danger btn-sm" onclick="deleteSchool('${d.id}','${attrJs(s.name)}')">Löschen</button>
     </div>`;
@@ -1330,7 +1358,7 @@ async function renderSASchoolList(){
       const admin=usersSnap.docs.find(u=>u.data().uid===s.adminUid);
       const lehrerCount=usersSnap.docs.filter(u=>u.data().schoolId===d.id&&u.data().role==='lehrer').length;
       return `<tr>
-        <td>${escHtml(s.name)}</td><td>${BUNDESLAENDER[s.bundesland]||s.bundesland}</td>
+        <td>${escHtml(s.name)}</td><td>${escHtml(BUNDESLAENDER[s.bundesland]||s.bundesland||'')}</td>
         <td>${lehrerCount}</td><td>${escHtml(admin?.data().email||'—')}</td>
         <td><button class="btn btn-danger btn-sm" onclick="deleteSchool('${d.id}','${attrJs(s.name)}')">Löschen</button></td>
       </tr>`;
@@ -1366,29 +1394,50 @@ window.deleteSchool=async function(schoolId,name){
 // ════════════════════════════════
 // ADMIN – DASHBOARD
 // ════════════════════════════════
+// Fahrlehrer der Schule fuer Listen und Auswahlfelder. Massgeblich ist die
+// Mitgliedschaft in der Kartei (users: fahrschuleId + Status): Wer die Schule
+// verlassen hat, gesperrt ist oder noch auf die Freischaltung wartet, behaelt
+// zwar sein Kalender-Profil, gehoert aber nicht in die Listen - die Regeln
+// lehnen jede Zuweisung an ihn ab. Der Inhaber steht mit drin (in vielen
+// Fahrschulen faehrt er selbst): ihm lassen sich Schueler und Urlaub
+// zuordnen, seine Termine zaehlen in der Auslastung.
+async function ladeSchulLehrer(){
+  const kSnap=await getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId)));
+  let mitglied=null;
+  try{
+    const uSnap=await getDocs(query(collection(db,'users'),where('fahrschuleId','==',currentSchoolId)));
+    mitglied={};
+    uSnap.docs.forEach(d=>{const u=d.data();mitglied[d.id]=u.status!=='ausstehend'&&u.status!=='gesperrt';});
+  }catch(e){console.warn('ladeSchulLehrer: Kartei-Abgleich nicht moeglich',e);}
+  return kSnap.docs.filter(d=>{
+    const u=d.data();
+    if(d.id===currentSchoolId)return true;
+    if(u.role!=='lehrer'||u.approved===false)return false;
+    return mitglied?mitglied[d.id]===true:true;
+  }).sort((a,b)=>lehrerName(a).localeCompare(lehrerName(b),'de'));
+}
+function lehrerName(d){const u=d.data();return (((u.fname||'')+' '+(u.lname||'')).trim()||u.email||'Fahrlehrer')+(d.id===currentSchoolId?' (Inhaber)':'');}
+
 pages['admin-dashboard']=async function(el){
   el.innerHTML=`<div class="page active"><h2 class="page-title">Übersicht</h2>
   <div class="grid-2" style="margin-bottom:16px">
     <div class="stat-card"><div class="stat-label">Fahrlehrer</div><div class="stat-val" id="stat-lehrer"><div class="spinner"></div></div></div>
     <div class="stat-card"><div class="stat-label">Fahrschüler</div><div class="stat-val" id="stat-schueler"><div class="spinner"></div></div></div>
   </div>
-  <div class="card"><div class="card-title">Ausstehende Freischaltungen</div><div id="pending-list"></div></div></div>`;
-  const [lSnap,sSnap,pSnap]=await Promise.all([
-    getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId),where('role','==','lehrer'),where('approved','==',true))),
-    getDocs(query(collection(db,SCHUELER_COLL),where('schoolId','==',currentSchoolId))),
-    getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId),where('role','==','lehrer'),where('approved','==',false))),
-  ]);
-  document.getElementById('stat-lehrer').textContent=lSnap.size;
-  document.getElementById('stat-schueler').textContent=sSnap.size;
-  const pl=document.getElementById('pending-list');
-  if(pSnap.empty){pl.innerHTML='<p class="text-muted">Keine ausstehenden Anfragen.</p>';return;}
-  pl.innerHTML='<table><thead><tr><th>Name</th><th>E-Mail</th><th></th></tr></thead><tbody>'+
-    pSnap.docs.map(d=>{const u=d.data();return`<tr><td>${escHtml(u.fname)} ${escHtml(u.lname)}</td><td>${escHtml(u.email)}</td><td><button class="btn btn-success btn-sm" onclick="approveLehrer('${d.id}')">Freischalten</button></td></tr>`;}).join('')+'</tbody></table>';
-};
-window.approveLehrer=async function(uid){
-  await updateDoc(doc(db,'kalenderUsers',uid),{approved:true});
-  toast('Freigeschaltet!','success');
-  pages['admin-dashboard'](document.getElementById('main-content'));
+  <div class="card"><div class="card-title">Neue Fahrlehrer</div>
+    <p class="text-muted" style="line-height:1.6">Fahrlehrer treten deiner Fahrschule in der <b>Schülerkartei</b> bei (Einladungslink oder Fahrschul-Code) und werden dort von dir freigeschaltet. Im Kalender erscheinen sie von selbst, sobald sie ihn einmal geöffnet haben.</p>
+  </div></div>`;
+  // Die Freischaltung laeuft allein ueber die Kartei. Die fruehere Liste
+  // "Ausstehende Freischaltungen" konnte nie etwas freischalten: Das
+  // Kalender-Profil eines anderen darf (und soll) niemand aendern.
+  const zahl=(id,wert)=>{const z=document.getElementById(id);if(z)z.textContent=wert;};
+  try{
+    const [lehrer,sSnap]=await Promise.all([
+      ladeSchulLehrer(),
+      getDocs(query(collection(db,SCHUELER_COLL),where('schoolId','==',currentSchoolId))),
+    ]);
+    zahl('stat-lehrer',lehrer.length);zahl('stat-schueler',sSnap.size);
+  }catch(e){console.warn('admin-dashboard',e);zahl('stat-lehrer','–');zahl('stat-schueler','–');}
 };
 
 // ════════════════════════════════
@@ -1397,50 +1446,42 @@ window.approveLehrer=async function(uid){
 pages['admin-lehrer']=async function(el){
   el.innerHTML=`<div class="page active"><h2 class="page-title">Fahrlehrer</h2>
   <div class="card" style="margin-bottom:16px">
-    <div class="card-title">Neuen Fahrlehrer anlegen</div>
-    <div class="grid-2">
-      <div class="field"><label>Vorname</label><input id="nl-fname" type="text"></div>
-      <div class="field"><label>Nachname</label><input id="nl-lname" type="text"></div>
-    </div>
-    <div class="grid-2">
-      <div class="field"><label>E-Mail</label><input id="nl-email" type="email"></div>
-      <div class="field"><label>Passwort</label><input id="nl-pw" type="password" placeholder="Mindestens 6 Zeichen"></div>
-    </div>
-    <button class="btn btn-primary" onclick="createLehrer()">+ Fahrlehrer anlegen</button>
+    <div class="card-title">Fahrlehrer hinzufügen oder entfernen</div>
+    <p class="text-muted" style="line-height:1.6">Das geschieht in der <b>Schülerkartei</b>: Dort lädst du Fahrlehrer ein, schaltest sie frei und nimmst sie wieder aus der Fahrschule. Wer freigeschaltet ist, erscheint hier, sobald er den Kalender einmal geöffnet hat – wer die Fahrschule verlässt, verschwindet von selbst.</p>
   </div>
   <div class="card"><div class="card-title">Alle Fahrlehrer</div><div id="lehrer-list"><div class="spinner"></div></div></div></div>`;
   await renderLehrerList();
 };
 async function renderLehrerList(){
   const el=document.getElementById('lehrer-list');if(!el)return;
-  const snap=await getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId),where('role','==','lehrer'),where('approved','==',true)));
-  if(snap.empty){el.innerHTML='<p class="text-muted">Noch keine Fahrlehrer.</p>';return;}
-  el.innerHTML='<table><thead><tr><th>Name</th><th>E-Mail</th><th>Blockdauer</th><th>Kalender</th><th>Schüler</th><th></th></tr></thead><tbody>'+
-    snap.docs.map(d=>{const u=d.data();const bd=u.blockDauer||60;
-      return`<tr><td>${escHtml(u.fname)} ${escHtml(u.lname)}</td><td>${escHtml(u.email)}</td>
+  let lehrer;
+  try{lehrer=await ladeSchulLehrer();}
+  catch(e){console.warn('renderLehrerList',e);el.innerHTML='<p class="text-muted">Fahrlehrer konnten nicht geladen werden ('+escHtml((e&&e.code)||'Fehler')+').</p>';return;}
+  if(!lehrer.length){el.innerHTML='<p class="text-muted">Noch keine Fahrlehrer.</p>';return;}
+  el.innerHTML='<table><thead><tr><th>Name</th><th>E-Mail</th><th>Blockdauer</th><th>Kalender</th><th>Schüler</th></tr></thead><tbody>'+
+    lehrer.map(d=>{const u=d.data();const bd=u.blockDauer||60;const lName=lehrerName(d);
+      return`<tr><td>${escHtml(lName)}</td><td>${escHtml(u.email||'')}</td>
         <td><select onchange="setLehrerBlockDauer('${d.id}',this.value)" style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:3px 7px;font-size:12px">
-          ${[45,50,60,75,80,90,100,120].map(m=>`<option value="${m}" ${bd===m?'selected':''}>${m} Min</option>`).join('')}
+          ${[...new Set([45,50,60,75,80,90,100,120,bd])].sort((a,b)=>a-b).map(m=>`<option value="${Number(m)||60}" ${bd===m?'selected':''}>${Number(m)||60} Min</option>`).join('')}
         </select></td>
-        <td><button class="btn btn-primary btn-sm" onclick="viewLehrerKalender('${d.id}','${attrJs(u.fname+' '+u.lname)}')">📅</button></td>
-        <td><button class="btn btn-secondary btn-sm" onclick="viewLehrerSchueler('${d.id}','${attrJs(u.fname+' '+u.lname)}')">Schüler</button></td>
-        <td><button class="btn btn-danger btn-sm" onclick="deleteLehrer('${d.id}','${attrJs(u.fname+' '+u.lname)}')">Löschen</button></td>
+        <td><button class="btn btn-primary btn-sm" onclick="viewLehrerKalender('${d.id}','${attrJs(lName)}')">📅</button></td>
+        <td><button class="btn btn-secondary btn-sm" onclick="viewLehrerSchueler('${d.id}','${attrJs(lName)}')">Schüler</button></td>
       </tr>`;}).join('')+'</tbody></table>';
 }
-window.createLehrer=async function(){
-  // Fahrlehrer registrieren sich in der Haupt-App und treten der Fahrschule
-  // per Code bei. Sie erscheinen hier automatisch, sobald sie den Kalender
-  // einmal öffnen. Kein createUser hier (zerstört die geteilte Sitzung).
-  toast('Fahrlehrer melden sich in der Haupt-App an und treten per Code bei – danach erscheinen sie hier automatisch.','error');
-};
-window.deleteLehrer=async function(uid,name){
-  if(!confirm(`Fahrlehrer "${name}" wirklich löschen?`))return;
-  await updateDoc(doc(db,'kalenderUsers',uid),{approved:false});
-  toast('Fahrlehrer deaktiviert.','success');
-  await renderLehrerList();
-};
+// Anlegen/Loeschen von Fahrlehrern gab es hier als Knoepfe, die nichts
+// bewirkten: Konten entstehen in der Kartei, und das Kalender-Profil eines
+// anderen darf niemand aendern. Entfernt - siehe Hinweis oben auf der Seite.
 window.setLehrerBlockDauer=async function(uid,min){
-  await updateDoc(doc(db,'kalenderUsers',uid),{blockDauer:parseInt(min)});
-  toast(`Blockdauer: ${min} Min gesetzt.`,'success');
+  const wert=parseInt(min);
+  if(!(wert>=15&&wert<=240))return toast('Ungültige Blockdauer.','error');
+  try{
+    await updateDoc(doc(db,'kalenderUsers',uid),{blockDauer:wert});
+    toast(`Blockdauer: ${wert} Min gesetzt.`,'success');
+  }catch(e){
+    console.warn('setLehrerBlockDauer',e);
+    toast('Blockdauer konnte nicht gespeichert werden'+((e&&e.code)?' ('+e.code+')':'')+'.','error');
+    renderLehrerList();
+  }
 };
 window.viewLehrerSchueler=async function(lehrerUid,lehrerName){
   const snap=await getDocs(query(collection(db,SCHUELER_COLL),where('lehrerUid','==',lehrerUid),where('schoolId','==',currentSchoolId)));
@@ -1466,16 +1507,17 @@ pages['admin-schueler']=async function(el){
     <button class="btn btn-primary" onclick="createSchueler()">+ Schüler anlegen</button>
   </div>
   <div class="card"><div class="card-title">Alle Schüler</div><div id="schueler-list"><div class="spinner"></div></div></div></div>`;
-  const lSnap=await getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId),where('role','==','lehrer'),where('approved','==',true)));
+  let lehrer=[];
+  try{lehrer=await ladeSchulLehrer();}catch(e){console.warn('admin-schueler Lehrer',e);}
   const sel=document.getElementById('ns-lehrer');
-  lSnap.docs.forEach(d=>{const u=d.data();sel.innerHTML+=`<option value="${d.id}">${escHtml(u.fname)} ${escHtml(u.lname)}</option>`;});
-  await loadSchuelerList(lSnap.docs);
+  if(sel)sel.innerHTML+=lehrer.map(d=>`<option value="${d.id}">${escHtml(lehrerName(d))}</option>`).join('');
+  await loadSchuelerList(lehrer);
 };
 async function loadSchuelerList(lehrerDocs){
   const el=document.getElementById('schueler-list');if(!el)return;
   const [snap,autosSnap]=await Promise.all([getDocs(query(collection(db,SCHUELER_COLL),where('schoolId','==',currentSchoolId))),getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId)))]);
   if(snap.empty){el.innerHTML='<p class="text-muted">Noch keine Schüler.</p>';return;}
-  const lm={};(lehrerDocs||[]).forEach(d=>{const u=d.data();lm[d.id]=u.fname+' '+u.lname;});
+  const lm={};(lehrerDocs||[]).forEach(d=>{lm[d.id]=lehrerName(d);});
   const am={};autosSnap.docs.forEach(d=>{const a=d.data();am[d.id]=a;});
   el.innerHTML='<table><thead><tr><th>Name</th><th>Fahrlehrer</th><th>Kontingent</th><th>Auto</th><th>Link</th><th></th></tr></thead><tbody>'+
     snap.docs.map(d=>{
@@ -1484,7 +1526,7 @@ async function loadSchuelerList(lehrerDocs){
       const k=s.maxFahrstunden>0?`${Number(s.bookedCount)||0}/${Number(s.maxFahrstunden)||0}`:`${Number(s.bookedCount)||0}/∞`;
       const w=s.maxFahrstunden>0&&(s.bookedCount||0)>=s.maxFahrstunden;
       const autoStr=s.autoId&&am[s.autoId]?`<span class="auto-kennzeichen" style="font-size:10px">${escHtml(am[s.autoId].kennzeichen)}</span>`:'—';
-      return`<tr><td>${escHtml(s.fname)} ${escHtml(s.lname)}</td><td>${s.lehrerUid?(lm[s.lehrerUid]||'?'):'—'}</td>
+      return`<tr><td>${escHtml(s.fname)} ${escHtml(s.lname)}</td><td>${s.lehrerUid?escHtml(lm[s.lehrerUid]||'nicht mehr in der Fahrschule'):'—'}</td>
         <td style="color:${w?'var(--danger)':'inherit'}">${k}${w?' ⚠️':''}</td>
         <td>${autoStr}</td>
         <td>${s.lehrerUid?`<button class="copy-btn" onclick="copyLink('${attrJs(link)}')">🔗</button>`:'—'}</td>
@@ -1506,8 +1548,9 @@ window.createSchueler=async function(){
 window.deleteSchueler=async function(id){if(!confirm('Schüler löschen?'))return;await deleteDoc(doc(db,SCHUELER_COLL,id));toast('Gelöscht.','success');pages['admin-schueler'](document.getElementById('main-content'));};
 window.editSchueler=async function(id){
   const snap=await getDoc(doc(db,SCHUELER_COLL,id));const s=snap.data();
-  const lSnap=await getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId),where('role','==','lehrer'),where('approved','==',true)));
-  const opts=lSnap.docs.map(d=>{const u=d.data();return`<option value="${d.id}" ${s.lehrerUid===d.id?'selected':''}>${escHtml(u.fname)} ${escHtml(u.lname)}</option>`;}).join('');
+  let lehrer=[];
+  try{lehrer=await ladeSchulLehrer();}catch(e){console.warn('editSchueler Lehrer',e);}
+  const opts=lehrer.map(d=>`<option value="${d.id}" ${s.lehrerUid===d.id?'selected':''}>${escHtml(lehrerName(d))}</option>`).join('');
   openModal(`<h2 class="modal-title">Schüler bearbeiten</h2>
     <div class="field"><label>Vorname</label><input id="es-fname" value="${escHtml(s.fname)}"></div>
     <div class="field"><label>Nachname</label><input id="es-lname" value="${escHtml(s.lname)}"></div>
@@ -1547,12 +1590,26 @@ pages['admin-schule']=async function(el){
     <button class="btn btn-primary" onclick="saveSchule()">Speichern</button>
   </div></div>`;
 };
+// Schulprofil des Kalenders speichern. Das Dokument schools/{id} wird von
+// keinem Programmteil angelegt - updateDoc scheiterte deshalb bei jeder
+// Schule, die es noch nicht hatte ("not-found"): Name, Bundesland,
+// Berechtigungen und Fahrstundenarten liessen sich nie speichern.
+async function schuleSpeichern(felder){
+  const ref=doc(db,'schools',currentSchoolId);
+  let gibtEs=false;
+  try{gibtEs=(await getDoc(ref)).exists();}catch(e){}
+  if(gibtEs){await updateDoc(ref,felder);}
+  else{
+    await setDoc(ref,{name:(currentSchool&&currentSchool.name)||'Meine Fahrschule',...felder,adminUid:currentUser.uid,createdAt:serverTimestamp()});
+  }
+  currentSchool={...(currentSchool||{id:currentSchoolId}),...felder};
+}
 window.saveSchule=async function(){
   const name=document.getElementById('sc-name').value.trim();
   const bl=document.getElementById('sc-bl').value;
   if(!name||!bl)return toast('Bitte alle Felder ausfüllen.','error');
-  await updateDoc(doc(db,'schools',currentSchoolId),{name,bundesland:bl});
-  currentSchool={...currentSchool,name,bundesland:bl};
+  try{await schuleSpeichern({name,bundesland:bl});}
+  catch(e){console.warn('saveSchule',e);return toast('Konnte nicht gespeichert werden'+((e&&e.code)?' ('+e.code+')':'')+'.','error');}
   Object.keys(_ftCache).forEach(k=>delete _ftCache[k]);
   document.getElementById('topbar-school-name').textContent=name;
   toast('Gespeichert!','success');
@@ -1584,11 +1641,11 @@ window.loadAuslastung=async function(){
   const _vMs=new Date(von+'T00:00:00').getTime(),_bMs=new Date(bis+'T23:59:59').getTime();
   let lSnap,slotsSnap;
   try{[lSnap,slotsSnap]=await Promise.all([
-    getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId))),
+    ladeSchulLehrer(),
     getDocs(query(collection(db,'slots'),where('schoolId','==',currentSchoolId))),
   ]);}catch(e){console.warn('auslastung',e);el.innerHTML='<p class="text-muted">⚠️ Konnte nicht geladen werden. Fehler: '+((e&&e.code)||(e&&e.message)||'?')+'</p>';return;}
   const stats={};
-  lSnap.docs.forEach(d=>{const u=d.data();if(u.role!=='lehrer'||u.approved!==true)return;stats[d.id]={name:u.fname+' '+u.lname,total:0,booked:0,types:{}};});
+  lSnap.forEach(d=>{stats[d.id]={name:lehrerName(d),total:0,booked:0,types:{}};});
   slotsSnap.docs.forEach(d=>{const s=d.data();if(!s.startTime||!s.startTime.toMillis)return;const _t=s.startTime.toMillis();if(_t<_vMs||_t>_bMs)return;if(!stats[s.lehrerUid])return;stats[s.lehrerUid].total++;if(s.bookedBy)stats[s.lehrerUid].booked++;stats[s.lehrerUid].types[s.type]=(stats[s.lehrerUid].types[s.type]||0)+1;});
   const totalS=Object.values(stats).reduce((a,b)=>a+b.total,0);
   const totalB=Object.values(stats).reduce((a,b)=>a+b.booked,0);
@@ -1632,7 +1689,7 @@ async function renderAutoList(){
   }
   if(snap.empty){el.innerHTML='<p class="text-muted">Noch keine Fahrzeuge.</p>';return;}
   el.innerHTML=snap.docs.map(d=>{const a=d.data();return`<div class="auto-card">
-    <div class="auto-icon">🚗</div><div class="auto-info"><div class="auto-name">${escHtml(a.modell)}</div><div class="auto-detail">${a.farbe?a.farbe+' · ':''}${escHtml(a.notiz||'')}</div></div>
+    <div class="auto-icon">🚗</div><div class="auto-info"><div class="auto-name">${escHtml(a.modell)}</div><div class="auto-detail">${a.farbe?escHtml(a.farbe)+' · ':''}${escHtml(a.notiz||'')}</div></div>
     <span class="auto-kennzeichen">${escHtml(a.kennzeichen)}</span>
     <button class="btn btn-secondary btn-sm" onclick="editAuto('${d.id}')">Bearb.</button>
     <button class="btn btn-danger btn-sm" onclick="deleteAuto('${d.id}')">Löschen</button>
@@ -1657,7 +1714,7 @@ window.editAuto=async function(id){
   openModal(`<h2 class="modal-title">Auto bearbeiten</h2>
     <div class="field"><label>Modell</label><input id="ea-m" value="${escHtml(a.modell)}"></div>
     <div class="field"><label>Kennzeichen</label><input id="ea-k" value="${escHtml(a.kennzeichen)}"></div>
-    <div class="field"><label>Farbe</label><input id="ea-f" value="${a.farbe||''}"></div>
+    <div class="field"><label>Farbe</label><input id="ea-f" value="${escHtml(a.farbe||'')}"></div>
     <div class="field"><label>Notiz</label><input id="ea-n" value="${escHtml(a.notiz||'')}"></div>
     <button class="btn btn-primary" onclick="saveAuto('${id}')">Speichern</button>`);
 };
@@ -1679,9 +1736,10 @@ pages['admin-urlaub']=async function(el){
     <button class="btn btn-primary" onclick="addUrlaub()">+ Urlaub eintragen</button>
   </div>
   <div class="card"><div class="card-title">Alle Urlaube</div><div id="urlaub-list"><div class="spinner"></div></div></div></div>`;
-  const lSnap=await getDocs(query(collection(db,'kalenderUsers'),where('schoolId','==',currentSchoolId),where('role','==','lehrer'),where('approved','==',true)));
+  let lehrer=[];
+  try{lehrer=await ladeSchulLehrer();}catch(e){console.warn('admin-urlaub Lehrer',e);}
   const sel=document.getElementById('urlaub-lehrer');
-  lSnap.docs.forEach(d=>{const u=d.data();sel.innerHTML+=`<option value="${d.id}">${escHtml(u.fname)} ${escHtml(u.lname)}</option>`;});
+  if(sel)sel.innerHTML+=lehrer.map(d=>`<option value="${d.id}">${escHtml(lehrerName(d))}</option>`).join('');
   await renderUrlaubList();
 };
 pages['lehrer-urlaub']=async function(el){
@@ -1714,7 +1772,7 @@ async function renderUrlaubList(filterUid){
              aber mit. Dann ist der Name nicht mehr aufloesbar. Vorher stand
              dort ein blosses "?", was wie ein Fehler aussah - jetzt steht da,
              was wirklich der Fall ist. -->
-        <div class="auto-name">${u.label||'Urlaub'}${!filterUid?' – '+(lm[u.lehrerUid]||'nicht mehr zugeordnet'):''}</div>
+        <div class="auto-name">${escHtml(u.label||'Urlaub')}${!filterUid?' – '+escHtml(lm[u.lehrerUid]||'nicht mehr zugeordnet'):''}</div>
         <div class="auto-detail">${von.toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'})} – ${bis.toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'})} (${tage} Tage)</div>
       </div>
       <button class="btn btn-danger btn-sm" onclick="deleteUrlaub('${d.id}')">Löschen</button>
@@ -1787,7 +1845,7 @@ async function renderSperrtageList(){
   if(snap.empty){el.innerHTML='<p class="text-muted">Keine globalen Sperrtage.</p>';return;}
   el.innerHTML='<table><thead><tr><th>Datum</th><th>Beschreibung</th><th></th></tr></thead><tbody>'+
     snap.docs.map(d=>{const b=d.data();const date=new Date(b.year,b.month,b.day);
-      return`<tr><td>${date.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'})}</td><td>${b.label||'—'}</td><td><button class="btn btn-danger btn-sm" onclick="deleteGlobalSperrtag('${d.id}')">Löschen</button></td></tr>`;}).join('')+'</tbody></table>';
+      return`<tr><td>${date.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'})}</td><td>${escHtml(b.label||'—')}</td><td><button class="btn btn-danger btn-sm" onclick="deleteGlobalSperrtag('${d.id}')">Löschen</button></td></tr>`;}).join('')+'</tbody></table>';
 }
 window.addGlobalSperrtag=async function(){
   const dateVal=document.getElementById('gs-date').value,label=document.getElementById('gs-label').value.trim();
@@ -1834,39 +1892,50 @@ pages['admin-einstellungen']=async function(el){
 };
 window.saveLehrerDarfSchueler=async function(v){
   try{
-    await updateDoc(doc(db,'schools',currentSchoolId),{lehrerDarfSchuelerAnlegen:v===true});
-    currentSchool={...currentSchool,lehrerDarfSchuelerAnlegen:v===true};
+    await schuleSpeichern({lehrerDarfSchuelerAnlegen:v===true});
     toast(v?'Fahrlehrer dürfen jetzt Schüler anlegen.':'Deaktiviert – nur Admin legt Schüler an.','success');
   }catch(e){console.warn('saveLehrerDarfSchueler',e);toast('Konnte nicht gespeichert werden'+((e&&e.code)?' ('+e.code+')':'')+'.','error');const _cb=document.getElementById('set-lehrer-schueler');if(_cb)_cb.checked=!v;}
 };
 function renderArtenList(){
   const el=document.getElementById('arten-list');if(!el)return;
   if(!fahrstundenarten.length){el.innerHTML='<p class="text-muted">Keine Arten.</p>';return;}
-  el.innerHTML=fahrstundenarten.map((t,i)=>{const r=parseInt(t.color.slice(1,3),16),g=parseInt(t.color.slice(3,5),16),b=parseInt(t.color.slice(5,7),16);
+  el.innerHTML=fahrstundenarten.map((t,i)=>{const farbe=artFarbe(t.color);const r=parseInt(farbe.slice(1,3),16),g=parseInt(farbe.slice(3,5),16),b=parseInt(farbe.slice(5,7),16);
     return`<div class="type-row">
-      <div style="background:${t.color};width:18px;height:18px;border-radius:4px;flex-shrink:0"></div>
-      <div class="type-row-name">${t.label}</div><div class="type-row-id">${t.id}</div>
-      <span class="badge" style="background:rgba(${r},${g},${b},0.18);color:${t.color};filter:brightness(1.4)">${t.label}</span>
-      <input type="color" value="${t.color}" style="width:32px;height:28px;border-radius:5px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;padding:2px;" onchange="changeArtColor(${i},this.value)">
+      <div style="background:${farbe};width:18px;height:18px;border-radius:4px;flex-shrink:0"></div>
+      <div class="type-row-name">${escHtml(t.label)}</div><div class="type-row-id">${escHtml(t.id)}</div>
+      <span class="badge" style="background:rgba(${r},${g},${b},0.18);color:${farbe};filter:brightness(1.4)">${escHtml(t.label)}</span>
+      <input type="color" value="${farbe}" style="width:32px;height:28px;border-radius:5px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;padding:2px;" onchange="changeArtColor(${i},this.value)">
       <button class="btn btn-danger btn-sm" onclick="deleteFahrstundenart(${i})">×</button>
     </div>`;}).join('');
 }
 window.addFahrstundenart=async function(){
   const label=document.getElementById('na-label').value.trim();
-  const id=document.getElementById('na-id').value.trim().toLowerCase().replace(/\s+/g,'_');
+  const id=document.getElementById('na-id').value.trim().toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_-]/g,'').slice(0,40);
   const color=document.getElementById('na-color').value;
   if(!label||!id)return toast('Name und ID erforderlich.','error');
   if(fahrstundenarten.find(a=>a.id===id))return toast('ID existiert bereits.','error');
-  fahrstundenarten.push({id,label,color});await saveArten();renderArtenList();injectTypeBadgeStyles();
+  fahrstundenarten.push({id,label,color:artFarbe(color)});
+  try{await saveArten();}catch(e){fahrstundenarten.pop();renderArtenList();return;}
+  renderArtenList();injectTypeBadgeStyles();
   document.getElementById('na-label').value='';document.getElementById('na-id').value='';
   toast('Hinzugefügt!','success');
 };
-window.deleteFahrstundenart=async function(i){if(fahrstundenarten.length<=1)return toast('Mindestens eine Art.','error');fahrstundenarten.splice(i,1);await saveArten();renderArtenList();injectTypeBadgeStyles();};
-window.changeArtColor=async function(i,c){fahrstundenarten[i].color=c;await saveArten();renderArtenList();injectTypeBadgeStyles();};
-window.resetFahrstundenarten=async function(){if(!confirm('Zurücksetzen?'))return;fahrstundenarten=[...DEFAULT_ARTEN];await saveArten();renderArtenList();injectTypeBadgeStyles();toast('Zurückgesetzt.','success');};
+window.deleteFahrstundenart=async function(i){if(fahrstundenarten.length<=1)return toast('Mindestens eine Art.','error');const alt=fahrstundenarten.slice();fahrstundenarten.splice(i,1);try{await saveArten();}catch(e){fahrstundenarten=alt;}renderArtenList();injectTypeBadgeStyles();};
+window.changeArtColor=async function(i,c){if(!fahrstundenarten[i])return;const alt=fahrstundenarten[i].color;fahrstundenarten[i].color=artFarbe(c);try{await saveArten();}catch(e){fahrstundenarten[i].color=alt;}renderArtenList();injectTypeBadgeStyles();};
+window.resetFahrstundenarten=async function(){if(!confirm('Zurücksetzen?'))return;const alt=fahrstundenarten;fahrstundenarten=DEFAULT_ARTEN.map(a=>({...a}));try{await saveArten();}catch(e){fahrstundenarten=alt;renderArtenList();injectTypeBadgeStyles();return;}renderArtenList();injectTypeBadgeStyles();toast('Zurückgesetzt.','success');};
 async function saveArten(){
-  if(istEinzelLehrer){await updateDoc(doc(db,'kalenderUsers',currentUser.uid),{fahrstundenarten});if(currentProfile)currentProfile.fahrstundenarten=fahrstundenarten;}
-  else{await setDoc(doc(db,'settings','fahrstundenarten'),{arten:fahrstundenarten});}
+  try{
+    if(istEinzelLehrer){await updateDoc(doc(db,'kalenderUsers',currentUser.uid),{fahrstundenarten});if(currentProfile)currentProfile.fahrstundenarten=fahrstundenarten;}
+    else if(currentRole==='superadmin'){await setDoc(doc(db,'settings','fahrstundenarten'),{arten:fahrstundenarten});}
+    // Je Fahrschule. Vorher schrieb jede Schule in EIN gemeinsames Dokument
+    // (settings/fahrstundenarten), das nur der Betreiber aendern darf - das
+    // Speichern scheiterte still, die Aenderung war nach dem Neuladen weg.
+    else{await schuleSpeichern({fahrstundenarten});}
+  }catch(e){
+    console.warn('saveArten',e);
+    toast('Fahrstundenarten konnten nicht gespeichert werden'+((e&&e.code)?' ('+e.code+')':'')+'.','error');
+    throw e;
+  }
 }
 
 // ════════════════════════════════
@@ -1939,11 +2008,11 @@ async function renderMonthCal(label,grid){
     const _fz=slotsTotalMin(slots);
     if(_fz>0)dc+=`<div class="cal-slot" style="background:${_fz>MAX_FAHRZEIT_MIN?'rgba(224,85,85,.25)':'rgba(63,185,80,.18)'};color:${_fz>MAX_FAHRZEIT_MIN?'#e05555':'#3fb950'};font-size:8px;font-weight:700">⏱ ${_fz} Min${_fz>MAX_FAHRZEIT_MIN?' ⚠️':''}</div>`;
     if(ft)dc+=`<div class="cal-slot" style="background:rgba(212,168,67,.2);color:var(--accent2);font-size:8px">🎉 ${ft}</div>`;
-    if(urlaubEntry)dc+=`<div class="cal-slot" style="background:rgba(91,186,122,.2);color:#5bba7a;font-size:8px">🏖️ ${urlaubEntry.label||'Urlaub'}</div>`;
+    if(urlaubEntry)dc+=`<div class="cal-slot" style="background:rgba(91,186,122,.2);color:#5bba7a;font-size:8px">🏖️ ${escHtml(urlaubEntry.label||'Urlaub')}</div>`;
     else if(isGlobal)dc+=`<div class="cal-slot" style="background:rgba(212,168,67,.15);color:var(--accent);font-size:8px">🏫 Gesperrt</div>`;
     else if(isBlocked){const _bl=blocksByDay[d]||[];dc+=(_bl.slice(0,2).map(b=>`<div class="cal-slot" style="background:${_blockColor(b)}26;color:${_blockColor(b)};font-size:8px">${escHtml(_blockLabel(b))}${b.ganztags===false?' '+_min2hhmm(b.vonMin):''}</div>`).join(''))||`<div class="cal-slot" style="background:rgba(224,85,85,.15);color:#e05555;font-size:9px">Gesperrt</div>`;}
     else dc+=slots.slice(0,3).map(s=>{const pend=!s.bookedBy&&window.__pendingReq&&window.__pendingReq.bySlot[s.id];
-      if(s.bookedBy)return`<div class="cal-slot slot-${s.type} slot-booked">${fmtTime(s.startTime)} ${typeLabel(s.type)}</div>`;
+      if(s.bookedBy)return`<div class="cal-slot slot-${artKlasse(s.type)} slot-booked">${fmtTime(s.startTime)} ${escHtml(typeLabel(s.type))}</div>`;
       if(pend)return`<div class="cal-slot" style="background:rgba(240,180,41,.28);color:var(--accent);font-weight:700">⏳ ${fmtTime(s.startTime)} Anfrage</div>`;
       return`<div class="cal-slot" style="background:rgba(91,186,122,.25);color:#5bba7a;font-weight:600">${fmtTime(s.startTime)} Frei</div>`;}).join('');
     html+=`<div class="cal-day${isToday?' today':''}${isBlocked&&!urlaubEntry?' blocked':''}${urlaubEntry?' urlaub-day':''}${ft&&!urlaubEntry?' feiertag-day':''}" onclick="openDayModal(${year},${month},${d})" style="display:flex;flex-direction:column">
@@ -2021,7 +2090,7 @@ window.openDayModal=async function(year,month,day){
   const scm={};scSnap.docs.forEach(d=>{const s=d.data();scm[d.id]=s.fname+' '+s.lname;});
   const slotsHtml=daySlots.length?daySlots.map(d=>{const s=d.data();const pend=!s.bookedBy&&window.__pendingReq&&window.__pendingReq.bySlot[d.id];const sn=s.bookedBy?(scm[s.bookedBy]||'?'):(pend?('⏳ Anfrage: '+pend):null);
     return`<div class="slot-row"><div class="slot-time">${fmtTime(s.startTime)} – ${fmtTime(s.endTime)}</div>
-    <div class="slot-info">${typeBadgeHtml(s.type)}${sn?`<div class="slot-student" onclick="oeffneTerminDetail('${d.id}',${year},${month},${day})" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted">👤 ${sn}${s.status==='nichtErschienen'?' ⚠️ Fehlstunde':''} ›</div>`:'<div class="slot-student" style="color:var(--success)">Frei</div>'}</div>
+    <div class="slot-info">${typeBadgeHtml(s.type)}${sn?`<div class="slot-student" onclick="oeffneTerminDetail('${d.id}',${year},${month},${day})" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted">👤 ${escHtml(sn)}${s.status==='nichtErschienen'?' ⚠️ Fehlstunde':''} ›</div>`:'<div class="slot-student" style="color:var(--success)">Frei</div>'}</div>
     ${!s.bookedBy?`<div style="display:flex;gap:6px;align-items:center;margin-top:6px;width:100%">
       <select id="man-buch-${d.id}" style="flex:1;min-width:0;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 8px;font-size:0.8rem">
         <option value="">Schüler wählen…</option>
@@ -2032,7 +2101,7 @@ window.openDayModal=async function(year,month,day){
     </div>`:''}</div>`;}).join(''):'<p class="text-muted">Keine Slots.</p>';
   openModal(`<h2 class="modal-title">${dateStr}</h2>
     ${ft?`<div style="background:rgba(212,168,67,.1);border:1px solid rgba(212,168,67,.3);border-radius:7px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:var(--accent)">🎉 Feiertag: ${ft}</div>`:''}
-    ${urlaubEntry?`<div style="background:rgba(91,186,122,.1);border:1px solid rgba(91,186,122,.3);border-radius:7px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:#5bba7a">🏖️ Urlaub: ${urlaubEntry.label||'Urlaub'}</div>`:''}
+    ${urlaubEntry?`<div style="background:rgba(91,186,122,.1);border:1px solid rgba(91,186,122,.3);border-radius:7px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:#5bba7a">🏖️ Urlaub: ${escHtml(urlaubEntry.label||'Urlaub')}</div>`:''}
     ${isGlobal?`<div style="background:rgba(212,168,67,.1);border:1px solid var(--accent);border-radius:7px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:var(--accent)">🏫 Globaler Sperrtag</div>`:''}
     <div class="card-title">Sperren / Abwesenheit</div>
     ${blockListHtml(bSnap.docs.map(d=>({id:d.id,...d.data()})))}
@@ -2047,7 +2116,7 @@ window.openDayModal=async function(year,month,day){
       <div class="field"><label>Dauer (Min)</label><input id="ns-dauer" type="number" min="15" step="5" value="${blockDauer}" oninput="updateEndTime()"></div>
     </div>
     <div class="field"><label>Endzeit (auto)</label><input id="ns-to" type="time" value="09:00" style="opacity:.6" readonly></div>
-    <div class="field"><label>Typ</label><select id="ns-type">${fahrstundenarten.map(t=>`<option value="${t.id}">${t.label}</option>`).join('')}</select></div>
+    <div class="field"><label>Typ</label><select id="ns-type">${fahrstundenarten.map(t=>`<option value="${escHtml(t.id)}">${escHtml(t.label)}</option>`).join('')}</select></div>
     <button class="btn btn-primary" onclick="addSlot(${year},${month},${day})">Slot hinzufügen</button>`);
   setTimeout(()=>updateEndTime(blockDauer),50);
 };
@@ -2055,6 +2124,11 @@ window.manuellBuchen = async function(slotId, schuelerId, year, month, day) {
   if (!schuelerId) { toast('Bitte zuerst einen Schüler auswählen.', 'error'); return; }
   try {
     await updateDoc(doc(db, 'slots', slotId), { bookedBy: schuelerId, bookedAt: serverTimestamp() });
+    // Wie bei bestaetigten Anfragen: Der Termin ist nicht mehr frei, also aus
+    // dem oeffentlichen Buchungslink nehmen (sonst fragten Schueler einen
+    // belegten Termin an) und in die Terminliste des Schuelers eintragen.
+    try { await publishMyBookingLink(); } catch (e) {}
+    try { await publishStudentBookings(schuelerId); } catch (e) {}
     toast('Slot manuell zugewiesen!', 'success');
     closeModal();
     try { renderCal(); } catch(e) {}
@@ -2924,7 +2998,11 @@ async function renderAdminCal(){
   const first=new Date(year,month,1);let startDow=first.getDay()-1;if(startDow<0)startDow=6;
   const dim=new Date(year,month+1,0).getDate(),prevDays=new Date(year,month,0).getDate();
   try{
-  const[sSnap,bSnap,scSnap]=await Promise.all([getDocs(query(collection(db,'slots'),where('lehrerUid','==',lehrerUid))),getDocs(query(collection(db,'blocked'),where('lehrerUid','==',lehrerUid))),getDocs(query(collection(db,SCHUELER_COLL),where('lehrerUid','==',lehrerUid)))]);
+  // Mit schoolId: Die Regeln geben dem Inhaber fremde Termine und Schueler nur
+  // frei, wenn die Abfrage selbst auf seine Schule begrenzt ist. Ohne den
+  // Filter wurde sie abgelehnt - der Kalender eines Fahrlehrers liess sich
+  // vom Inhaber gar nicht oeffnen.
+  const[sSnap,bSnap,scSnap]=await Promise.all([getDocs(query(collection(db,'slots'),where('lehrerUid','==',lehrerUid),where('schoolId','==',currentSchoolId))),getDocs(query(collection(db,'blocked'),where('lehrerUid','==',lehrerUid))),getDocs(query(collection(db,SCHUELER_COLL),where('lehrerUid','==',lehrerUid),where('schoolId','==',currentSchoolId)))]);
   const scm={};scSnap.docs.forEach(d=>{const s=d.data();scm[d.id]=s.fname+' '+s.lname;});
   const slotsByDay={};sSnap.docs.forEach(d=>{const s=d.data();if(!s.startTime||!s.startTime.toDate)return;const dt=s.startTime.toDate();if(dt.getFullYear()===year&&dt.getMonth()===month){const day=dt.getDate();if(!slotsByDay[day])slotsByDay[day]=[];slotsByDay[day].push({id:d.id,...s});}});
   const bSet=new Set();const blocksByDay={};bSnap.docs.forEach(d=>{const b=d.data();if(b.year===year&&b.month===month){bSet.add(b.day);(blocksByDay[b.day]=blocksByDay[b.day]||[]).push({id:d.id,...b});}});
@@ -2933,7 +3011,7 @@ async function renderAdminCal(){
   for(let d=1;d<=dim;d++){
     const isT=d===today.getDate()&&month===today.getMonth()&&year===today.getFullYear();
     const isB=bSet.has(d);const slots=slotsByDay[d]||[];
-    const slotHtml=slots.slice(0,2).map(s=>{const sn=s.bookedBy?(scm[s.bookedBy]||'?'):'';return s.bookedBy?`<div class="cal-slot slot-${s.type} slot-booked" title="${escHtml(sn)}">${fmtTime(s.startTime)} ${escHtml(sn)}</div>`:`<div class="cal-slot" style="background:rgba(91,186,122,.25);color:#5bba7a">${fmtTime(s.startTime)} Frei</div>`;}).join('');
+    const slotHtml=slots.slice(0,2).map(s=>{const sn=s.bookedBy?(scm[s.bookedBy]||'?'):'';return s.bookedBy?`<div class="cal-slot slot-${artKlasse(s.type)} slot-booked" title="${escHtml(sn)}">${fmtTime(s.startTime)} ${escHtml(sn)}</div>`:`<div class="cal-slot" style="background:rgba(91,186,122,.25);color:#5bba7a">${fmtTime(s.startTime)} Frei</div>`;}).join('');
     html+=`<div class="cal-day${isT?' today':''}${isB?' blocked':''}" onclick="adminOpenDayDetail(${year},${month},${d})" style="display:flex;flex-direction:column">
       <div class="cal-day-num">${d}</div>${isB?((blocksByDay[d]||[]).slice(0,2).map(b=>`<div class="cal-slot" style="background:${_blockColor(b)}26;color:${_blockColor(b)};font-size:8px">${escHtml(_blockLabel(b))}</div>`).join('')||'<div class="cal-slot" style="background:rgba(224,85,85,.15);color:#e05555;font-size:8px">Gesperrt</div>'):slotHtml}
       ${slots.length>2?`<div style="font-size:8px;color:var(--text-muted)">+${slots.length-2}</div>`:''}
@@ -2947,12 +3025,15 @@ async function renderAdminCal(){
 window.adminOpenDayDetail=async function(year,month,day){
   const lUid=window._adminCalLehrerUid;
   const date=new Date(year,month,day);const dateStr=date.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
-  const[sSnap,scSnap,bSnap]=await Promise.all([getDocs(query(collection(db,'slots'),where('lehrerUid','==',lUid))),getDocs(query(collection(db,SCHUELER_COLL),where('lehrerUid','==',lUid))),getDocs(query(collection(db,'blocked'),where('lehrerUid','==',lUid),where('year','==',year),where('month','==',month),where('day','==',day)))]);
+  let sSnap,scSnap,bSnap;
+  try{
+    [sSnap,scSnap,bSnap]=await Promise.all([getDocs(query(collection(db,'slots'),where('lehrerUid','==',lUid),where('schoolId','==',currentSchoolId))),getDocs(query(collection(db,SCHUELER_COLL),where('lehrerUid','==',lUid),where('schoolId','==',currentSchoolId))),getDocs(query(collection(db,'blocked'),where('lehrerUid','==',lUid),where('year','==',year),where('month','==',month),where('day','==',day)))]);
+  }catch(e){console.warn('adminOpenDayDetail',e);toast('Tag konnte nicht geladen werden'+((e&&e.code)?' ('+e.code+')':'')+'.','error');return;}
   const scm={};scSnap.docs.forEach(d=>{const s=d.data();scm[d.id]=s.fname+' '+s.lname;});
-  const daySlots=sSnap.docs.filter(d=>{const dt=d.data().startTime.toDate();return dt.getFullYear()===year&&dt.getMonth()===month&&dt.getDate()===day;});
+  const daySlots=sSnap.docs.filter(d=>{const st=d.data().startTime;if(!st||!st.toDate)return false;const dt=st.toDate();return dt.getFullYear()===year&&dt.getMonth()===month&&dt.getDate()===day;});
   const sHtml=daySlots.length?daySlots.map(d=>{const s=d.data();const pend=!s.bookedBy&&window.__pendingReq&&window.__pendingReq.bySlot[d.id];const sn=s.bookedBy?(scm[s.bookedBy]||'?'):(pend?('⏳ Anfrage: '+pend):null);
     return`<div class="slot-row"><div class="slot-time">${fmtTime(s.startTime)}–${fmtTime(s.endTime)}</div>
-    <div class="slot-info">${typeBadgeHtml(s.type)}${sn?`<div class="slot-student">👤 ${sn}</div>`:'<div class="slot-student" style="color:var(--success)">Frei</div>'}</div></div>`;}).join(''):'<p class="text-muted">Keine Slots.</p>';
+    <div class="slot-info">${typeBadgeHtml(s.type)}${sn?`<div class="slot-student">👤 ${escHtml(sn)}</div>`:'<div class="slot-student" style="color:var(--success)">Frei</div>'}</div></div>`;}).join(''):'<p class="text-muted">Keine Slots.</p>';
   openModal(`<h2 class="modal-title">${dateStr}</h2><div class="card-title">Slots – ${escHtml(window._adminCalLehrerName)}</div>${sHtml}<hr class="divider"><div class="card-title">Sperren / Abwesenheit</div>${blockListHtml(bSnap.docs.map(d=>({id:d.id,...d.data()})))}${blockFormHtml(year,month,day,lUid)}`);
 };
 
@@ -3089,12 +3170,12 @@ pages['lehrer-profil']=async function(el){
     <div class="card-title">🗓️ Slotplaner</div>
     <p class="text-muted" style="margin-bottom:10px;font-size:12px;line-height:1.5">Arbeitszeit + Pause festlegen → daraus freie Buchungsblöcke erzeugen. Feiertage, dein Urlaub und Sperrtage werden ausgelassen; schon belegte Zeiten bleiben erhalten. Pause leer lassen = keine.</p>
     <div class="grid-2">
-      <div class="field"><label>Arbeit von</label><input type="time" id="sp-von" value="${sp.von||'08:00'}"></div>
-      <div class="field"><label>Arbeit bis</label><input type="time" id="sp-bis" value="${sp.bis||'18:00'}"></div>
+      <div class="field"><label>Arbeit von</label><input type="time" id="sp-von" value="${escHtml(sp.von||'08:00')}"></div>
+      <div class="field"><label>Arbeit bis</label><input type="time" id="sp-bis" value="${escHtml(sp.bis||'18:00')}"></div>
     </div>
     <div class="grid-2">
-      <div class="field"><label>Pause von</label><input type="time" id="sp-pause-von" value="${sp.pauseVon||''}"></div>
-      <div class="field"><label>Pause bis</label><input type="time" id="sp-pause-bis" value="${sp.pauseBis||''}"></div>
+      <div class="field"><label>Pause von</label><input type="time" id="sp-pause-von" value="${escHtml(sp.pauseVon||'')}"></div>
+      <div class="field"><label>Pause bis</label><input type="time" id="sp-pause-bis" value="${escHtml(sp.pauseBis||'')}"></div>
     </div>
     <div class="grid-2">
       <div class="field"><label>Blocklänge (Min)</label><input type="number" id="lehrer-bd" min="15" step="5" value="${bd}"></div>
@@ -3285,7 +3366,7 @@ function renderBookingPageContent(schuelerId,lehrerUid,linkData,stud,complete,wl
 }
 function _bcalKey(d){return d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate();}
 function _bcalGroup(arr){const m={};(arr||[]).forEach(t=>{if(!t||!t.start)return;const k=_bcalKey(new Date(t.start));(m[k]=m[k]||[]).push(t);});return m;}
-function _bcalRow(t,bookable){const p=n=>String(n).padStart(2,'0');const d=new Date(t.start),e=new Date(t.ende);const time=`${p(d.getHours())}:${p(d.getMinutes())}–${p(e.getHours())}:${p(e.getMinutes())}`;let right;if(bookable){right=`<button class="btn btn-primary btn-sm" onclick="pickBookingSlotById('${t.id}')">Anfragen</button>`;}else{const stornierbar=t.id&&(new Date(t.start).getTime()-Date.now()>48*3600000);right=stornierbar?`<button class="btn btn-danger btn-sm" onclick="storniereMeinen('${t.id}')">Stornieren</button>`:'<span class="bcal-booked-tag">✓ gebucht</span>';}return `<div class="slot-row"><div class="slot-time">${time}</div><div class="slot-info">${typeBadgeHtml(t.type)}</div>${right}</div>`;}
+function _bcalRow(t,bookable){const p=n=>String(n).padStart(2,'0');const d=new Date(t.start),e=new Date(t.ende);const time=`${p(d.getHours())}:${p(d.getMinutes())}–${p(e.getHours())}:${p(e.getMinutes())}`;let right;if(bookable){right=`<button class="btn btn-primary btn-sm" onclick="pickBookingSlotById('${attrJs(t.id)}')">Anfragen</button>`;}else{const stornierbar=t.id&&(new Date(t.start).getTime()-Date.now()>48*3600000);right=stornierbar?`<button class="btn btn-danger btn-sm" onclick="storniereMeinen('${attrJs(t.id)}')">Stornieren</button>`:'<span class="bcal-booked-tag">✓ gebucht</span>';}return `<div class="slot-row"><div class="slot-time">${time}</div><div class="slot-info">${typeBadgeHtml(t.type)}</div>${right}</div>`;}
 function renderBookingCalendar(){
   const box=document.getElementById('booking-cal');if(!box)return;
   const view=window.__bookingCalView||'month';
@@ -3376,9 +3457,9 @@ window.storniereMeinen=async function(slotId){
 };
 window.aufWarteliste=async function(){
   const c=window.__bookingCtx;if(!c)return;
-  const notiz=(document.getElementById('wl-notiz')?.value||'').trim();
+  const notiz=(document.getElementById('wl-notiz')?.value||'').trim().slice(0,500);
   try{
-    await setDoc(doc(db,'bookingWaitlist',c.schuelerId),{lehrerUid:c.lehrerUid,schuelerId:c.schuelerId,vorname:c.vorname||'',notiz,status:'wartend',createdAt:serverTimestamp()});
+    await setDoc(doc(db,'bookingWaitlist',c.schuelerId),{lehrerUid:c.lehrerUid,schuelerId:c.schuelerId,vorname:String(c.vorname||'').slice(0,60),notiz,status:'wartend',createdAt:serverTimestamp()});
     toast('Du stehst jetzt auf der Warteliste.','success');
   }catch(e){console.warn('wl-join',e);toast('Eintragen fehlgeschlagen. Bitte später erneut versuchen.','error');}
 };
@@ -3393,7 +3474,7 @@ window.sendeNachricht=async function(){
   if(!text)return toast('Bitte eine Nachricht eingeben.','error');
   if(text.length>1000)return toast('Nachricht zu lang (max. 1000 Zeichen).','error');
   try{
-    await addDoc(collection(db,'bookingMessages'),{lehrerUid:c.lehrerUid,schuelerId:c.schuelerId,vorname:c.vorname||'',text,status:'neu',createdAt:serverTimestamp()});
+    await addDoc(collection(db,'bookingMessages'),{lehrerUid:c.lehrerUid,schuelerId:c.schuelerId,vorname:String(c.vorname||'').slice(0,60),text,status:'neu',createdAt:serverTimestamp()});
     if(el)el.value='';
     toast('Nachricht gesendet ✓','success');
   }catch(e){console.warn('msg',e);toast('Senden fehlgeschlagen. Bitte später erneut.','error');}
@@ -3413,7 +3494,7 @@ window.doSwapRequest=async function(i){
   if(!c||!newSlot||!old)return;
   closeModal();
   try{
-    await addDoc(collection(db,'bookingRequests'),{lehrerUid:c.lehrerUid,schuelerId:c.schuelerId,vorname:c.vorname||'',slotId:newSlot.id,swapSlotId:old.id,start:newSlot.start,ende:newSlot.ende,type:newSlot.type||'fahrstunde',status:'angefragt',tausch:true,createdAt:serverTimestamp()});
+    await addDoc(collection(db,'bookingRequests'),{lehrerUid:c.lehrerUid,schuelerId:c.schuelerId,vorname:String(c.vorname||'').slice(0,60),slotId:newSlot.id,swapSlotId:old.id,start:newSlot.start,ende:newSlot.ende,type:newSlot.type||'fahrstunde',status:'angefragt',tausch:true,createdAt:serverTimestamp()});
     __bookingUnsub.forEach(u=>{try{u();}catch(e){}});__bookingUnsub=[];
     const content=document.getElementById('booking-content');
     if(content)content.innerHTML='<div class="booking-card" style="text-align:center;padding:34px 20px"><div style="font-size:2.8rem;margin-bottom:14px">🔄</div><h2 style="margin:0 0 8px;font-size:1.2rem">Tausch-Anfrage gesendet!</h2><p class="text-muted" style="line-height:1.5">Dein Fahrlehrer bestätigt den Tausch in Kürze. Du kannst diese Seite jetzt schließen.</p><button class="btn btn-secondary" style="margin-top:16px" onclick="zurBuchungsUebersicht()">Zurück zur Übersicht</button></div>';
@@ -3429,7 +3510,7 @@ window.pickBookingSlot=function(i){
 window.sendeBuchungsanfrage=async function(schuelerId,lehrerUid,vorname,slot){
   const content=document.getElementById('booking-content');
   try{
-    await addDoc(collection(db,'bookingRequests'),{lehrerUid,schuelerId,vorname:vorname||'',slotId:slot.id,start:slot.start,ende:slot.ende,type:slot.type||'fahrstunde',status:'angefragt',createdAt:serverTimestamp()});
+    await addDoc(collection(db,'bookingRequests'),{lehrerUid,schuelerId,vorname:String(vorname||'').slice(0,60),slotId:slot.id,start:slot.start,ende:slot.ende,type:slot.type||'fahrstunde',status:'angefragt',createdAt:serverTimestamp()});
     // FIX: __meineAnfragen lebte nur im Speicher. Nach einem Neuladen der
     // Seite sah der Schueler denselben Slot wieder als frei und fragte ihn
     // ein zweites Mal an - beim Fahrlehrer landeten zwei Anfragen fuer
