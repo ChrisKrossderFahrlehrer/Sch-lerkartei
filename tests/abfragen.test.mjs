@@ -182,12 +182,15 @@ await geht('alle Kalenderprofile der Schule',                    SCHULE, 'kalend
 await geht('alle Schueler der Schule',                           SCHULE, 'schueler', [['schoolId', SCHULE]], 3);
 await geht('alle Termine der Schule (Auslastung)',               SCHULE, 'slots', [['schoolId', SCHULE]], 3);
 await geht('Termine eines Schuelers (Nachweis)',                 SCHULE, 'slots', [['schoolId', SCHULE], ['bookedBy', 'k1']]);
-await geht('Kalender eines Fahrlehrers ansehen (nur lehrerUid)', SCHULE, 'slots', [['lehrerUid', KOLLEGE]]);
+await geht('Kalender eines Fahrlehrers ansehen (lehrerUid + schoolId)', SCHULE, 'slots', [['lehrerUid', KOLLEGE], ['schoolId', SCHULE]]);
+// Ohne schoolId lehnen die Regeln ab - so stellte kalender.html die Abfrage
+// bis 11/2026, der Kalender eines Fahrlehrers liess sich nie oeffnen.
+await gehtNicht('...ohne schoolId (alte Abfrage) wird abgelehnt', SCHULE, 'slots', [['lehrerUid', KOLLEGE]]);
 await geht('Schueler eines Fahrlehrers (lehrerUid + schoolId)',  SCHULE, 'schueler', [['lehrerUid', LEHRER], ['schoolId', SCHULE]]);
-await geht('Schueler eines Fahrlehrers (nur lehrerUid)',         SCHULE, 'schueler', [['lehrerUid', KOLLEGE]]);
+await geht('Schueler eines Kollegen (lehrerUid + schoolId)',     SCHULE, 'schueler', [['lehrerUid', KOLLEGE], ['schoolId', SCHULE]]);
 await geht('Sperrzeiten eines Fahrlehrers',                      SCHULE, 'blocked', [['lehrerUid', LEHRER]]);
 await geht('Urlaub der Schule',                                  SCHULE, 'urlaub', [['schoolId', SCHULE]]);
-await geht('Urlaub eines Fahrlehrers (nur lehrerUid)',           SCHULE, 'urlaub', [['lehrerUid', LEHRER]]);
+await geht('Urlaub eines Fahrlehrers (lehrerUid + schoolId)',    SCHULE, 'urlaub', [['lehrerUid', LEHRER], ['schoolId', SCHULE]]);
 await geht('Pruefungen der Schule',                              SCHULE, 'pruefungen', [['schoolId', SCHULE]]);
 await geht('Theorie eines Schuelers (Nachweis)',                 SCHULE, 'theorieStunden', [['schoolId', SCHULE], ['schuelerId', 'k1']]);
 await geht('Kartei-Akten fuer den Nachweis',                     SCHULE, 'students', [['fahrschuleId', SCHULE]], 2);

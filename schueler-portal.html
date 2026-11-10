@@ -882,8 +882,8 @@ function renderDashboard() {
   const s    = codeData.studentSnapshot || {};
   const msgs = codeData.messages || [];
   const lessons = (codeData.plannedLessons || [])
-    .filter(l => l.status !== 'abgesagt')
-    .sort((a,b) => a.datum.localeCompare(b.datum));
+    .filter(l => l && l.datum && l.status !== 'abgesagt')
+    .sort((a,b) => String(a.datum).localeCompare(String(b.datum)));
 
   const pct      = Math.min(100, Math.round(((s.fahrstunden||0) / (s.zielStunden||30)) * 100));
   const nextLesson = lessons.find(l => l.datum >= heuteLokal());
@@ -910,7 +910,7 @@ function renderDashboard() {
               <div style="font-size:0.65rem;font-weight:700;text-transform:uppercase">${mo}</div>
             </div>
             <div>
-              ${nextLesson.uhrzeit ? `<div style="font-weight:700">${nextLesson.uhrzeit} Uhr</div>` : ''}
+              ${nextLesson.uhrzeit ? `<div style="font-weight:700">${escHtml(nextLesson.uhrzeit)} Uhr</div>` : ''}
               ${nextLesson.ort     ? `<div style="font-size:0.82rem;color:var(--muted);margin-top:2px">📍 ${escHtml(nextLesson.ort)}</div>` : ''}
               ${nextLesson.notiz  ? `<div style="font-size:0.82rem;color:var(--muted);margin-top:2px">📝 ${escHtml(nextLesson.notiz)}</div>` : ''}
               <div class="lesson-status status-${nextLesson.status || 'geplant'}" style="margin-top:6px">
@@ -1167,7 +1167,8 @@ window.sendMessage = async () => {
 // ── Planner ────────────────────────────────────────────────────
 function renderPlanner() {
   const heute   = heuteLokal();
-  const lessons = (codeData.plannedLessons || []).sort((a,b) => a.datum.localeCompare(b.datum));
+  const lessons = (codeData.plannedLessons || []).filter(l => l && l.datum)
+    .sort((a,b) => String(a.datum).localeCompare(String(b.datum)));
   const upcoming = lessons.filter(l => l.datum >= heute);
   const past     = lessons.filter(l => l.datum <  heute);
 
@@ -1198,12 +1199,12 @@ function renderPlanner() {
         <div class="lesson-date-month">${mo}</div>
       </div>
       <div class="lesson-info">
-        <div class="lesson-title">${l.uhrzeit ? l.uhrzeit + ' Uhr' : 'Fahrstunde'}</div>
+        <div class="lesson-title">${l.uhrzeit ? escHtml(l.uhrzeit) + ' Uhr' : 'Fahrstunde'}</div>
         <div class="lesson-detail">
           ${l.ort   ? `📍 ${escHtml(l.ort)}<br>` : ''}
           ${l.notiz ? `📝 ${escHtml(l.notiz)}` : ''}
         </div>
-        <div class="lesson-status status-${l.status||'geplant'}">${statusMap[l.status||'geplant']}</div>
+        <div class="lesson-status status-${statusMap[l.status] ? l.status : 'geplant'}">${statusMap[l.status] || statusMap.geplant}</div>
         ${actionsHTML}
       </div>
     </div>`;

@@ -559,6 +559,9 @@ import { getFirestore, enableIndexedDbPersistence,
          getDoc, getDocs, setDoc,
          onSnapshot, query, where, orderBy, deleteField }        from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, listAll, deleteObject }                from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+// FIX: fehlte - "E-Mail manuell bestaetigen" brach mit "getFunctions is not
+// defined" ab, bevor die Cloud Function ueberhaupt gerufen wurde.
+import { getFunctions, httpsCallable }                           from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
 
 // ── FIREBASE CONFIG ──────────────────────────────────────────
 const firebaseConfig = {
@@ -1521,6 +1524,13 @@ onAuthStateChanged(auth, async (user) => {
   // vorher war kurz eine leere bzw. die Login-Seite zu sehen.
   const ladenAus = () => { document.getElementById('loading').style.display = 'none'; };
 
+  // Anonyme Sitzung aus dem Schueler-Portal (gleicher Browser): wie "niemand
+  // angemeldet" - ohne Wartezeit und ohne die Marke "zuletzt angemeldet".
+  if (user && user.isAnonymous) {
+    ladenAus();
+    showScreen('screen-login');
+    return;
+  }
   if (!user) {
     let zuletzt = false;
     try { zuletzt = localStorage.getItem('fs_zuletzt_angemeldet') === '1'; } catch(e) {}

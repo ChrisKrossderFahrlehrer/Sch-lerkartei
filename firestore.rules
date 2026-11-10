@@ -511,8 +511,14 @@ service cloud.firestore {
       // Aussperrung per Mausklick, aus einer fremden Fahrschule heraus.
       // Lesen und Aendern pruefen die Zugehoerigkeit oben laengst; beim
       // Loeschen fehlte sie. Jetzt gleichgezogen.
+      // ZWEITE PRUEFUNG 11/2026: nur FREMDE Profile (Mitglieder). Das eigene
+      // Profil zu loeschen und neu anzulegen hebelte alles aus, was die
+      // Update-Regel schuetzt (Sperre, E-Mail-Bestaetigung, Loeschvormerkung)
+      // und war ein Glied der Kette in die Kalender fremder Schulen (siehe
+      // kalFreigegeben). Das eigene Konto loescht man ueber die Cloud Function.
       allow delete: if isSuperAdmin()
-                    || (isFsAdmin() && resource.data.fahrschuleId == userFsId());
+                    || (isFsAdmin() && uid != request.auth.uid
+                        && resource.data.fahrschuleId == userFsId());
     }
 
     // ══════════════════════════════════════════════════════
@@ -775,20 +781,38 @@ service cloud.firestore {
     // Fahrschul-Code kannte, sah damit sofort alle Termine, Schueler und
     // Pruefungen der Schule; ein GESPERRTES Mitglied ebenso weiterhin.
     // Jetzt gilt dieselbe Bedingung wie in der Kartei: die eigene Schule
-    // immer, eine fremde nur mit Freigabe. Konten ohne ADK-Profil (nur vom
-    // Betreiber angelegt) bleiben unberuehrt, damit niemand ausgesperrt wird.
+    // immer, eine fremde nur mit Freigabe.
     function kalFreigegeben(sid) {
       // FIX: Zusaetzlich muss die Schule zur Kartei-Zuordnung passen. Vorher
       // behielt ein Fahrlehrer, der die Fahrschule verlassen hat (users.
       // fahrschuleId zeigt wieder auf ihn selbst), ueber sein altes Kalender-
       // Profil vollen Zugriff auf Termine, Schueler und Notizen der Schule.
-      return sid == request.auth.uid || !userDocExists() ||
-             (userFsId() == sid && istFreigegeben());
+      //
+      // ZWEITE PRUEFUNG 11/2026: Hier stand zusaetzlich "|| !userDocExists()"
+      // (Konten ohne Kartei-Profil galten als freigegeben). Das war ein Weg
+      // in JEDE fremde Schule, deren Fahrschul-Code man kennt: als Fahrschule
+      // registrieren, mit dem Code "beitreten" (wartend), das Kalender-Profil
+      // auf die fremde Schule anlegen, das eigene Kartei-Profil wieder
+      // loeschen - danach griff die Ausnahme und der Kalender der fremden
+      // Schule (Namen, Telefonnummern, Termine) stand offen. Der Kalender
+      // selbst laesst Konten ohne Kartei-Profil ohnehin nicht hinein
+      // ("Kein ADK-Konto gefunden") - die Ausnahme schuetzte also niemanden.
+      return sid == request.auth.uid ||
+             (userDocExists() && userFsId() == sid && istFreigegeben());
+    }
+    // Ist dieses Konto laut KARTEI ein freigegebenes Mitglied der Schule?
+    // (Das Kalender-Profil allein genuegt nicht - es bleibt nach einem
+    // Austritt stehen, bis der Betreffende den Kalender wieder oeffnet.)
+    function kalIstMitglied(luid, sid) {
+      return exists(/databases/$(database)/documents/users/$(luid)) &&
+             get(/databases/$(database)/documents/users/$(luid)).data.get('fahrschuleId', luid) == sid &&
+             get(/databases/$(database)/documents/users/$(luid)).data.get('status', 'aktiv') != 'ausstehend' &&
+             get(/databases/$(database)/documents/users/$(luid)).data.get('status', 'aktiv') != 'gesperrt';
     }
     // Gehört ein Dokument mit dieser schoolId zu MEINER Schule? (oder bin ich SuperAdmin)
     function kalOwnsSchool(sid) {
       return kalIsSuperAdmin() ||
-             (kalUserExists() && kalMySchool() == sid && kalFreigegeben(sid));
+             (sid is string && kalUserExists() && kalMySchool() == sid && kalFreigegeben(sid));
     }
     // Gehört ein Lehrer (per UID) zu meiner Schule? (für Collections ohne schoolId, z.B. blocked)
     function kalLehrerInMySchool(luid) {
@@ -812,23 +836,39 @@ service cloud.firestore {
     // beim Aendern, damit niemand ein eigenes Dokument in eine fremde Schule
     // "umzieht".
     function kalKollege(luid) {
-      return kalUserExists() && kalMySchool() != null && kalFreigegeben(kalMySchool()) &&
+      // ... und laut Kartei noch Mitglied: Einem ausgetretenen Fahrlehrer
+      // (altes Kalender-Profil) kann niemand mehr Schueler oder Termine
+      // zuweisen - er koennte sie sonst weiter lesen.
+      return kalUserExists() && kalMySchool() is string && kalFreigegeben(kalMySchool()) &&
              exists(/databases/$(database)/documents/kalenderUsers/$(luid)) &&
-             get(/databases/$(database)/documents/kalenderUsers/$(luid)).data.schoolId == kalMySchool();
+             get(/databases/$(database)/documents/kalenderUsers/$(luid)).data.schoolId == kalMySchool() &&
+             kalIstMitglied(luid, kalMySchool());
+    }
+    // Lehrer: keiner, ich selbst oder ein Kollege meiner Kalender-Schule
+    function kalLehrerOk(d) {
+      return d.get('lehrerUid', null) == null || d.get('lehrerUid', null) == request.auth.uid ||
+             kalKollege(d.get('lehrerUid', null));
+    }
+    // Schule: meine Kalender-Schule, meine Kartei-Schule (mit Freigabe),
+    // meine eigene Kennung, oder ohne Schule nur fuer eigene Eintraege
+    function kalSchuleOk(d) {
+      return kalOwnsSchool(d.get('schoolId', null)) ||
+             (isRealAccount() && (d.get('schoolId', null) == request.auth.uid ||
+                                  schulMitglied(d.get('schoolId', null)))) ||
+             (isRealAccount() && d.get('schoolId', null) == null &&
+              d.get('lehrerUid', null) == request.auth.uid);
     }
     function kalSchreibOk(d) {
+      return kalIsSuperAdmin() || (kalLehrerOk(d) && kalSchuleOk(d));
+    }
+    // Beim AENDERN darf die bisherige Zuordnung stehen bleiben: Sonst liesse
+    // sich ein Dokument, das noch einem ausgetretenen Fahrlehrer zugeordnet
+    // ist, gar nicht mehr bearbeiten (auch nicht, um es neu zuzuordnen -
+    // dafuer wird die lehrerUid ja geaendert und dann wieder geprueft).
+    function kalAendernOk(alt, neu) {
       return kalIsSuperAdmin() || (
-        // Lehrer: keiner, ich selbst oder ein Kollege meiner Kalender-Schule
-        (d.get('lehrerUid', null) == null || d.get('lehrerUid', null) == request.auth.uid ||
-         kalKollege(d.get('lehrerUid', null))) &&
-        // Schule: meine Kalender-Schule, meine Kartei-Schule (mit Freigabe),
-        // meine eigene Kennung, oder ohne Schule nur fuer eigene Eintraege
-        (kalOwnsSchool(d.get('schoolId', null)) ||
-         (isRealAccount() && (d.get('schoolId', null) == request.auth.uid ||
-                              schulMitglied(d.get('schoolId', null)))) ||
-         (isRealAccount() && d.get('schoolId', null) == null &&
-          d.get('lehrerUid', null) == request.auth.uid))
-      );
+        (neu.get('lehrerUid', null) == alt.get('lehrerUid', null) || kalLehrerOk(neu)) &&
+        kalSchuleOk(neu));
     }
     // Neue Dokumente nur mit automatisch vergebener ID (addDoc). Die IDs
     // landen in onclick-Attributen der Oberflaeche.
@@ -852,12 +892,25 @@ service cloud.firestore {
                        (kalAuth() && request.auth.uid == uid) ||
                        (kalUserExists() && resource.data.schoolId == kalMySchool()
                                         && kalFreigegeben(kalMySchool()));
+      // schoolId muss eine echte Kennung sein: Ohne Kartei-Profil ist
+      // kalAdkFahrschuleId() null - mit "schoolId: null" liess sich sonst ein
+      // Kalender-Profil der "Schule null" anlegen (Zugriff auf alle
+      // Dokumente, deren schoolId ausdruecklich null ist).
       allow create: if kalIsSuperAdmin() ||
                        (isRealAccount() && request.auth.uid == uid &&
+                        request.resource.data.schoolId is string &&
                         request.resource.data.schoolId == kalAdkFahrschuleId());
       allow update: if kalIsSuperAdmin() ||
                        (isRealAccount() && request.auth.uid == uid &&
-                        request.resource.data.schoolId == kalAdkFahrschuleId());
+                        request.resource.data.schoolId is string &&
+                        request.resource.data.schoolId == kalAdkFahrschuleId()) ||
+                       // Der Inhaber (Fahrschul-ID = seine uid) stellt fuer
+                       // seine Fahrlehrer die Blockdauer ein. Vorher verbot
+                       // die Regel das - die Auswahl im Kalender zeigte nur
+                       // einen Rechtefehler.
+                       (isRealAccount() && uid != request.auth.uid &&
+                        resource.data.schoolId == request.auth.uid &&
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['blockDauer']));
       allow delete: if kalIsSuperAdmin() ||
                        (kalAuth() && request.auth.uid == uid);
     }
@@ -873,7 +926,10 @@ service cloud.firestore {
       allow create: if kalIsSuperAdmin() ||
                        (isRealAccount() && schoolId == request.auth.uid &&
                         request.resource.data.adminUid == request.auth.uid);
-      allow update: if kalOwnsSchool(schoolId);
+      // Nur der Inhaber (vorher jedes freigegebene Mitglied - das konnte
+      // damit Namen, Berechtigungen und Fahrstundenarten der Schule aendern).
+      allow update: if kalIsSuperAdmin() ||
+                       (isRealAccount() && schoolId == request.auth.uid);
       allow delete: if kalIsSuperAdmin();
     }
 
@@ -884,13 +940,13 @@ service cloud.firestore {
     match /schueler/{docId} {
       allow read, delete: if kalOwnsSchool(resource.data.schoolId) || (isAuth() && resource.data.lehrerUid == request.auth.uid);
       allow update:       if (kalOwnsSchool(resource.data.schoolId) || (isAuth() && resource.data.lehrerUid == request.auth.uid))
-                             && kalSchreibOk(request.resource.data);
+                             && kalAendernOk(resource.data, request.resource.data);
       allow create:       if kalIdOk(docId) && kalSchreibOk(request.resource.data);
     }
     match /slots/{docId} {
       allow read, delete: if kalOwnsSchool(resource.data.schoolId) || (isAuth() && resource.data.lehrerUid == request.auth.uid);
       allow update:       if (kalOwnsSchool(resource.data.schoolId) || (isAuth() && resource.data.lehrerUid == request.auth.uid))
-                             && kalSchreibOk(request.resource.data);
+                             && kalAendernOk(resource.data, request.resource.data);
       allow create:       if kalIdOk(docId) && kalSchreibOk(request.resource.data);
       // Schüler-Selbststorno (OHNE Login): NUR den eigenen gebuchten Termin
       // freigeben (bookedBy -> null). Eng begrenzt:
@@ -912,7 +968,7 @@ service cloud.firestore {
     match /theorieStunden/{docId} {
       allow read, delete: if kalOwnsSchool(resource.data.schoolId) || (isAuth() && resource.data.lehrerUid == request.auth.uid);
       allow update:       if (kalOwnsSchool(resource.data.schoolId) || (isAuth() && resource.data.lehrerUid == request.auth.uid))
-                             && kalSchreibOk(request.resource.data);
+                             && kalAendernOk(resource.data, request.resource.data);
       allow create:       if kalIdOk(docId) && kalSchreibOk(request.resource.data);
     }
     match /autos/{docId} {
@@ -923,31 +979,31 @@ service cloud.firestore {
       // Fahrschul-Mitgliedschaft.
       allow read, delete: if kalOwnsSchool(resource.data.schoolId) || (isAuth() && resource.data.lehrerUid == request.auth.uid);
       allow update:       if (kalOwnsSchool(resource.data.schoolId) || (isAuth() && resource.data.lehrerUid == request.auth.uid))
-                             && kalSchreibOk(request.resource.data);
+                             && kalAendernOk(resource.data, request.resource.data);
       allow create:       if kalIdOk(docId) && kalSchreibOk(request.resource.data);
     }
     match /globalBlocked/{docId} {
       allow read, delete: if kalOwnsSchool(resource.data.schoolId) || (isAuth() && resource.data.lehrerUid == request.auth.uid);
       allow update:       if (kalOwnsSchool(resource.data.schoolId) || (isAuth() && resource.data.lehrerUid == request.auth.uid))
-                             && kalSchreibOk(request.resource.data);
+                             && kalAendernOk(resource.data, request.resource.data);
       allow create:       if kalIdOk(docId) && kalSchreibOk(request.resource.data);
     }
     match /urlaub/{docId} {
       allow read, delete: if kalOwnsSchool(resource.data.schoolId) || (isAuth() && resource.data.lehrerUid == request.auth.uid);
       allow update:       if (kalOwnsSchool(resource.data.schoolId) || (isAuth() && resource.data.lehrerUid == request.auth.uid))
-                             && kalSchreibOk(request.resource.data);
+                             && kalAendernOk(resource.data, request.resource.data);
       allow create:       if kalIdOk(docId) && kalSchreibOk(request.resource.data);
     }
     match /notizen/{docId} {
       allow read, delete: if kalOwnsSchool(resource.data.schoolId) || (isAuth() && resource.data.lehrerUid == request.auth.uid);
       allow update:       if (kalOwnsSchool(resource.data.schoolId) || (isAuth() && resource.data.lehrerUid == request.auth.uid))
-                             && kalSchreibOk(request.resource.data);
+                             && kalAendernOk(resource.data, request.resource.data);
       allow create:       if kalIdOk(docId) && kalSchreibOk(request.resource.data);
     }
     match /warteliste/{docId} {
       allow read, delete: if kalOwnsSchool(resource.data.schoolId) || (isAuth() && resource.data.lehrerUid == request.auth.uid);
       allow update:       if (kalOwnsSchool(resource.data.schoolId) || (isAuth() && resource.data.lehrerUid == request.auth.uid))
-                             && kalSchreibOk(request.resource.data);
+                             && kalAendernOk(resource.data, request.resource.data);
       allow create:       if kalIdOk(docId) && kalSchreibOk(request.resource.data);
     }
     // SICHERHEITS-AUDIT (Datenverlust): Diese Regel fragte nach 'lehrerUid' -
@@ -964,16 +1020,20 @@ service cloud.firestore {
     // nicht in einen Fehler laufen laesst.
     // Pruefungen: wie kalSchreibOk, der Erfasser steht in 'eingetragenVon'
     // (ohne Schule nur fuer eigene Eintraege).
+    function kalPruefungSchuleOk(d) {
+      return kalOwnsSchool(d.get('schoolId', null)) ||
+             (isRealAccount() && (d.get('schoolId', null) == request.auth.uid ||
+                                  schulMitglied(d.get('schoolId', null)))) ||
+             (isRealAccount() && d.get('schoolId', null) == null &&
+              (d.get('lehrerUid', null) == request.auth.uid || d.get('eingetragenVon', null) == request.auth.uid));
+    }
     function kalPruefungOk(d) {
+      return kalIsSuperAdmin() || (kalLehrerOk(d) && kalPruefungSchuleOk(d));
+    }
+    function kalPruefungAendernOk(alt, neu) {
       return kalIsSuperAdmin() || (
-        (d.get('lehrerUid', null) == null || d.get('lehrerUid', null) == request.auth.uid ||
-         kalKollege(d.get('lehrerUid', null))) &&
-        (kalOwnsSchool(d.get('schoolId', null)) ||
-         (isRealAccount() && (d.get('schoolId', null) == request.auth.uid ||
-                              schulMitglied(d.get('schoolId', null)))) ||
-         (isRealAccount() && d.get('schoolId', null) == null &&
-          (d.get('lehrerUid', null) == request.auth.uid || d.get('eingetragenVon', null) == request.auth.uid)))
-      );
+        (neu.get('lehrerUid', null) == alt.get('lehrerUid', null) || kalLehrerOk(neu)) &&
+        kalPruefungSchuleOk(neu));
     }
     match /pruefungen/{docId} {
       allow read, delete: if kalOwnsSchool(resource.data.schoolId)
@@ -982,7 +1042,7 @@ service cloud.firestore {
       allow update:       if (kalOwnsSchool(resource.data.schoolId)
                               || (isAuth() && resource.data.get('lehrerUid', '') == request.auth.uid)
                               || (isAuth() && resource.data.get('eingetragenVon', '') == request.auth.uid))
-                             && kalPruefungOk(request.resource.data);
+                             && kalPruefungAendernOk(resource.data, request.resource.data);
       allow create:       if kalIdOk(docId) && kalPruefungOk(request.resource.data);
     }
     // blocked hat kein schoolId, nur lehrerUid → über den Lehrer absichern
@@ -1038,6 +1098,11 @@ service cloud.firestore {
                     && request.resource.data.lehrerUid is string
                     && request.resource.data.schuelerId == schuelerId
                     && request.resource.data.keys().hasAll(['lehrerUid','schuelerId','vorname','status','createdAt'])
+                    && request.resource.data.keys().hasOnly(['lehrerUid','schuelerId','vorname','notiz','status','createdAt'])
+                    && request.resource.data.vorname is string
+                    && request.resource.data.vorname.size() <= 60
+                    && request.resource.data.get('notiz', '') is string
+                    && request.resource.data.get('notiz', '').size() <= 500
                     && exists(/databases/$(database)/documents/bookingLinks/$(request.resource.data.lehrerUid))
                     && get(/databases/$(database)/documents/bookingLinks/$(request.resource.data.lehrerUid)).data.aktiv == true;
     }
@@ -1046,6 +1111,16 @@ service cloud.firestore {
       allow list:   if false;
       allow create: if isAuth() && request.resource.data.lehrerUid == request.auth.uid;
       allow update, delete: if isAuth() && resource.data.lehrerUid == request.auth.uid;
+      // Dokument OHNE lehrerUid uebernehmen: Der Server (syncBookedCount)
+      // legte bei einer von Hand zugewiesenen Fahrstunde ein Dokument an, das
+      // nur den Zaehler enthielt. Die Regel oben verlangt lehrerUid - der
+      // Buchungslink liess sich fuer diesen Schueler danach nie mehr
+      // erstellen. Uebernehmen darf, wem der Kalender-Schueler gehoert.
+      allow update: if isRealAccount()
+                    && !('lehrerUid' in resource.data)
+                    && request.resource.data.lehrerUid == request.auth.uid
+                    && exists(/databases/$(database)/documents/schueler/$(schuelerId))
+                    && get(/databases/$(database)/documents/schueler/$(schuelerId)).data.lehrerUid == request.auth.uid;
       // Schüler darf (ohne Login) NUR die eigene Terminliste anpassen – z.B.
       // nach einem Selbststorno. lehrerUid/vorname bleiben gesperrt.
       allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['meineTermine','updatedAt'])
@@ -1058,9 +1133,24 @@ service cloud.firestore {
     //   Lesen/Ändern/Löschen ausschließlich der betroffene Lehrer.
     match /bookingRequests/{reqId} {
       allow read:   if isAuth() && resource.data.lehrerUid == request.auth.uid;
+      // ZWEITE PRUEFUNG 11/2026: Ohne Login anlegbar - deshalb nur bekannte
+      // Felder, kurze Texte und einfache Kennungen. Der Vorname wird beim
+      // Fahrlehrer angezeigt; er stand dort ungeschuetzt im Tagesfenster
+      // (eingeschleuster Code lief in der Sitzung des Fahrlehrers).
       allow create: if request.resource.data.status == 'angefragt'
                     && reqId.matches('^[A-Za-z0-9]{20}$')
                     && request.resource.data.keys().hasAll(['lehrerUid','schuelerId','slotId','start','ende','status'])
+                    && request.resource.data.keys().hasOnly(['lehrerUid','schuelerId','vorname','slotId','swapSlotId','start','ende','type','status','tausch','createdAt'])
+                    && request.resource.data.schuelerId.matches('^[A-Za-z0-9_-]{1,64}$')
+                    && request.resource.data.slotId is string
+                    && request.resource.data.slotId.matches('^[A-Za-z0-9_-]{1,64}$')
+                    && request.resource.data.get('swapSlotId', 'x').matches('^[A-Za-z0-9_-]{1,64}$')
+                    && request.resource.data.get('vorname', '') is string
+                    && request.resource.data.get('vorname', '').size() <= 60
+                    && request.resource.data.start is string && request.resource.data.start.size() <= 40
+                    && request.resource.data.ende is string && request.resource.data.ende.size() <= 40
+                    && request.resource.data.get('type', '') is string
+                    && request.resource.data.get('type', '').size() <= 40
                     && request.resource.data.lehrerUid is string
                     && request.resource.data.schuelerId is string
                     && exists(/databases/$(database)/documents/bookingLinks/$(request.resource.data.lehrerUid))
@@ -1085,6 +1175,9 @@ service cloud.firestore {
                     && request.resource.data.text.size() > 0
                     && request.resource.data.text.size() <= 1000
                     && request.resource.data.keys().hasAll(['lehrerUid','schuelerId','vorname','text','status','createdAt'])
+                    && request.resource.data.keys().hasOnly(['lehrerUid','schuelerId','vorname','text','status','createdAt'])
+                    && request.resource.data.vorname is string
+                    && request.resource.data.vorname.size() <= 60
                     && exists(/databases/$(database)/documents/bookingStudents/$(request.resource.data.schuelerId))
                     && get(/databases/$(database)/documents/bookingStudents/$(request.resource.data.schuelerId)).data.lehrerUid == request.resource.data.lehrerUid;
     }

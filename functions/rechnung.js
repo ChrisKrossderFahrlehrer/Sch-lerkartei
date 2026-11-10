@@ -209,4 +209,4 @@ function abrechnungsZiel(userData, uid) {
   return null;
 }
 
-module.exports = { rechnungAnlegen, baueRechnungsPdf, rechnungsSteller, RECHNUNG_PLANS, abrechnungsZiel, rechnungsBeschreibung };
+module.exports = { rechnungAnlegen, baueRechnungsPdf, rechnungsSteller, RECHNUNG_PLANS, PAYPAL_PLAN_IDS, abrechnungsZiel, rechnungsBeschreibung };
