@@ -78,6 +78,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .nav-item:hover,.nav-item.active{background:var(--surface2);color:var(--text);}
 .nav-item.active{color:var(--accent);}
 .nav-icon{font-size:15px;width:18px;text-align:center;}
+.nav-group{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);opacity:.8;padding:16px 12px 6px;}
+.nav-group:first-child{padding-top:2px;}
 .nav-section{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);padding:12px 12px 4px;margin-top:4px;}
 .main{flex:1;padding:28px;overflow-y:auto;}
 .page-title{font-family:var(--font-display);font-size:26px;color:var(--text);margin-bottom:20px;}
@@ -581,13 +583,22 @@ window.blockTime=async function(year,month,day,lehrerUid){
   const _nEl=document.getElementById('blk-notiz');const notiz=((_nEl&&_nEl.value)||'').trim();
   try{
     await addDoc(collection(db,'blocked'),{lehrerUid,schoolId:currentSchoolId||null,year,month,day,grund,label,ganztags,vonMin,bisMin,notiz,createdAt:serverTimestamp()});
-    if(lehrerUid===currentUser.uid){try{await publishMyBookingLink();}catch(e){}}
+    // Auch wenn der Inhaber bei einem Fahrlehrer sperrt: Der gesperrte Termin
+    // blieb sonst buchbar, bis der Fahrlehrer selbst den Kalender oeffnete.
+    try{await publishBookingLinkFuer(lehrerUid,{nurWennVorhanden:lehrerUid!==currentUser.uid});}catch(e){}
     toast('Zeit gesperrt.','success');closeModal();
     if(document.getElementById('admin-cal-grid'))renderAdminCal();else renderCal();
   }catch(e){console.warn('block',e);toast('Sperren fehlgeschlagen.','error');}
 };
 window.unblockTime=async function(id,isOwn){
-  try{await deleteDoc(doc(db,'blocked',id));if(isOwn){try{await publishMyBookingLink();}catch(e){}}toast('Aufgehoben.','success');closeModal();if(document.getElementById('admin-cal-grid'))renderAdminCal();else renderCal();}
+  try{
+    // Wem gehoert die Sperre? Hebt der Inhaber sie bei einem Fahrlehrer auf,
+    // dessen Buchungslink nachziehen (wie beim Sperren).
+    let _lUid=isOwn?currentUser.uid:null;
+    if(!isOwn){try{const _b=await getDoc(doc(db,'blocked',id));if(_b.exists())_lUid=_b.data().lehrerUid||null;}catch(e){}}
+    await deleteDoc(doc(db,'blocked',id));
+    if(_lUid){try{await publishBookingLinkFuer(_lUid,{nurWennVorhanden:_lUid!==currentUser.uid});}catch(e){}}
+    toast('Aufgehoben.','success');closeModal();if(document.getElementById('admin-cal-grid'))renderAdminCal();else renderCal();}
   catch(e){toast('Fehlgeschlagen.','error');}
 };
 
@@ -900,6 +911,9 @@ onAuthStateChanged(auth,async user=>{
     document.getElementById('topbar-school-name').textContent=currentSchool.name;
   }
   try { await loadTypes(); } catch(e){ console.warn('loadTypes:',e); }
+  // Ist der E-Mail-Versand eingerichtet? (Nur fuer den Hinweistext beim
+  // Stornieren - verschickt wird ohnehin auf dem Server.)
+  getDoc(doc(db,'settings','kalenderMail')).then(m=>{window.__mailAktiv=!!(m.exists()&&m.data().aktiv===true);}).catch(()=>{});
   show('app');buildSidebar();
   navigate(currentRole==='superadmin'?'sa-dashboard':currentRole==='admin'?'admin-dashboard':'lehrer-kalender');
 });
@@ -936,9 +950,23 @@ function buildSidebar(){
     ...(istEinzelLehrer?[{id:'nachweis',icon:'📄',label:'Ausbildungsnachweis'}]:[]),
     {id:'lehrer-profil',icon:'⚙️',label:'Einstellungen'},
   ];
-  const items=currentRole==='superadmin'?saNav:currentRole==='admin'?adminNav:lehrerNav;
-  window.__navItems=items;
-  nav.innerHTML=items.map(i=>`<button class="nav-item" id="nav-${i.id}" onclick="navigate('${i.id}')"><span class="nav-icon">${i.icon}</span><span class="nav-label">${i.label}</span></button>`).join('');
+  // Der Inhaber faehrt in aller Regel selbst. Bisher hatte er im Kalender nur
+  // die Verwaltungs-Seiten: Eigene Zeitslots anlegen, Buchungsanfragen
+  // bestaetigen oder den eigenen Buchungslink teilen konnte er nicht. Er
+  // bekommt die Fahrlehrer-Seiten jetzt zusaetzlich, in einer eigenen Gruppe.
+  // (Urlaub, Pruefungen und Nachweis stehen fuer ihn schon oben.)
+  const meinNav=[
+    {gruppe:'Meine Fahrstunden'},
+    {id:'lehrer-kalender',icon:'📅',label:'Mein Kalender'},
+    {id:'lehrer-slots',icon:'⏱️',label:'Meine Zeitslots'},
+    {id:'lehrer-buchungen',icon:'📋',label:'Meine Buchungen'},
+    {id:'lehrer-schueler',icon:'🧑‍🎓',label:'Meine Schüler'},
+    {id:'lehrer-theorie',icon:'📖',label:'Theorie'},
+    {id:'lehrer-profil',icon:'🗓️',label:'Slotplaner & Auto'},
+  ];
+  const items=currentRole==='superadmin'?saNav:currentRole==='admin'?[{gruppe:'Fahrschule'},...adminNav,...meinNav]:lehrerNav;
+  window.__navItems=items.filter(i=>i.id);
+  nav.innerHTML=items.map(i=>i.gruppe?`<div class="nav-group">${i.gruppe}</div>`:`<button class="nav-item" id="nav-${i.id}" onclick="navigate('${i.id}')"><span class="nav-icon">${i.icon}</span><span class="nav-label">${i.label}</span></button>`).join('');
   if(!nav.__hintsBound){nav.__hintsBound=true;nav.addEventListener('scroll',updateNavHints,{passive:true});}
   setTimeout(updateNavHints,60);
 }
@@ -1005,7 +1033,8 @@ function updateReqBadge(n){
 }
 function startGlobalRequestWatch(){
   if (__reqUnsubGlobal || !currentUser) return;
-  if (currentRole !== 'lehrer') return; // nur Lehrer-Ansicht
+  // Fahrlehrer - und der Inhaber, der selbst faehrt und eigene Anfragen bekommt
+  if (currentRole !== 'lehrer' && currentRole !== 'admin') return;
   try {
     __reqUnsubGlobal = onSnapshot(
       query(collection(db,'bookingRequests'), where('lehrerUid','==',currentUser.uid)),
@@ -1237,7 +1266,11 @@ pages['lehrer-theorie']=async function(el){
   window.__thArt = 'grund';
   document.getElementById('th-datum').valueAsDate = new Date();
   fuelleThemenListe();
-  const snap = await getDocs(query(collection(db,SCHUELER_COLL), where('lehrerUid','==',currentUser.uid)));
+  // Theorie ist Gruppenunterricht: Der Inhaber waehlt aus allen Schuelern
+  // der Fahrschule, ein Fahrlehrer aus seinen eigenen.
+  const snap = await getDocs(currentRole==='admin'
+    ? query(collection(db,SCHUELER_COLL), where('schoolId','==',currentSchoolId))
+    : query(collection(db,SCHUELER_COLL), where('lehrerUid','==',currentUser.uid)));
   const listEl = document.getElementById('th-schueler-liste');
   if (snap.empty) { listEl.innerHTML = '<p class="text-muted">Keine Schüler gefunden.</p>'; return; }
   const schueler = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (a.lname||'').localeCompare(b.lname||''));
@@ -1522,14 +1555,13 @@ async function loadSchuelerList(lehrerDocs){
   el.innerHTML='<table><thead><tr><th>Name</th><th>Fahrlehrer</th><th>Kontingent</th><th>Auto</th><th>Link</th><th></th></tr></thead><tbody>'+
     snap.docs.map(d=>{
       const s=d.data();
-      const link=`${location.origin}${location.pathname}?schueler=${d.id}&lehrer=${s.lehrerUid||''}`;
       const k=s.maxFahrstunden>0?`${Number(s.bookedCount)||0}/${Number(s.maxFahrstunden)||0}`:`${Number(s.bookedCount)||0}/∞`;
       const w=s.maxFahrstunden>0&&(s.bookedCount||0)>=s.maxFahrstunden;
       const autoStr=s.autoId&&am[s.autoId]?`<span class="auto-kennzeichen" style="font-size:10px">${escHtml(am[s.autoId].kennzeichen)}</span>`:'—';
       return`<tr><td>${escHtml(s.fname)} ${escHtml(s.lname)}</td><td>${s.lehrerUid?escHtml(lm[s.lehrerUid]||'nicht mehr in der Fahrschule'):'—'}</td>
         <td style="color:${w?'var(--danger)':'inherit'}">${k}${w?' ⚠️':''}</td>
         <td>${autoStr}</td>
-        <td>${s.lehrerUid?`<button class="copy-btn" onclick="copyLink('${attrJs(link)}')">🔗</button>`:'—'}</td>
+        <td>${s.lehrerUid?`<button class="copy-btn" title="Buchungslink kopieren" onclick="buchungslinkTeilen('${d.id}')">🔗</button>`:'—'}</td>
         <td><button class="btn btn-secondary btn-sm" onclick="editSchueler('${d.id}')">Bearb.</button> <button class="btn btn-danger btn-sm" onclick="deleteSchueler('${d.id}')">Löschen</button></td>
       </tr>`;}).join('')+'</tbody></table>';
 }
@@ -1572,6 +1604,19 @@ window.saveSchueler=async function(id){
     maxFahrstunden:parseInt(document.getElementById('es-max').value)||0,
     maxAktiveTermine:parseInt(document.getElementById('es-maxaktiv').value)||0,
   });
+  // Hat der Schueler schon einen Buchungslink, die Buchungsseite nachziehen:
+  // Sie zeigte sonst weiter das alte Kontingent - und nach einem Wechsel des
+  // Fahrlehrers blieb sie am alten haengen (der neue konnte den Link nicht
+  // mehr teilen).
+  try{
+    const _lUid=document.getElementById('es-lehrer').value||null;
+    const _bs=await getDoc(doc(db,'bookingStudents',id));
+    if(_bs.exists()&&_lUid){
+      const _vn=document.getElementById('es-fname').value.trim();
+      await setDoc(doc(db,'bookingStudents',id),{vorname:_vn,lehrerUid:_lUid,updatedAt:serverTimestamp()},{merge:true});
+      await publishStudentBookings(id,_vn,_lUid);
+    }
+  }catch(e){console.warn('saveSchueler Buchungsseite',e);}
   toast('Gespeichert!','success');closeModal();pages['admin-schueler'](document.getElementById('main-content'));
 };
 
@@ -2554,7 +2599,7 @@ window.oeffneTerminDetail = async function(slotId, year, month, day) {
           ${anOptionen}
         </select>
       </div>
-      <button class="btn btn-danger" style="width:100%;margin-bottom:18px" onclick="if(confirm('Diesen Termin wirklich stornieren und löschen?'))stornierGebuchtenSlot('${slotId}',${year},${month},${day})">🗑️ Termin stornieren</button>
+      <button class="btn btn-danger" style="width:100%;margin-bottom:18px" onclick="if(confirm('Diesen Termin wirklich stornieren und löschen?'+(window.__mailAktiv?' Ist beim Schüler eine E-Mail-Adresse hinterlegt, bekommt er die Absage per E-Mail.':'')))stornierGebuchtenSlot('${slotId}',${year},${month},${day})">🗑️ Termin stornieren</button>
       <hr class="divider">
       <div class="card-title">Bisherige Fahrstunden bei dir</div>
       <p class="text-muted" style="margin:-4px 0 8px">Gesamt: <strong style="color:var(--text)">${gesamt}</strong>${fehlstunden ? ` · davon ${fehlstunden} Fehlstunde${fehlstunden > 1 ? 'n' : ''}` : ''}</p>
@@ -2578,7 +2623,9 @@ window.stornierGebuchtenSlot = async function(slotId, year, month, day) {
   try {
     const slotSnap = await getDoc(doc(db, 'slots', slotId));
     const bb = slotSnap.exists() ? slotSnap.data().bookedBy : null;
-    await updateDoc(doc(db, 'slots', slotId), { bookedBy: null, bookedAt: null });
+    // absageAm: Schueler bekommt die Absage per E-Mail. wirdGeloescht: Der
+    // Termin verschwindet gleich - der Server bietet ihn deshalb niemandem an.
+    await updateDoc(doc(db, 'slots', slotId), { bookedBy: null, bookedAt: null, absageAm: serverTimestamp(), wirdGeloescht: true });
     await deleteDoc(doc(db, 'slots', slotId));
     try { await publishMyBookingLink(); } catch (e) {}
     if (bb) { try { await publishStudentBookings(bb); } catch (e) {} }
@@ -2687,16 +2734,29 @@ pages['lehrer-buchungen']=async function(el){
   liveOn(query(collection(db,'bookingWaitlist'),where('lehrerUid','==',currentUser.uid)),_rbuch);
   liveOn(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid)),_rbuch);
 };
-async function publishMyBookingLink(){
+async function publishMyBookingLink(){return publishBookingLinkFuer(currentUser.uid);}
+// Veroeffentlicht die freien Termine eines Fahrlehrers fuer seine Schueler.
+// Normalerweise die eigenen. Der INHABER darf das auch fuer einen Fahrlehrer
+// seiner Schule (Buchungslink aus der Schuelerliste, Sperrzeit im Kalender
+// des Fahrlehrers) - die Abfragen brauchen dann zusaetzlich den Filter auf
+// die Schule, sonst lehnen die Regeln sie ab.
+// opt.nurWennVorhanden: nichts anlegen, wenn der Fahrlehrer noch gar keinen
+// Buchungslink hat (z. B. beim Sperren einer Zeit durch den Inhaber).
+async function publishBookingLinkFuer(lUid,opt){
+  const eigen=lUid===currentUser.uid;
+  const _von=(coll)=>eigen?query(collection(db,coll),where('lehrerUid','==',lUid)):query(collection(db,coll),where('lehrerUid','==',lUid),where('schoolId','==',currentSchoolId));
   try{
-    const snap=await getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid)));
-    let _blocks=[];try{const _bs=await getDocs(query(collection(db,'blocked'),where('lehrerUid','==',currentUser.uid)));_blocks=_bs.docs.map(d=>({id:d.id,...d.data()}));}catch(e){}
+    let _prev=null;
+    try{_prev=await getDoc(doc(db,'bookingLinks',lUid));}catch(e){}
+    if(opt&&opt.nurWennVorhanden&&!(_prev&&_prev.exists()))return{count:0,aktiv:false};
+    const snap=await getDocs(_von('slots'));
+    let _blocks=[];try{const _bs=await getDocs(query(collection(db,'blocked'),where('lehrerUid','==',lUid)));_blocks=_bs.docs.map(d=>({id:d.id,...d.data()}));}catch(e){}
     // FIX: Hier wurden bisher NUR die 'blocked'-Zeiten beruecksichtigt, nicht
     // aber Urlaub und schulweite Sperrtage - beide werden im Kalender des
     // Fahrlehrers sonst ueberall geprueft. Ein vor dem Urlaub angelegter Slot
     // blieb dadurch im oeffentlichen Buchungslink sichtbar und buchbar,
     // obwohl der Fahrlehrer nachweislich im Urlaub ist.
-    let _urlaub=[];try{const _us=await getDocs(query(collection(db,'urlaub'),where('lehrerUid','==',currentUser.uid)));_urlaub=_us.docs.map(d=>d.data());}catch(e){}
+    let _urlaub=[];try{const _us=await getDocs(_von('urlaub'));_urlaub=_us.docs.map(d=>d.data());}catch(e){}
     const _sperrtage=new Set();
     try{
       const _gs=await getDocs(query(collection(db,'globalBlocked'),where('schoolId','==',currentSchoolId||'__none__')));
@@ -2708,21 +2768,27 @@ async function publishMyBookingLink(){
     snap.docs.forEach(d=>{const s=d.data();if(!s.startTime||!s.startTime.toDate||!s.endTime||!s.endTime.toDate)return;if(!(s.bookedBy||s.auto!==true))return;const a=s.startTime.toDate();_committedByDay[_dayKey(a)]=(_committedByDay[_dayKey(a)]||0)+Math.round((s.endTime.toDate()-a)/60000);});
     const freieSlots=snap.docs.filter(d=>{const s=d.data();if(s.bookedBy||!s.startTime||s.startTime.toDate().getTime()<nowMs)return false;const _sd=s.startTime.toDate(),_ed=s.endTime.toDate();if(_slotBlocked(_sd,_sd.getHours()*60+_sd.getMinutes(),_ed.getHours()*60+_ed.getMinutes(),_blocks))return false;if(urlaubCoversDate(_urlaub,_sd))return false;if(_sperrtage.has(_sd.getFullYear()+'-'+_sd.getMonth()+'-'+_sd.getDate()))return false;const _dur=Math.round((_ed-_sd)/60000);const _wouldBe=(_committedByDay[_dayKey(_sd)]||0)+(s.auto===true?_dur:0);if(_wouldBe>MAX_FAHRZEIT_MIN)return false;return true;})
       .map(d=>{const s=d.data();return{id:d.id,start:s.startTime.toDate().toISOString(),ende:s.endTime.toDate().toISOString(),type:s.type||'fahrstunde'};});
-    const lehrerName=(((currentProfile&&currentProfile.fname)||'')+' '+((currentProfile&&currentProfile.lname)||'')).trim();
-    let aktiv=true;
-    try{const prev=await getDoc(doc(db,'bookingLinks',currentUser.uid));if(prev.exists())aktiv=prev.data().aktiv!==false;}catch(e){}
-    await setDoc(doc(db,'bookingLinks',currentUser.uid),{lehrerUid:currentUser.uid,lehrerName:lehrerName||'Fahrlehrer',schoolName:(currentSchool&&currentSchool.name)||'',schoolId:currentSchoolId||null,freieSlots,aktiv,updatedAt:serverTimestamp()},{merge:true});
+    let lehrerName=(((currentProfile&&currentProfile.fname)||'')+' '+((currentProfile&&currentProfile.lname)||'')).trim();
+    if(!eigen){
+      lehrerName=(_prev&&_prev.exists()&&_prev.data().lehrerName)||'';
+      try{const _lp=await getDoc(doc(db,'kalenderUsers',lUid));if(_lp.exists()){const _n=((_lp.data().fname||'')+' '+(_lp.data().lname||'')).trim();if(_n)lehrerName=_n;}}catch(e){}
+    }
+    const aktiv=(_prev&&_prev.exists())?_prev.data().aktiv!==false:true;
+    await setDoc(doc(db,'bookingLinks',lUid),{lehrerUid:lUid,lehrerName:lehrerName||'Fahrlehrer',schoolName:(currentSchool&&currentSchool.name)||'',schoolId:currentSchoolId||null,freieSlots,aktiv,updatedAt:serverTimestamp()},{merge:true});
     return {count:freieSlots.length,aktiv};
-  }catch(e){console.warn('publishMyBookingLink',e);return{count:0,aktiv:true};}
+  }catch(e){console.warn('publishBookingLinkFuer',e);return{count:0,aktiv:true};}
 }
-async function publishStudentBookings(schuelerId,vorname){
+async function publishStudentBookings(schuelerId,vorname,lehrerUid){
+  const lUid=lehrerUid||currentUser.uid;
   try{
-    const snap=await getDocs(query(collection(db,'slots'),where('lehrerUid','==',currentUser.uid)));
+    const snap=await getDocs(lUid===currentUser.uid
+      ?query(collection(db,'slots'),where('lehrerUid','==',lUid))
+      :query(collection(db,'slots'),where('lehrerUid','==',lUid),where('schoolId','==',currentSchoolId)));
     const grenze=Date.now()-2*3600000;
     const meineTermine=snap.docs.filter(d=>{const s=d.data();return s.bookedBy===schuelerId && s.startTime && s.startTime.toDate().getTime()>=grenze;})
       .map(d=>{const s=d.data();return{id:d.id,start:s.startTime.toDate().toISOString(),ende:s.endTime.toDate().toISOString(),type:s.type||'fahrstunde'};});
     let scd={};try{const sc=await getDoc(doc(db,SCHUELER_COLL,schuelerId));if(sc.exists())scd=sc.data();}catch(e){}
-    const payload={lehrerUid:currentUser.uid,meineTermine,maxAktiveTermine:scd.maxAktiveTermine||0,maxFahrstunden:scd.maxFahrstunden||0,bookedCount:scd.bookedCount||0,updatedAt:serverTimestamp()};
+    const payload={lehrerUid:lUid,meineTermine,maxAktiveTermine:scd.maxAktiveTermine||0,maxFahrstunden:scd.maxFahrstunden||0,bookedCount:scd.bookedCount||0,updatedAt:serverTimestamp()};
     if(vorname!==undefined&&vorname!==null)payload.vorname=vorname||'';
     await setDoc(doc(db,'bookingStudents',schuelerId),payload,{merge:true});
   }catch(e){console.warn('publishStudentBookings',e);}
@@ -2788,6 +2854,28 @@ async function schuelerLinkTeilen(schuelerId,vorname){
   try{await navigator.clipboard.writeText(link);toast('Link kopiert! Jetzt an den Schüler senden.','success');}
   catch(e){window.prompt('Buchungs-Link (kopieren):',link);}
 }
+// Buchungslink zu einem Schueler teilen - fuer JEDEN 🔗-Knopf.
+// Die Knoepfe in "Meine Schüler" und in der Schuelerliste des Inhabers
+// kopierten bisher nur die Adresse. Was die Buchungsseite braucht (Vorname,
+// Zuordnung zum Fahrlehrer, freie Termine), wurde dabei nicht angelegt:
+// Warteliste und Nachrichten wurden abgelehnt, bis der Fahrlehrer den Link
+// zufaellig auch einmal unter "Buchungen" geteilt hatte.
+window.buchungslinkTeilen=async function(schuelerId){
+  let sc=null;
+  try{const sn=await getDoc(doc(db,SCHUELER_COLL,schuelerId));if(sn.exists())sc=sn.data();}catch(e){console.warn('buchungslinkTeilen',e);}
+  if(!sc)return toast('Schüler nicht gefunden.','error');
+  if(!sc.lehrerUid)return toast('Bitte zuerst einen Fahrlehrer zuordnen.','error');
+  if(sc.lehrerUid===currentUser.uid)return schuelerLinkTeilen(schuelerId,sc.fname||'');
+  // Inhaber teilt den Link fuer einen Fahrlehrer seiner Schule
+  const lUid=sc.lehrerUid;
+  try{await setDoc(doc(db,'bookingStudents',schuelerId),{vorname:sc.fname||'',lehrerUid:lUid,aktiv:true,updatedAt:serverTimestamp()},{merge:true});}
+  catch(e){console.warn('buchungslinkTeilen',e);toast('Link konnte nicht erstellt werden'+((e&&e.code)?' ('+e.code+')':'')+'.','error');return;}
+  await publishBookingLinkFuer(lUid);
+  try{await publishStudentBookings(schuelerId,sc.fname||'',lUid);}catch(e){}
+  const link=location.href.split('?')[0].split('#')[0]+'?schueler='+schuelerId+'&lehrer='+lUid;
+  try{await navigator.clipboard.writeText(link);toast('Link kopiert! Jetzt an den Schüler senden.','success');}
+  catch(e){window.prompt('Buchungs-Link (kopieren):',link);}
+};
 async function renderBookingRequests(){
   const box=document.getElementById('booking-requests');if(!box)return;
   let reqs=[];
@@ -2871,11 +2959,16 @@ async function renderBestaetigteBuchungen(){
         <td><button class="btn btn-danger btn-sm" onclick="cancelBookingLehrer('${d.id}')">Stornieren</button></td></tr>`;}).join('')+'</tbody></table>';
 }
 window.cancelBookingLehrer=async function(id){
-  const[sSnap,lSnap]=await Promise.all([getDoc(doc(db,'slots',id)),getDoc(doc(db,'kalenderUsers',currentUser.uid))]);
-  const slot=sSnap.data();await updateDoc(doc(db,'slots',id),{bookedBy:null,bookedAt:null});
-  // bookedCount wird jetzt vom Trigger syncBookedCount serverseitig gepflegt -
-  // hier nicht mehr mitzählen, sonst würde doppelt heruntergezählt.
-  await triggerEmail('stornierung_freigeworden',{datum:slot.startTime.toDate().toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}),von:fmtTime(slot.startTime),bis:fmtTime(slot.endTime),typ:typeLabel(slot.type),lehrerName:lSnap.data().fname+' '+lSnap.data().lname,lehrerUid:currentUser.uid,slotId:id});
+  if(!window.confirm('Diese Buchung stornieren?\n\nDer Termin wird wieder frei.'+(window.__mailAktiv?' Ist beim Schüler eine E-Mail-Adresse hinterlegt, bekommt er die Absage per E-Mail.':'')))return;
+  const sSnap=await getDoc(doc(db,'slots',id));
+  if(!sSnap.exists())return toast('Termin nicht gefunden.','error');
+  const slot=sSnap.data();
+  // absageAm = "vom Fahrlehrer abgesagt": Daran erkennt der Server
+  // (functions/mail.js), dass der Schueler eine E-Mail bekommt (wenn bei ihm
+  // eine Adresse hinterlegt ist) und die Warteliste vom freien Termin
+  // erfaehrt. Frueher wurde hier ein Auftrag in 'mailQueue' abgelegt, den nie
+  // jemand verschickt hat.
+  await updateDoc(doc(db,'slots',id),{bookedBy:null,bookedAt:null,absageAm:serverTimestamp()});
   try{await publishMyBookingLink();}catch(e){}
   if(slot.bookedBy){try{await publishStudentBookings(slot.bookedBy);}catch(e){}}
   toast('Storniert.','success');pages['lehrer-buchungen'](document.getElementById('main-content'));
@@ -2890,7 +2983,7 @@ pages['lehrer-schueler']=async function(el){
   try{snap=await getDocs(query(collection(db,SCHUELER_COLL),where('lehrerUid','==',currentUser.uid)));}catch(e){console.warn('schueler read',e);}
   try{autosSnap=await getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId)));}catch(e){console.warn('autos read',e);}
   const lsContent=document.getElementById('ls-content');if(!lsContent)return;
-  const _canAdd=istEinzelLehrer||(currentSchool&&currentSchool.lehrerDarfSchuelerAnlegen===true);
+  const _canAdd=istEinzelLehrer||currentRole==='admin'||(currentSchool&&currentSchool.lehrerDarfSchuelerAnlegen===true);
   const _addForm=_canAdd?`<div class="card" style="margin-bottom:14px">
     <div class="card-title">Neuen Schüler anlegen</div>
     <div class="grid-2"><div class="field"><label>Vorname</label><input id="lns-fname" type="text"></div><div class="field"><label>Nachname</label><input id="lns-lname" type="text"></div></div>
@@ -2902,7 +2995,6 @@ pages['lehrer-schueler']=async function(el){
   let html=_addForm;
   for(const d of snap.docs){
     const s=d.data();
-    const link=`${location.origin}${location.pathname}?schueler=${d.id}&lehrer=${currentUser.uid}`;
     const max=s.maxFahrstunden||0,count=s.bookedCount||0,warn=max>0&&count>=max;
     const kontingent=max>0?`${count}/${max}`:`${count}/∞`;
     let autoHtml='';
@@ -2923,7 +3015,7 @@ pages['lehrer-schueler']=async function(el){
             ${letzteStatus?pruefungStatusBadge(letzteStatus):''}
           </div>
         </div>
-        <button class="copy-btn" onclick="copyLink('${attrJs(link)}')">🔗 Buchungslink</button>
+        <button class="copy-btn" onclick="buchungslinkTeilen('${d.id}')">🔗 Buchungslink</button>
       </div>
       <div class="grid-3" style="gap:12px">
         <div>
@@ -3150,9 +3242,9 @@ window.removeFromWarteliste=async function(id){await updateDoc(doc(db,'wartelist
 // LEHRER – EINSTELLUNGEN (Profil)
 // ════════════════════════════════
 pages['lehrer-profil']=async function(el){
-  el.innerHTML=`<div class="page active"><h2 class="page-title">Einstellungen</h2><div class="card"><div id="profil-content"><div class="spinner"></div></div></div></div>`;
+  el.innerHTML=`<div class="page active"><h2 class="page-title">${currentRole==='admin'?'Slotplaner & Auto':'Einstellungen'}</h2><div class="card"><div id="profil-content"><div class="spinner"></div></div></div></div>`;
   const[autosSnap,pSnap]=await Promise.all([getDocs(query(collection(db,'autos'),where('schoolId','==',currentSchoolId))),getDoc(doc(db,'kalenderUsers',currentUser.uid))]);
-  const p=pSnap.data();const currentAutoId=p.autoId||'';const bd=p.blockDauer||60;const sp=p.slotplan||{};
+  const p=pSnap.data()||{};const currentAutoId=p.autoId||'';const bd=p.blockDauer||60;const sp=p.slotplan||{};
   const opts=`<option value="">— Kein Auto —</option>`+autosSnap.docs.map(d=>{const a=d.data();return`<option value="${d.id}" ${currentAutoId===d.id?'selected':''}>${escHtml(a.modell)} · ${escHtml(a.kennzeichen)}</option>`;}).join('');
   let autoHtml='';
   if(currentAutoId){const ca=autosSnap.docs.find(d=>d.id===currentAutoId);if(ca){const a=ca.data();autoHtml=`<div class="auto-card" style="margin-bottom:16px"><div class="auto-icon">🚗</div><div class="auto-info"><div class="auto-name">${escHtml(a.modell)}</div></div><span class="auto-kennzeichen">${escHtml(a.kennzeichen)}</span></div>`;}}
@@ -3312,7 +3404,8 @@ window.addNotizLehrer=async function(sid){
 // ════════════════════════════════
 // E-MAIL
 // ════════════════════════════════
-async function triggerEmail(type,payload){try{await addDoc(collection(db,'mailQueue'),{type,payload,status:'pending',createdAt:serverTimestamp()});}catch(e){console.warn('Mail trigger:',e);}}
+// (triggerEmail/mailQueue entfernt: Benachrichtigungen entstehen jetzt auf dem
+// Server aus der Aenderung am Termin - siehe functions/mail.js.)
 
 // ════════════════════════════════
 // SCHÜLER BUCHUNGSSEITE

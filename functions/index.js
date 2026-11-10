@@ -1158,6 +1158,9 @@ exports.papierkorbSchueler = onDocumentUpdated('students/{studentId}', async (ev
 // Erinnerung an Fahrschueler etwa zwei Stunden vor einer geplanten Stunde
 // (siehe functions/erinnerung.js). Laeuft alle 30 Minuten.
 const { erinnerungenSenden } = require('./erinnerung');
+const { buchungenNeuZaehlen, kontingenteNachzaehlen } = require('./zaehler');
+const { nachStornierung, mailEinstellungenLaden, mailStatus, einstellungenPruefen, verbindungPruefen,
+        smtpSenden, mailAdresseOk, eineZeile, EINSTELLUNG: MAIL_EINSTELLUNG } = require('./mail');
 exports.fahrstundenErinnerung = onSchedule(
   { schedule: 'every 30 minutes', timeZone: 'Europe/Berlin', timeoutSeconds: 300, memory: '256MiB' },
   async () => {
@@ -1245,6 +1248,12 @@ exports.taeglichesAufraeumen = onSchedule(
       bericht.abos = await abgelaufeneAbosBeenden(db, jetzt);
     } catch (e) { console.error('Gekuendigte Abos:', e); }
 
+    // 6) Zaehler "gebuchte Fahrstunden" nachzaehlen (functions/zaehler.js) -
+    // bringt auch Altbestand in Ordnung, an dem sich nichts mehr aendert.
+    try {
+      bericht.zaehler = await kontingenteNachzaehlen(db);
+    } catch (e) { console.error('Buchungszaehler:', e); }
+
     // Kurzlebige CSRF-Marken des Kalender-Logins (eine Stunde reicht)
     try {
       bericht.oauth = await loescheAlle(
@@ -1273,7 +1282,8 @@ exports.taeglichesAufraeumen = onSchedule(
 // Wert zusaetzlich bei 0, damit bereits entstandene Abweichungen sich mit
 // der Zeit von selbst auswachsen statt ins Negative zu laufen.
 // ═══════════════════════════════════════════════════════════════════
-exports.syncBookedCount = onDocumentUpdated('slots/{slotId}', async (event) => {
+// timeoutSeconds: Nach einer Stornierung gehen ggf. mehrere E-Mails hinaus.
+exports.syncBookedCount = onDocumentUpdated({ document: 'slots/{slotId}', timeoutSeconds: 120 }, async (event) => {
   const vorher  = event.data.before.data();
   const nachher = event.data.after.data();
   if (!vorher || !nachher) return;
@@ -1282,46 +1292,99 @@ exports.syncBookedCount = onDocumentUpdated('slots/{slotId}', async (event) => {
   if (vonId === nachId) return; // keine Buchungsaenderung
 
   const db = getFirestore();
-  const schritte = [];
-  if (vonId)  schritte.push([vonId, -1]);
-  if (nachId) schritte.push([nachId, +1]);
-
-  for (const [schuelerId, delta] of schritte) {
-    try {
-      const neuerStand = await db.runTransaction(async (tx) => {
-        const ref = db.doc(`schueler/${schuelerId}`);
-        const snap = await tx.get(ref);
-        if (!snap.exists) return null;
-        // Nur Schueler, die zum Termin passen (gleiche Schule oder gleicher
-        // Fahrlehrer). Sonst konnte ein beliebiger Termin mit einer fremden
-        // Schueler-ID deren Fahrstunden-Zaehler veraendern.
-        const sc = snap.data();
-        const slot = delta < 0 ? vorher : nachher;
-        const passt = (!sc.schoolId && !sc.lehrerUid)
-          || (sc.schoolId && sc.schoolId === slot.schoolId)
-          || (sc.lehrerUid && sc.lehrerUid === slot.lehrerUid);
-        if (!passt) return null;
-        const wert = Math.max(0, (Number(sc.bookedCount) || 0) + delta);
-        tx.update(ref, { bookedCount: wert });
-        return wert;
-      });
-      // Der Client veroeffentlicht den Zaehler direkt nach seiner Aenderung an
-      // das Schueler-Portal (bookingStudents) - zu diesem Zeitpunkt ist dieser
-      // Trigger aber unter Umstaenden noch gar nicht gelaufen, der Schueler
-      // saehe also den alten Stand. Deshalb hier nachziehen.
-      if (neuerStand !== null) {
-        // update statt set(merge): Gibt es das Dokument noch nicht, darf es
-        // hier NICHT entstehen. Ein Dokument nur mit dem Zaehler (ohne
-        // lehrerUid) konnte der Fahrlehrer danach nie mehr beschreiben - der
-        // Buchungslink fuer diesen Schueler liess sich nicht mehr erstellen.
-        await db.doc(`bookingStudents/${schuelerId}`)
-          .update({ bookedCount: neuerStand })
-          .catch(() => {});
-      }
-    } catch (e) {
-      console.warn('bookedCount fuer', schuelerId, 'fehlgeschlagen:', e.message);
-    }
+  // ZWEITE PRUEFUNG 11/2026: nachzaehlen statt +1/-1 (functions/zaehler.js) -
+  // ein einmal falscher Stand heilt damit von selbst.
+  for (const schuelerId of [vonId, nachId]) {
+    if (!schuelerId) continue;
+    try { await buchungenNeuZaehlen(db, schuelerId); }
+    catch (e) { console.warn('bookedCount fuer', schuelerId, 'fehlgeschlagen:', e.message); }
   }
+
+  // Storniert (gebucht -> frei): Fahrlehrer bzw. Schueler und Warteliste
+  // benachrichtigen, Termin wieder anbieten (functions/mail.js).
+  if (vonId && !nachId) {
+    try { await nachStornierung(db, event.params.slotId, vorher, nachher, { push: pushToLehrer }); }
+    catch (e) { console.warn('nachStornierung:', e.message); }
+  }
+});
+
+// Ein Termin wird gleich MIT Schueler angelegt (so traegt die Kartei geplante
+// Fahrstunden in den Kalender ein) - zaehlte bisher nie.
+exports.buchungszaehlerNeuerTermin = onDocumentCreated('slots/{slotId}', async (event) => {
+  const s = event.data && event.data.data();
+  if (!s || !s.bookedBy) return;
+  try { await buchungenNeuZaehlen(getFirestore(), s.bookedBy); }
+  catch (e) { console.warn('bookedCount (neu) fuer', s.bookedBy, 'fehlgeschlagen:', e.message); }
+});
+
+// Ein GEBUCHTER Termin wird geloescht - zaehlte bisher nie zurueck.
+exports.buchungszaehlerGeloeschterTermin = onDocumentDeleted('slots/{slotId}', async (event) => {
+  const s = event.data && event.data.data();
+  if (!s || !s.bookedBy) return;
+  try { await buchungenNeuZaehlen(getFirestore(), s.bookedBy); }
+  catch (e) { console.warn('bookedCount (geloescht) fuer', s.bookedBy, 'fehlgeschlagen:', e.message); }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// E-MAIL-VERSAND EINRICHTEN (nur Betreiber)
+//
+// Die Zugangsdaten des Postfachs liegen in serverEinstellungen/mail - eine
+// Sammlung OHNE Eintrag in den Firestore-Regeln, also fuer keinen Browser
+// lesbar. Gesetzt werden sie nur hier; das Passwort wird nie zurueckgegeben.
+// Vor dem Speichern meldet sich die Function probeweise am Mailserver an -
+// falsche Daten werden gar nicht erst gespeichert.
+// ═══════════════════════════════════════════════════════════════════
+exports.mailEinstellungen = onCall(async (request) => {
+  const auth = request.auth;
+  if (!auth) throw new HttpsError('unauthenticated', 'Bitte anmelden.');
+  let darf = auth.token.email === 'chriskoo@mail.de';
+  if (!darf) {
+    const eigenes = await getFirestore().doc(`users/${auth.uid}`).get();
+    darf = eigenes.exists && eigenes.data().rolle === 'superadmin';
+  }
+  if (!darf) throw new HttpsError('permission-denied', 'Nur fuer den Betreiber.');
+
+  const db = getFirestore();
+  const d = request.data || {};
+  const ref = db.doc(MAIL_EINSTELLUNG);
+
+  if (d.aktion === 'speichern') {
+    const bisherSnap = await ref.get();
+    const p = einstellungenPruefen(d, bisherSnap.exists ? bisherSnap.data() : null);
+    if (!p.ok) throw new HttpsError('invalid-argument', p.fehler);
+    try { await verbindungPruefen(p.cfg); }
+    catch (e) {
+      throw new HttpsError('failed-precondition',
+        'Die Anmeldung am Mailserver hat nicht geklappt (' + eineZeile((e && (e.code || e.message)) || 'Fehler', 120)
+        + '). Bitte Server, Port, Benutzername und Passwort prüfen.');
+    }
+    await ref.set({ ...p.cfg, geaendertAm: Date.now() });
+    // Nur die Tatsache "Versand ist an" ist fuer die App sichtbar - damit der
+    // Kalender beim Stornieren nichts verspricht, was nicht passiert.
+    await db.doc('settings/kalenderMail').set({ aktiv: true });
+  } else if (d.aktion === 'abschalten') {
+    await ref.set({ aktiv: false, geaendertAm: Date.now() }, { merge: true });
+    await db.doc('settings/kalenderMail').set({ aktiv: false });
+  } else if (d.aktion === 'test') {
+    const cfg = await mailEinstellungenLaden(db);
+    if (!cfg) throw new HttpsError('failed-precondition', 'Der E-Mail-Versand ist noch nicht eingerichtet.');
+    const an = auth.token.email;
+    if (!mailAdresseOk(an)) throw new HttpsError('failed-precondition', 'Dein Konto hat keine E-Mail-Adresse.');
+    try {
+      await smtpSenden(cfg, {
+        an, betreff: 'FahrSync: Test des E-Mail-Versands',
+        text: 'Diese Testnachricht zeigt: Der E-Mail-Versand aus dem FahrSync-Kalender funktioniert.\n\n'
+          + 'Schüler bekommen ab jetzt eine E-Mail, wenn ihr Fahrlehrer eine Fahrstunde absagt oder '
+          + '(auf der Warteliste) ein Termin frei wird – sofern beim Schüler eine E-Mail-Adresse hinterlegt ist.',
+      });
+    } catch (e) {
+      throw new HttpsError('unavailable',
+        'Die Testnachricht konnte nicht gesendet werden (' + eineZeile((e && (e.code || e.message)) || 'Fehler', 120) + ').');
+    }
+  } else if (d.aktion !== 'status') {
+    throw new HttpsError('invalid-argument', 'Unbekannte Aktion.');
+  }
+  return mailStatus(db);
 });
 
 // ── SCHUELER IN DIE FAHRSCHULE UEBERNEHMEN ───────────────────────────────

@@ -1060,8 +1060,12 @@ service cloud.firestore {
     // mailQueue: enthält E-Mail-Inhalte (personenbezogen). Jeder eingeloggte
     // Nutzer darf eine Mail EINREIHEN (create), aber nur SuperAdmin/System
     // darf den Inhalt LESEN. Kein Lesen durch normale Nutzer.
+    // ZWEITE PRUEFUNG 11/2026: Die Warteschlange wird nicht mehr beschrieben.
+    // Benachrichtigungen entstehen jetzt auf dem Server aus der Aenderung am
+    // Termin selbst (functions/mail.js) - Empfaenger und Inhalt kommen nie
+    // mehr aus dem Browser. Der Block bleibt fuer das Aufraeumen von Altbestand.
     match /mailQueue/{docId} {
-      allow create: if isRealAccount();
+      allow create: if false;
       allow read:   if kalIsSuperAdmin();
       allow update, delete: if kalIsSuperAdmin();
     }
@@ -1082,6 +1086,16 @@ service cloud.firestore {
       allow get:    if true;
       allow list:   if false;
       allow create, update, delete: if isAuth() && request.auth.uid == lehrerUid;
+      // Der INHABER veroeffentlicht die freien Termine eines Fahrlehrers
+      // seiner Schule. Ohne das zeigte ein Buchungslink, den der Inhaber aus
+      // der Schuelerliste kopierte, nichts an (und Warteliste/Nachrichten
+      // gingen nicht), solange der Fahrlehrer den Link nicht selbst einmal
+      // geteilt hatte. Nur fuer freigeschaltete Mitglieder der eigenen Schule.
+      allow create, update: if isRealAccount()
+                            && lehrerUid != request.auth.uid
+                            && kalIstMitglied(lehrerUid, request.auth.uid)
+                            && request.resource.data.lehrerUid == lehrerUid
+                            && request.resource.data.schoolId == request.auth.uid;
     }
     // bookingStudents/{schuelerId}: nur Vorname + lehrerUid (für die Begrüßung).
     //   get per ID (Link kennt die zufällige Schüler-ID), list gesperrt.
@@ -1118,16 +1132,25 @@ service cloud.firestore {
       allow list:   if false;
       allow create: if isAuth() && request.resource.data.lehrerUid == request.auth.uid;
       allow update, delete: if isAuth() && resource.data.lehrerUid == request.auth.uid;
-      // Dokument OHNE lehrerUid uebernehmen: Der Server (syncBookedCount)
-      // legte bei einer von Hand zugewiesenen Fahrstunde ein Dokument an, das
-      // nur den Zaehler enthielt. Die Regel oben verlangt lehrerUid - der
-      // Buchungslink liess sich fuer diesen Schueler danach nie mehr
-      // erstellen. Uebernehmen darf, wem der Kalender-Schueler gehoert.
+      // UEBERNEHMEN durch den aktuellen Fahrlehrer des Schuelers. Zwei Faelle
+      // liessen den Buchungslink sonst fuer immer scheitern:
+      //  - Das Dokument hat (aus einer frueheren Fassung von syncBookedCount)
+      //    gar keine lehrerUid.
+      //  - Der Schueler wurde einem anderen Fahrlehrer zugeteilt: Das Dokument
+      //    gehoerte weiter dem alten, der neue durfte es nicht beschreiben.
+      // Massgeblich ist, wem der Kalender-Schueler JETZT zugeordnet ist.
       allow update: if isRealAccount()
-                    && !('lehrerUid' in resource.data)
                     && request.resource.data.lehrerUid == request.auth.uid
                     && exists(/databases/$(database)/documents/schueler/$(schuelerId))
                     && get(/databases/$(database)/documents/schueler/$(schuelerId)).data.lehrerUid == request.auth.uid;
+      // Der INHABER legt den Buchungslink fuer einen Schueler seiner Schule an
+      // (Symbol 🔗 in der Schuelerliste) - immer auf den Fahrlehrer, dem der
+      // Schueler zugeordnet ist, nie auf jemand anderen.
+      allow create, update: if isRealAccount()
+                    && exists(/databases/$(database)/documents/schueler/$(schuelerId))
+                    && get(/databases/$(database)/documents/schueler/$(schuelerId)).data.schoolId == request.auth.uid
+                    && request.resource.data.lehrerUid is string
+                    && request.resource.data.lehrerUid == get(/databases/$(database)/documents/schueler/$(schuelerId)).data.lehrerUid;
       // Schüler darf (ohne Login) NUR die eigene Terminliste anpassen – z.B.
       // nach einem Selbststorno. lehrerUid/vorname bleiben gesperrt.
       allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['meineTermine','updatedAt'])
