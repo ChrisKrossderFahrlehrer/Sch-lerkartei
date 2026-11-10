@@ -4,7 +4,7 @@
 // FahrSync Push-Benachrichtigungen (Cloud Functions v2, Region Frankfurt)
 // Sendet data-only Nachrichten – der Service Worker zeigt sie an
 // (zuverlaessig auf iOS-PWA und Android/Chrome, keine Doppelanzeige).
-const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
+const { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } = require('firebase-functions/v2/firestore');
 const { onRequest, onCall, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { setGlobalOptions } = require('firebase-functions/v2');
@@ -335,11 +335,27 @@ exports.syncSlotToGoogleCalendar = onDocumentUpdated({ document: 'slots/{slotId}
         end:   { dateTime: after.endTime.toDate().toISOString(),   timeZone: 'Europe/Berlin' },
         description: 'Automatisch synchronisiert von FahrSync'
       });
-      if (ev && ev.id) await event.data.after.ref.set({ googleEventId: ev.id }, { merge: true });
+      // update statt set(merge): Wurde der Termin inzwischen geloescht, darf
+      // hier kein Rest-Dokument (nur mit googleEventId) neu entstehen.
+      if (ev && ev.id) await event.data.after.ref.update({ googleEventId: ev.id }).catch(() => {});
     } else if (wurdeFreigegeben && before.googleEventId) {
       await googleCalendarRequest(after.lehrerUid, secretValue, 'DELETE', `events/${before.googleEventId}`);
     }
   } catch (e) { console.warn('syncSlotToGoogleCalendar', e.message); }
+});
+
+// Ein GEBUCHTER Termin wird geloescht: Der Eintrag im Google-Kalender des
+// Fahrlehrers blieb bisher stehen (abgeglichen wurde nur beim Buchen und
+// Freigeben) - dort stand dann eine Fahrstunde, die es nicht mehr gibt.
+exports.syncSlotDeleteToGoogleCalendar = onDocumentDeleted({ document: 'slots/{slotId}', secrets: [GOOGLE_CLIENT_SECRET] }, async (event) => {
+  const s = event.data && event.data.data();
+  if (!s || !s.lehrerUid || !s.bookedBy || !s.googleEventId) return;
+  try {
+    const tokenSnap = await getFirestore().collection('calendarTokens').doc(s.lehrerUid).get();
+    if (!tokenSnap.exists) return;
+    await googleCalendarRequest(s.lehrerUid, GOOGLE_CLIENT_SECRET.value(), 'DELETE',
+      `events/${encodeURIComponent(String(s.googleEventId))}`);
+  } catch (e) { console.warn('syncSlotDeleteToGoogleCalendar', e.message); }
 });
 
 // ══════════════════════════════════════════════════════════════════
@@ -361,7 +377,7 @@ exports.createStripeCheckoutSession = onCall({ secrets: [STRIPE_SECRET_KEY] }, a
   if (!auth) throw new HttpsError('unauthenticated', 'Bitte anmelden.');
   const uid = auth.uid;
   const { plan, planer } = request.data || {};
-  if (!plan || !RECHNUNG_PLANS[plan]) {
+  if (typeof plan !== 'string' || !Object.hasOwn(RECHNUNG_PLANS, plan)) {
     throw new HttpsError('invalid-argument', 'Ungueltiger Tarif.');
   }
 
@@ -712,8 +728,16 @@ exports.findeAltenZugangscode = onCall(async (request) => {
   const absender = request.rawRequest && (
     (request.rawRequest.headers && request.rawRequest.headers['x-forwarded-for']) ||
     request.rawRequest.ip);
-  const ersteAdresse = String(absender || '').split(',')[0].trim();
-  if (!(await versuchErlaubt('code:' + ersteAdresse, 20))) {
+  const adressen = String(absender || '').split(',').map(a => a.trim()).filter(Boolean);
+  const ersteAdresse = adressen[0] || '';
+  // Die ERSTE Adresse in X-Forwarded-For schickt der Aufrufer selbst mit -
+  // wer sie bei jedem Versuch wechselt, umging die Bremse. Die LETZTE haengt
+  // Googles Eingang an. Deshalb zusaetzlich auf sie bremsen (grosszuegiger,
+  // falls sich dahinter mehrere Nutzer eine Adresse teilen).
+  const letzteAdresse = adressen[adressen.length - 1] || '';
+  if (!(await versuchErlaubt('code:' + ersteAdresse, 20)) ||
+      (letzteAdresse && letzteAdresse !== ersteAdresse &&
+       !(await versuchErlaubt('code-l:' + letzteAdresse, 120)))) {
     throw new HttpsError('resource-exhausted', 'Zu viele Versuche. Bitte spaeter erneut versuchen.');
   }
 
@@ -806,7 +830,7 @@ exports.bestaetigePaypalAbo = onCall(
     if (!auth) throw new HttpsError('unauthenticated', 'Bitte anmelden.');
 
     const { subscriptionId, plan, planer } = request.data || {};
-    const planInfo = PAYPAL_PLAN_IDS[plan];
+    const planInfo = (typeof plan === 'string' && Object.hasOwn(PAYPAL_PLAN_IDS, plan)) ? PAYPAL_PLAN_IDS[plan] : null;
     if (!subscriptionId || typeof subscriptionId !== 'string' || !planInfo) {
       throw new HttpsError('invalid-argument', 'Ungueltiger Tarif oder Subscription-ID.');
     }
@@ -928,6 +952,15 @@ exports.paypalWebhook = onRequest(
         }
         if (!billingColl) {
           console.warn('paypalWebhook: keine Fahrschule/Nutzer zu Subscription', subscriptionId);
+          // Die erste Zahlung meldet PayPal oft, BEVOR die App das Abo dem
+          // Konto zugeordnet hat (bestaetigePaypalAbo). Mit "ok" galt die
+          // Meldung als erledigt - fuer die erste Zahlung entstand dann nie
+          // eine Rechnung. Bei einer frischen Zahlung deshalb um erneute
+          // Zustellung bitten (PayPal wiederholt bis zu 3 Tage lang).
+          const zahlungAm = Date.parse(resource.create_time || '') || 0;
+          if (zahlungAm && Date.now() - zahlungAm < 24 * 60 * 60 * 1000) {
+            res.status(503).send('Abo noch nicht zugeordnet - bitte erneut zustellen'); return;
+          }
           res.status(200).send('ok - kein Treffer'); return;
         }
 

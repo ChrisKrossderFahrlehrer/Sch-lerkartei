@@ -11506,7 +11506,14 @@ function renderTutStep() {
 // Auto-Tutorial beim ersten Login
 function checkFirstTime() {
   if (!localStorage.getItem('tutorialSeen')) {
-    setTimeout(() => startTutorial(), 800);
+    setTimeout(() => {
+      // Vom Betreiber angelegte Konten muessen zuerst ein eigenes Passwort
+      // setzen (erstlogin-modal). Das Tutorial legte sich sonst ueber dieses
+      // Pflicht-Fenster - es startet jetzt erst, wenn das Passwort gesetzt ist.
+      const erst = document.getElementById('erstlogin-modal');
+      if (erst && erst.style.display === 'flex') { window.__tutorialNachErstlogin = true; return; }
+      startTutorial();
+    }, 800);
   }
 }
 
@@ -11771,6 +11778,10 @@ window.erstLoginAbschliessen = async () => {
     await dbUpd(doc(db, 'users', currentUser.uid), { erstLoginAusstehend: false });
     document.getElementById('erstlogin-modal').style.display = 'none';
     toast('✓ Passwort gespeichert – viel Erfolg!');
+    if (window.__tutorialNachErstlogin && !localStorage.getItem('tutorialSeen')) {
+      window.__tutorialNachErstlogin = false;
+      setTimeout(() => startTutorial(), 900);
+    }
   } catch(e) {
     console.warn('erstLoginAbschliessen:', e);
     btn.disabled = false; btn.textContent = 'Speichern & loslegen ✓';

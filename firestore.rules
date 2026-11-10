@@ -814,14 +814,6 @@ service cloud.firestore {
       return kalIsSuperAdmin() ||
              (sid is string && kalUserExists() && kalMySchool() == sid && kalFreigegeben(sid));
     }
-    // Gehört ein Lehrer (per UID) zu meiner Schule? (für Collections ohne schoolId, z.B. blocked)
-    function kalLehrerInMySchool(luid) {
-      return kalIsSuperAdmin() ||
-             (isRealAccount() && luid == request.auth.uid) ||
-             (kalUserExists() && kalFreigegeben(kalMySchool()) &&
-              exists(/databases/$(database)/documents/kalenderUsers/$(luid)) &&
-              get(/databases/$(database)/documents/kalenderUsers/$(luid)).data.schoolId == kalMySchool());
-    }
 
     // ── Anlegen/Aendern in den Kalender-Sammlungen ──
     // SICHERHEITS-AUDIT 11/2026: Anlegen war erlaubt, wenn ENTWEDER die
@@ -1046,9 +1038,24 @@ service cloud.firestore {
       allow create:       if kalIdOk(docId) && kalPruefungOk(request.resource.data);
     }
     // blocked hat kein schoolId, nur lehrerUid → über den Lehrer absichern
+    // ZWEITE PRUEFUNG 11/2026: Sperrzeiten tragen den Grund der Abwesenheit
+    // ("Krank", "Arzt", eigene Notiz). Bisher durfte JEDES Mitglied der Schule
+    // die Sperrzeiten aller Kollegen lesen, aendern und loeschen. Die App
+    // braucht nur zwei Wege: der Fahrlehrer seine eigenen, der Inhaber die
+    // seiner Fahrlehrer (Kalender-Ansicht im Admin-Bereich).
+    function kalSperreDarf(luid) {
+      return kalIsSuperAdmin() ||
+             (isRealAccount() && luid == request.auth.uid) ||
+             (isRealAccount() && luid is string &&
+              exists(/databases/$(database)/documents/kalenderUsers/$(luid)) &&
+              get(/databases/$(database)/documents/kalenderUsers/$(luid)).data.schoolId == request.auth.uid);
+    }
     match /blocked/{docId} {
-      allow read, update, delete: if kalLehrerInMySchool(resource.data.lehrerUid);
-      allow create:               if kalLehrerInMySchool(request.resource.data.lehrerUid);
+      allow read, delete: if kalSperreDarf(resource.data.lehrerUid);
+      // Die Sperre bleibt beim selben Fahrlehrer
+      allow update:       if kalSperreDarf(resource.data.lehrerUid)
+                             && request.resource.data.lehrerUid == resource.data.lehrerUid;
+      allow create:       if kalIdOk(docId) && kalSperreDarf(request.resource.data.lehrerUid);
     }
     // mailQueue: enthält E-Mail-Inhalte (personenbezogen). Jeder eingeloggte
     // Nutzer darf eine Mail EINREIHEN (create), aber nur SuperAdmin/System
