@@ -639,6 +639,48 @@ await pruefe('Fahrlehrer uebernimmt das Buchungsdokument SEINES Schuelers (nur Z
   await assertSucceeds(setDoc(doc(als(LEHRER), 'bookingStudents', 'kAdopt'), { vorname: 'Tom', lehrerUid: LEHRER, aktiv: true }, { merge: true }));
 });
 
+console.log('\nSPERRZEITEN — der Grund der Abwesenheit geht Kollegen nichts an');
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  const db = ctx.firestore();
+  await setDoc(doc(db, 'blocked', 'sperreLehrer'), { lehrerUid: LEHRER, schoolId: SCHULE, year: 2026, month: 11, day: 3, grund: 'krank', label: 'Krank' });
+  await setDoc(doc(db, 'blocked', 'sperreSolo'),   { lehrerUid: SOLO, year: 2026, month: 11, day: 3, grund: 'arzt', label: 'Arzt' });
+});
+await pruefe('Kollege liest die Sperrzeit eines anderen NICHT', async () => {
+  await assertFails(getDoc(doc(als(ALT), 'blocked', 'sperreLehrer')));
+});
+await pruefe('...listet sie NICHT', async () => {
+  await assertFails(getDocs(query(collection(als(ALT), 'blocked'), where('lehrerUid', '==', LEHRER))));
+});
+await pruefe('...loescht sie NICHT', async () => {
+  await assertFails(deleteDoc(doc(als(ALT), 'blocked', 'sperreLehrer')));
+});
+await pruefe('...traegt dem anderen KEINE Sperre ein', async () => {
+  await assertFails(setDoc(doc(als(ALT), 'blocked', 'sperreVomKollegen'), { lehrerUid: LEHRER, schoolId: SCHULE, year: 2026, month: 11, day: 4 }));
+});
+await pruefe('Fremder liest die Sperrzeit NICHT', async () => {
+  await assertFails(getDoc(doc(als(ANGREIFER), 'blocked', 'sperreLehrer')));
+});
+await pruefe('Fahrlehrer liest, aendert und listet seine eigenen', async () => {
+  await assertSucceeds(getDoc(doc(als(LEHRER), 'blocked', 'sperreLehrer')));
+  await assertSucceeds(updateDoc(doc(als(LEHRER), 'blocked', 'sperreLehrer'), { notiz: 'bis Freitag' }));
+  await assertSucceeds(getDocs(query(collection(als(LEHRER), 'blocked'), where('lehrerUid', '==', LEHRER))));
+});
+await pruefe('Fahrlehrer traegt eine eigene Sperre ein (wie kalender.html)', async () => {
+  await assertSucceeds(setDoc(doc(als(LEHRER), 'blocked', 'Bb3dEf6hIj9kLm2nOp5q'), { lehrerUid: LEHRER, schoolId: SCHULE, year: 2026, month: 11, day: 5, grund: 'privat', label: 'Privat', ganztags: true, vonMin: null, bisMin: null, notiz: '' }));
+});
+await pruefe('...und schiebt sie NICHT einem anderen zu', async () => {
+  await assertFails(updateDoc(doc(als(LEHRER), 'blocked', 'sperreLehrer'), { lehrerUid: ALT }));
+});
+await pruefe('Inhaber sieht, traegt ein und loescht Sperrzeiten seiner Fahrlehrer', async () => {
+  await assertSucceeds(getDocs(query(collection(als(SCHULE), 'blocked'), where('lehrerUid', '==', LEHRER))));
+  await assertSucceeds(setDoc(doc(als(SCHULE), 'blocked', 'Cc3dEf6hIj9kLm2nOp5q'), { lehrerUid: LEHRER, schoolId: SCHULE, year: 2026, month: 11, day: 6, grund: 'schulung', label: 'Schulung' }));
+  await assertSucceeds(deleteDoc(doc(als(SCHULE), 'blocked', 'Cc3dEf6hIj9kLm2nOp5q')));
+});
+await pruefe('Solo-Lehrer behaelt seine Sperrzeiten', async () => {
+  await assertSucceeds(getDocs(query(collection(als(SOLO), 'blocked'), where('lehrerUid', '==', SOLO))));
+  await assertSucceeds(deleteDoc(doc(als(SOLO), 'blocked', 'sperreSolo')));
+});
+
 console.log('\nOHNE LOGIN — Buchungsseite: nur bekannte Felder, kurze Texte');
 await pruefe('Buchungsanfrage mit ueberlangem Vornamen darf NICHT', async () => {
   await assertFails(setDoc(doc(ohneAnmeldung(), 'bookingRequests', 'Aa1bBb2cCc3dDd4eEe5f'), { ...anfrage, vorname: 'x'.repeat(61) }));
