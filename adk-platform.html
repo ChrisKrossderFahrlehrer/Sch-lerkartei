@@ -1810,6 +1810,17 @@ async function renderSuperAdminEinst() {
       <button class="btn-main" onclick="adminEmailManuellBestaetigen()">✅ E-Mail als bestätigt markieren</button>
     </div>
 
+    <div class="section-hd" style="margin-top:8px">✉️ E-Mail-Versand aus dem Kalender</div>
+    <div class="card" style="margin-bottom:8px">
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:12px;line-height:1.5">
+        Über dieses Postfach bekommen Fahrschüler eine E-Mail, wenn ihr Fahrlehrer eine Fahrstunde absagt oder
+        (auf der Warteliste) ein Termin frei wird – nur wenn beim Schüler im Kalender eine E-Mail-Adresse hinterlegt ist.
+        Die Zugangsdaten stehen im Menü deines E-Mail-Anbieters unter „SMTP“ oder „Postausgangsserver“.
+        Das Passwort wird nur auf dem Server gespeichert und nie wieder angezeigt.
+      </div>
+      <div id="sa-mail-box"><div style="padding:14px;text-align:center;color:var(--muted)">Lädt…</div></div>
+    </div>
+
     <div class="section-hd" style="margin-top:8px">📢 Nachricht an alle Fahrschulen</div>
     <div class="card" style="margin-bottom:8px">
       <div style="font-size:0.75rem;color:var(--muted);margin-bottom:14px;line-height:1.5">
@@ -1877,6 +1888,8 @@ async function renderSuperAdminEinst() {
   `;
   // Aktiv-Status im Speicher halten für den Toggle
   _bcAktiv = !!bc.aktiv;
+  // Stand des E-Mail-Versands nachladen (eigener Aufruf, haelt die Seite nicht auf)
+  renderMailEinst();
 }
 
 let _bcAktiv = false;
@@ -2726,6 +2739,111 @@ window.toggleProLehrer = async (id, aktivieren) => {
 };
 
 
+
+// ── E-MAIL-VERSAND AUS DEM KALENDER (Postfach einrichten) ──────────────
+// Alles laeuft ueber die Function mailEinstellungen (nur Betreiber). Die
+// Zugangsdaten liegen in einer Sammlung, die kein Browser lesen kann; das
+// Passwort kommt nie zurueck - das Feld bleibt beim Bearbeiten leer und
+// heisst dann "unverändert".
+async function mailFn(daten) {
+  const fns = getFunctions(app, 'europe-west3');
+  return (await httpsCallable(fns, 'mailEinstellungen')(daten)).data;
+}
+function mailFehlerText(e) {
+  const t = String((e && e.message) || (e && e.code) || 'unbekannt');
+  return t === 'internal' || t === 'INTERNAL' ? 'Der Server hat nicht geantwortet. Bitte später erneut versuchen.' : t;
+}
+function mailBoxZeichnen(st) {
+  const box = document.getElementById('sa-mail-box'); if (!box) return;
+  const zeit = (ms) => ms ? new Date(ms).toLocaleString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+  const lage = !st.eingerichtet ? '<span style="color:var(--muted)">○ Noch nicht eingerichtet – es werden keine E-Mails versendet.</span>'
+    : st.aktiv ? '<span style="color:var(--accent2)">● Aktiv</span>'
+    : '<span style="color:var(--danger)">○ Abgeschaltet</span>';
+  const zusatz = [
+    st.eingerichtet && st.aktiv ? 'Heute versendet: ' + (Number(st.heute) || 0) + ' von höchstens ' + (Number(st.maxProTag) || 0) : '',
+    st.letzterVersand ? 'Letzter Versand: ' + zeit(st.letzterVersand) : '',
+    st.letzterFehler && (!st.letzterVersand || st.letzterFehlerAm > st.letzterVersand)
+      ? '<span style="color:var(--danger)">Letzter Fehler (' + zeit(st.letzterFehlerAm) + '): ' + escHtml(st.letzterFehler) + '</span>' : '',
+  ].filter(Boolean).join('<br>');
+  box.innerHTML = `
+    <div style="font-size:0.85rem;font-weight:600;margin-bottom:${zusatz ? 4 : 12}px">${lage}</div>
+    ${zusatz ? `<div style="font-size:0.75rem;color:var(--muted);line-height:1.6;margin-bottom:12px">${zusatz}</div>` : ''}
+    <div class="form-group">
+      <label class="form-label">Postausgangsserver (SMTP)</label>
+      <input class="form-input" id="sa-mail-host" value="${escHtml(st.host || '')}" placeholder="z.B. smtp.ionos.de" autocapitalize="off" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Port</label>
+      <select class="form-input" id="sa-mail-port">
+        <option value="465" ${Number(st.port) !== 587 ? 'selected' : ''}>465 (SSL/TLS – üblich)</option>
+        <option value="587" ${Number(st.port) === 587 ? 'selected' : ''}>587 (STARTTLS)</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Benutzername (meist die E-Mail-Adresse)</label>
+      <input class="form-input" id="sa-mail-benutzer" value="${escHtml(st.benutzer || '')}" placeholder="kontakt@fahrsync.de" autocapitalize="off" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Passwort${st.eingerichtet ? ' (leer lassen = unverändert)' : ''}</label>
+      <input class="form-input" id="sa-mail-passwort" type="password" value="" placeholder="${escHtml(st.eingerichtet ? '••••••••' : 'Passwort des Postfachs')}" autocomplete="new-password">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Absender-Adresse</label>
+      <input class="form-input" id="sa-mail-absender" type="email" value="${escHtml(st.absender || '')}" placeholder="kontakt@fahrsync.de" autocapitalize="off" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Absender-Name (wenn die Fahrschule keinen Namen hat)</label>
+      <input class="form-input" id="sa-mail-name" value="${escHtml(st.absenderName || 'FahrSync')}" maxlength="60">
+    </div>
+    <div id="sa-mail-status" style="font-size:0.82rem;min-height:20px;margin-bottom:8px;text-align:center;padding:8px;border-radius:8px"></div>
+    <button class="btn-main" id="sa-mail-speichern" onclick="mailSpeichern()">💾 Prüfen und speichern</button>
+    ${st.eingerichtet && st.aktiv ? `
+      <button class="btn-secondary" onclick="mailTesten()">✉️ Testnachricht an mich senden</button>
+      <button class="btn-secondary" onclick="mailAbschalten()">Versand abschalten</button>` : ''}`;
+}
+async function renderMailEinst() {
+  const box = document.getElementById('sa-mail-box'); if (!box) return;
+  try { mailBoxZeichnen(await mailFn({ aktion: 'status' })); }
+  catch (e) {
+    console.warn('mailEinstellungen status:', e);
+    box.innerHTML = '<div style="font-size:0.8rem;color:var(--danger);line-height:1.5">Stand konnte nicht geladen werden: ' + escHtml(mailFehlerText(e)) + '</div>';
+  }
+}
+function mailMeldung(text, farbe) {
+  const el = document.getElementById('sa-mail-status'); if (!el) return;
+  el.style.color = farbe || 'var(--muted)'; el.textContent = text;
+}
+window.mailSpeichern = async () => {
+  const wert = (id) => (document.getElementById(id) || {}).value || '';
+  const daten = {
+    aktion: 'speichern',
+    host: wert('sa-mail-host').trim(), port: Number(wert('sa-mail-port')) || 465,
+    benutzer: wert('sa-mail-benutzer').trim(), passwort: wert('sa-mail-passwort'),
+    absender: wert('sa-mail-absender').trim(), absenderName: wert('sa-mail-name').trim(),
+  };
+  if (!daten.host || !daten.benutzer || !daten.absender) { mailMeldung('Bitte Server, Benutzername und Absender-Adresse ausfüllen.', 'var(--danger)'); return; }
+  const btn = document.getElementById('sa-mail-speichern');
+  if (btn) btn.disabled = true;
+  mailMeldung('Anmeldung am Mailserver wird geprüft…');
+  try {
+    const st = await mailFn(daten);
+    mailBoxZeichnen(st);
+    mailMeldung('✓ Gespeichert – die Anmeldung am Mailserver hat geklappt. Sende dir jetzt eine Testnachricht.', 'var(--accent2)');
+  } catch (e) {
+    mailMeldung(mailFehlerText(e), 'var(--danger)');
+    if (btn) btn.disabled = false;
+  }
+};
+window.mailTesten = async () => {
+  mailMeldung('Testnachricht wird gesendet…');
+  try { mailBoxZeichnen(await mailFn({ aktion: 'test' })); mailMeldung('✓ Testnachricht gesendet – schau in dein Postfach (auch im Spam-Ordner).', 'var(--accent2)'); }
+  catch (e) { mailMeldung(mailFehlerText(e), 'var(--danger)'); }
+};
+window.mailAbschalten = async () => {
+  if (!confirm('E-Mail-Versand abschalten? Schüler bekommen dann keine E-Mails mehr aus dem Kalender. Die Zugangsdaten bleiben gespeichert.')) return;
+  try { mailBoxZeichnen(await mailFn({ aktion: 'abschalten' })); mailMeldung('Versand abgeschaltet.'); }
+  catch (e) { mailMeldung(mailFehlerText(e), 'var(--danger)'); }
+};
 
 window.adminEmailManuellBestaetigen = async () => {
   const email = document.getElementById('ver-email').value.trim();

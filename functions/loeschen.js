@@ -166,7 +166,7 @@ async function loescheKontoHart(uid) {
   for (const einUid of betroffeneUids) {
     for (const pfad of [`calendarTokens/${einUid}`, `calendarStatus/${einUid}`,
                         `kalenderUsers/${einUid}`, `bookingLinks/${einUid}`,
-                        `studentSessions/${einUid}`]) {
+                        `studentSessions/${einUid}`, `mailZaehler/${einUid}`]) {
       await db.doc(pfad).delete().catch(() => {});
     }
     await loescheAlle(db.collection('fcmTokens').where('uid', '==', einUid));
