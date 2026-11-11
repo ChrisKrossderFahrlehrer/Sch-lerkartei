@@ -12,6 +12,8 @@
 //   - nie mit Namen anderer Schueler im Text
 //   - nie fuer einen Termin, der gar nicht buchbar ist (Sperre, Urlaub,
 //     geloescht, vergangen)
+//   - nie fuer ein Konto, dessen Kalender der Betreiber nicht freigeschaltet
+//     hat (sonst waere das Postfach ein Werkzeug fuer Spam an Fremde)
 //
 // Starten:  cd tests && npm test   (laeuft in der Emulator-Kette mit)
 
@@ -33,7 +35,7 @@ const db = getFirestore();
 
 const mail = require(join(hier, '..', 'functions', 'mail.js'));
 const { nachStornierung, einstellungenPruefen, mailStatus, mailAdresseOk, textAbsage, textTerminFrei,
-        EINSTELLUNG, STATUS, MAX_PRO_TAG } = mail;
+        EINSTELLUNG, STATUS, MAX_PRO_TAG, MAX_PRO_LEHRER_UND_TAG, nameSauber } = mail;
 
 let ok = 0, schlecht = 0;
 async function pruefe(text, fn) {
@@ -74,6 +76,10 @@ const vomLehrer = (vorher, mehr = {}) => ({ ...vorher, bookedBy: null, bookedAt:
 const vomSchueler = (vorher) => ({ ...vorher, bookedBy: null, bookedAt: null, storniertVonSchueler: vorher.bookedBy, storniertAt: ts(JETZT) });
 
 // ── Bestand ──────────────────────────────────────────────────────────
+// Der Betreiber hat den Kalender der Fahrschule freigeschaltet
+await db.doc(`fahrschulen/${SCHULE}`).set({ name: 'Fahrschule Sonne', kalenderAktiv: true });
+await db.doc(`users/${L}`).set({ uid: L, rolle: 'fahrlehrer', status: 'aktiv', fahrschuleId: SCHULE });
+await db.doc(`users/${L2}`).set({ uid: L2, rolle: 'fahrlehrer', status: 'aktiv', fahrschuleId: SCHULE });
 await db.doc(`kalenderUsers/${L}`).set({ fname: 'Tom', lname: 'Fahrer', schoolId: SCHULE });
 await db.doc(`kalenderUsers/${L2}`).set({ fname: 'Uwe', lname: 'Anders', schoolId: SCHULE });
 await db.doc(`bookingLinks/${L}`).set({ lehrerUid: L, schoolId: SCHULE, schoolName: 'Fahrschule Sonne', aktiv: true, freieSlots: [] });
@@ -337,6 +343,77 @@ await pruefe('Abgeschaltet (aktiv: false): keine Mail', async () => {
   gleich(post.length, 0, 'Mails');
   await db.doc(EINSTELLUNG).update({ aktiv: true });
 });
+console.log('\nNUR FUER FREIGESCHALTETE KALENDER — das Postfach ist kein Werkzeug fuer Fremde');
+// Jeder kann sich registrieren und ueber die Schnittstelle Termine und
+// "Schueler" mit beliebigen Adressen anlegen. Verschickt wird deshalb nur,
+// wenn der Betreiber den Kalender freigeschaltet hat.
+let nr = 30;
+const absageLauf = async (jetzt) => {
+  neu();
+  const start = Date.UTC(2027, 0, nr - 20, 9, 0, 0); nr++;
+  const v = await frischerTermin('t' + nr, { startTime: ts(start), endTime: ts(start + 90 * 60000) });
+  return nachStornierung(db, 't' + nr, v, vomLehrer(v, { wirdGeloescht: true }), { senden, push, jetzt });
+};
+const T = spaeter + 10 * TAG;
+await pruefe('Kalender der Fahrschule NICHT freigeschaltet: keine Mail', async () => {
+  await db.doc(`fahrschulen/${SCHULE}`).update({ kalenderAktiv: false });
+  const e = await absageLauf(T);
+  gleich(e.absage, false, 'absage'); gleich(post.length, 0, 'Mails');
+});
+await pruefe('...aber der Fahrlehrer einzeln freigeschaltet: Mail geht', async () => {
+  await db.doc(`users/${L}`).update({ kalenderAktiv: true });
+  const e = await absageLauf(T);
+  gleich(e.absage, true, 'absage');
+  await db.doc(`users/${L}`).update({ kalenderAktiv: false });
+  await db.doc(`fahrschulen/${SCHULE}`).update({ kalenderAktiv: true });
+});
+await pruefe('Fahrlehrer gesperrt: keine Mail', async () => {
+  await db.doc(`users/${L}`).update({ status: 'gesperrt' });
+  const e = await absageLauf(T);
+  gleich(e.absage, false, 'absage'); gleich(post.length, 0, 'Mails');
+});
+await pruefe('Fahrlehrer nur beigetreten, noch nicht freigeschaltet: keine Mail', async () => {
+  await db.doc(`users/${L}`).update({ status: 'ausstehend' });
+  const e = await absageLauf(T);
+  gleich(e.absage, false, 'absage');
+  await db.doc(`users/${L}`).update({ status: 'aktiv' });
+});
+await pruefe('Konto ohne Profil in der Kartei: keine Mail', async () => {
+  const profil = await lies(`users/${L}`);
+  await db.doc(`users/${L}`).delete();
+  const e = await absageLauf(T);
+  gleich(e.absage, false, 'absage'); gleich(post.length, 0, 'Mails');
+  await db.doc(`users/${L}`).set(profil);
+});
+await pruefe('Link im Vornamen / Fahrlehrer- / Schulnamen kommt NICHT als Link an', async () => {
+  await db.doc('schueler/mia').update({ fname: 'Mia http://boese.example/gewinn?x=1' });
+  await db.doc(`kalenderUsers/${L}`).update({ lname: 'www.boese.example' });
+  await db.doc(`bookingLinks/${L}`).update({ schoolName: 'Sonne https://boese.example' });
+  const e = await absageLauf(T);
+  gleich(e.absage, true, 'absage');
+  const t = post[0].betreff + post[0].text + post[0].absenderName;
+  wahr(!/:\/\/|boese\.example|www\./.test(t), 'Link im Text: ' + t);
+  wahr(post[0].text.includes('Hallo Mia'), 'Vorname bleibt lesbar');
+  await db.doc('schueler/mia').update({ fname: 'Mia' });
+  await db.doc(`kalenderUsers/${L}`).update({ lname: 'Fahrer' });
+  await db.doc(`bookingLinks/${L}`).update({ schoolName: 'Fahrschule Sonne' });
+});
+await pruefe('Gewoehnliche Namen bleiben unveraendert', async () => {
+  for (const n of ['Jean-Luc', "O'Brien", 'Dr. Max Müller', 'Zoë', 'Fahrschule A. Beispiel & Söhne (Nord)'])
+    gleich(nameSauber(n), n, 'Name');
+});
+await pruefe('Grenze je Fahrlehrer: ein Konto kann das Tageskontingent nicht aufbrauchen', async () => {
+  const tag = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date(T + TAG));
+  await db.doc(`mailZaehler/${L}`).set({ tag, anzahl: MAX_PRO_LEHRER_UND_TAG });
+  const e = await absageLauf(T + TAG);
+  gleich(e.absage, false, 'absage'); gleich(post.length, 0, 'Mails');
+});
+await pruefe('...am naechsten Tag wieder', async () => {
+  const e = await absageLauf(T + 2 * TAG);
+  gleich(e.absage, true, 'absage');
+  gleich((await lies(`mailZaehler/${L}`)).anzahl, 1, 'Zaehler');
+});
+
 await pruefe('Der Stand fuer den Betreiber enthaelt das Passwort NICHT', async () => {
   const st = await mailStatus(db);
   gleich(st.eingerichtet, true, 'eingerichtet'); gleich(st.host, 'smtp.example.org', 'host');

@@ -26,8 +26,17 @@
 //     sie ueber die Function mailEinstellungen (nur Betreiber), das Passwort
 //     wird nie wieder herausgegeben.
 //   - Ohne eingerichtetes Postfach passiert nichts (kein Fehler).
-//   - Bremsen: je Warteliste-Eintrag hoechstens eine Mail in 6 Stunden,
-//     insgesamt hoechstens MAX_PRO_TAG Mails am Tag.
+//   - Versendet wird nur fuer Fahrlehrer, deren Kalender der Betreiber
+//     freigeschaltet hat (kalenderAktiv - von niemandem selbst setzbar). Ein
+//     Konto kann sich kostenlos registrieren und ueber die Schnittstelle
+//     Termine und "Schueler" mit beliebigen Adressen anlegen: Ohne diese
+//     Schranke liessen sich ueber das Postfach des Betreibers Nachrichten an
+//     Fremde verschicken.
+//   - Namen im Text (Vorname, Fahrlehrer, Fahrschule) werden auf Buchstaben,
+//     Ziffern und wenige Zeichen beschraenkt - kein Platz fuer Links.
+//   - Bremsen: je Warteliste-Eintrag hoechstens eine Mail in 6 Stunden, je
+//     Fahrlehrer hoechstens MAX_PRO_LEHRER_UND_TAG, insgesamt hoechstens
+//     MAX_PRO_TAG Mails am Tag.
 
 const nodemailer = require('nodemailer');
 
@@ -35,6 +44,7 @@ const EINSTELLUNG = 'serverEinstellungen/mail';
 const STATUS = 'serverEinstellungen/mailStatus';
 const APP_URL = 'https://fahrsync.de/kalender.html';
 const MAX_PRO_TAG = 300;
+const MAX_PRO_LEHRER_UND_TAG = 40;
 const WARTELISTE_PAUSE_MS = 6 * 60 * 60 * 1000;
 const MAX_WARTELISTE_JE_TERMIN = 20;   // haelt die Laufzeit der Function im Rahmen
 const ERLAUBTE_PORTS = [465, 587, 2525];
@@ -52,6 +62,34 @@ function hostOk(h) {
 // Eine Zeile, keine Steuerzeichen - fuer Namen, die in Betreff/Absender/Text landen
 function eineZeile(s, max = 80) {
   return String(s == null ? '' : s).replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+}
+
+// Namen, die in einer Mail an Dritte landen: nur Buchstaben, Ziffern,
+// Leerzeichen und wenige Satzzeichen. Punkte bleiben nur vor einem Leerzeichen
+// oder am Ende ("Dr. Max", "Fahrschule A. Beispiel") - aus "seite.example/x"
+// wird "seite example x", kein Mailprogramm macht daraus einen Link.
+function nameSauber(s, max = 60) {
+  return String(s == null ? '' : s).normalize('NFC')
+    .replace(/[^\p{L}\p{M}\p{N} .,'&()+-]/gu, ' ')
+    .replace(/\.(?=\S)/g, ' ')
+    .replace(/\s+/g, ' ').trim().slice(0, max);
+}
+
+// Hat der Betreiber den Kalender fuer diesen Fahrlehrer freigeschaltet?
+// Dieselbe Frage stellt kalender.html beim Anmelden - dort schuetzt sie nur
+// die Oberflaeche, hier den Versand.
+async function kalenderFreigeschaltet(db, lehrerUid) {
+  const u = await db.doc(`users/${lehrerUid}`).get();
+  if (!u.exists) return false;
+  const d = u.data();
+  if (d.rolle === 'superadmin') return true;
+  const schule = (typeof d.fahrschuleId === 'string' && d.fahrschuleId) ? d.fahrschuleId : lehrerUid;
+  if (d.status === 'gesperrt') return false;
+  if (d.status === 'ausstehend' && schule !== lehrerUid) return false;
+  if (d.kalenderAktiv === true) return true;
+  if (!ID_OK.test(schule)) return false;
+  const fs = await db.doc(`fahrschulen/${schule}`).get();
+  return fs.exists && fs.get('kalenderAktiv') === true;
 }
 
 // Eingaben des Betreibers pruefen. bisher = gespeicherte Einstellungen (fuer
@@ -139,16 +177,24 @@ async function smtpSenden(cfg, nachricht) {
 const berlinTagFormat = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit' });
 function berlinTag(ms) { return berlinTagFormat.format(new Date(ms)); }
 
-// Reserviert einen Platz im Tageskontingent. false = Grenze erreicht.
-async function tagesgrenzeBelegen(db, jetzt) {
+// Reserviert einen Platz im Tageskontingent - insgesamt und (wenn angegeben)
+// fuer den Fahrlehrer, damit ein einzelnes Konto nicht das ganze Kontingent
+// verbraucht. false = eine der Grenzen ist erreicht.
+async function tagesgrenzeBelegen(db, jetzt, lehrerUid) {
   const ref = db.doc(STATUS);
+  const lRef = (typeof lehrerUid === 'string' && ID_OK.test(lehrerUid)) ? db.doc(`mailZaehler/${lehrerUid}`) : null;
   const tag = berlinTag(jetzt);
   return db.runTransaction(async (tx) => {
     const s = await tx.get(ref);
+    const l = lRef ? await tx.get(lRef) : null;
     const d = s.exists ? s.data() : {};
+    const ld = l && l.exists ? l.data() : {};
     const anzahl = d.tag === tag ? (Number(d.anzahl) || 0) : 0;
+    const lAnzahl = ld.tag === tag ? (Number(ld.anzahl) || 0) : 0;
     if (anzahl >= MAX_PRO_TAG) return false;
+    if (lRef && lAnzahl >= MAX_PRO_LEHRER_UND_TAG) return false;
     tx.set(ref, { tag, anzahl: anzahl + 1 }, { merge: true });
+    if (lRef) tx.set(lRef, { tag, anzahl: lAnzahl + 1 });
     return true;
   });
 }
@@ -158,7 +204,7 @@ async function tagesgrenzeBelegen(db, jetzt) {
 async function mailVerschicken(db, cfg, nachricht, senden, jetzt) {
   if (!mailAdresseOk(nachricht.an)) return false;
   try {
-    if (!(await tagesgrenzeBelegen(db, jetzt))) {
+    if (!(await tagesgrenzeBelegen(db, jetzt, nachricht.lehrerUid))) {
       console.warn('Mail: Tagesgrenze erreicht - nicht gesendet');
       return false;
     }
@@ -336,21 +382,23 @@ async function nachStornierung(db, slotId, vorher, nachher, opt = {}) {
 
   const cfg = await mailEinstellungenLaden(db);
   if (!cfg) return erg;
+  // Nur fuer Fahrlehrer, deren Kalender der Betreiber freigeschaltet hat
+  if (!(await kalenderFreigeschaltet(db, lehrerUid))) return erg;
 
   const [lehrerSnap, linkSnap] = await Promise.all([
     db.doc(`kalenderUsers/${lehrerUid}`).get(), db.doc(`bookingLinks/${lehrerUid}`).get()]);
   const lehrerName = lehrerSnap.exists
-    ? eineZeile(((lehrerSnap.get('fname') || '') + ' ' + (lehrerSnap.get('lname') || '')), 80) : '';
-  const schulName = linkSnap.exists ? eineZeile(linkSnap.get('schoolName') || '', 80) : '';
+    ? nameSauber(((lehrerSnap.get('fname') || '') + ' ' + (lehrerSnap.get('lname') || '')), 60) : '';
+  const schulName = linkSnap.exists ? nameSauber(linkSnap.get('schoolName') || '', 60) : '';
   const absenderName = schulName ? `${schulName} (FahrSync)` : undefined;
 
   // 3) Absage an den betroffenen Schueler
   if (absage) {
     const sc = await db.doc(`schueler/${schuelerId}`).get();
     if (sc.exists && (sc.get('lehrerUid') === lehrerUid || (sc.get('schoolId') && sc.get('schoolId') === vorher.schoolId))) {
-      const t = textAbsage({ vorname: eineZeile(sc.get('fname'), 60), lehrerName, schulName, startMs });
+      const t = textAbsage({ vorname: nameSauber(sc.get('fname'), 40), lehrerName, schulName, startMs });
       erg.absage = await mailVerschicken(db, cfg,
-        { an: String(sc.get('email') || '').trim(), betreff: t.betreff, text: t.text, absenderName }, senden, jetzt);
+        { an: String(sc.get('email') || '').trim(), betreff: t.betreff, text: t.text, absenderName, lehrerUid }, senden, jetzt);
     }
   }
 
@@ -372,10 +420,10 @@ async function nachStornierung(db, slotId, vorher, nachher, opt = {}) {
     const an = String(sc.get('email') || '').trim();
     if (!mailAdresseOk(an)) continue;
     const t = textTerminFrei({
-      vorname: eineZeile(sc.get('fname'), 60), lehrerName, schulName, startMs, endeMs,
+      vorname: nameSauber(sc.get('fname'), 40), lehrerName, schulName, startMs, endeMs,
       link: `${APP_URL}?schueler=${w.id}&lehrer=${lehrerUid}`,
     });
-    if (await mailVerschicken(db, cfg, { an, betreff: t.betreff, text: t.text, absenderName }, senden, jetzt)) {
+    if (await mailVerschicken(db, cfg, { an, betreff: t.betreff, text: t.text, absenderName, lehrerUid }, senden, jetzt)) {
       erg.warteliste++;
       await w.ref.update({ mailAm: jetzt }).catch(() => {});
     }
@@ -386,5 +434,6 @@ async function nachStornierung(db, slotId, vorher, nachher, opt = {}) {
 module.exports = {
   nachStornierung, terminWiederAnbieten, terminGesperrt, berlinTeile, mailEinstellungenLaden, mailStatus, einstellungenPruefen,
   verbindungPruefen, smtpSenden, mailVerschicken, textAbsage, textTerminFrei,
-  mailAdresseOk, hostOk, eineZeile, EINSTELLUNG, STATUS, MAX_PRO_TAG, WARTELISTE_PAUSE_MS,
+  mailAdresseOk, hostOk, eineZeile, nameSauber, kalenderFreigeschaltet,
+  EINSTELLUNG, STATUS, MAX_PRO_TAG, MAX_PRO_LEHRER_UND_TAG, WARTELISTE_PAUSE_MS,
 };
