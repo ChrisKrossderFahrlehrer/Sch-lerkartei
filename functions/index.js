@@ -755,6 +755,9 @@ exports.findeAltenZugangscode = onCall(async (request) => {
 // Filter, Zustellverzoegerung). Nutzt die Admin-SDK, die das direkt
 // setzen kann, ohne den eigentlichen Mail-Link zu brauchen.
 exports.adminEmailBestaetigen = onCall(async (request) => {
+  // E-Mail-Versand einrichten laeuft ueber diese Function (Begruendung bei
+  // mailEinstellungenAusfuehren). Die Betreiber-Pruefung steht dort selbst.
+  if (request.data && request.data.bereich === 'mail') return mailEinstellungenAusfuehren(request);
   const auth = request.auth;
   if (!auth) throw new HttpsError('unauthenticated', 'Bitte anmelden.');
   const istSuperAdminEmail = auth.token.email === 'chriskoo@mail.de';
@@ -1334,7 +1337,17 @@ exports.buchungszaehlerGeloeschterTermin = onDocumentDeleted('slots/{slotId}', a
 // Vor dem Speichern meldet sich die Function probeweise am Mailserver an -
 // falsche Daten werden gar nicht erst gespeichert.
 // ═══════════════════════════════════════════════════════════════════
-exports.mailEinstellungen = onCall(async (request) => {
+//
+// AUFRUF: Die Plattform ruft das ueber adminEmailBestaetigen auf
+// ({ bereich: 'mail', ... }), nicht ueber mailEinstellungen. Grund: Eine NEUE
+// aufrufbare Function braucht einmalig die Freigabe "oeffentlich aufrufbar"
+// (Cloud Run setIamPolicy). Das Dienstkonto des automatischen Deploys darf
+// die nicht setzen - mailEinstellungen wurde deshalb zwar angelegt, ist aber
+// vom Browser aus nicht erreichbar (403). adminEmailBestaetigen hat die
+// Freigabe seit jeher und prueft denselben Kreis (nur Betreiber).
+// Der Export bleibt stehen: Ihn zu entfernen wuerde den Deploy abbrechen
+// (Loeschen geht im automatischen Lauf nicht).
+async function mailEinstellungenAusfuehren(request) {
   const auth = request.auth;
   if (!auth) throw new HttpsError('unauthenticated', 'Bitte anmelden.');
   let darf = auth.token.email === 'chriskoo@mail.de';
@@ -1385,7 +1398,8 @@ exports.mailEinstellungen = onCall(async (request) => {
     throw new HttpsError('invalid-argument', 'Unbekannte Aktion.');
   }
   return mailStatus(db);
-});
+}
+exports.mailEinstellungen = onCall(mailEinstellungenAusfuehren);
 
 // ── SCHUELER IN DIE FAHRSCHULE UEBERNEHMEN ───────────────────────────────
 // Ein Fahrlehrer, der sich zuerst allein angemeldet und spaeter per Code

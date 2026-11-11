@@ -2741,13 +2741,16 @@ window.toggleProLehrer = async (id, aktivieren) => {
 
 
 // ── E-MAIL-VERSAND AUS DEM KALENDER (Postfach einrichten) ──────────────
-// Alles laeuft ueber die Function mailEinstellungen (nur Betreiber). Die
+// Alles laeuft ueber den Server (nur Betreiber, siehe mailFn). Die
 // Zugangsdaten liegen in einer Sammlung, die kein Browser lesen kann; das
 // Passwort kommt nie zurueck - das Feld bleibt beim Bearbeiten leer und
 // heisst dann "unverändert".
 async function mailFn(daten) {
   const fns = getFunctions(app, 'europe-west3');
-  return (await httpsCallable(fns, 'mailEinstellungen')(daten)).data;
+  // Aufruf ueber adminEmailBestaetigen mit bereich:'mail' - die eigene
+  // Function mailEinstellungen ist vom Browser aus nicht erreichbar
+  // (Begruendung in functions/index.js bei mailEinstellungenAusfuehren).
+  return (await httpsCallable(fns, 'adminEmailBestaetigen')({ ...daten, bereich: 'mail' })).data;
 }
 function mailFehlerText(e) {
   const t = String((e && e.message) || (e && e.code) || 'unbekannt');
