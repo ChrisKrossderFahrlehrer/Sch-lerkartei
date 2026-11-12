@@ -133,7 +133,79 @@ async function abgelaufeneAbosBeenden(db, jetzt = Date.now(), hoechstens = 200) 
   return bericht;
 }
 
+// ── Kuendigen IN DER APP (Knopf "Abo kündigen") ─────────────────────
+// Bisher ging Kuendigen nur bei PayPal selbst oder per E-Mail an den
+// Betreiber, der das Abo dann von Hand bei Stripe beenden musste. Jetzt
+// kuendigt der Inhaber selbst; der Server beendet das Abo beim
+// Zahlungsdienstleister und merkt die Kuendigung vor (wie die Webhooks).
+//
+//   Stripe: "zum Ende des Abrechnungszeitraums kuendigen" - es wird nichts
+//           mehr abgebucht, der bezahlte Zeitraum laeuft aus. Bis dahin
+//           laesst sich die Kuendigung zuruecknehmen.
+//   PayPal: kennt kein "zum Periodenende". Das Abo wird beendet (keine
+//           weiteren Abbuchungen), der bezahlte Zeitraum bleibt nutzbar. Eine
+//           Ruecknahme geht nicht - dann einfach neu abschliessen.
+//
+// anbieter = { stripeKuendigen(subId) -> bezahltBis (ms),
+//              stripeFortsetzen(subId),
+//              paypalKuendigen(subId) -> bezahltBis (ms) }
+// ausgelagert, damit der Ablauf ohne echte Zahlungen pruefbar ist
+// (tests/kuendigen.test.mjs).
+
+function zahlungsartVon(b) {
+  const subId = String(b.aboSubscriptionId || '');
+  if (b.aboZahlungsart === 'stripe' || subId.startsWith('sub_')) return 'stripe';
+  return 'paypal';
+}
+
+// Was der Knopf in der App anzeigen soll
+function aboStand(b, jetzt = Date.now()) {
+  const subId = b.aboSubscriptionId || null;
+  const gekuendigt = !!(subId && b.aboGekuendigteSubscriptionId === subId && b.aboEndetAm);
+  const zahlungsart = subId ? zahlungsartVon(b) : null;
+  return {
+    laufendesAbo: !!subId && b.abo && b.abo !== 'free',
+    gekuendigt,
+    endetAm: gekuendigt ? b.aboEndetAm : null,
+    zahlungsart,
+    // Zuruecknehmen nur bei Stripe und nur, solange das Abo noch laeuft
+    fortsetzbar: gekuendigt && zahlungsart === 'stripe'
+      && String(b.aboKuendigungQuelle || '').startsWith('stripe') && b.aboEndetAm > jetzt,
+  };
+}
+
+async function aboKuendigen(db, ref, anbieter, jetzt = Date.now()) {
+  const snap = await ref.get();
+  if (!snap.exists) return { fehler: 'kein-abo' };
+  const b = snap.data();
+  const subId = b.aboSubscriptionId;
+  if (!subId || !b.abo || b.abo === 'free') return { fehler: 'kein-abo' };
+  if (b.aboGekuendigteSubscriptionId === subId && b.aboEndetAm) {
+    return { ergebnis: 'schon-gekuendigt', ...aboStand(b, jetzt) };
+  }
+  const art = zahlungsartVon(b);
+  const bezahltBis = art === 'stripe'
+    ? await anbieter.stripeKuendigen(subId)
+    : await anbieter.paypalKuendigen(subId);
+  const r = await kuendigungVormerken(db, subId, jetzt, art + ':app', bezahltBis);
+  const neu = (await ref.get()).data();
+  return { ergebnis: r.ergebnis, ...aboStand(neu, jetzt) };
+}
+
+async function aboFortsetzen(db, ref, anbieter, jetzt = Date.now()) {
+  const snap = await ref.get();
+  if (!snap.exists) return { fehler: 'kein-abo' };
+  const b = snap.data();
+  const st = aboStand(b, jetzt);
+  if (!st.gekuendigt) return { ergebnis: 'nicht-gekuendigt', ...st };
+  if (!st.fortsetzbar) return { fehler: 'nicht-fortsetzbar', ...st };
+  await anbieter.stripeFortsetzen(b.aboSubscriptionId);
+  await kuendigungAufheben(db, b.aboSubscriptionId);
+  return { ergebnis: 'fortgesetzt', ...aboStand((await ref.get()).data(), jetzt) };
+}
+
 module.exports = {
   kuendigungVormerken, kuendigungAufheben, abgelaufeneAbosBeenden,
   KUENDIGUNG_ENTFERNEN, findeAbo, NACHLAUF_TAGE, kuendigungsEnde,
+  aboStand, aboKuendigen, aboFortsetzen, zahlungsartVon,
 };
