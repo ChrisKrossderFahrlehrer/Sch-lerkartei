@@ -282,6 +282,7 @@ exports.trennKalenderVerbindung = onCall({ region: 'europe-west3' }, async (reqC
 // Abo wurde ueber diesen Weg nie freigeschaltet.
 const { rechnungAnlegen, RECHNUNG_PLANS, PAYPAL_PLAN_IDS, abrechnungsZiel, rechnungsBeschreibung } = require('./rechnung');
 // Gekuendigte Abos: 14 Tage Nachlauf, dann 'free' - siehe functions/abo.js.
+const { aboStand, aboKuendigen, aboFortsetzen } = require('./abo');
 const { kuendigungVormerken, kuendigungAufheben, abgelaufeneAbosBeenden,
         KUENDIGUNG_ENTFERNEN } = require('./abo');
 
@@ -1091,10 +1092,96 @@ async function kuendigeLaufendesAbo(billingColl, billingId) {
   }
 }
 
+// ── Abo in der App kuendigen (functions/abo.js) ──────────────────────
+// Laeuft ueber kontoLoeschungBeantragen mit { aktion: 'abo-...' }: Eine NEUE
+// aufrufbare Function kann der automatische Deploy nicht oeffentlich machen
+// (siehe mailEinstellungenAusfuehren). Diese hat die Freigabe und die
+// Zugangsdaten fuer Stripe und PayPal bereits.
+const ABO_ANBIETER = {
+  async stripeKuendigen(subId) {
+    const stripe = new Stripe(STRIPE_SECRET_KEY.value());
+    const abo = await stripe.subscriptions.update(subId, { cancel_at_period_end: true });
+    // Ende des laufenden (bezahlten oder Test-) Zeitraums. Seit API-Version
+    // 2025-03-31 steht current_period_end an den Positionen.
+    const posten = (abo.items && abo.items.data && abo.items.data[0]) || {};
+    const sek = abo.cancel_at || abo.current_period_end || posten.current_period_end || abo.trial_end || 0;
+    return sek * 1000;
+  },
+  async stripeFortsetzen(subId) {
+    const stripe = new Stripe(STRIPE_SECRET_KEY.value());
+    await stripe.subscriptions.update(subId, { cancel_at_period_end: false });
+  },
+  async paypalKuendigen(subId) {
+    const token = await paypalAccessToken(PAYPAL_CLIENT_ID.value(), PAYPAL_CLIENT_SECRET.value());
+    const basis = `https://api-m.paypal.com/v1/billing/subscriptions/${encodeURIComponent(subId)}`;
+    const kopf = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    // Erst lesen: Bis wann ist bezahlt? (naechste Abbuchung = Ende)
+    let bis = 0, status = '';
+    const info = await fetch(basis, { headers: kopf });
+    if (info.ok) {
+      const d = await info.json();
+      status = d.status || '';
+      bis = Date.parse((d.billing_info && d.billing_info.next_billing_time) || '') || 0;
+    }
+    if (status !== 'CANCELLED' && status !== 'EXPIRED') {
+      const r = await fetch(basis + '/cancel', {
+        method: 'POST', headers: kopf, body: JSON.stringify({ reason: 'Vom Kunden in der App gekuendigt' }),
+      });
+      // 422 = schon beendet - das Ziel ist erreicht
+      if (!r.ok && r.status !== 422) {
+        throw new HttpsError('unavailable', 'PayPal hat die Kündigung nicht angenommen (' + r.status + '). Bitte später erneut versuchen.');
+      }
+    }
+    return bis;
+  },
+};
+
+async function aboImKontoVerwalten(request) {
+  const auth = request.auth;
+  if (!auth) throw new HttpsError('unauthenticated', 'Bitte anmelden.');
+  const db = getFirestore();
+  const userSnap = await db.doc(`users/${auth.uid}`).get();
+  if (!userSnap.exists) throw new HttpsError('failed-precondition', 'Kein Profil gefunden.');
+  // Das Abo gehoert dem Inhaber (fahrschulen/{uid}) bzw. dem eigenstaendigen
+  // Fahrlehrer (users/{uid}). Angestellte Fahrlehrer haben keines - bei ihnen
+  // findet sich keine Abo-Kennung, sie koennen also nichts kuendigen.
+  const { istInhaber } = loeschUmfang(auth.uid, userSnap.data());
+  const ref = db.doc(`${istInhaber ? 'fahrschulen' : 'users'}/${auth.uid}`);
+  const aktion = request.data.aktion;
+  if (aktion === 'abo-stand') {
+    const s = await ref.get();
+    return aboStand(s.exists ? s.data() : {});
+  }
+  try {
+    const r = aktion === 'abo-kuendigen'
+      ? await aboKuendigen(db, ref, ABO_ANBIETER)
+      : await aboFortsetzen(db, ref, ABO_ANBIETER);
+    if (r.fehler === 'kein-abo') throw new HttpsError('failed-precondition', 'Es läuft kein bezahltes Abo, das gekündigt werden könnte.');
+    if (r.fehler === 'nicht-fortsetzbar') throw new HttpsError('failed-precondition', 'Diese Kündigung lässt sich nicht zurücknehmen. Schließe bei Bedarf einfach ein neues Abo ab.');
+    console.log('Abo', aktion, 'durch', auth.uid, '-', r.ergebnis, r.zahlungsart || '');
+    return r;
+  } catch (e) {
+    if (e instanceof HttpsError) throw e;
+    console.error('Abo', aktion, 'fehlgeschlagen fuer', auth.uid, e.message);
+    throw new HttpsError('unavailable', 'Der Zahlungsdienstleister hat nicht geantwortet. Bitte später erneut versuchen.');
+  }
+}
+
 // ── Nutzer beantragt die Loeschung seines Kontos ────────────────────
 exports.kontoLoeschungBeantragen = onCall(
   { secrets: [STRIPE_SECRET_KEY, PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET] },
   async (request) => {
+    // Abo kuendigen / fortsetzen / Stand (siehe aboImKontoVerwalten).
+    // WICHTIG: nur diese drei genau benannten Aktionen - alles andere ist wie
+    // bisher der Loeschantrag.
+    const aktion = request.data && request.data.aktion;
+    if (aktion === 'abo-kuendigen' || aktion === 'abo-fortsetzen' || aktion === 'abo-stand') {
+      return aboImKontoVerwalten(request);
+    }
+    // Eine unbekannte Aktion darf NIE als Loeschantrag durchgehen.
+    if (aktion !== undefined && aktion !== null && aktion !== 'konto-loeschen') {
+      throw new HttpsError('invalid-argument', 'Unbekannte Aktion.');
+    }
     const auth = request.auth;
     if (!auth) throw new HttpsError('unauthenticated', 'Bitte anmelden.');
     const uid = auth.uid;

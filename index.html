@@ -2417,10 +2417,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     <div style="font-size:0.8rem;line-height:1.65;color:var(--muted);margin-top:12px">
       <div id="abo-kuendigung-stand" style="display:none;background:var(--surface2);border:1px solid var(--accent);border-radius:10px;padding:10px 12px;margin-bottom:12px;color:var(--text)"></div>
       Dein Abonnement ist <b style="color:var(--text)">mit einer Frist von 14 Tagen zum Ende des Abrechnungsmonats kündbar</b> – ohne Angabe von Gründen. Bitte kündige also spätestens 14 Tage vor Ablauf.<br><br>
-      <b style="color:var(--text)">Weg 1 – direkt bei PayPal:</b><br>
-      PayPal-Konto öffnen → Zahlungen → Abonnements → „FahrSync" auswählen → Kündigen.<br><br>
-      <b style="color:var(--text)">Weg 2 – per E-Mail (auch bei Kreditkarte oder Lastschrift):</b><br>
-      Formlose Nachricht an <a href="mailto:kontakt@fahrsync.de?subject=K%C3%BCndigung%20FahrSync-Abo" style="color:var(--accent)">kontakt@fahrsync.de</a> genügt – wir bestätigen den Eingang.<br><br>
+      <div id="abo-kuendigen-box" style="margin-bottom:14px"></div>
+      <b style="color:var(--text)">Klappt das nicht?</b> Eine formlose Nachricht an <a href="mailto:kontakt@fahrsync.de?subject=K%C3%BCndigung%20FahrSync-Abo" style="color:var(--accent)">kontakt@fahrsync.de</a> genügt ebenfalls – wir bestätigen den Eingang.<br><br>
       <b style="color:var(--text)">Was danach passiert:</b> Nach der Kündigung kannst du die bezahlten Funktionen bis zum Ende des bereits bezahlten Zeitraums nutzen, mindestens aber noch 14 Tage. Danach läuft dein Konto im kostenlosen Tarif weiter – deine Schüler und alle Daten bleiben erhalten. Wenn du dein Konto ganz löschen möchtest: Einstellungen → „Konto und alle Daten löschen".
     </div>
     <button class="btn-sheet-cancel" onclick="document.getElementById('abo-verwalten-modal').classList.remove('open')" style="margin-top:16px">Schließen</button>
@@ -2555,7 +2553,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [onclick]:focus-visi
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openImpressum()" style="background:var(--surface2);margin-bottom:12px">📄 Impressum</button>
     <button class="btn-sheet-cancel" onclick="document.getElementById('settings-modal').classList.remove('open');openMeineRechnungen()" style="background:var(--surface2);margin-bottom:8px">🧾 Meine Rechnungen</button>
     <button class="btn-sheet-cancel" id="btn-invite-settings" style="display:none;background:var(--surface2);margin-bottom:8px" onclick="document.getElementById('settings-modal').classList.remove('open');openInviteModal()">👥 Fahrlehrer einladen</button>
-    <button class="btn-sheet-cancel" id="btn-abo-settings" style="display:none;background:var(--surface2);margin-bottom:8px" onclick="document.getElementById('settings-modal').classList.remove('open');document.getElementById('abo-verwalten-modal').classList.add('open')">💳 Abo verwalten &amp; kündigen</button>
+    <button class="btn-sheet-cancel" id="btn-abo-settings" style="display:none;background:var(--surface2);margin-bottom:8px" onclick="document.getElementById('settings-modal').classList.remove('open');aboVerwaltenOeffnen()">💳 Abo verwalten &amp; kündigen</button>
     <!-- DSGVO Art. 17: Recht auf Löschung, vom Nutzer selbst auslösbar -->
     <div style="height:1px;background:var(--border);margin:14px 0 12px"></div>
     <div id="konto-loeschung-laeuft" style="display:none;background:rgba(248,81,73,0.1);border:1px solid var(--danger);border-radius:10px;padding:12px;margin-bottom:8px;font-size:0.78rem;line-height:1.5;color:var(--text)"></div>
@@ -8879,6 +8877,72 @@ function downloadBlob(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+// ── Abo kündigen (Knopf im Fenster "Abo verwalten & kündigen") ───────
+// Bisher ging Kuendigen nur bei PayPal selbst oder per E-Mail - der Betreiber
+// musste Stripe-Abos dann von Hand beenden. Jetzt beendet der Server das Abo
+// direkt beim Zahlungsdienstleister (functions/abo.js). Aufruf ueber
+// kontoLoeschungBeantragen mit einer abo-Aktion (Begruendung dort).
+const aboAufruf = (aktion) => httpsCallable(fns, 'kontoLoeschungBeantragen')({ aktion }).then(r => r.data);
+const aboDatum = (ms) => new Date(ms).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+function aboKuendigenZeichnen(st) {
+  const box = document.getElementById('abo-kuendigen-box'); if (!box) return;
+  const knopf = (text, onclick, gefahr) => `<button class="btn-sheet-cancel" onclick="${onclick}" style="width:100%;margin-top:8px;${gefahr ? 'background:rgba(255,77,109,.12);border:1px solid rgba(255,77,109,.45);color:#ff4d6d;font-weight:700' : ''}">${text}</button>`;
+  if (!st || !st.laufendesAbo) {
+    box.innerHTML = '<div style="background:var(--surface2);border-radius:10px;padding:10px 12px;color:var(--text)">Es läuft kein bezahltes Abo – es gibt nichts zu kündigen.</div>';
+    return;
+  }
+  const art = st.zahlungsart === 'stripe' ? 'Karte / Lastschrift (Stripe)' : 'PayPal';
+  if (st.gekuendigt) {
+    box.innerHTML = `<div style="background:var(--surface2);border:1px solid var(--accent);border-radius:10px;padding:10px 12px;color:var(--text)">✅ <b>Gekündigt.</b> Es wird nichts mehr abgebucht. Die bezahlten Funktionen laufen bis <b>${escHtml(aboDatum(st.endetAm))}</b>, danach geht es im kostenlosen Tarif weiter – deine Daten bleiben erhalten.</div>`
+      + (st.fortsetzbar ? knopf('↩️ Kündigung zurücknehmen', 'aboFortsetzenKlick()') : '');
+    return;
+  }
+  box.innerHTML = `<div style="color:var(--text)">Bezahlt per <b>${escHtml(art)}</b>.</div>`
+    + knopf('Abo jetzt kündigen', 'aboKuendigenKlick()', true);
+}
+window.aboVerwaltenOeffnen = async () => {
+  document.getElementById('abo-verwalten-modal').classList.add('open');
+  const box = document.getElementById('abo-kuendigen-box');
+  if (box) box.innerHTML = '<div style="color:var(--muted)">Abo wird geladen…</div>';
+  try { aboKuendigenZeichnen(await aboAufruf('abo-stand')); }
+  catch (e) {
+    console.warn('abo-stand', e);
+    if (box) box.innerHTML = '<div style="color:var(--danger,#ff4d6d)">Der Stand deines Abos konnte nicht geladen werden. Bitte später erneut versuchen oder per E-Mail kündigen.</div>';
+  }
+};
+let __aboLaeuft = false;
+window.aboKuendigenKlick = async () => {
+  if (__aboLaeuft) return;
+  if (!confirm('Abo wirklich kündigen?\n\nEs wird danach nichts mehr abgebucht. Die bezahlten Funktionen kannst du bis zum Ende des bezahlten Zeitraums nutzen (mindestens noch 14 Tage), danach geht es im kostenlosen Tarif weiter. Deine Daten bleiben erhalten.')) return;
+  __aboLaeuft = true;
+  const box = document.getElementById('abo-kuendigen-box');
+  if (box) box.innerHTML = '<div style="color:var(--muted)">Kündigung wird übermittelt…</div>';
+  try {
+    const st = await aboAufruf('abo-kuendigen');
+    aboKuendigenZeichnen(st);
+    toast('✅ Abo gekündigt – läuft bis ' + aboDatum(st.endetAm));
+    try { await loadAboStatus(currentUser.uid); } catch (e) {}
+  } catch (e) {
+    console.warn('abo-kuendigen', e);
+    toast('⚠️ ' + ((e && e.message) || 'Kündigung fehlgeschlagen'));
+    try { aboKuendigenZeichnen(await aboAufruf('abo-stand')); } catch (e2) {}
+  } finally { __aboLaeuft = false; }
+};
+window.aboFortsetzenKlick = async () => {
+  if (__aboLaeuft) return;
+  if (!confirm('Kündigung zurücknehmen?\n\nDein Abo läuft dann wie bisher weiter und wird zum nächsten Termin wieder abgebucht.')) return;
+  __aboLaeuft = true;
+  try {
+    const st = await aboAufruf('abo-fortsetzen');
+    aboKuendigenZeichnen(st);
+    toast('✅ Kündigung zurückgenommen – dein Abo läuft weiter.');
+    try { await loadAboStatus(currentUser.uid); } catch (e) {}
+  } catch (e) {
+    console.warn('abo-fortsetzen', e);
+    toast('⚠️ ' + ((e && e.message) || 'Das hat nicht geklappt'));
+  } finally { __aboLaeuft = false; }
+};
+
 // ── DSGVO Art. 17: Konto selbst löschen ─────────────────────────────
 // Die Datenschutzerklärung nennt die Konto-Löschung ausdrücklich als Weg,
 // eine Einwilligung zu widerrufen - eine Funktion dafür gab es bisher nicht.
@@ -10757,7 +10821,7 @@ window.openImpressum = async () => {
           <strong style="color:var(--text)">§ 4 Preise und Zahlung</strong><br>
           Es gelten die zum Zeitpunkt der Bestellung in der App ausgewiesenen Preise. Die Abrechnung erfolgt monatlich im Voraus über den vom Kunden gewählten Zahlungsdienstleister (PayPal oder Stripe). Gemäß § 19 UStG wird keine Umsatzsteuer berechnet. Für die Stufe „Unbegrenzt" fällt zusätzlich eine einmalige, nicht erstattungsfähige Einrichtungsgebühr an, die auf der Bestellseite ausgewiesen ist und mit Abschluss des Abonnements – auch während der kostenlosen Testphase – fällig wird. Der Anbieter ist berechtigt, die Preise zum Beginn eines Abrechnungsmonats angemessen anzupassen, wenn sich die Kosten für die Bereitstellung der Leistung verändern – insbesondere Server- und Hostingkosten, Gebühren der Zahlungsdienstleister, Lizenzkosten sowie allgemeine Betriebskosten. Eine Preisänderung wird mindestens sechs Wochen vor ihrem Wirksamwerden per E-Mail und zusätzlich in der App angekündigt. Der Kunde kann das Abonnement in diesem Fall abweichend von § 5 ohne Einhaltung der 14-tägigen Frist zum Zeitpunkt des Wirksamwerdens der Änderung kündigen (Sonderkündigungsrecht). Kündigt er bis dahin nicht, gilt der neue Preis ab dem angekündigten Zeitpunkt; auf diese Folge und auf das Sonderkündigungsrecht wird in der Ankündigung ausdrücklich hingewiesen. Während einer laufenden kostenlosen Testphase finden keine Preisänderungen statt.<br><br>
           <strong style="color:var(--text)">§ 5 Laufzeit und Kündigung</strong><br>
-          Das Abonnement läuft auf unbestimmte Zeit und kann mit einer Frist von 14 Tagen zum Ende des laufenden Abrechnungsmonats gekündigt werden. Bei Zahlung per PayPal erfolgt die Kündigung wahlweise direkt im PayPal-Konto des Kunden (Zahlungen → Abonnements → Kündigen); unabhängig vom gewählten Zahlungsdienstleister genügt außerdem jederzeit eine formlose Kündigung per E-Mail an kontakt@fahrsync.de. Nach Eingang der Kündigung stehen die kostenpflichtigen Funktionen bis zum Ende des bereits bezahlten Abrechnungszeitraums, mindestens jedoch noch 14 Tage zur Verfügung; danach wird das Konto auf den kostenlosen Tarif umgestellt. Die gespeicherten Daten bleiben dabei erhalten; § 10 bleibt unberührt. Ein Wechsel der Preisstufe erfolgt durch Kündigung des bestehenden und Abschluss eines neuen Abonnements.<br><br>
+          Das Abonnement läuft auf unbestimmte Zeit und kann mit einer Frist von 14 Tagen zum Ende des laufenden Abrechnungsmonats gekündigt werden. Die Kündigung erfolgt am einfachsten in der App (Einstellungen → „Abo verwalten &amp; kündigen“ → „Abo jetzt kündigen“); bei Zahlung per PayPal ist sie auch direkt im PayPal-Konto des Kunden möglich (Zahlungen → Abonnements → Kündigen); unabhängig vom gewählten Zahlungsdienstleister genügt außerdem jederzeit eine formlose Kündigung per E-Mail an kontakt@fahrsync.de. Nach Eingang der Kündigung stehen die kostenpflichtigen Funktionen bis zum Ende des bereits bezahlten Abrechnungszeitraums, mindestens jedoch noch 14 Tage zur Verfügung; danach wird das Konto auf den kostenlosen Tarif umgestellt. Die gespeicherten Daten bleiben dabei erhalten; § 10 bleibt unberührt. Ein Wechsel der Preisstufe erfolgt durch Kündigung des bestehenden und Abschluss eines neuen Abonnements.<br><br>
           <strong style="color:var(--text)">§ 6 Zahlungsverzug und Sperrung</strong><br>
           Schlägt eine fällige Abbuchung fehl, unternimmt der jeweilige Zahlungsdienstleister (PayPal oder Stripe) automatisch weitere Einzugsversuche. Bleibt die Zahlung aus, ist der Betreiber berechtigt, den Zugang bis zum Ausgleich der offenen Forderung zu sperren. Während der Sperrung bleiben die Daten des Kunden erhalten.<br><br>
           <strong style="color:var(--text)">§ 7 Nutzungsbedingungen</strong><br>
