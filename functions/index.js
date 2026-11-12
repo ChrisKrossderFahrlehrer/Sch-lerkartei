@@ -663,9 +663,14 @@ exports.stripeWebhook = onRequest(
       res.status(200).send('ok');
     } catch (e) {
       console.error('stripeWebhook Fehler:', e);
-      // 200 statt 500: verhindert, dass Stripe denselben fehlerhaften
-      // Vorgang endlos wiederholt zustellt.
-      res.status(200).send('ok - Fehler geloggt');
+      // 500, damit Stripe die Meldung erneut zustellt (mit wachsenden
+      // Abstaenden, hoechstens drei Tage lang). Vorher stand hier 200: Ein
+      // voruebergehender Fehler (z. B. Datenbank kurz nicht erreichbar)
+      // liess ein BEZAHLTES Abo dann fuer immer unfreigeschaltet bzw. ohne
+      // Rechnung. Eine Wiederholung ist unschaedlich - Freischalten,
+      // Rechnung (feste Dokument-Kennung je Zahlung) und Kuendigung sind
+      // wiederholungsfest.
+      res.status(500).send('Fehler - bitte erneut zustellen');
     }
   }
 );
@@ -1014,10 +1019,12 @@ exports.paypalWebhook = onRequest(
       res.status(200).send('ok');
     } catch (e) {
       console.error('paypalWebhook Fehler:', e);
-      // 200 statt 500: verhindert, dass PayPal denselben (evtl. defekten)
-      // Event minutenlang wiederholt zustellt, waehrend der Fehler im Log
-      // trotzdem sichtbar bleibt.
-      res.status(200).send('error geloggt');
+      // 500, damit PayPal die Meldung erneut zustellt (PayPal versucht es
+      // bis zu drei Tage lang). Vorher stand hier 200 - ein voruebergehender
+      // Fehler kostete dann still die Rechnung oder die Freischaltung.
+      // Wiederholungen sind unschaedlich (Zahlungs-ID wird geprueft,
+      // Rechnung hat eine feste Dokument-Kennung).
+      res.status(500).send('Fehler - bitte erneut zustellen');
     }
   }
 );

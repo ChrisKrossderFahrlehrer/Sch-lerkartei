@@ -135,6 +135,13 @@ async function rechnungAnlegen({
   const rechnungRef = db.collection('rechnungen').doc(docId);
 
   const steller = await rechnungsSteller();
+  // § 34a Nr. 1 UStDV: Auch die Rechnung eines Kleinunternehmers braucht die
+  // VOLLSTAENDIGE Anschrift des Ausstellers. Fehlt sie in den Plattform-
+  // Einstellungen, wird die Rechnung trotzdem erstellt (die Zahlung ist ja
+  // erfolgt), aber laut im Protokoll vermerkt.
+  if (!steller.strasse || !steller.plz || !steller.ort) {
+    console.error('RECHNUNG UNVOLLSTAENDIG: Anschrift des Ausstellers fehlt (Plattform -> Einstellungen -> Impressum: Strasse, PLZ, Ort)');
+  }
   const empfaenger = {
     name: empfaengerName,
     strasse: b.rechnungsStrasse, plz: b.rechnungsPlz, ort: b.rechnungsOrt,
@@ -149,11 +156,13 @@ async function rechnungAnlegen({
       return null;                       // Zaehler bleibt unberuehrt
     }
     const c = await tx.get(counterRef);
-    const jahr = new Date().getFullYear();
+    // Deutsche Zeit: Der Server laeuft in UTC - eine Zahlung am 31.12. um
+    // 23:30 Uhr bekaeme sonst Datum und Jahr des Folgetags.
+    const jahr = Number(new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', year: 'numeric' }).format(new Date()));
     const bisher = c.exists ? (c.data().naechsteNummer || 1) : 1;
     const nummer = `${jahr}-${String(bisher).padStart(5, '0')}`;
 
-    const datum = new Date().toLocaleDateString('de-DE');
+    const datum = new Date().toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', year: 'numeric' });
     const pdfBuffer = await baueRechnungsPdf({
       nummer, datum, steller, empfaenger, planLabel: planInfo.label, betrag, zahlungsart, beschreibung,
     });
