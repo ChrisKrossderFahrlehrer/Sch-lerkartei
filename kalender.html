@@ -50,6 +50,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .field input,.field select,.field textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-family:var(--font-body);font-size:14px;outline:none;transition:border .2s;}
 .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);}
 .field select option{background:#1a1a1a;}
+.suchfeld{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:0 12px;margin-bottom:12px;transition:border .2s;}
+.suchfeld:focus-within{border-color:var(--accent);}
+.suchfeld input{flex:1;min-width:0;background:none;border:0;outline:none;color:var(--text);font-family:var(--font-body);font-size:15px;padding:11px 0;}
+.suchfeld .such-anzahl{font-size:12px;color:var(--text-muted);white-space:nowrap;}
+.suchfeld-klein{margin:0 0 6px;padding:0 10px;border-radius:8px;}
+.suchfeld-klein input{font-size:13px;padding:7px 0;}
 
 /* ── Buttons ── */
 .btn{display:inline-flex;align-items:center;gap:8px;padding:9px 18px;border:none;border-radius:8px;font-family:var(--font-body);font-size:14px;font-weight:500;cursor:pointer;transition:all .2s;text-decoration:none;}
@@ -537,11 +543,14 @@ const DEFAULT_ARTEN = [
 ];
 
 // ── SPERR-/ABWESENHEITS-ARTEN ──
+// Reihenfolge = Reihenfolge in der Auswahl; die erste ist vorausgewaehlt.
+// Neutral zuerst: Stand "Krank" vorne, speicherte jede schnelle Sperre
+// ungewollt ein Gesundheitsdatum (Art. 9 DSGVO).
 const SPERR_ARTEN = {
-  krank:        {label:'Krank',        color:'#e05555'},
-  weiterbildung:{label:'Weiterbildung',color:'#2d9b8a'},
-  privat:       {label:'Privat',       color:'#9b59b6'},
   sonstiges:    {label:'Gesperrt',     color:'#888888'},
+  privat:       {label:'Privat',       color:'#9b59b6'},
+  weiterbildung:{label:'Weiterbildung',color:'#2d9b8a'},
+  krank:        {label:'Krank',        color:'#e05555'},
 };
 function _min2hhmm(m){return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');}
 function _blockLabel(b){return b.grund==='sonstiges'?(b.label||'Gesperrt'):(((SPERR_ARTEN[b.grund]||{}).label)||b.label||'Gesperrt');}
@@ -554,7 +563,7 @@ function fahrzeitBadge(min){const over=min>MAX_FAHRZEIT_MIN;return `<span style=
 function blockFormHtml(year,month,day,lehrerUid){
   const opts=Object.keys(SPERR_ARTEN).map(k=>`<option value="${k}">${SPERR_ARTEN[k].label}</option>`).join('');
   return `<div class="field"><label>Grund</label><select id="blk-grund" onchange="document.getElementById('blk-label-wrap').style.display=this.value==='sonstiges'?'block':'none'">${opts}</select></div>
-    <div class="field" id="blk-label-wrap" style="display:none"><label>Bezeichnung</label><input id="blk-label" type="text" placeholder="z.B. Arzttermin"></div>
+    <div class="field" id="blk-label-wrap"><label>Bezeichnung (optional)</label><input id="blk-label" type="text" placeholder="z. B. Termin, Werkstatt"></div>
     <label style="display:flex;align-items:center;gap:8px;margin:4px 0 10px;font-size:14px;cursor:pointer"><input type="checkbox" id="blk-ganztags" checked onchange="document.getElementById('blk-zeit').style.display=this.checked?'none':'flex'"> Ganztägig</label>
     <div id="blk-zeit" style="display:none;gap:8px;margin-bottom:10px">
       <div class="field" style="flex:1;margin:0"><label>Von</label><input id="blk-von" type="time" value="09:00"></div>
@@ -655,6 +664,44 @@ function fmtDatetime(ts){if(!ts)return'';const d=ts.toDate?ts.toDate():new Date(
 // Anfuehrungszeichen zerlegte das Eingabefeld. Escapen schadet im Textinhalt
 // nichts (&quot; wird wieder als " angezeigt), also einheitlich beides.
 function escHtml(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+// ── Schülersuche ──────────────────────────────────────────────────────
+// Bei vielen Schuelern (eine Fahrschule hat schnell 100+) muss niemand mehr
+// scrollen: Listen bekommen ein Suchfeld, Auswahlfelder ein Filterfeld.
+// Gesucht wird ohne Gross-/Kleinschreibung und ohne Akzente, mehrere Woerter
+// muessen alle vorkommen ("mia wag" findet "Mia Wagner").
+function suchNorm(t){return String(t==null?'':t).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ß/g,'ss');}
+function suchWoerter(t){return suchNorm(t).trim().split(/\s+/).filter(Boolean);}
+function suchText(...teile){return escHtml(suchNorm(teile.filter(Boolean).join(' ')));}
+function nachName(a,b){return String((a.lname||'')+' '+(a.fname||'')).localeCompare(String((b.lname||'')+' '+(b.fname||'')),'de',{sensitivity:'base'});}
+function suchfeldHtml(zielId,platzhalter,klein){
+  return `<label class="suchfeld${klein?' suchfeld-klein':''}"><span aria-hidden="true">🔍</span><input type="search" autocomplete="off" enterkeyhint="search" aria-label="${escHtml(platzhalter||'Schüler suchen')}" placeholder="${escHtml(platzhalter||'Schüler suchen…')}" data-ziel="${escHtml(zielId)}" oninput="listeFiltern(this)"><span class="such-anzahl"></span></label>`;
+}
+// Liste: Eintraege mit data-suche ein-/ausblenden
+window.listeFiltern=function(inp){
+  const ziel=document.getElementById(inp.dataset.ziel);if(!ziel)return;
+  const q=suchWoerter(inp.value);let n=0,ges=0;
+  ziel.querySelectorAll('[data-suche]').forEach(e=>{ges++;const ok=q.every(w=>e.getAttribute('data-suche').includes(w));e.style.display=ok?'':'none';if(ok)n++;});
+  let leer=ziel.querySelector(':scope > .such-leer');
+  if(!n&&ges){if(!leer){leer=document.createElement('p');leer.className='text-muted such-leer';leer.style.padding='10px 0';leer.textContent='Kein Schüler gefunden.';ziel.appendChild(leer);}leer.style.display='';}
+  else if(leer)leer.style.display='none';
+  const a=inp.parentElement.querySelector('.such-anzahl');if(a)a.textContent=q.length?`${n} von ${ges}`:`${ges}`;
+};
+// Nach dem (Neu-)Zeichnen einer Liste: Anzahl zeigen und einen schon
+// eingegebenen Suchbegriff erneut anwenden
+function sucheAnwenden(zielId){document.querySelectorAll(`input[data-ziel="${zielId}"]`).forEach(i=>listeFiltern(i));}
+// Auswahlfeld (<select>): Optionen auf die Treffer beschraenken. Bei genau
+// einem Treffer wird er gleich ausgewaehlt.
+window.auswahlFiltern=function(inp,selId){
+  const sel=document.getElementById(selId);if(!sel)return;
+  if(!sel.__alle)sel.__alle=[...sel.options].map(o=>({v:o.value,t:o.textContent}));
+  const q=suchWoerter(inp.value);const alt=sel.value;
+  const treffer=sel.__alle.filter(o=>!o.v||q.every(w=>suchNorm(o.t).includes(w)));
+  sel.innerHTML=treffer.map(o=>`<option value="${escHtml(o.v)}">${escHtml(o.t)}</option>`).join('');
+  const echte=treffer.filter(o=>o.v);
+  if(echte.some(o=>o.v===alt))sel.value=alt;
+  else if(q.length&&echte.length===1){sel.value=echte[0].v;sel.dispatchEvent(new Event('change'));}
+  else sel.value='';
+};
 // Fuer Werte, die in einem onclick="…('HIER')" stehen. Zwei Ebenen: Der
 // Browser wandelt HTML-Entities im Attribut ZUERST zurueck, erst danach
 // wertet er JavaScript aus. Ein &#39; waere also wieder ein echtes ' und
@@ -1258,6 +1305,7 @@ pages['lehrer-theorie']=async function(el){
     </div>
     <div class="card" style="margin-bottom:16px">
       <div class="card-title">Teilnehmende Schüler</div>
+      ${suchfeldHtml('th-schueler-liste','Schüler suchen…')}
       <div id="th-schueler-liste"><div class="spinner"></div></div>
     </div>
     <div id="th-status" style="font-size:0.85rem;min-height:22px;margin-bottom:10px;text-align:center;padding:10px;border-radius:8px"></div>
@@ -1273,12 +1321,13 @@ pages['lehrer-theorie']=async function(el){
     : query(collection(db,SCHUELER_COLL), where('lehrerUid','==',currentUser.uid)));
   const listEl = document.getElementById('th-schueler-liste');
   if (snap.empty) { listEl.innerHTML = '<p class="text-muted">Keine Schüler gefunden.</p>'; return; }
-  const schueler = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (a.lname||'').localeCompare(b.lname||''));
+  const schueler = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort(nachName);
   listEl.innerHTML = schueler.map(s => `
-    <label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer">
+    <label data-suche="${suchText(s.fname,s.lname)}" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer">
       <input type="checkbox" class="th-schueler-check" value="${escHtml(s.id)}" style="width:18px;height:18px;flex-shrink:0">
       <span>${escHtml(s.fname||'')} ${escHtml(s.lname||'')}</span>
     </label>`).join('');
+  sucheAnwenden('th-schueler-liste');
 };
 window.setThArt = function(art){
   window.__thArt = art;
@@ -1518,8 +1567,9 @@ window.setLehrerBlockDauer=async function(uid,min){
 };
 window.viewLehrerSchueler=async function(lehrerUid,lehrerName){
   const snap=await getDocs(query(collection(db,SCHUELER_COLL),where('lehrerUid','==',lehrerUid),where('schoolId','==',currentSchoolId)));
-  const rows=snap.docs.map(d=>{const s=d.data();return`<tr><td>${escHtml(s.fname)} ${escHtml(s.lname)}</td><td>${escHtml(s.email||'—')}</td><td><button class="btn btn-danger btn-sm" onclick="unassignSchueler('${d.id}')">Entfernen</button></td></tr>`;}).join('');
-  openModal(`<h2 class="modal-title">Schüler: ${escHtml(lehrerName)}</h2>${rows?`<table><thead><tr><th>Name</th><th>E-Mail</th><th></th></tr></thead><tbody>${rows}</tbody></table>`:'<p class="text-muted">Keine Schüler.</p>'}`);
+  const rows=snap.docs.slice().sort((x,y)=>nachName(x.data(),y.data())).map(d=>{const s=d.data();return`<tr data-suche="${suchText(s.fname,s.lname,s.email)}"><td>${escHtml(s.fname)} ${escHtml(s.lname)}</td><td>${escHtml(s.email||'—')}</td><td><button class="btn btn-danger btn-sm" onclick="unassignSchueler('${d.id}')">Entfernen</button></td></tr>`;}).join('');
+  openModal(`<h2 class="modal-title">Schüler: ${escHtml(lehrerName)}</h2>${snap.size>8?suchfeldHtml('vls-liste','Schüler suchen…'):''}<div id="vls-liste">${rows?`<table><thead><tr><th>Name</th><th>E-Mail</th><th></th></tr></thead><tbody>${rows}</tbody></table>`:'<p class="text-muted">Keine Schüler.</p>'}</div>`);
+  sucheAnwenden('vls-liste');
 };
 window.unassignSchueler=async function(id){await updateDoc(doc(db,SCHUELER_COLL,id),{lehrerUid:null});toast('Entfernt.','success');closeModal();};
 
@@ -1539,7 +1589,7 @@ pages['admin-schueler']=async function(el){
     <div class="field"><label>Max. gleichzeitig gebuchte Termine (0=∞)</label><input id="ns-maxaktiv" type="number" min="0" value="0"></div>
     <button class="btn btn-primary" onclick="createSchueler()">+ Schüler anlegen</button>
   </div>
-  <div class="card"><div class="card-title">Alle Schüler</div><div id="schueler-list"><div class="spinner"></div></div></div></div>`;
+  <div class="card"><div class="card-title">Alle Schüler</div>${suchfeldHtml('schueler-list','Name, Fahrlehrer, E-Mail oder Telefon…')}<div id="schueler-list"><div class="spinner"></div></div></div></div>`;
   let lehrer=[];
   try{lehrer=await ladeSchulLehrer();}catch(e){console.warn('admin-schueler Lehrer',e);}
   const sel=document.getElementById('ns-lehrer');
@@ -1553,17 +1603,18 @@ async function loadSchuelerList(lehrerDocs){
   const lm={};(lehrerDocs||[]).forEach(d=>{lm[d.id]=lehrerName(d);});
   const am={};autosSnap.docs.forEach(d=>{const a=d.data();am[d.id]=a;});
   el.innerHTML='<table><thead><tr><th>Name</th><th>Fahrlehrer</th><th>Kontingent</th><th>Auto</th><th>Link</th><th></th></tr></thead><tbody>'+
-    snap.docs.map(d=>{
+    snap.docs.slice().sort((x,y)=>nachName(x.data(),y.data())).map(d=>{
       const s=d.data();
       const k=s.maxFahrstunden>0?`${Number(s.bookedCount)||0}/${Number(s.maxFahrstunden)||0}`:`${Number(s.bookedCount)||0}/∞`;
       const w=s.maxFahrstunden>0&&(s.bookedCount||0)>=s.maxFahrstunden;
       const autoStr=s.autoId&&am[s.autoId]?`<span class="auto-kennzeichen" style="font-size:10px">${escHtml(am[s.autoId].kennzeichen)}</span>`:'—';
-      return`<tr><td>${escHtml(s.fname)} ${escHtml(s.lname)}</td><td>${s.lehrerUid?escHtml(lm[s.lehrerUid]||'nicht mehr in der Fahrschule'):'—'}</td>
+      return`<tr data-suche="${suchText(s.fname,s.lname,s.lehrerUid?lm[s.lehrerUid]:'',s.email,s.tel)}"><td>${escHtml(s.fname)} ${escHtml(s.lname)}</td><td>${s.lehrerUid?escHtml(lm[s.lehrerUid]||'nicht mehr in der Fahrschule'):'—'}</td>
         <td style="color:${w?'var(--danger)':'inherit'}">${k}${w?' ⚠️':''}</td>
         <td>${autoStr}</td>
         <td>${s.lehrerUid?`<button class="copy-btn" title="Buchungslink kopieren" onclick="buchungslinkTeilen('${d.id}')">🔗</button>`:'—'}</td>
         <td><button class="btn btn-secondary btn-sm" onclick="editSchueler('${d.id}')">Bearb.</button> <button class="btn btn-danger btn-sm" onclick="deleteSchueler('${d.id}')">Löschen</button></td>
       </tr>`;}).join('')+'</tbody></table>';
+  sucheAnwenden('schueler-list');
 }
 window.copyLink=function(link){navigator.clipboard.writeText(link);toast('Link kopiert!','success');};
 window.createSchueler=async function(){
@@ -2132,11 +2183,12 @@ window.openDayModal=async function(year,month,day){
   const isBlocked=!bSnap.empty,isGlobal=!gbSnap.empty;
   const blockedId=isBlocked?bSnap.docs[0].id:null;
   const scSnap=await getDocs(query(collection(db,SCHUELER_COLL),where('lehrerUid','==',currentUser.uid)));
-  const scm={};scSnap.docs.forEach(d=>{const s=d.data();scm[d.id]=s.fname+' '+s.lname;});
+  const scm={};scSnap.docs.slice().sort((x,y)=>nachName(x.data(),y.data())).forEach(d=>{const s=d.data();scm[d.id]=s.fname+' '+s.lname;});
+  const scViele=Object.keys(scm).length>8;
   const slotsHtml=daySlots.length?daySlots.map(d=>{const s=d.data();const pend=!s.bookedBy&&window.__pendingReq&&window.__pendingReq.bySlot[d.id];const sn=s.bookedBy?(scm[s.bookedBy]||'?'):(pend?('⏳ Anfrage: '+pend):null);
     return`<div class="slot-row"><div class="slot-time">${fmtTime(s.startTime)} – ${fmtTime(s.endTime)}</div>
     <div class="slot-info">${typeBadgeHtml(s.type)}${sn?`<div class="slot-student" onclick="oeffneTerminDetail('${d.id}',${year},${month},${day})" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted">👤 ${escHtml(sn)}${s.status==='nichtErschienen'?' ⚠️ Fehlstunde':''} ›</div>`:'<div class="slot-student" style="color:var(--success)">Frei</div>'}</div>
-    ${!s.bookedBy?`<div style="display:flex;gap:6px;align-items:center;margin-top:6px;width:100%">
+    ${!s.bookedBy?`${scViele?`<div style="margin-top:6px;width:100%"><label class="suchfeld suchfeld-klein"><span aria-hidden="true">🔍</span><input type="search" autocomplete="off" placeholder="Schüler suchen…" aria-label="Schüler suchen" oninput="auswahlFiltern(this,'man-buch-${d.id}')"></label></div>`:''}<div style="display:flex;gap:6px;align-items:center;margin-top:6px;width:100%">
       <select id="man-buch-${d.id}" style="flex:1;min-width:0;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 8px;font-size:0.8rem">
         <option value="">Schüler wählen…</option>
         ${Object.entries(scm).map(([sid,name])=>`<option value="${sid}">${escHtml(name)}</option>`).join('')}
@@ -2247,7 +2299,7 @@ pages['nachweis']=async function(el){
   el.innerHTML=`<div class="page active"><h2 class="page-title">📄 Ausbildungsnachweis</h2>
   <p class="text-muted" style="margin:-8px 0 16px">Nach dem Muster in Anlage 3 DV-FahrlG (§ 31 Abs. 1 FahrlG, § 6 Abs. 2 FahrschAusbO). Wähle den Schüler, prüfe die Angaben und erstelle den Nachweis zum Drucken oder als PDF.</p>
   <div class="card">
-    <div class="field"><label for="nw-schueler">Fahrschüler</label><select id="nw-schueler" onchange="nwSchuelerGewaehlt()"><option value="">— bitte wählen —</option></select></div>
+    <div class="field"><label for="nw-schueler">Fahrschüler</label><label class="suchfeld suchfeld-klein"><span aria-hidden="true">🔍</span><input type="search" autocomplete="off" placeholder="Schüler suchen…" aria-label="Schüler suchen" oninput="auswahlFiltern(this,'nw-schueler')"></label><select id="nw-schueler" onchange="nwSchuelerGewaehlt()"><option value="">— bitte wählen —</option></select></div>
     <div id="nw-form" style="display:none">
       <div class="grid-2">
         <div class="field"><label for="nw-klasse">Ausbildung für Klasse</label><select id="nw-klasse" onchange="nwKlasseGeaendert()"><option>B</option><option>B197</option><option>BE</option><option>A</option><option>A2</option><option>A1</option><option>AM</option></select></div>
@@ -2299,6 +2351,7 @@ pages['nachweis']=async function(el){
     snap.docs.map(d=>({id:d.id,...d.data()}))
       .sort((a,b)=>(a.lname||'').localeCompare(b.lname||''))
       .forEach(s=>{ window.__nwSchueler[s.id]=s; sel.insertAdjacentHTML('beforeend',`<option value="${escHtml(s.id)}">${escHtml(s.lname||'')}, ${escHtml(s.fname||'')}</option>`); });
+    sel.__alle=null;   // Suchfilter neu aufbauen
     if(snap.empty) sel.insertAdjacentHTML('afterend','<p class="text-muted" style="margin-top:8px">Noch keine Schüler im Kalender.</p>');
   }catch(e){ console.warn('nachweis schueler',e); toast('Schüler konnten nicht geladen werden.','error'); }
 };
@@ -2992,19 +3045,26 @@ pages['lehrer-schueler']=async function(el){
     <button class="btn btn-primary" onclick="createSchuelerLehrer()">+ Schüler anlegen</button>
   </div>`:'';
   if(snap.empty){lsContent.innerHTML=_addForm+'<p class="text-muted">Noch keine Schüler. '+(_canAdd?'Lege oben deinen ersten an.':'Sie werden von deiner Fahrschule zugewiesen.')+'</p>';return;}
-  let html=_addForm;
-  for(const d of snap.docs){
+  // Notizen und Pruefungen aller Schueler gleichzeitig laden - nacheinander
+  // dauerte das bei 100 Schuelern lange.
+  const docs=snap.docs.slice().sort((x,y)=>nachName(x.data(),y.data()));
+  const zusatz=await Promise.all(docs.map(async d=>{
+    let notizenHtml='',pruefungen=[];
+    try{notizenHtml=await loadNotizenHtml(d.id,'lehrer');}catch(e){console.warn('notizen',e);}
+    try{pruefungen=await loadPruefungenForSchueler(d.id);}catch(e){console.warn('pruefungen',e);}
+    return{notizenHtml,pruefungen};
+  }));
+  let html=_addForm+(docs.length>1?suchfeldHtml('ls-liste','Schüler suchen…'):'')+'<div id="ls-liste">';
+  for(const [nr,d] of docs.entries()){
     const s=d.data();
     const max=s.maxFahrstunden||0,count=s.bookedCount||0,warn=max>0&&count>=max;
     const kontingent=max>0?`${count}/${max}`:`${count}/∞`;
     let autoHtml='';
     if(s.autoId){const ca=autosSnap.docs.find(x=>x.id===s.autoId);if(ca){const a=ca.data();autoHtml=`<span class="auto-kennzeichen" style="font-size:10px">${escHtml(a.kennzeichen)}</span> <span style="font-size:11px;color:var(--text-muted)">${escHtml(a.modell)}</span>`;}}
     const autoOptsS=`<option value="">— Kein Auto —</option>`+autosSnap.docs.map(x=>{const a=x.data();return`<option value="${x.id}" ${s.autoId===x.id?'selected':''}>${escHtml(a.modell)} · ${escHtml(a.kennzeichen)}</option>`;}).join('');
-    let notizenHtml='',pruefungen=[];
-    try{notizenHtml=await loadNotizenHtml(d.id,'lehrer');}catch(e){console.warn('notizen',e);}
-    try{pruefungen=await loadPruefungenForSchueler(d.id);}catch(e){console.warn('pruefungen',e);}
+    const {notizenHtml,pruefungen}=zusatz[nr];
     const letzteStatus=pruefungen.length?pruefungen[0].status:null;
-    html+=`<div class="card">
+    html+=`<div class="card" data-suche="${suchText(s.fname,s.lname,s.email,s.tel)}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:14px">
         <div>
           <div style="font-family:var(--font-display);font-size:18px">${escHtml(s.fname)} ${escHtml(s.lname)}</div>
@@ -3041,7 +3101,8 @@ pages['lehrer-schueler']=async function(el){
       </div>
     </div>`;
   }
-  lsContent.innerHTML=html;
+  lsContent.innerHTML=html+'</div>';
+  sucheAnwenden('ls-liste');
 };
 window.saveSchuelerAuto=async function(sid){await updateDoc(doc(db,SCHUELER_COLL,sid),{autoId:document.getElementById('auto-sel-'+sid).value||null});toast('Auto gespeichert!','success');};
 window.createSchuelerLehrer=async function(){
@@ -3174,12 +3235,15 @@ pages['lehrer-pruefungen']=async function(el){
   el.innerHTML=`<div class="page active"><h2 class="page-title">Prüfungen</h2><div id="lp-content"><div class="spinner"></div></div></div>`;
   const snap=await getDocs(query(collection(db,SCHUELER_COLL),where('lehrerUid','==',currentUser.uid)));
   const lp=document.getElementById('lp-content');if(snap.empty){lp.innerHTML='<p class="text-muted">Keine Schüler.</p>';return;}
-  let html='';
-  for(const d of snap.docs){const s=d.data();const ps=await loadPruefungenForSchueler(d.id);const ls=ps.length?ps[0].status:null;
-    html+=`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px"><div><div style="font-family:var(--font-display);font-size:17px">${escHtml(s.fname)} ${escHtml(s.lname)}</div><div style="margin-top:3px">${ls?pruefungStatusBadge(ls):'<span class="badge badge-ausstehend">Keine Prüfung</span>'}</div></div><button class="btn btn-primary btn-sm" onclick="openAddPruefung('${d.id}')">+ Eintragen</button></div>
+  const docs=snap.docs.slice().sort((x,y)=>nachName(x.data(),y.data()));
+  const alle=await Promise.all(docs.map(d=>loadPruefungenForSchueler(d.id).catch(()=>[])));
+  let html=(docs.length>1?suchfeldHtml('lp-liste','Schüler suchen…'):'')+'<div id="lp-liste">';
+  for(const [nr,d] of docs.entries()){const s=d.data();const ps=alle[nr];const ls=ps.length?ps[0].status:null;
+    html+=`<div class="card" data-suche="${suchText(s.fname,s.lname)}"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px"><div><div style="font-family:var(--font-display);font-size:17px">${escHtml(s.fname)} ${escHtml(s.lname)}</div><div style="margin-top:3px">${ls?pruefungStatusBadge(ls):'<span class="badge badge-ausstehend">Keine Prüfung</span>'}</div></div><button class="btn btn-primary btn-sm" onclick="openAddPruefung('${d.id}')">+ Eintragen</button></div>
     <div id="pruefungen-container-${d.id}">${renderPruefungenList(ps,true,d.id)}</div></div>`;
   }
-  lp.innerHTML=html;
+  lp.innerHTML=html+'</div>';
+  sucheAnwenden('lp-liste');
 };
 pages['admin-pruefungen']=async function(el){
   el.innerHTML=`<div class="page active"><h2 class="page-title">Prüfungen</h2>
@@ -3188,7 +3252,7 @@ pages['admin-pruefungen']=async function(el){
     <div class="field" style="max-width:220px"><label>Status</label><select id="ap-filter" onchange="filterAdminPruefungen()"><option value="">Alle</option><option value="ausstehend">Ausstehend</option><option value="bestanden">Bestanden</option><option value="nicht_bestanden">Nicht bestanden</option></select></div>
   </div>
   <div id="ap-stats" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px"></div>
-  <div class="card"><div id="ap-list"><div class="spinner"></div></div></div></div>`;
+  <div class="card">${suchfeldHtml('ap-list','Schüler oder Fahrlehrer suchen…')}<div id="ap-list"><div class="spinner"></div></div></div></div>`;
   await loadAdminPruefungen();
 };
 let _apCache=[];
@@ -3203,21 +3267,27 @@ async function loadAdminPruefungen(){
   renderAdminPruefungenList(lm);
 }
 function renderAdminPruefungenList(lm){
+  if(lm)_apLm=lm;else lm=_apLm;
   const filter=document.getElementById('ap-filter')?.value||'',el=document.getElementById('ap-list');if(!el)return;
   let list=_apCache;
   if(filter==='bestanden')list=list.filter(s=>s.pruefungen.some(p=>p.status==='bestanden'));
   else if(filter==='nicht_bestanden')list=list.filter(s=>s.pruefungen.some(p=>p.status==='nicht_bestanden'));
   else if(filter==='ausstehend')list=list.filter(s=>!s.pruefungen.some(p=>p.status==='bestanden'));
   if(!list.length){el.innerHTML='<p class="text-muted">Keine Einträge.</p>';return;}
-  el.innerHTML=list.map(s=>{const ls=s.pruefungen.length?s.pruefungen[0].status:null;return`<div class="pruefung-card">
+  list=list.slice().sort(nachName);
+  el.innerHTML=list.map(s=>{const ls=s.pruefungen.length?s.pruefungen[0].status:null;return`<div data-suche="${suchText(s.fname,s.lname,s.lehrerUid?lm?.[s.lehrerUid]:'')}"><div class="pruefung-card">
     <div class="pruefung-status" style="background:${ls?pruefungStatusDot(ls):'#444'}"></div>
-    <div class="pruefung-info"><div class="pruefung-title">${escHtml(s.fname)} ${escHtml(s.lname)}</div><div class="pruefung-meta">${s.lehrerUid?(lm?.[s.lehrerUid]||'?'):'—'} · ${s.pruefungen.length} Versuch(e)</div></div>
+    <div class="pruefung-info"><div class="pruefung-title">${escHtml(s.fname)} ${escHtml(s.lname)}</div><div class="pruefung-meta">${s.lehrerUid?escHtml(lm?.[s.lehrerUid]||'?'):'—'} · ${s.pruefungen.length} Versuch(e)</div></div>
     ${ls?pruefungStatusBadge(ls):'<span class="badge badge-ausstehend">Keine</span>'}
     <button class="btn btn-primary btn-sm" onclick="openAddPruefung('${s.id}')">+ Eintragen</button>
     <button class="btn btn-secondary btn-sm" onclick="togglePruefungDetail('${s.id}')">Details</button>
-  </div><div id="pd-${s.id}" style="display:none;padding:0 0 8px 22px">${renderPruefungenList(s.pruefungen,true,s.id)}</div>`;}).join('');
+  </div><div id="pd-${s.id}" style="display:none;padding:0 0 8px 22px">${renderPruefungenList(s.pruefungen,true,s.id)}</div></div>`;}).join('');
+  sucheAnwenden('ap-list');
 }
-window.filterAdminPruefungen=function(){renderAdminPruefungenList(null);};
+// Fahrlehrer-Namen merken: Der Statusfilter zeichnete die Liste bisher ohne
+// sie neu (statt Namen stand dann "?" da).
+let _apLm=null;
+window.filterAdminPruefungen=function(){renderAdminPruefungenList(_apLm);};
 window.togglePruefungDetail=function(sid){const el=document.getElementById('pd-'+sid);if(el)el.style.display=el.style.display==='none'?'block':'none';};
 
 // ════════════════════════════════

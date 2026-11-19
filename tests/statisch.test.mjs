@@ -257,7 +257,7 @@ function attributAn(lit, pos) {
   return null;
 }
 
-const ENTWERTET = /\b(esc|escHtml|escape|escapeHtmlEigen|esc2|attrJs|encodeURIComponent)\s*\(/;
+const ENTWERTET = /\b(esc|escHtml|escape|escapeHtmlEigen|esc2|attrJs|encodeURIComponent|suchText)\s*\(/;   // suchText entwertet selbst (kalender.html)
 
 // Gemeldet wird nur, was ueberhaupt freien Text tragen KANN. Ein erster
 // Entwurf schlug bei jeder eingesetzten Dokument-ID, Zahl und Schleifen-
