@@ -885,7 +885,12 @@ function renderDashboard() {
     .filter(l => l && l.datum && l.status !== 'abgesagt')
     .sort((a,b) => String(a.datum).localeCompare(String(b.datum)));
 
-  const pct      = Math.min(100, Math.round(((s.fahrstunden||0) / (s.zielStunden||30)) * 100));
+  // Ausbildungsstand wie in der Fahrlehrer-App (Themen + Pflichtfahrten).
+  // Aeltere Schnappschuesse ohne das Feld: bis zum naechsten Speichern
+  // beim Fahrlehrer die bisherige Anzeige.
+  const pct      = typeof s.ausbildungsstand === 'number'
+    ? Math.max(0, Math.min(100, Math.round(s.ausbildungsstand)))
+    : Math.min(100, Math.round(((s.fahrstunden||0) / (s.zielStunden||30)) * 100));
   const nextLesson = lessons.find(l => l.datum >= heuteLokal());
   const unreadMsg  = msgs.filter(m => m.sender === 'fahrlehrer' && (m.timestamp || m.createdAt || 0) > lastReadMsgTs).length;
 
