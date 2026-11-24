@@ -5907,8 +5907,13 @@ function pruefungsAmpel(s) {
   return { farbe, text, offen, pct, hinweise };
 }
 
+// Der Ausbildungsstand zaehlt, was der Schueler KANN - nicht, wie viele
+// Stunden er schon gefahren ist. Die Fahrstunden haben ihren eigenen Balken
+// und gehen getrennt in die Pruefungsampel ein (fs >= ziel), stecken aber
+// nicht mehr in dieser Prozentzahl. Gewichte: Themen 2/3, Pflichtfahrten 1/3
+// (B197: Themen, Pflichtfahrten, Schaltstunden, Testfahrt im alten
+// Verhaeltnis 35:15:10:5).
 function overallProgress(s) {
-  const fs=s.fahrstunden||0, ziel=s.zielStunden||30;
   const klasse = s.klasse || 'B';
   const isA    = klasse==='A';
   const isB197 = klasse==='B197';
@@ -5926,10 +5931,10 @@ function overallProgress(s) {
     const sonderDone = SONDER_B197.filter(f=>(s.sonderfahrten||{})[f.key]>=f.min).length;
     const schaltPct  = Math.min((s.schaltstunden||0)/(s.zielSchaltstunden||10), 1);
     const testfahrt  = s.testfahrtBestanden ? 1 : 0;
-    return Math.round(((fs/ziel)*0.35 + themaAvg*0.35 + (sonderDone/SONDER_B197.length)*0.15 + schaltPct*0.1 + testfahrt*0.05)*100);
+    return Math.round((themaAvg*0.35 + (sonderDone/SONDER_B197.length)*0.15 + schaltPct*0.1 + testfahrt*0.05)/0.65*100);
   }
   const sonderDone=SONDER.filter(f=>(s.sonderfahrten||{})[f.key]>=f.min).length;
-  return Math.round(((fs/ziel)*0.4 + themaAvg*0.4 + (sonderDone/SONDER.length)*0.2)*100);
+  return Math.round((themaAvg*0.4 + (sonderDone/SONDER.length)*0.2)/0.6*100);
 }
 
 // ─────────────────────────────────────────
@@ -9678,6 +9683,8 @@ function buildPortalSnapshot(s, code, expiresAt) {
     zielStunden:       s.zielStunden || 30,
     sonderfahrten:     s.sonderfahrten || {},
     themen:            themenAusPlan(s),
+    // Derselbe Ausbildungsstand, den der Fahrlehrer sieht.
+    ausbildungsstand:  Math.min(overallProgress(s), 100),
     verkehrszeichen:   buildPortalVerkehrszeichen(s),
     schaltstunden:     s.schaltstunden || 0,
     zielSchaltstunden: s.zielSchaltstunden || 10,
