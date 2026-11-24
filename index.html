@@ -656,6 +656,11 @@ body.light .student-card { box-shadow:0 3px 0 rgba(16,24,40,0.12), 0 7px 16px rg
 .badge-amber { background:rgba(240,180,41,0.15); color:var(--accent); }
 .badge-blue  { background:rgba(88,166,255,0.15); color:var(--blue); }
 .badge-gray  { background:var(--surface2); color:var(--muted); }
+/* Pruefungsampel in der Schuelerliste - antippbar, daher als Knopf */
+.ampel-pill { border:1px solid transparent; cursor:pointer; font-family:inherit; line-height:1.3; min-height:24px; }
+.ampel-gruen { background:rgba(63,185,80,0.16); color:var(--accent2); border-color:rgba(63,185,80,0.45); }
+.ampel-gelb  { background:rgba(240,180,41,0.16); color:var(--accent); border-color:rgba(240,180,41,0.5); }
+.ampel-rot   { background:rgba(248,81,73,0.12); color:var(--danger); border-color:rgba(248,81,73,0.4); }
 
 /* ══ BETA-DASHBOARD: sichtbar andere Gestaltung ══════════════════
    Der Schalter aenderte bisher praktisch nichts Sichtbares: Lade-Skelette
@@ -3784,15 +3789,19 @@ const dbDel = (...a) => window.__DEMO ? window.__demoWrite('del', a) : deleteDoc
 function __demoDaten(){
   const now=Date.now(), nm=(d)=>now-d*86400000, base=new Date();
   const iso=(o)=>{ const x=new Date(base); x.setDate(x.getDate()+o); return alsLokalesDatum(x); };
+  // Themenstand fuer die Demo: jedes Thema der Klasse auf dieselbe Stufe.
+  const themenAuf = (ADK, stufe) => { const o={}; ADK.forEach(g => g.items.forEach(n => { o[n]=stufe; })); return o; };
+  // Drei Ausbildungsstaende, damit die Pruefungsampel in allen Farben zu
+  // sehen ist: Lena gruen, Mia gelb, Jonas rot.
   const students=[
-    { id:'demo-s1', uid:'demo-user', fahrschuleId:'demo-user', schuelerNr:1, vorname:'Lena', nachname:'Bauer', geburt:'2006-04-12', klasse:'B', klassen:['B'], ziel:30, fahrstunden:14, sonderfahrten:3, theorieBestanden:true, archiviert:false, pinned:true, createdAt:nm(40) },
-    { id:'demo-s2', uid:'demo-user', fahrschuleId:'demo-user', schuelerNr:2, vorname:'Jonas', nachname:'Klein', geburt:'2005-09-30', klasse:'B', klassen:['B'], ziel:30, fahrstunden:6, sonderfahrten:0, theorieBestanden:false, archiviert:false, pinned:false, createdAt:nm(20) },
-    { id:'demo-s3', uid:'demo-user', fahrschuleId:'demo-user', schuelerNr:3, vorname:'Mia', nachname:'Schulz', geburt:'2004-01-18', klasse:'BE', klassen:['BE'], ziel:12, fahrstunden:9, sonderfahrten:2, theorieBestanden:true, archiviert:false, pinned:false, createdAt:nm(10) }
+    { id:'demo-s1', uid:'demo-user', fahrschuleId:'demo-user', schuelerNr:1, vorname:'Lena', nachname:'Bauer', geburt:'2006-04-12', klasse:'B', klassen:['B'], zielStunden:30, fahrstunden:30, sonderfahrten:{ueber:5,autobahn:4,nacht:3}, themen:themenAuf(ADK_THEMEN,4), theorieBestanden:true, archiviert:false, pinned:true, createdAt:nm(40) },
+    { id:'demo-s2', uid:'demo-user', fahrschuleId:'demo-user', schuelerNr:2, vorname:'Jonas', nachname:'Klein', geburt:'2005-09-30', klasse:'B', klassen:['B'], zielStunden:30, fahrstunden:6, sonderfahrten:{}, themen:themenAuf(ADK_THEMEN,1), theorieBestanden:false, archiviert:false, pinned:false, createdAt:nm(20) },
+    { id:'demo-s3', uid:'demo-user', fahrschuleId:'demo-user', schuelerNr:3, vorname:'Mia', nachname:'Schulz', geburt:'2004-01-18', klasse:'BE', klassen:['BE'], zielStunden:12, fahrstunden:9, sonderfahrten:{ueber:3,autobahn:1}, themen:themenAuf(ADK_THEMEN_BE,3), theorieBestanden:true, archiviert:false, pinned:false, createdAt:nm(10) }
   ];
   const proto={
     'demo-s1':[
-      { id:'demo-p1', studentId:'demo-s1', uid:'demo-user', datum:iso(-7), notiz:'Einparken geuebt, klappt gut.', maengel:['Schulterblick'], sterne:4, stunde:12, fortschritt:70, unterschrift:null, typ:'fahrstunde', createdAt:nm(7) },
-      { id:'demo-p2', studentId:'demo-s1', uid:'demo-user', datum:iso(-3), notiz:'Autobahn, sehr sicher.', maengel:[], sterne:5, stunde:14, fortschritt:78, unterschrift:null, typ:'fahrstunde', createdAt:nm(3) },
+      { id:'demo-p1', studentId:'demo-s1', uid:'demo-user', datum:iso(-7), notiz:'Einparken geuebt, klappt gut.', maengel:['Schulterblick'], sterne:4, stunde:28, fortschritt:85, unterschrift:null, typ:'fahrstunde', createdAt:nm(7) },
+      { id:'demo-p2', studentId:'demo-s1', uid:'demo-user', datum:iso(-3), notiz:'Autobahn, sehr sicher.', maengel:[], sterne:5, stunde:30, fortschritt:95, unterschrift:null, typ:'fahrstunde', createdAt:nm(3) },
       { id:'demo-p3', studentId:'demo-s1', uid:'demo-user', datum:iso(3), notiz:'Naechste Stunde: Nachtfahrt.', maengel:[], sterne:0, stunde:0, fortschritt:0, unterschrift:null, typ:'planung', createdAt:now }
     ],
     'demo-s2':[ { id:'demo-p4', studentId:'demo-s2', uid:'demo-user', datum:iso(-5), notiz:'Erste Stunden, Grundlagen.', maengel:['Kupplung'], sterne:3, stunde:6, fortschritt:20, unterschrift:null, typ:'fahrstunde', createdAt:nm(5) } ],
@@ -5892,13 +5901,13 @@ function pruefungsAmpel(s) {
     Object.entries(zaehl).filter(([, n]) => n >= 2)
       .forEach(([m, n]) => hinweise.push(`${m}: in ${n} der letzten ${letzte.length} Stunden notiert`));
   }
-  if (pct < 90) hinweise.push(`ADK-Themen: ${pct}% (für Prüfungsbereit 90%)`);
+  if (pct < 90) hinweise.push(`ADK-Themen: ${pct}% (für Prüfungsreif 90%)`);
 
   // Ampel-Logik
   const pflichtOk = sonderFehlt.length === 0 && fs >= ziel && (!theorieNoetig || !!s.theorieBestanden);
   let farbe, text;
   if (pflichtOk && pct >= 90) {
-    farbe = 'gruen'; text = 'Prüfungsbereit';
+    farbe = 'gruen'; text = 'Prüfungsreif';
   } else if (pct >= 70 || (sonderFehlt.length <= 1 && fs >= ziel * 0.8)) {
     farbe = 'gelb'; text = 'Fast bereit';
   } else {
@@ -6058,7 +6067,7 @@ window.renderList = () => {
         : s.klasse==='BE' ? SONDERFAHRTEN_BE : SONDERFAHRTEN;
       return !SONDER.every(f => (s.sonderfahrten||{})[f.key] >= f.min);
     }); break;
-    case 'reif':     filtered = filtered.filter(s => overallProgress(s) >= 90); break;
+    case 'reif':     filtered = filtered.filter(s => pruefungsAmpel(s).farbe === 'gruen'); break;
     case 'pruefOffen': filtered = filtered.filter(s => !s.pruefOrg); break;
     case 'archiv':   break; // already handled above
   }
@@ -6159,11 +6168,13 @@ function renderStudentCard(s) {
   const bf17Tag = isBF17(s) ? '<span style="display:inline-block;background:rgba(88,166,255,0.18);color:#58a6ff;border-radius:5px;padding:1px 6px;font-size:0.72rem;font-weight:700;margin-left:2px" title="Begleitetes Fahren ab 17">BF17</span>' : '';
   const ampelKarte = pruefungsAmpel(s);
   const ampelPunkt = ampelKarte.farbe === 'gruen' ? '🟢' : ampelKarte.farbe === 'gelb' ? '🟡' : '🔴';
-  const ampelDot = `<span title="${escHtml(ampelKarte.text)}" style="font-size:0.7rem;margin-right:3px">${ampelPunkt}</span>`;
   const meta=['#'+getSchuelerNr(s), klasseLabel, a?a+' Jahre':null, (s.fahrstunden||0)+' Std.', s.theorieBestanden?'📋 Theorie ✓':null].filter(Boolean).join(' · ');
   const badge = istGeloescht(s)?`<span class="badge badge-gray">🗑️ Endgültig am ${new Date(endgueltigLoeschenAm(s)).toLocaleDateString('de-DE')}</span>`
     : s.archiviert?'<span class="badge badge-green">🎓 Fertig</span>':
-    pct>=90?'<span class="badge badge-green">Prüfungsreif</span>':pct>=60?'<span class="badge badge-amber">Guter Fortschritt</span>':pct>0?'<span class="badge badge-blue">In Ausbildung</span>':'<span class="badge badge-gray">Neu</span>';
+    // Pruefungsampel statt Prozent-Etikett: Gruen gibt es nur, wenn wirklich
+    // alles erfuellt ist (Pflichtfahrten, Stunden, Theorie, 90 % Themen) -
+    // dieselbe Ampel wie in der Akte. Antippen zeigt, was noch fehlt.
+    `<button type="button" class="badge ampel-pill ampel-${ampelKarte.farbe}" onclick="event.stopPropagation();zeigeAmpelDetail('${s.id}')" title="Prüfungsampel – tippen für Details">${ampelPunkt} ${ampelKarte.text}</button>`;
 
   // 🔔 Ungelesene Nachrichten + Termin-Reaktionen
   const unread = teacherUnreadMap[s.id];
@@ -6190,7 +6201,7 @@ function renderStudentCard(s) {
   const _delay = window.__cardAnim ? ('animation-delay:' + Math.min((window.__cardIdx++) * 0.028, 0.45) + 's;') : '';
   return `<div class="student-card${_anim}" onclick="openDetail('${s.id}')" style="${_delay}${(unread||expiryAbgelaufen)?'border-color:rgba(248,81,73,0.4)':''}">
     ${avatarHtml(s, c)}
-    <div style="flex:1;min-width:0"><div class="sc-name">${ampelDot}${s.pinned?'📌 ':''}${escapeHtmlEigen(s.vorname)} ${escapeHtmlEigen(s.nachname)}${geburtstagTag(s)} ${bf17Tag}</div><div class="sc-meta">${meta}</div>${notifHTML}</div>
+    <div style="flex:1;min-width:0"><div class="sc-name">${s.pinned?'📌 ':''}${escapeHtmlEigen(s.vorname)} ${escapeHtmlEigen(s.nachname)}${geburtstagTag(s)} ${bf17Tag}</div><div class="sc-meta">${meta}</div>${notifHTML}</div>
     <div class="sc-right">
       <button onclick="event.stopPropagation();togglePin('${s.id}')" title="${s.pinned?'Lösen':'Anpinnen'}" style="background:none;border:none;cursor:pointer;font-size:1rem;padding:4px;min-width:40px;min-height:40px;display:inline-flex;align-items:center;justify-content:center;opacity:${s.pinned?'1':'0.35'};line-height:1">📌</button>
       <div class="progress-ring-wrap">
@@ -8678,7 +8689,7 @@ function renderDashboard() {
   }
 
   const sorted = [...aktive].sort((a,b) => overallProgress(b) - overallProgress(a));
-  const pruefungsreif = aktive.filter(s => overallProgress(s) >= 90).length;
+  const pruefungsreif = aktive.filter(s => pruefungsAmpel(s).farbe === 'gruen').length;
   const sonderOk = aktive.filter(s => SONDERFAHRTEN.every(f => (s.sonderfahrten||{})[f.key] >= f.min)).length;
   const theorieBestanden = aktive.filter(s => s.theorieBestanden).length;
   const avgStunden = total ? Math.round(aktive.reduce((a,s) => a + (s.fahrstunden||0), 0) / total) : 0;
